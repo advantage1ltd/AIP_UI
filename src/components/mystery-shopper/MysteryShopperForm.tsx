@@ -87,7 +87,7 @@ export function MysteryShopperForm({
                 >
                   <FormControl>
                     <SelectTrigger id="officerId">
-                      <SelectValue id="officerValue" placeholder="Select an officer" />
+                      <SelectValue placeholder="Select an officer" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -120,7 +120,7 @@ export function MysteryShopperForm({
                 >
                   <FormControl>
                     <SelectTrigger id="customerName">
-                      <SelectValue id="customerValue" placeholder="Select a customer" />
+                      <SelectValue placeholder="Select a customer" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -153,7 +153,7 @@ export function MysteryShopperForm({
                 >
                   <FormControl>
                     <SelectTrigger id="location">
-                      <SelectValue id="locationValue" placeholder="Select a location" />
+                      <SelectValue placeholder="Select a location" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>

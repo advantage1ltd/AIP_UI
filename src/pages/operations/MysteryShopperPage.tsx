@@ -1,9 +1,21 @@
-import React, { useState, useCallback, useMemo } from "react";
+import * as React from "react";
+import { useState, useCallback, useMemo } from "react";
 import { format } from "date-fns";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { v4 as uuidv4 } from 'uuid';
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { 
   Form,
   FormControl,
@@ -20,13 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,22 +57,31 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
-import { MysteryShopperForm } from "@/components/mystery-shopper/MysteryShopperForm";
 import { useForm } from "react-hook-form";
 
 // Mock data
 const mockOfficers = [
-  { id: "off1", name: "Mr Abhishek Abhishek" },
-  // Add other officers as needed
+  { id: "OFF001", name: "John Smith" },
+  { id: "OFF002", name: "Sarah Johnson" },
+  { id: "OFF003", name: "Michael Brown" },
+  { id: "OFF004", name: "Emily Davis" },
+  { id: "OFF005", name: "James Wilson" }
 ];
 
 const mockCustomers = [
-  { id: "cust1", name: "Midcounties Co-Operative" },
-  // Add other customers as needed
+  { id: "CUS001", name: "Walmart Supercenter" },
+  { id: "CUS002", name: "Target Corporation" },
+  { id: "CUS003", name: "Costco Wholesale" },
+  { id: "CUS004", name: "Home Depot" },
+  { id: "CUS005", name: "Best Buy" }
 ];
 
 const mockLocations = [
-  // Add your locations
+  { id: "LOC001", name: "New York City" },
+  { id: "LOC002", name: "Los Angeles" },
+  { id: "LOC003", name: "Chicago" },
+  { id: "LOC004", name: "Houston" },
+  { id: "LOC005", name: "Phoenix" }
 ];
 
 interface EvaluationCriteria {
@@ -124,6 +138,56 @@ const defaultScores = evaluationCriteria.reduce((acc, criteria) => ({
   [criteria.id]: { score: 0, comments: "" }
 }), {});
 
+// Form validation schema
+const formSchema = z.object({
+  officerId: z.string({
+    required_error: "Please select an officer",
+  }).refine((value) => {
+    return mockOfficers.some(officer => officer.id === value);
+  }, {
+    message: "Please select a valid officer"
+  }),
+  customerName: z.string({
+    required_error: "Please select a customer",
+  }).refine((value) => {
+    return mockCustomers.some(customer => customer.id === value);
+  }, {
+    message: "Please select a valid customer"
+  }),
+  location: z.string({
+    required_error: "Please select a location",
+  }).refine((value) => {
+    return mockLocations.some(location => location.id === value);
+  }, {
+    message: "Please select a valid location"
+  }),
+  mysteryShopperName: z.string({
+    required_error: "Mystery shopper name is required",
+  }).min(2, "Name must be at least 2 characters")
+   .max(50, "Name cannot exceed 50 characters")
+   .regex(/^[a-zA-Z\s'-]+$/, "Name can only contain letters, spaces, hyphens and apostrophes"),
+  date: z.date({
+    required_error: "Please select a date",
+  }).refine((date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date >= today;
+  }, {
+    message: "Date cannot be in the past"
+  }),
+  time: z.string({
+    required_error: "Please select a time",
+  }).regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Please enter a valid time"),
+  scores: z.record(z.object({
+    score: z.number({
+      required_error: "Score is required",
+    }).min(0, "Score must be positive").max(10, "Score cannot exceed maximum"),
+    comments: z.string().optional(),
+  })),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
 export default function MysteryShopperPage() {
   const [evaluations, setEvaluations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -133,7 +197,8 @@ export default function MysteryShopperPage() {
   const [evaluationToDelete, setEvaluationToDelete] = useState<any | null>(null);
   const { toast } = useToast();
 
-  const form = useForm({
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       officerId: '',
       customerName: '',
@@ -145,12 +210,34 @@ export default function MysteryShopperPage() {
     }
   });
 
+  const resetForm = useCallback(() => {
+    form.reset({
+      officerId: '',
+      customerName: '',
+      date: new Date(),
+      time: '',
+      mysteryShopperName: '',
+      location: '',
+      scores: defaultScores
+    });
+  }, [form]);
+
   const handleNewEvaluation = () => {
+    resetForm();
     setSelectedEvaluation(null);
     setIsDialogOpen(true);
   };
 
   const handleEditEvaluation = (evaluation: any) => {
+    form.reset({
+      officerId: evaluation.officerId,
+      customerName: evaluation.customerName,
+      date: new Date(evaluation.date),
+      time: evaluation.time,
+      mysteryShopperName: evaluation.mysteryShopperName,
+      location: evaluation.location,
+      scores: evaluation.scores
+    });
     setSelectedEvaluation(evaluation);
     setIsDialogOpen(true);
   };
@@ -173,47 +260,56 @@ export default function MysteryShopperPage() {
         0
       );
 
+      // Get names from IDs
+      const selectedOfficer = mockOfficers.find(o => o.id === data.officerId);
+      const selectedCustomer = mockCustomers.find(c => c.id === data.customerName);
+      const selectedLocation = mockLocations.find(l => l.id === data.location);
+
       // Prepare evaluation data
       const evaluationData = {
         id: selectedEvaluation?.id || uuidv4(),
         ...data,
+        officerName: selectedOfficer?.name || '',
+        customerName: selectedCustomer?.name || '',
+        locationName: selectedLocation?.name || '',
         totalScore: total,
         maxPossibleScore: max,
-        percentage: max > 0 ? ((total / max) * 100).toFixed(1) : '0',
-        officerName: mockOfficers.find(o => o.id === data.officerId)?.name,
-        customerName: mockCustomers.find(c => c.id === data.customerName)?.name,
-        locationName: mockLocations.find(l => l.id === data.location)?.name,
+        percentage: ((total / max) * 100).toFixed(1),
+        createdAt: selectedEvaluation?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
-      // Update state in batches
-      requestAnimationFrame(() => {
-        setEvaluations(prev => {
-          if (selectedEvaluation) {
-            return prev.map(e => e.id === evaluationData.id ? evaluationData : e);
-          }
-          return [evaluationData, ...prev];
-        });
-
-        toast({
-          title: "Success",
-          description: selectedEvaluation
-            ? "Evaluation has been updated"
-            : "Evaluation has been created",
-        });
-
-        setIsDialogOpen(false);
-        setSelectedEvaluation(null);
+      // Update evaluations
+      setEvaluations((prev) => {
+        const existing = prev.findIndex((e) => e.id === evaluationData.id);
+        if (existing >= 0) {
+          const updated = [...prev];
+          updated[existing] = evaluationData;
+          return updated;
+        }
+        return [...prev, evaluationData];
       });
+
+      // Show success message
+      toast({
+        title: "Success",
+        description: `Evaluation ${selectedEvaluation ? 'updated' : 'created'} successfully.`,
+      });
+
+      // Reset form and close dialog
+      resetForm();
+      setIsDialogOpen(false);
     } catch (error) {
+      console.error('Error saving evaluation:', error);
       toast({
         title: "Error",
-        description: "Failed to save evaluation",
+        description: "Failed to save evaluation. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [selectedEvaluation, toast]);
+  }, [selectedEvaluation, resetForm, toast]);
 
   const handleDeleteConfirm = async () => {
     if (!evaluationToDelete) return;
@@ -236,127 +332,44 @@ export default function MysteryShopperPage() {
     }
   };
 
+  const onSubmit = form.handleSubmit(handleSubmit);
+
   return (
-    <div className="container mx-auto py-10 space-y-8">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold tracking-tight">Mystery Shopper Records</h2>
-        <Button onClick={handleNewEvaluation}>Add Record</Button>
-      </div>
-
-      {/* Records Table */}
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Officer</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Time</TableHead>
-              <TableHead>Mystery Shopper</TableHead>
-              <TableHead>Total Score</TableHead>
-              <TableHead>Percentage</TableHead>
-              <TableHead className="w-[70px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {evaluations.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-4">
-                  No records found
-                </TableCell>
-              </TableRow>
-            ) : (
-              evaluations.map((evaluation) => (
-                <TableRow key={evaluation.id}>
-                  <TableCell>{evaluation.officerName}</TableCell>
-                  <TableCell>{evaluation.customerName}</TableCell>
-                  <TableCell>{evaluation.locationName}</TableCell>
-                  <TableCell>{format(new Date(evaluation.date), 'PP')}</TableCell>
-                  <TableCell>{evaluation.time}</TableCell>
-                  <TableCell>{evaluation.mysteryShopperName}</TableCell>
-                  <TableCell>{evaluation.totalScore}</TableCell>
-                  <TableCell>{evaluation.percentage}%</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditEvaluation(evaluation)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDeleteEvaluation(evaluation)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Form Dialog */}
-      <Dialog 
-        open={isDialogOpen} 
-        onOpenChange={(open) => {
-          if (!open) {
-            setIsDialogOpen(false);
-            setSelectedEvaluation(null);
-          }
-        }}
-      >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedEvaluation ? "Edit Mystery Shopper Evaluation" : "New Mystery Shopper Evaluation"}
-            </DialogTitle>
-            <DialogDescription>
-              Fill in the evaluation details below
-            </DialogDescription>
-          </DialogHeader>
-          <MysteryShopperForm
-            onSubmit={handleSubmit}
-            initialData={selectedEvaluation}
-            isLoading={isLoading}
-            defaultScores={defaultScores}
-            evaluationCriteria={evaluationCriteria}
-            mockOfficers={mockOfficers}
-            mockCustomers={mockCustomers}
-            mockLocations={mockLocations}
-          />
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 bg-slate-600 p-6 text-white">
-              <div className="grid grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <FormLabel htmlFor="officerId" className="text-yellow-300 w-40">Officer Name:</FormLabel>
-                    <FormField
-                      name="officerId"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
+    <div className="container mx-auto py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Mystery Shopper Evaluations</h1>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>New Evaluation</Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-6">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-xl">New Mystery Shopper Evaluation</DialogTitle>
+              <DialogDescription className="text-sm text-gray-500">
+                Fill in the details for the new mystery shopper evaluation.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={onSubmit} className="space-y-8">
+                {/* Basic Information Section */}
+                <div className="space-y-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="text-lg font-semibold pb-2 border-b mb-4">Basic Information</div>
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Left Column */}
+                    <div className="space-y-4">
+                      <FormField
+                        name="officerId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">Officer Name</FormLabel>
                             <Select 
                               onValueChange={field.onChange} 
                               defaultValue={field.value}
-                              name="officerId"
                             >
-                              <FormControl>
-                                <SelectTrigger id="officerId" className="bg-blue-600 text-white border-none">
-                                  <SelectValue id="officerValue" placeholder="Select an officer" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Select an officer" />
+                              </SelectTrigger>
+                              <SelectContent className="z-50">
                                 {mockOfficers.map((officer) => (
                                   <SelectItem key={officer.id} value={officer.id}>
                                     {officer.name}
@@ -364,31 +377,24 @@ export default function MysteryShopperPage() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            <FormMessage />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
 
-                  <div className="flex items-center gap-2">
-                    <FormLabel htmlFor="customerName" className="text-yellow-300 w-40">Customer Name:</FormLabel>
-                    <FormField
-                      name="customerName"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
-                            <Select 
-                              onValueChange={field.onChange} 
+                      <FormField
+                        name="customerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">Customer Name</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
                               defaultValue={field.value}
-                              name="customerName"
                             >
-                              <FormControl>
-                                <SelectTrigger id="customerName" className="bg-blue-600 text-white border-none">
-                                  <SelectValue id="customerValue" placeholder="Select a customer" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Select a customer" />
+                              </SelectTrigger>
+                              <SelectContent className="z-50">
                                 {mockCustomers.map((customer) => (
                                   <SelectItem key={customer.id} value={customer.id}>
                                     {customer.name}
@@ -396,76 +402,24 @@ export default function MysteryShopperPage() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            <FormMessage />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
 
-                  <div className="flex items-center gap-2">
-                    <FormLabel htmlFor="date" className="text-yellow-300 w-40">Date:</FormLabel>
-                    <FormField
-                      name="date"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
-                            <Input
-                              id="date"
-                              name="date"
-                              type="date"
-                              {...field}
-                              value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
-                              onChange={(e) => field.onChange(e.target.valueAsDate)}
-                              className="bg-white text-black"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <FormLabel htmlFor="mysteryShopperName" className="text-yellow-300 w-40">Mystery Shopper Name:</FormLabel>
-                    <FormField
-                      name="mysteryShopperName"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
-                            <Input 
-                              id="mysteryShopperName"
-                              name="mysteryShopperName"
-                              {...field}
-                              className="bg-white text-black" 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <FormLabel htmlFor="location" className="text-yellow-300">Location:</FormLabel>
-                    <FormField
-                      name="location"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
-                            <Select 
-                              onValueChange={field.onChange} 
+                      <FormField
+                        name="location"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">Location</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
                               defaultValue={field.value}
-                              name="location"
                             >
-                              <FormControl>
-                                <SelectTrigger id="location" className="bg-white text-black">
-                                  <SelectValue id="locationValue" placeholder="Select a location" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Select a location" />
+                              </SelectTrigger>
+                              <SelectContent className="z-50">
                                 {mockLocations.map((location) => (
                                   <SelectItem key={location.id} value={location.id}>
                                     {location.name}
@@ -473,119 +427,182 @@ export default function MysteryShopperPage() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            <FormMessage />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
-                  <div className="flex items-center gap-2">
-                    <FormLabel htmlFor="time" className="text-yellow-300">Time:</FormLabel>
-                    <FormField
-                      name="time"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
-                            <Input 
-                              id="time" 
-                              name="time"
-                              type="time" 
-                              {...field}
-                              className="bg-white text-black" 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {/* Right Column */}
+                    <div className="space-y-4">
+                      <FormField
+                        name="mysteryShopperName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">Mystery Shopper Name</FormLabel>
+                            <Input {...field} />
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          name="date"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">Date</FormLabel>
+                              <Input
+                                type="date"
+                                {...field}
+                                value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                onChange={(e) => field.onChange(e.target.valueAsDate)}
+                              />
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          name="time"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">Time</FormLabel>
+                              <Input 
+                                type="time" 
+                                {...field}
+                              />
+                              <FormMessage className="text-xs" />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="mt-8">
-                <p className="text-yellow-300 mb-4">The items to be checked are categorised below, along with a maximum score level and a comments/observations box.</p>
-                <div className="bg-slate-700 p-4 rounded">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-b border-slate-500">
-                        <TableHead className="w-[400px] text-yellow-300">The Basics</TableHead>
-                        <TableHead className="w-[80px] text-yellow-300">Max</TableHead>
-                        <TableHead className="w-[80px] text-yellow-300">Score</TableHead>
-                        <TableHead className="text-yellow-300">Comments and/or observations</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {evaluationCriteria.map((criteria) => (
-                        <TableRow key={criteria.id} className="border-b border-slate-500">
-                          <TableCell className="align-top text-white">
-                            {criteria.title}
-                          </TableCell>
-                          <TableCell className="text-center text-white">{criteria.maxScore}</TableCell>
-                          <TableCell>
+                {/* Evaluation Criteria Section */}
+                <div className="space-y-6">
+                  <div className="text-base font-semibold pb-2 border-b mb-4">Evaluation Criteria</div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {evaluationCriteria.map((criteria, index) => (
+                      <div key={criteria.id} className="bg-gray-50 p-2 rounded-lg">
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-start gap-3">
+                            <div className="space-y-0.5">
+                              <h4 className="text-xs font-medium leading-tight">{criteria.title}</h4>
+                              <p className="text-[11px] text-gray-500">Max Score: {criteria.maxScore}</p>
+                            </div>
                             <FormField
                               name={`scores.${criteria.id}.score`}
                               render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input
-                                      id={`score-${criteria.id}`}
-                                      name={`scores.${criteria.id}.score`}
-                                      type="number"
-                                      min="0"
-                                      max={criteria.maxScore}
-                                      {...field}
-                                      onChange={(e) => field.onChange(Number(e.target.value))}
-                                      className="w-16 bg-white text-black"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
+                                <FormItem className="w-16">
+                                  <FormLabel className="sr-only">Score</FormLabel>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max={criteria.maxScore}
+                                    {...field}
+                                    onChange={(e) => field.onChange(Number(e.target.value))}
+                                    className="text-center h-7 px-1 text-sm"
+                                  />
+                                  <FormMessage className="text-[10px]" />
                                 </FormItem>
                               )}
                             />
-                          </TableCell>
-                          <TableCell>
-                            <FormField
-                              name={`scores.${criteria.id}.comments`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input
-                                      id={`comments-${criteria.id}`}
-                                      name={`scores.${criteria.id}.comments`}
-                                      placeholder="Add comments..."
-                                      {...field}
-                                      className="bg-white text-black"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      <TableRow>
-                        <TableCell colSpan={2} className="text-right font-bold text-white">Total Score:</TableCell>
-                        <TableCell className="font-bold text-white">
-                          {Object.values(form.getValues().scores || {}).reduce((total: number, { score }: any) => total + (score || 0), 0)}
-                        </TableCell>
-                        <TableCell></TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
+                          </div>
+                          <FormField
+                            name={`scores.${criteria.id}.comments`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="sr-only">Comments</FormLabel>
+                                <Input
+                                  placeholder="Add comments..."
+                                  {...field}
+                                  className="h-7 text-xs"
+                                />
+                                <FormMessage className="text-[10px]" />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex justify-end gap-4">
-                <Button type="submit" disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
-                  {isLoading ? "Saving..." : "Submit Evaluation"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+                <DialogFooter>
+                  <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                        <span className="text-sm">Saving...</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm">Save Evaluation</span>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="bg-white rounded-lg shadow">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Officer Name</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Location</TableHead>
+              <TableHead>Mystery Shopper</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Score</TableHead>
+              <TableHead className="w-[70px]">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {evaluations.map((evaluation) => (
+              <TableRow key={evaluation.id}>
+                <TableCell>{evaluation.officerName}</TableCell>
+                <TableCell>{evaluation.customerName}</TableCell>
+                <TableCell>{evaluation.locationName}</TableCell>
+                <TableCell>{evaluation.mysteryShopperName}</TableCell>
+                <TableCell>
+                  {format(new Date(evaluation.date), 'MMM d, yyyy')} at {evaluation.time}
+                </TableCell>
+                <TableCell>
+                  {evaluation.percentage}% ({evaluation.totalScore}/{evaluation.maxPossibleScore})
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEditEvaluation(evaluation)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleDeleteEvaluation(evaluation)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* Delete Dialog */}
       <AlertDialog 
