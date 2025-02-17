@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 
+
 // Lazy load page components
 const Index = lazy(() => import('./pages/Index'))
 const ActionCalendar = lazy(() => import('./pages/ActionCalendar'))
@@ -73,7 +74,7 @@ const AppRoutes = () => {
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/configure-views" element={<ConfigureViews />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
+
 
           {/* Administration Routes */}
           <Route path="/administration/user-setup" element={<UserSetup />} />

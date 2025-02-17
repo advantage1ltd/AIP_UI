@@ -47,6 +47,8 @@ export interface Incident {
   siteName: string
   offenderName: string
   typeOfIncident: IncidentType
+  incidentType: string
+  description: string
   incidentInvolved: IncidentInvolved[]
   policeInvolvement: boolean
   urnNumber?: string

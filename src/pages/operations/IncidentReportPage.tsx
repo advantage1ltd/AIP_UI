@@ -10,7 +10,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   AlertDialog,
@@ -24,13 +23,36 @@ import {
 } from "@/components/ui/alert-dialog"
 import { mockIncidents } from "@/data/mockIncidents"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { PlusCircle, PoundSterling, Store, AlertCircle } from "lucide-react"
+import { 
+  PlusCircle, 
+  PoundSterling, 
+  Store, 
+  AlertCircle, 
+  Edit2,
+  Trash2,
+  Eye,
+  FileText,
+  Search,
+  Calendar,
+  Building2
+} from "lucide-react"
+import { Input } from "@/components/ui/input"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
 export default function IncidentReportPage() {
   const [open, setOpen] = useState(false)
   const [incidents, setIncidents] = useState<Incident[]>(mockIncidents)
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null)
   const [deletingIncident, setDeletingIncident] = useState<Incident | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [viewingIncident, setViewingIncident] = useState<Incident | null>(null)
 
   // Calculate statistics
   const stats = {
@@ -68,6 +90,10 @@ export default function IncidentReportPage() {
     setOpen(true)
   }, [])
 
+  const handleView = useCallback((incident: Incident) => {
+    setViewingIncident(incident)
+  }, [])
+
   const handleDelete = useCallback((incident: Incident) => {
     setDeletingIncident(incident)
   }, [])
@@ -80,82 +106,195 @@ export default function IncidentReportPage() {
     }
   }, [deletingIncident])
 
+  const filteredIncidents = incidents.filter(incident => 
+    incident.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    incident.incidentType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    incident.description.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-background/80">
-      <div className="container mx-auto p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Header Section */}
         <div className="flex flex-col space-y-8">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-teal-500">
-                Incident Report 
-              </h1>
-              <p className="text-muted-foreground mt-2">
-                Track and manage security incidents across all stores
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-100 p-2 rounded-lg">
+                <FileText className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Incident Reports</h1>
+                <p className="text-sm text-gray-500">Track and manage security incidents across all stores</p>
+              </div>
             </div>
             <Button
-              onClick={() => setOpen(true)}
+              onClick={() => {
+                setEditingIncident(null)
+                setOpen(true)
+              }}
               size="lg"
-              className="bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 text-white shadow-lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center gap-2"
             >
-              Report New Incident
+              <PlusCircle className="w-5 h-5" />
+              New Incident
             </Button>
           </div>
 
           {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-3 lg:gap-8">
-            <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/20">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Amount Saved</CardTitle>
-                <PoundSterling className="h-4 w-4 text-blue-500" />
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-blue-900">Total Amount Saved</CardTitle>
+                <PoundSterling className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-500">£{stats.totalAmountSaved.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-blue-700">£{stats.totalAmountSaved.toFixed(2)}</div>
               </CardContent>
             </Card>
-            <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/10 border-emerald-500/20">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Unique Stores</CardTitle>
-                <Store className="h-4 w-4 text-emerald-500" />
+            <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-emerald-900">Unique Stores</CardTitle>
+                <Store className="h-4 w-4 text-emerald-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-emerald-500">{stats.uniqueStores}</div>
+                <div className="text-2xl font-bold text-emerald-700">{stats.uniqueStores}</div>
               </CardContent>
             </Card>
-            <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 border-purple-500/20">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Incidents</CardTitle>
-                <AlertCircle className="h-4 w-4 text-purple-500" />
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-purple-900">Total Incidents</CardTitle>
+                <AlertCircle className="h-4 w-4 text-purple-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-500">{stats.totalIncidents}</div>
+                <div className="text-2xl font-bold text-purple-700">{stats.totalIncidents}</div>
               </CardContent>
             </Card>
           </div>
         </div>
 
         {/* Table Section */}
-        <div className="mt-8 rounded-xl bg-gradient-to-br from-zinc-800/10 to-zinc-900/10 p-6 backdrop-blur-sm border border-zinc-800/20">
-          <IncidentsTable
-            incidents={incidents}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
+        <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {/* Search Bar */}
+          <div className="p-4 border-b border-gray-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search incidents..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 max-w-md border-gray-300"
+              />
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50 hover:bg-gray-50">
+                  <TableHead className="font-semibold text-gray-900">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-500" />
+                      Date
+                    </div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-900">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-gray-500" />
+                      Site Name
+                    </div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-900">Incident Type</TableHead>
+                  <TableHead className="font-semibold text-gray-900">Description</TableHead>
+                  <TableHead className="font-semibold text-gray-900">Value Recovered</TableHead>
+                  <TableHead className="font-semibold text-gray-900 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredIncidents.map((incident) => (
+                  <TableRow 
+                    key={incident.id}
+                    className="hover:bg-gray-50 transition-colors"
+                  >
+                    <TableCell className="font-medium">
+                      {new Date(incident.dateInputted).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>{incident.siteName}</TableCell>
+                    <TableCell>{incident.incidentType}</TableCell>
+                    <TableCell className="max-w-md truncate">{incident.description}</TableCell>
+                    <TableCell>£{incident.totalValueRecovered?.toFixed(2) || '0.00'}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleView(incident)}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(incident)}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(incident)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredIncidents.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <p className="text-gray-500">No incidents found</p>
+                      <Button
+                        variant="link"
+                        onClick={() => {
+                          setEditingIncident(null)
+                          setOpen(true)
+                        }}
+                        className="text-blue-600 hover:text-blue-700 mt-2"
+                      >
+                        Create your first incident report
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
 
         {/* Dialogs */}
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="max-w-[70vw] w-full max-h-[90vh] p-6 bg-gradient-to-br from-background to-background/80 backdrop-blur-sm border-zinc-800/20">
-            <DialogHeader className="pb-4">
-              <DialogTitle className="text-2xl">
+        <Dialog 
+          open={open} 
+          onOpenChange={(isOpen) => {
+            setOpen(isOpen)
+            if (!isOpen) {
+              setEditingIncident(null)
+            }
+          }}
+        >
+          <DialogContent className="max-w-[90vw] h-[90vh] overflow-y-auto">
+            <DialogHeader className="border-b pb-4">
+              <DialogTitle className="text-2xl font-bold">
                 {editingIncident ? 'Edit Incident Report' : 'New Incident Report'}
               </DialogTitle>
-              <DialogDescription>
-                Fill in the details of the security incident below
+              <DialogDescription className="text-gray-500">
+                Fill in the details of the security incident below. All fields marked with * are required.
               </DialogDescription>
             </DialogHeader>
-            <div className="overflow-y-auto pr-6 max-h-[calc(90vh-10rem)]">
+            <div className="flex-1 overflow-y-auto py-6 px-1">
               <IncidentForm
                 initialData={editingIncident}
                 onSubmit={handleSubmit}
@@ -168,8 +307,56 @@ export default function IncidentReportPage() {
           </DialogContent>
         </Dialog>
 
-        <AlertDialog open={!!deletingIncident} onOpenChange={(open) => !open && setDeletingIncident(null)}>
-          <AlertDialogContent className="bg-gradient-to-br from-background to-background/80 backdrop-blur-sm border-zinc-800/20">
+        <Dialog 
+          open={!!viewingIncident} 
+          onOpenChange={(isOpen) => !isOpen && setViewingIncident(null)}
+        >
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Incident Details</DialogTitle>
+            </DialogHeader>
+            {viewingIncident && (
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Date</label>
+                    <p className="text-gray-900">{new Date(viewingIncident.dateInputted).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Site Name</label>
+                    <p className="text-gray-900">{viewingIncident.siteName}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Incident Type</label>
+                    <p className="text-gray-900">{viewingIncident.incidentType}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Value Recovered</label>
+                    <p className="text-gray-900">£{viewingIncident.totalValueRecovered?.toFixed(2) || '0.00'}</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Description</label>
+                  <p className="text-gray-900 mt-1">{viewingIncident.description}</p>
+                </div>
+                <div className="pt-4 flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setViewingIncident(null)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog 
+          open={!!deletingIncident} 
+          onOpenChange={(isOpen) => !isOpen && setDeletingIncident(null)}
+        >
+          <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Incident Report</AlertDialogTitle>
               <AlertDialogDescription>
@@ -177,10 +364,10 @@ export default function IncidentReportPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="bg-zinc-800 hover:bg-zinc-700">Cancel</AlertDialogCancel>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleConfirmDelete}
-                className="bg-red-500 hover:bg-red-600"
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 Delete
               </AlertDialogAction>

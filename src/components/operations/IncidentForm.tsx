@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { format } from "date-fns"
-import { CalendarIcon, PlusCircle, Trash2, AlertCircle, Package, PoundSterling, Hash, Receipt, Edit } from "lucide-react"
+import { CalendarIcon, PlusCircle, Trash2, AlertCircle, Package, PoundSterling, Hash, Receipt, Edit, Building2, FileText, Shield, ListChecks, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -39,6 +39,16 @@ import {
   CardFooter,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { 
+  MOCK_CUSTOMERS, 
+  MOCK_STORES, 
+  MOCK_OFFICERS, 
+  MOCK_OFFICER_ROLES,
+  Customer,
+  Store,
+  Officer,
+  OfficerRole
+} from "@/data/mockDropdownData"
 
 const incidentTypes: IncidentType[] = [
   IncidentType.ARREST,
@@ -146,7 +156,7 @@ const IncidentForm = memo(({ onSubmit, onCancel, initialData }: IncidentFormProp
     })
   }, [])
 
-  const handleStolenItemChange = useCallback(<T extends keyof StolenItem>(itemId: string, field: T, value: StolenItem[T]) => {
+  const handleStolenItemChange = useCallback((itemId: string, field: keyof StolenItem, value: string | number) => {
     setFormData(prev => {
       const updatedItems = prev.stolenItems?.map(item => {
         if (item.id === itemId) {
@@ -154,7 +164,7 @@ const IncidentForm = memo(({ onSubmit, onCancel, initialData }: IncidentFormProp
 
           if (field === 'cost') {
             // Ensure cost is a valid number and not negative
-            const parsedCost = parseFloat(value as string)
+            const parsedCost = typeof value === 'string' ? parseFloat(value) : value
             if (!isNaN(parsedCost) && parsedCost >= 0) {
               updatedItem.cost = Math.round(parsedCost * 100) / 100 // Round to 2 decimal places
             } else {
@@ -163,7 +173,7 @@ const IncidentForm = memo(({ onSubmit, onCancel, initialData }: IncidentFormProp
             updatedItem.totalAmount = updatedItem.cost * updatedItem.quantity
           } else if (field === 'quantity') {
             // Ensure quantity is a valid positive integer
-            const parsedQuantity = parseInt(value as string)
+            const parsedQuantity = typeof value === 'string' ? parseInt(value) : value
             if (!isNaN(parsedQuantity) && parsedQuantity > 0) {
               updatedItem.quantity = parsedQuantity
             } else {
@@ -191,53 +201,105 @@ const IncidentForm = memo(({ onSubmit, onCancel, initialData }: IncidentFormProp
   }, [])
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-6">
-        {/* Column 1: Basic Information and Incident Details */}
-        <div className="space-y-8">
-          <div className="space-y-4 p-6 rounded-lg border border-black bg-background/50">
-            <h3 className="font-semibold -mx-6 -mt-6 mb-4 p-4 border-b border-b-black bg-zinc-800/50 rounded-t-lg">Basic Information</h3>
+    <form onSubmit={handleSubmit} className="space-y-8">
+      {/* Basic Information */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-blue-500" />
+              Basic Information
+            </CardTitle>
+            <CardDescription>Enter the core details about the incident</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div>
-              <Label>Customer Name</Label>
-              <Input
+              <Label>Customer Name *</Label>
+              <Select
                 value={formData.customerName || ''}
-                onChange={(e) => handleInputChange('customerName', e.target.value)}
-                placeholder="Enter customer name"
-                required
-              />
+                onValueChange={(value) => handleInputChange('customerName', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOCK_CUSTOMERS.map((customer) => (
+                    <SelectItem key={customer} value={customer}>
+                      {customer}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label>Store Name</Label>
-              <Input
+              <Label>Store Name *</Label>
+              <Select
                 value={formData.siteName || ''}
-                onChange={(e) => handleInputChange('siteName', e.target.value)}
-                placeholder="Enter store name"
-                required
-              />
+                onValueChange={(value) => handleInputChange('siteName', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select store" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOCK_STORES.map((store) => (
+                    <SelectItem key={store} value={store}>
+                      {store}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label>Officer Name</Label>
-              <Input
+              <Label>Officer Name *</Label>
+              <Select
                 value={formData.officerName || ''}
-                onChange={(e) => handleInputChange('officerName', e.target.value)}
-                placeholder="Enter officer name"
-                required
-              />
+                onValueChange={(value) => handleInputChange('officerName', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select officer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOCK_OFFICERS.map((officer) => (
+                    <SelectItem key={officer} value={officer}>
+                      {officer}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label>Officer Role</Label>
-              <Input
+              <Label>Officer Role *</Label>
+              <Select
                 value={formData.officerRole || ''}
-                onChange={(e) => handleInputChange('officerRole', e.target.value)}
-                placeholder="Enter officer role"
-              />
+                onValueChange={(value) => handleInputChange('officerRole', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOCK_OFFICER_ROLES.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="space-y-4 p-6 rounded-lg border border-black bg-background/50">
-            <h3 className="font-semibold -mx-6 -mt-6 mb-4 p-4 border-b border-b-black bg-zinc-800/50 rounded-t-lg">Incident Details</h3>
+        {/* Incident Details */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-blue-500" />
+              Incident Details
+            </CardTitle>
+            <CardDescription>Specify when and what type of incident occurred</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div>
-              <Label>Date of Incident</Label>
+              <Label>Date of Incident *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -263,15 +325,16 @@ const IncidentForm = memo(({ onSubmit, onCancel, initialData }: IncidentFormProp
               </Popover>
             </div>
             <div>
-              <Label>Time of Incident</Label>
+              <Label>Time of Incident *</Label>
               <Input
                 type="time"
                 value={formData.timeOfIncident || ''}
                 onChange={(e) => handleInputChange('timeOfIncident', e.target.value)}
+                required
               />
             </div>
             <div>
-              <Label>Type of Incident</Label>
+              <Label>Type of Incident *</Label>
               <Select
                 value={formData.typeOfIncident}
                 onValueChange={(value) => handleInputChange('typeOfIncident', value as IncidentType)}
@@ -288,15 +351,21 @@ const IncidentForm = memo(({ onSubmit, onCancel, initialData }: IncidentFormProp
                 </SelectContent>
               </Select>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Column 2: Description, Police Involvement, and Additional Details */}
-        <div className="space-y-8">
-          <div className="space-y-4 p-6 rounded-lg border border-black bg-background/50">
-            <h3 className="font-semibold -mx-6 -mt-6 mb-4 p-4 border-b border-b-black bg-zinc-800/50 rounded-t-lg">Description</h3>
+        {/* Description */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-500" />
+              Description
+            </CardTitle>
+            <CardDescription>Provide detailed information about the incident</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div>
-              <Label>Incident Details</Label>
+              <Label>Incident Details *</Label>
               <Textarea
                 value={formData.incidentDetails || ''}
                 onChange={(e) => handleInputChange('incidentDetails', e.target.value)}
@@ -314,17 +383,30 @@ const IncidentForm = memo(({ onSubmit, onCancel, initialData }: IncidentFormProp
                 className="min-h-[100px]"
               />
             </div>
-          </div>
+          </CardContent>
+        </Card>
+      </div>
 
-          <div className="space-y-4 p-6 rounded-lg border border-black bg-background/50">
-            <h3 className="font-semibold -mx-6 -mt-6 mb-4 p-4 border-b border-b-black bg-zinc-800/50 rounded-t-lg">Police Involvement</h3>
+      {/* Second Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {/* Police Involvement */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Shield className="w-5 h-5 text-blue-500" />
+              Police Involvement
+            </CardTitle>
+            <CardDescription>Record any police-related information</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div>
+              <Label>Was Police Involved?</Label>
               <RadioGroup
                 value={formData.policeInvolvement ? "yes" : "no"}
                 onValueChange={(value) =>
                   handleInputChange('policeInvolvement', value === "yes")
                 }
-                className="flex items-center space-x-4"
+                className="flex items-center space-x-4 mt-2"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="yes" id="yes" />
@@ -338,7 +420,7 @@ const IncidentForm = memo(({ onSubmit, onCancel, initialData }: IncidentFormProp
             </div>
 
             {formData.policeInvolvement && (
-              <div className="space-y-4">
+              <>
                 <div>
                   <Label>URN Number</Label>
                   <Input
@@ -355,117 +437,84 @@ const IncidentForm = memo(({ onSubmit, onCancel, initialData }: IncidentFormProp
                     placeholder="Enter reference number"
                   />
                 </div>
-              </div>
+              </>
             )}
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="space-y-4 p-6 rounded-lg border border-black bg-background/50">
-            <h3 className="font-semibold -mx-6 -mt-6 mb-4 p-4 border-b border-b-black bg-zinc-800/50 rounded-t-lg">Additional Details</h3>
+        {/* Offender Details */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="w-5 h-5 text-blue-500" />
+              Offender Details
+            </CardTitle>
+            <CardDescription>Record information about the offender</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div>
-              <Label>Duty Manager Name</Label>
+              <Label>Offender Name</Label>
               <Input
-                value={formData.dutyManagerName || ''}
-                onChange={(e) => handleInputChange('dutyManagerName', e.target.value)}
-                placeholder="Enter duty manager name"
+                value={formData.offenderName || ''}
+                onChange={(e) => handleInputChange('offenderName', e.target.value)}
+                placeholder="Enter offender name"
               />
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                checked={formData.personalDetailsVerified}
-                onCheckedChange={(checked) =>
-                  handleInputChange('personalDetailsVerified', checked as boolean)
-                }
-              />
-              <Label>Personal Details Verified?</Label>
+            <div>
+              <Label>Offender Sex</Label>
+              <Select 
+                value={formData.offenderSex || 'N/A or N/K'}
+                onValueChange={(value: OffenderSex) => handleInputChange('offenderSex', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select offender sex" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="N/A or N/K">N/A or N/K</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-        </div>
-
-        {/* Column 3: Offender Details, Incident Involved, and Stolen Items */}
-        <div className="space-y-8">
-          <div className="space-y-4 p-6 rounded-lg border border-black bg-background/50">
-            <h3 className="font-semibold -mx-6 -mt-6 mb-4 p-4 border-b border-b-black bg-zinc-800/50 rounded-t-lg">Offender Details</h3>
-            <div className="space-y-4">
-              <div>
-                <Label>Offender Name</Label>
-                <Input
-                  value={formData.offenderName || ''}
-                  onChange={(e) => handleInputChange('offenderName', e.target.value)}
-                  placeholder="Enter offender name"
-                />
-              </div>
-              <div>
-                <Label>Offender Sex</Label>
-                <Select 
-                  value={formData.offenderSex || 'N/A or N/K'}
-                  onValueChange={(value: OffenderSex) => handleInputChange('offenderSex', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select offender sex" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Male">Male</SelectItem>
-                    <SelectItem value="Female">Female</SelectItem>
-                    <SelectItem value="N/A or N/K">N/A or N/K</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Offender DOB</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.offenderDOB ? (
-                        format(new Date(formData.offenderDOB), "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.offenderDOB ? new Date(formData.offenderDOB) : undefined}
-                      onSelect={(date) => handleInputChange('offenderDOB', date?.toISOString() || '')}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div>
-                <Label>Address</Label>
-                <div className="space-y-2">
-                  <Input
-                    value={formData.offenderAddress?.numberAndStreet || ''}
-                    onChange={(e) => handleAddressChange('numberAndStreet', e.target.value)}
-                    placeholder="Number and Street"
+            <div>
+              <Label>Offender DOB</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.offenderDOB ? (
+                      format(new Date(formData.offenderDOB), "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={formData.offenderDOB ? new Date(formData.offenderDOB) : undefined}
+                    onSelect={(date) => handleInputChange('offenderDOB', date?.toISOString() || '')}
+                    initialFocus
                   />
-                  <Input
-                    value={formData.offenderAddress?.town || ''}
-                    onChange={(e) => handleAddressChange('town', e.target.value)}
-                    placeholder="Town"
-                  />
-                  <Input
-                    value={formData.offenderAddress?.county || ''}
-                    onChange={(e) => handleAddressChange('county', e.target.value)}
-                    placeholder="County"
-                  />
-                  <Input
-                    value={formData.offenderAddress?.postCode || ''}
-                    onChange={(e) => handleAddressChange('postCode', e.target.value)}
-                    placeholder="Post Code"
-                  />
-                </div>
-              </div>
+                </PopoverContent>
+              </Popover>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="space-y-4 p-6 rounded-lg border border-black bg-background/50">
-            <h3 className="font-semibold -mx-6 -mt-6 mb-4 p-4 border-b border-b-black bg-zinc-800/50 rounded-t-lg">Incident Involved</h3>
+        {/* Incident Involved */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ListChecks className="w-5 h-5 text-blue-500" />
+              Incident Categories
+            </CardTitle>
+            <CardDescription>Select all applicable categories</CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="grid grid-cols-1 gap-2">
               {incidentInvolved.map((type) => (
                 <div key={type} className="flex items-center space-x-2">
@@ -489,105 +538,140 @@ const IncidentForm = memo(({ onSubmit, onCancel, initialData }: IncidentFormProp
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Stolen Items (Full Width) */}
-      <div className="space-y-4 p-6 rounded-lg border border-black bg-background/50 mb-6">
-        <div className="flex items-center justify-between -mx-6 -mt-6 mb-4 p-4 border-b border-b-black bg-zinc-800/50 rounded-t-lg">
-          <h3 className="font-semibold">Stolen Items</h3>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddStolenItem}
-          >
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Item
-          </Button>
-        </div>
-
-        <div className="rounded-md border border-black">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Description</TableHead>
-                <TableHead className="w-[100px]">Cost</TableHead>
-                <TableHead className="w-[100px]">Quantity</TableHead>
-                <TableHead className="w-[100px]">Total</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {formData.stolenItems?.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <Input
-                      value={item.description}
-                      onChange={(e) => handleStolenItemChange(item.id, 'description', e.target.value)}
-                      placeholder="Item description"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.cost}
-                      onChange={(e) => handleStolenItemChange(item.id, 'cost', e.target.value)}
-                      step="0.01"
-                      min="0"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => handleStolenItemChange(item.id, 'quantity', Number(e.target.value))}
-                      min="1"
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    £{item.totalAmount.toFixed(2)}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveStolenItem(item.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {(!formData.stolenItems || formData.stolenItems.length === 0) && (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    No items added. Click "Add Item" to start.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      {/* Total Value and Actions (Full Width) */}
-      <div className="flex items-center justify-between space-x-6 sticky bottom-0 bg-background/95 backdrop-blur-sm p-4 rounded-lg border border-black shadow-lg">
-        <div className="flex-1 bg-zinc-800/50 p-6 rounded-lg">
+      {/* Stolen Items Section */}
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between">
-            <Label className="text-lg">Total Value Recovered</Label>
-            <div className="text-2xl font-bold text-green-500">
-              £{formData.totalValueRecovered?.toFixed(2) || '0.00'}
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Package className="w-5 h-5 text-blue-500" />
+                Stolen Items
+              </CardTitle>
+              <CardDescription>Record details of any stolen items</CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAddStolenItem}
+              className="flex items-center gap-2"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Add Item
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="w-[120px]">Cost</TableHead>
+                  <TableHead className="w-[120px]">Quantity</TableHead>
+                  <TableHead className="w-[120px]">Total</TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {formData.stolenItems?.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      <Input
+                        value={item.description}
+                        onChange={(e) => handleStolenItemChange(item.id, 'description', e.target.value)}
+                        placeholder="Item description"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={item.cost}
+                        onChange={(e) => handleStolenItemChange(item.id, 'cost', e.target.value)}
+                        step="0.01"
+                        min="0"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => handleStolenItemChange(item.id, 'quantity', e.target.value)}
+                        min="1"
+                      />
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      £{item.totalAmount.toFixed(2)}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveStolenItem(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(!formData.stolenItems || formData.stolenItems.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center">
+                      <div className="flex flex-col items-center gap-2 text-sm text-gray-500">
+                        <Package className="w-8 h-8 text-gray-400" />
+                        <p>No items added</p>
+                        <p>Click "Add Item" to start recording stolen items</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Form Actions */}
+      <div className="sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t p-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <PoundSterling className="w-5 h-5 text-green-500" />
+            <div>
+              <p className="text-sm font-medium text-gray-500">Total Value Recovered</p>
+              <p className="text-2xl font-bold text-green-600">
+                £{formData.totalValueRecovered?.toFixed(2) || '0.00'}
+              </p>
+            </div>
+          </div>
+          <Separator orientation="vertical" className="h-12" />
+          <div className="flex items-center gap-2">
+            <Package className="w-5 h-5 text-blue-500" />
+            <div>
+              <p className="text-sm font-medium text-gray-500">Total Items</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {formData.stolenItems?.length || 0}
+              </p>
             </div>
           </div>
         </div>
         <div className="flex gap-4">
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onCancel}
+            className="min-w-[100px]"
+          >
             Cancel
           </Button>
-          <Button type="submit" className="bg-green-600 hover:bg-green-700">
+          <Button 
+            type="submit" 
+            className="min-w-[100px] bg-green-600 hover:bg-green-700"
+          >
             Save Incident
           </Button>
         </div>
