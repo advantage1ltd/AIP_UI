@@ -1,151 +1,117 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Search, UserPlus, Pencil, Trash2 } from "lucide-react"
-import { useState } from "react"
+import { Pencil, Trash2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 
-// Dummy data
-const DUMMY_CANDIDATES = [
-  {
-    id: 1,
-    region: "West Midlands",
-    officerName: "John Smith",
-    roleOffered: "Security Officer",
-    interviewDate: "2024-02-15",
-    driver: "Yes",
-    vettingStartDate: "2024-02-16",
-    interviewNotes: "Yes",
-    estimatedStartDate: "2024-03-01",
-    interviewingManager: "Sarah Wilson",
-    redFlags: "No",
-    recruitmentOutcome: "Ready for next stage!",
-    comments: "Excellent candidate with strong references."
-  },
-  {
-    id: 2,
-    region: "East Midlands",
-    officerName: "Jane Doe",
-    roleOffered: "Site Supervisor",
-    interviewDate: "2024-02-14",
-    driver: "No",
-    vettingStartDate: "2024-02-15",
-    interviewNotes: "Yes",
-    estimatedStartDate: "2024-03-15",
-    interviewingManager: "Mike Johnson",
-    redFlags: "Yes",
-    recruitmentOutcome: "Docs Received - Processing",
-    comments: "Pending background check verification."
-  }
-]
-
 interface VettingTableProps {
-  onNew: () => void
-  onEdit: (candidate: any) => void
-  onDelete: (candidate: any) => void
+  onEdit: (candidate: Candidate) => void
+  onDelete: (candidate: Candidate) => void
+  searchTerm: string
+  selectedStatus: string
 }
 
-export function VettingTable({ onNew, onEdit, onDelete }: VettingTableProps) {
-  const [searchQuery, setSearchQuery] = useState("")
-  
-  const filteredCandidates = DUMMY_CANDIDATES.filter(candidate =>
-    candidate.officerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    candidate.region.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+interface Candidate {
+  id: string
+  officerName: string
+  email: string
+  phone: string
+  position: string
+  status: 'pending' | 'in-progress' | 'completed' | 'rejected'
+  submittedDate: Date
+  notes?: string
+}
 
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd-MM-yyyy')
-  }
+const sampleCandidates: Candidate[] = [
+  {
+    id: '1',
+    officerName: 'John Smith',
+    email: 'john.smith@example.com',
+    phone: '07700 900123',
+    position: 'Security Officer',
+    status: 'in-progress',
+    submittedDate: new Date('2024-02-15'),
+    notes: 'References pending'
+  },
+  // ... add more sample data
+]
+
+export function VettingTable({ onEdit, onDelete, searchTerm, selectedStatus }: VettingTableProps) {
+  const filteredCandidates = sampleCandidates.filter(candidate => {
+    const matchesSearch = 
+      candidate.officerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      candidate.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      candidate.position.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    const matchesStatus = selectedStatus === 'all' || candidate.status === selectedStatus
+
+    return matchesSearch && matchesStatus
+  })
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="relative w-72">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search candidates..." 
-            className="pl-9 bg-white/50 border-none" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <Button onClick={onNew} className="bg-purple-600 hover:bg-purple-700">
-          <UserPlus className="mr-2 h-4 w-4" />
-          New Candidate
-        </Button>
-      </div>
-
-      <div className="rounded-lg border bg-white/50 backdrop-blur-sm shadow-sm overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Region</TableHead>
-              <TableHead>Officer Name</TableHead>
-              <TableHead>Role Offered</TableHead>
-              <TableHead>Interview Date</TableHead>
-              <TableHead>Driver</TableHead>
-              <TableHead>Vetting Start</TableHead>
-              <TableHead>Interview Notes</TableHead>
-              <TableHead>Est. Start Date</TableHead>
-              <TableHead>Manager</TableHead>
-              <TableHead>Red Flags</TableHead>
-              <TableHead>Recruitment Outcome</TableHead>
-              <TableHead>Comments</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredCandidates.map((candidate) => (
-              <TableRow key={candidate.id}>
-                <TableCell>{candidate.region}</TableCell>
-                <TableCell>{candidate.officerName}</TableCell>
-                <TableCell>{candidate.roleOffered}</TableCell>
-                <TableCell>{formatDate(candidate.interviewDate)}</TableCell>
-                <TableCell>{candidate.driver}</TableCell>
-                <TableCell>{formatDate(candidate.vettingStartDate)}</TableCell>
-                <TableCell>{candidate.interviewNotes}</TableCell>
-                <TableCell>{formatDate(candidate.estimatedStartDate)}</TableCell>
-                <TableCell>{candidate.interviewingManager}</TableCell>
-                <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    candidate.redFlags === "Yes" 
-                      ? "bg-red-100 text-red-700" 
-                      : "bg-green-100 text-green-700"
-                  }`}>
-                    {candidate.redFlags}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                    {candidate.recruitmentOutcome}
-                  </span>
-                </TableCell>
-                <TableCell className="max-w-[200px] truncate" title={candidate.comments}>
-                  {candidate.comments}
-                </TableCell>
-                <TableCell className="text-right">
+    <div className="rounded-lg border bg-white/50 backdrop-blur-sm shadow-sm overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Officer Name</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Position</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Submitted Date</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredCandidates.map((candidate) => (
+            <TableRow key={candidate.id} className="bg-white border-b hover:bg-gray-50">
+              <TableCell className="px-6 py-4 font-medium text-gray-900">{candidate.officerName}</TableCell>
+              <TableCell className="px-6 py-4">{candidate.email}</TableCell>
+              <TableCell className="px-6 py-4">{candidate.position}</TableCell>
+              <TableCell className="px-6 py-4">
+                <Badge className={getStatusColor(candidate.status)}>
+                  {candidate.status}
+                </Badge>
+              </TableCell>
+              <TableCell className="px-6 py-4">{format(candidate.submittedDate, 'dd/MM/yyyy')}</TableCell>
+              <TableCell className="px-6 py-4 text-right">
+                <div className="flex items-center gap-2 justify-end">
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="sm"
                     onClick={() => onEdit(candidate)}
-                    className="hover:bg-purple-100"
+                    className="hover:bg-gray-100 rounded-full p-2"
                   >
-                    <Pencil className="h-4 w-4 text-purple-600" />
+                    <Pencil className="h-4 w-4 text-gray-500" />
                   </Button>
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="sm"
                     onClick={() => onDelete(candidate)}
-                    className="hover:bg-red-100"
+                    className="hover:bg-gray-100 rounded-full p-2"
                   >
-                    <Trash2 className="h-4 w-4 text-red-600" />
+                    <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   )
+}
+
+function getStatusColor(status: string) {
+  switch (status) {
+    case 'pending':
+      return 'bg-yellow-100 text-yellow-800'
+    case 'in-progress':
+      return 'bg-blue-100 text-blue-800'
+    case 'completed':
+      return 'bg-green-100 text-green-800'
+    case 'rejected':
+      return 'bg-red-100 text-red-800'
+    default:
+      return 'bg-gray-100 text-gray-800'
+  }
 }

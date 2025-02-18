@@ -47,6 +47,13 @@ const CBT = lazy(() => import("./pages/recruitment/CBT"))
 const Starters = lazy(() => import("./pages/recruitment/Starters"))
 const Leavers = lazy(() => import("./pages/recruitment/Leavers"))
 const HolidayRequestPage = lazy(() => import('@/pages/operations/HolidayRequestPage'))
+const CustomerDAR = lazy(() => import('./pages/customer/CustomerDAR'))
+const IncidentGraph = lazy(() => import('./pages/customer/IncidentGraph'))
+const IncidentReport = lazy(() => import('./pages/customer/IncidentReport'))
+const SafeSecureChecks = lazy(() => import('./pages/customer/SafeSecureChecks'))
+const SatisfactionReports = lazy(() => import('./pages/customer/SatisfactionReports'))
+const OfficerSupport = lazy(() => import('./pages/customer/OfficerSupport'))
+const OfficerPerformancePage = lazy(() => import('./pages/management/OfficerPerformance'))
 
 const App: React.FC = () => {
   return (
@@ -117,6 +124,7 @@ const App: React.FC = () => {
                 <Route path="manager-customer-report" element={<ManagerCustomerReportPage />} />
                 <Route path="manager-support" element={<ManagerSupportPage />} />
                 <Route path="incidents-report" element={<IncidentsReportPage />} />
+                <Route path="officer-performance" element={<OfficerPerformancePage />} />
               </Route>
 
               {/* Compliance Routes */}
@@ -125,6 +133,16 @@ const App: React.FC = () => {
                 <Route path="contract-renewal" element={<ContractRenewalPage />} />
                 <Route path="password-register" element={<PasswordRegisterPage />} />
                 <Route path="asset-register" element={<AssetRegisterPage />} />
+              </Route>
+
+              {/* Customer Routes */}
+              <Route path="/customer">
+                <Route path="dar" element={<CustomerDAR />} />
+                <Route path="incident-graph" element={<IncidentGraph />} />
+                <Route path="incident-report" element={<IncidentReport />} />
+                <Route path="safe-secure-checks" element={<SafeSecureChecks />} />
+                <Route path="officer-support" element={<OfficerSupport />} />
+                <Route path="satisfaction-reports" element={<SatisfactionReports />} />
               </Route>
             </Routes>
           </Suspense>

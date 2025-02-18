@@ -499,6 +499,15 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                   <FileWarning className="h-4 w-4" />
                   <span>Incidents Report</span>
                 </Link>
+                <Link
+                  to="/management/officer-performance"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                  tabIndex={0}
+                  onKeyDown={handleKeyDown}
+                >
+                  <Award className="h-4 w-4" />
+                  <span>Officer Performance</span>
+                </Link>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -546,6 +555,72 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                 >
                   <Boxes className="h-4 w-4" />
                   <span>Asset Register</span>
+                </Link>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Customer Section */}
+          <AccordionItem value="customer" className="border-none">
+            <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
+              <Users2 className="h-4 w-4" />
+              <span className="flex-1 text-left">Customer</span>
+            </AccordionTrigger>
+            <AccordionContent className="pb-1 pt-0">
+              <div className="ml-4 space-y-1">
+                <Link
+                  to="/customer/dar"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                  tabIndex={0}
+                  onKeyDown={handleKeyDown}
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>Daily Activity Report</span>
+                </Link>
+                <Link
+                  to="/customer/incident-graph"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                  tabIndex={0}
+                  onKeyDown={handleKeyDown}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Incident Graph</span>
+                </Link>
+                <Link
+                  to="/customer/incident-report"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                  tabIndex={0}
+                  onKeyDown={handleKeyDown}
+                >
+                  <FileWarning className="h-4 w-4" />
+                  <span>Incident Report</span>
+                </Link>
+                <Link
+                  to="/customer/safe-secure-checks"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                  tabIndex={0}
+                  onKeyDown={handleKeyDown}
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Safe & Secure Checks</span>
+                </Link>
+                <Link
+                  to="/customer/officer-support"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                  tabIndex={0}
+                  onKeyDown={handleKeyDown}
+                >
+                  <HelpCircle className="h-4 w-4" />
+                  <span>Officer Support</span>
+                </Link>
+                <Link
+                  to="/customer/satisfaction-reports"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                  tabIndex={0}
+                  onKeyDown={handleKeyDown}
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  <span>Satisfaction Reports</span>
                 </Link>
               </div>
             </AccordionContent>
