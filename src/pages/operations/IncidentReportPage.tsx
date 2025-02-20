@@ -114,7 +114,7 @@ export default function IncidentReportPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-8xl">
         {/* Header Section */}
         <div className="flex flex-col space-y-8">
           <div className="flex justify-between items-center">
@@ -285,13 +285,13 @@ export default function IncidentReportPage() {
             }
           }}
         >
-          <DialogContent className="max-w-[90vw] h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[60vw] h-[90vh] overflow-y-auto">
             <DialogHeader className="border-b pb-4">
               <DialogTitle className="text-2xl font-bold">
-                {editingIncident ? 'Edit Incident Report' : 'New Incident Report'}
+                {editingIncident ? 'Edit Incident Report' : 'Officer Incident Report'}
               </DialogTitle>
               <DialogDescription className="text-gray-500">
-                Fill in the details of the security incident below. All fields marked with * are required.
+        
               </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto py-6 px-1">

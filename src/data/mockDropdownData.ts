@@ -1,54 +1,59 @@
-export const MOCK_CUSTOMERS = [
-  'Tesco Express',
-  'Sainsbury\'s Local',
-  'ASDA',
-  'Waitrose',
-  'Co-op',
-  'Marks & Spencer',
-  'Lidl',
-  'Aldi',
-  'Morrisons'
-] as const;
+// Types
+export interface Customer {
+  id: string;
+  name: string;
+  type: string;
+}
 
-export const MOCK_STORES = [
-  'London Bridge Store',
-  'Manchester Central',
-  'Birmingham South',
-  'Edinburgh Central',
-  'Glasgow North',
-  'Leeds City Centre',
-  'Liverpool One',
-  'Cardiff Bay',
-  'Bristol Clifton',
-  'Newcastle Eldon Square'
-] as const;
+export interface Store {
+  id: string;
+  name: string;
+  address: string;
+  region: string;
+}
 
-export const MOCK_OFFICERS = [
-  'John Smith',
-  'Emma Brown',
-  'David Clark',
-  'Alice Thompson',
-  'Mark Wilson',
-  'Sarah Johnson',
-  'Michael Davies',
-  'Rachel Roberts',
-  'James Anderson',
-  'Lisa Taylor'
-] as const;
+export interface Officer {
+  id: string;
+  name: string;
+  role: string;
+  badge: string;
+}
 
-export const MOCK_OFFICER_ROLES = [
-  'Security Officer',
-  'Senior Security Officer',
-  'Security Supervisor',
-  'Security Team Leader',
-  'Security Manager',
-  'Loss Prevention Officer',
-  'Store Detective',
-  'Security Coordinator',
-  'Security Shift Leader'
-] as const;
+export interface OfficerRole {
+  id: string;
+  name: string;
+  level: number;
+}
 
-export type Customer = typeof MOCK_CUSTOMERS[number];
-export type Store = typeof MOCK_STORES[number];
-export type Officer = typeof MOCK_OFFICERS[number];
-export type OfficerRole = typeof MOCK_OFFICER_ROLES[number]; 
+// Mock Data
+export const MOCK_CUSTOMERS: Customer[] = [
+  { id: '1', name: 'Tesco Express', type: 'Retail' },
+  { id: '2', name: 'Sainsbury\'s Local', type: 'Retail' },
+  { id: '3', name: 'ASDA', type: 'Retail' },
+  { id: '4', name: 'Waitrose', type: 'Retail' },
+  { id: '5', name: 'Co-op', type: 'Retail' },
+];
+
+export const MOCK_STORES: Store[] = [
+  { id: '1', name: 'London Bridge Store', address: '123 London Bridge St, London', region: 'South' },
+  { id: '2', name: 'Manchester Central', address: '456 Market St, Manchester', region: 'North' },
+  { id: '3', name: 'Birmingham South', address: '789 High St, Birmingham', region: 'Midlands' },
+  { id: '4', name: 'Edinburgh Central', address: '321 Princes St, Edinburgh', region: 'Scotland' },
+  { id: '5', name: 'Glasgow North', address: '654 Buchanan St, Glasgow', region: 'Scotland' },
+];
+
+export const MOCK_OFFICERS: Officer[] = [
+  { id: '1', name: 'John Smith', role: 'Security Officer', badge: 'SO001' },
+  { id: '2', name: 'Emma Brown', role: 'Senior Security Officer', badge: 'SO002' },
+  { id: '3', name: 'David Clark', role: 'Security Officer', badge: 'SO003' },
+  { id: '4', name: 'Alice Thompson', role: 'Security Supervisor', badge: 'SO004' },
+  { id: '5', name: 'Mark Wilson', role: 'Security Officer', badge: 'SO005' },
+];
+
+export const MOCK_OFFICER_ROLES: OfficerRole[] = [
+  { id: '1', name: 'Security Officer', level: 1 },
+  { id: '2', name: 'Senior Security Officer', level: 2 },
+  { id: '3', name: 'Security Supervisor', level: 3 },
+  { id: '4', name: 'Site Manager', level: 4 },
+  { id: '5', name: 'Regional Manager', level: 5 },
+]; 

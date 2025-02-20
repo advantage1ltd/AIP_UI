@@ -1112,7 +1112,7 @@ const EmployeeDiaryPage: React.FC = () => {
                 Next
               </Button>
             </div>
-          </div>
+      </div>
         </CardContent>
       </Card>
       {ErrorLogViewer}
