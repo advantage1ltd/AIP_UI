@@ -37,36 +37,61 @@ export interface StolenItem {
   cost: number
   quantity: number
   totalAmount: number
+  category: string
 }
 
 export interface Incident {
-  id?: string;
-  officerName: string
-  officerRole: string
-  customerName: string
-  siteName: string
-  offenderName: string
-  typeOfIncident: IncidentType
-  incidentType: string
-  description: string
-  incidentInvolved: IncidentInvolved[]
-  policeInvolvement: boolean
-  urnNumber?: string
-  dateOfIncident: string
-  timeOfIncident: string
-  incidentDetails: string
-  storeComments: string
-  offenderSex: OffenderSex
-  offenderAge: number
-  offenderDOB: string
-  offenderPlaceOfBirth: string
-  offenderAddress: OffenderAddress
-  personalDetailsVerified: boolean
-  policeID: string
-  crimeReferenceNumber: string
-  totalValueRecovered: number
-  stolenItems: StolenItem[]
-  dutyManagerName: string
-  dateInputted: string
-  userThatInput: string
+  id: string;
+  customerName: string;
+  siteName: string;
+  officerName: string;
+  officerRole: string;
+  dateOfIncident: string;
+  timeOfIncident: string;
+  incidentType: string;
+  description: string;
+  incidentDetails: string;
+  storeComments?: string;
+  incidentInvolved: string[];
+  policeInvolvement: boolean;
+  urnNumber?: string;
+  totalValueRecovered?: number;
+  stolenItems?: StolenItem[];
+  dutyManagerName: string;
+  dateInputted: string;
+  userThatInput: string;
+  status?: 'pending' | 'resolved' | 'in-progress';
+  priority?: 'low' | 'medium' | 'high';
+  actionTaken?: string;
+  evidenceAttached?: boolean;
+  witnessStatements?: string[];
+  involvedParties?: string[];
+  reportNumber?: string;
+  locationDetails?: {
+    area: string;
+    specificLocation: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+  };
+  timeDetails?: {
+    discoveryTime: string;
+    reportedTime: string;
+    responseTime?: string;
+  };
+  offenderName?: string;
+  offenderAddress?: {
+    houseName?: string;
+    numberAndStreet?: string;
+    villageOrSuburb?: string;
+    town?: string;
+    county?: string;
+    postCode?: string;
+  };
+  offenderSex?: 'Male' | 'Female' | 'N/A or N/K';
+  offenderDOB?: string;
+  offenderPlaceOfBirth?: string;
+  policeID?: string;
+  crimeRefNumber?: string;
 }

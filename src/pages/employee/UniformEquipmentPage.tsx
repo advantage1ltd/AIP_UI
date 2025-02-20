@@ -500,7 +500,7 @@ const UniformEquipmentPage: React.FC = () => {
                 Next
               </Button>
             </div>
-          </div>
+      </div>
         </CardContent>
       </Card>
     </div>
