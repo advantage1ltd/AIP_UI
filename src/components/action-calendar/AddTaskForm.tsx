@@ -45,68 +45,68 @@ export function AddTaskForm({ onSubmit, selectedDate }: AddTaskFormProps) {
   const getPriorityIcon = (priority: Task['priority']) => {
     switch (priority) {
       case 'high':
-        return <ArrowUpCircle className="h-4 w-4 text-red-500" />
+        return <ArrowUpCircle className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
       case 'medium':
-        return <MinusCircle className="h-4 w-4 text-amber-500" />
+        return <MinusCircle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500" />
       case 'low':
-        return <ArrowDownCircle className="h-4 w-4 text-green-500" />
+        return <ArrowDownCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
       default:
         return null
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="title">Title</Label>
+    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+      <div className="space-y-1 sm:space-y-2">
+        <Label htmlFor="title" className="text-sm sm:text-base">Title</Label>
         <Input
           id="title"
           placeholder="Enter task title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="border-purple-100 focus-visible:ring-purple-500"
+          className="border-purple-100 focus-visible:ring-purple-500 text-sm sm:text-base"
           required
         />
       </div>
       
-      <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
+      <div className="space-y-1 sm:space-y-2">
+        <Label htmlFor="description" className="text-sm sm:text-base">Description</Label>
         <Textarea
           id="description"
           placeholder="Enter task description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="min-h-[100px] resize-none border-purple-100 focus-visible:ring-purple-500"
+          className="min-h-[80px] sm:min-h-[100px] resize-none border-purple-100 focus-visible:ring-purple-500 text-sm sm:text-base"
           required
         />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="priority">Priority Level</Label>
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2">
+        <div className="space-y-1 sm:space-y-2">
+          <Label htmlFor="priority" className="text-sm sm:text-base">Priority Level</Label>
           <Select 
             value={priority} 
             onValueChange={(value: Task['priority']) => setPriority(value)}
           >
-            <SelectTrigger id="priority" className="border-purple-100 focus:ring-purple-500">
+            <SelectTrigger id="priority" className="border-purple-100 focus:ring-purple-500 text-sm sm:text-base">
               <SelectValue placeholder="Select Priority" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="high" className="flex items-center gap-2">
+              <SelectItem value="high" className="flex items-center gap-2 text-sm sm:text-base">
                 <div className="flex items-center gap-2">
-                  <ArrowUpCircle className="h-4 w-4 text-red-500" />
+                  <ArrowUpCircle className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
                   High
                 </div>
               </SelectItem>
-              <SelectItem value="medium" className="flex items-center gap-2">
+              <SelectItem value="medium" className="flex items-center gap-2 text-sm sm:text-base">
                 <div className="flex items-center gap-2">
-                  <MinusCircle className="h-4 w-4 text-amber-500" />
+                  <MinusCircle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500" />
                   Medium
                 </div>
               </SelectItem>
-              <SelectItem value="low" className="flex items-center gap-2">
+              <SelectItem value="low" className="flex items-center gap-2 text-sm sm:text-base">
                 <div className="flex items-center gap-2">
-                  <ArrowDownCircle className="h-4 w-4 text-green-500" />
+                  <ArrowDownCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
                   Low
                 </div>
               </SelectItem>
@@ -114,18 +114,18 @@ export function AddTaskForm({ onSubmit, selectedDate }: AddTaskFormProps) {
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="assignee">Assign To</Label>
+        <div className="space-y-1 sm:space-y-2">
+          <Label htmlFor="assignee" className="text-sm sm:text-base">Assign To</Label>
           <Select 
             value={assignee} 
             onValueChange={setAssignee}
           >
-            <SelectTrigger id="assignee" className="border-purple-100 focus:ring-purple-500">
+            <SelectTrigger id="assignee" className="border-purple-100 focus:ring-purple-500 text-sm sm:text-base">
               <SelectValue placeholder="Select Assignee" />
             </SelectTrigger>
             <SelectContent>
               {assignees.map((person) => (
-                <SelectItem key={person} value={person}>
+                <SelectItem key={person} value={person} className="text-sm sm:text-base">
                   {person}
                 </SelectItem>
               ))}
@@ -134,18 +134,18 @@ export function AddTaskForm({ onSubmit, selectedDate }: AddTaskFormProps) {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>Due Date</Label>
+      <div className="space-y-1 sm:space-y-2">
+        <Label className="text-sm sm:text-base">Due Date</Label>
         <Popover>
           <PopoverTrigger asChild>
             <Button
               variant={"outline"}
               className={cn(
-                "w-full justify-start text-left font-normal border-purple-100 focus:ring-purple-500",
+                "w-full justify-start text-left font-normal border-purple-100 focus:ring-purple-500 text-sm sm:text-base",
                 !date && "text-muted-foreground"
               )}
             >
-              <CalendarIcon className="mr-2 h-4 w-4" />
+              <CalendarIcon className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
               {date ? format(date, "PPP") : <span>Pick a date</span>}
             </Button>
           </PopoverTrigger>
@@ -161,7 +161,7 @@ export function AddTaskForm({ onSubmit, selectedDate }: AddTaskFormProps) {
         </Popover>
       </div>
 
-      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700">
+      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 mt-2 sm:mt-4 text-sm sm:text-base py-2 sm:py-2.5">
         Create Task
       </Button>
     </form>

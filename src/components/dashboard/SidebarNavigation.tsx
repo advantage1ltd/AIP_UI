@@ -384,25 +384,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                 >
                   <BookOpen className="h-4 w-4" />
                   <span>CBT</span>
-                </Link>
-                <Link
-                  to="/recruitment/starters"
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                  tabIndex={0}
-                  onKeyDown={handleKeyDown}
-                >
-                  <UserPlus className="h-4 w-4" />
-                  <span>Starters</span>
-                </Link>
-                <Link
-                  to="/recruitment/leavers"
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                  tabIndex={0}
-                  onKeyDown={handleKeyDown}
-                >
-                  <UserCheck className="h-4 w-4" />
-                  <span>Leavers</span>
-                </Link>
+                </Link>         
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -519,16 +501,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
               <span className="flex-1 text-left">Compliance</span>
             </AccordionTrigger>
             <AccordionContent className="pb-1 pt-0">
-              <div className="ml-4 space-y-1">
-                <Link
-                  to="/compliance/guard-certification"
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                  tabIndex={0}
-                  onKeyDown={handleKeyDown}
-                >
-                  <BadgeCheck className="h-4 w-4" />
-                  <span>Guard Certification</span>
-                </Link>
+              <div className="ml-4 space-y-1">           
                 <Link
                   to="/compliance/contract-renewal"
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
@@ -596,13 +569,13 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                   <span>Incident Report</span>
                 </Link>
                 <Link
-                  to="/customer/safe-secure-checks"
+                  to="/customer/be-safe-be-secure-graph"
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
                   tabIndex={0}
                   onKeyDown={handleKeyDown}
                 >
                   <ShieldCheck className="h-4 w-4" />
-                  <span>Safe & Secure Checks</span>
+                  <span>Be Safe Be Secure Graph</span>
                 </Link>
                 <Link
                   to="/customer/officer-support"

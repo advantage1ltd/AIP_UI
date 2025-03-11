@@ -1,7 +1,7 @@
-import { DashboardMetrics } from '@/components/Dashboard/DashboardMetrics'
-import { RecentActivity } from '@/components/Dashboard/RecentActivity'
-import { TaskScheduler } from '@/components/Dashboard/TaskScheduler'
-import { PerformanceGraph } from '@/components/Dashboard/PerformanceGraph'
+import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics'
+import { RecentActivity } from '@/components/dashboard/RecentActivity'
+import { TaskScheduler } from '@/components/dashboard/TaskScheduler'
+import { PerformanceGraph } from '@/components/dashboard/PerformanceGraph'
 
 const DashboardPage = () => {
   return (

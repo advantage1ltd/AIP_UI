@@ -7,4 +7,5 @@ export interface Lead {
   email: string;
   phone: string;
   lastInteraction: string;
+  notes?: string;
 }
