@@ -157,21 +157,22 @@ export default function Leads() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 space-y-8">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h1 className="text-4xl font-bold text-primary">New Leads</h1>
-            <p className="text-lg text-muted-foreground">
+      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
+        {/* Header with action buttons */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-border/40">
+          <div className="space-y-1 w-full sm:w-auto">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">Lead Management</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               Manage and track your potential clients
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-2 sm:mt-0">
             <LeadFilter 
               filters={filters}
               onFilterChange={handleFilterChange}
             />
             <Button 
-              className="gap-2 bg-primary hover:bg-primary/90"
+              className="gap-2 bg-primary hover:bg-primary/90 w-full sm:w-auto"
               onClick={() => setIsAddLeadOpen(true)}
             >
               <Plus className="h-4 w-4" />
@@ -180,19 +181,22 @@ export default function Leads() {
           </div>
         </div>
 
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <Input
-              placeholder="Search leads..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
-            />
+        {/* Search and Group Controls */}
+        <Card className="border border-border/40 shadow-sm">
+          <div className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="relative w-full sm:max-w-sm">
+              <Input
+                placeholder="Search leads..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full"
+              />
+            </div>
             <Select 
               value={groupBy || 'none'} 
               onValueChange={(value) => setGroupBy(value === 'none' ? null : value as "status" | "company")}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Group by..." />
               </SelectTrigger>
               <SelectContent>
@@ -204,37 +208,73 @@ export default function Leads() {
           </div>
         </Card>
 
-        {groupedLeads ? (
-          Object.entries(groupedLeads).map(([group, leads]) => (
-            <div key={group} className="space-y-4">
-              <h2 className="text-lg font-semibold">{group}</h2>
-              <LeadTable 
-                leads={leads}
-                onMoveToContact={handleMoveToContact}
-              />
-            </div>
-          ))
-        ) : (
-          <LeadTable 
-            leads={filteredLeads}
-            onMoveToContact={handleMoveToContact}
-          />
+        {/* Lead Count Summary */}
+        <div className="text-sm text-muted-foreground">
+          Showing {filteredLeads.length} {filteredLeads.length === 1 ? 'lead' : 'leads'}
+          {filters.status ? ` with status "${filters.status}"` : ''}
+          {searchQuery ? ` matching "${searchQuery}"` : ''}
+        </div>
+
+        {/* Leads Table */}
+        <div className="bg-white rounded-lg border border-border/40 shadow-sm overflow-hidden">
+          {groupedLeads ? (
+            Object.entries(groupedLeads).map(([group, leads]) => (
+              <div key={group} className="space-y-2 p-4 sm:p-6">
+                <h2 className="text-lg font-semibold text-primary">{group}</h2>
+                <LeadTable 
+                  leads={leads}
+                  onMoveToContact={handleMoveToContact}
+                />
+              </div>
+            ))
+          ) : (
+            <LeadTable 
+              leads={filteredLeads}
+              onMoveToContact={handleMoveToContact}
+            />
+          )}
+        </div>
+
+        {/* Add Lead Button (Bottom) */}
+        {filteredLeads.length > 0 && (
+          <Button
+            variant="outline"
+            className="w-full py-4 sm:py-6 border-dashed"
+            onClick={() => setIsAddLeadOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add lead
+          </Button>
         )}
 
-        <Button
-          variant="outline"
-          className="w-full py-6 border-dashed"
-          onClick={() => setIsAddLeadOpen(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add lead
-        </Button>
+        {/* Empty State */}
+        {filteredLeads.length === 0 && (
+          <div className="flex flex-col items-center justify-center p-8 sm:p-12 bg-white rounded-lg border border-border/40 shadow-sm text-center">
+            <div className="rounded-full bg-primary/10 p-3 mb-4">
+              <Plus className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No leads found</h3>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              {searchQuery || filters.status 
+                ? "Try adjusting your search or filters to find what you're looking for." 
+                : "Get started by adding your first lead to begin tracking potential clients."}
+            </p>
+            <Button 
+              className="gap-2 bg-primary hover:bg-primary/90"
+              onClick={() => setIsAddLeadOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Add your first lead
+            </Button>
+          </div>
+        )}
       </div>
 
+      {/* Add Lead Dialog */}
       <Dialog open={isAddLeadOpen} onOpenChange={setIsAddLeadOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-primary">
+            <DialogTitle className="text-xl sm:text-2xl font-bold text-primary">
               Add New Lead
             </DialogTitle>
             <DialogDescription>

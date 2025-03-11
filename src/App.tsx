@@ -26,7 +26,6 @@ const CustomerReportingPage = lazy(() => import('@/pages/management/CustomerRepo
 const ManagerCustomerReportPage = lazy(() => import('@/pages/management/ManagerCustomerReportPage'))
 const ManagerSupportPage = lazy(() => import('@/pages/management/ManagerSupportPage'))
 const IncidentsReportPage = lazy(() => import('@/pages/management/IncidentsReportPage'))
-const GuardCertificationPage = lazy(() => import('@/pages/compliance/GuardCertificationPage'))
 const ContractRenewalPage = lazy(() => import('@/pages/compliance/ContractRenewalPage'))
 const PasswordRegisterPage = lazy(() => import('@/pages/compliance/PasswordRegisterPage'))
 const AssetRegisterPage = lazy(() => import('@/pages/compliance/AssetRegisterPage'))
@@ -44,16 +43,14 @@ const Deals = lazy(() => import('@/pages/crm/Deals'))
 const Pipeline = lazy(() => import('@/pages/crm/Pipeline'))
 const Vetting = lazy(() => import("./pages/recruitment/Vetting"))
 const CBT = lazy(() => import("./pages/recruitment/CBT"))
-const Starters = lazy(() => import("./pages/recruitment/Starters"))
-const Leavers = lazy(() => import("./pages/recruitment/Leavers"))
 const HolidayRequestPage = lazy(() => import('@/pages/operations/HolidayRequestPage'))
 const CustomerDAR = lazy(() => import('./pages/customer/CustomerDAR'))
 const IncidentGraph = lazy(() => import('./pages/customer/IncidentGraph'))
 const IncidentReport = lazy(() => import('./pages/customer/IncidentReport'))
-const SafeSecureChecks = lazy(() => import('./pages/customer/SafeSecureChecks'))
 const SatisfactionReports = lazy(() => import('./pages/customer/SatisfactionReports'))
 const OfficerSupport = lazy(() => import('./pages/customer/OfficerSupport'))
 const OfficerPerformancePage = lazy(() => import('./pages/management/OfficerPerformance'))
+const BeSafeBeSecureGraph = lazy(() => import('./pages/customer/BeSafeBeSecureGraph'))
 
 const App: React.FC = () => {
   return (
@@ -92,8 +89,6 @@ const App: React.FC = () => {
               <Route path="/recruitment">
                 <Route path="vetting" element={<Vetting />} />
                 <Route path="cbt" element={<CBT />} />
-                <Route path="starters" element={<Starters />} />
-                <Route path="leavers" element={<Leavers />} />
               </Route>
 
               {/* Operations Routes */}
@@ -129,7 +124,6 @@ const App: React.FC = () => {
 
               {/* Compliance Routes */}
               <Route path="/compliance">
-                <Route path="guard-certification" element={<GuardCertificationPage />} />
                 <Route path="contract-renewal" element={<ContractRenewalPage />} />
                 <Route path="password-register" element={<PasswordRegisterPage />} />
                 <Route path="asset-register" element={<AssetRegisterPage />} />
@@ -140,9 +134,8 @@ const App: React.FC = () => {
                 <Route path="dar" element={<CustomerDAR />} />
                 <Route path="incident-graph" element={<IncidentGraph />} />
                 <Route path="incident-report" element={<IncidentReport />} />
-                <Route path="safe-secure-checks" element={<SafeSecureChecks />} />
-                <Route path="officer-support" element={<OfficerSupport />} />
                 <Route path="satisfaction-reports" element={<SatisfactionReports />} />
+                <Route path="be-safe-be-secure-graph" element={<BeSafeBeSecureGraph />} />
               </Route>
             </Routes>
           </Suspense>

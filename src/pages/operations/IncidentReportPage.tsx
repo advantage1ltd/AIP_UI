@@ -290,6 +290,7 @@ export default function IncidentReportPage() {
               <DialogTitle className="text-2xl font-bold">
                 {editingIncident ? 'Edit Incident Report' : 'Officer Incident Report'}
               </DialogTitle>
+              
               <DialogDescription className="text-gray-500">
         
               </DialogDescription>
