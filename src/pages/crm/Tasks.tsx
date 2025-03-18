@@ -323,7 +323,7 @@ function Tasks() {
             <Button onClick={() => setShowNewTaskDialog(true)} className="h-9">
               <Plus className="h-4 w-4 mr-2" />
               New Task
-            </Button>
+          </Button>
           </div>
         </div>
 
@@ -370,7 +370,7 @@ function Tasks() {
               <CardTitle className="text-xs sm:text-sm font-medium text-white">Due Today</CardTitle>
               <div className="rounded-full bg-amber-500/30 p-1.5 sm:p-2">
                 <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-              </div>
+          </div>
             </CardHeader>
             <CardContent className="px-4 pb-4">
               <div className="text-xl sm:text-2xl font-bold text-white">{taskStats.dueToday}</div>
@@ -379,7 +379,7 @@ function Tasks() {
                   {taskStats.overdue} overdue
                 </span>
                 <span className="text-xs text-amber-100 ml-1.5">tasks need attention</span>
-              </div>
+          </div>
             </CardContent>
           </Card>
 
@@ -388,7 +388,7 @@ function Tasks() {
               <CardTitle className="text-xs sm:text-sm font-medium text-white">High Priority</CardTitle>
               <div className="rounded-full bg-red-500/30 p-1.5 sm:p-2">
                 <ArrowUpCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-              </div>
+          </div>
             </CardHeader>
             <CardContent className="px-4 pb-4">
               <div className="text-xl sm:text-2xl font-bold text-white">{taskStats.highPriority}</div>
@@ -397,7 +397,7 @@ function Tasks() {
                   {taskStats.stuck} blocked
                 </span>
                 <span className="text-xs text-red-100 ml-1.5">tasks need review</span>
-              </div>
+          </div>
             </CardContent>
           </Card>
         </div>
@@ -407,47 +407,47 @@ function Tasks() {
           <div className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-3">
             <div className="relative w-full sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search tasks..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+            <Input
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="working">In Progress</SelectItem>
                 <SelectItem value="done">Completed</SelectItem>
                 <SelectItem value="stuck">Blocked</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            </SelectContent>
+          </Select>
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priorities</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-              </SelectContent>
-            </Select>
+              <SelectValue placeholder="Filter by priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Priorities</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+            </SelectContent>
+          </Select>
             <Button variant="outline" size="icon" className="hidden sm:flex">
               <SlidersHorizontal className="h-4 w-4" />
-            </Button>
+          </Button>
           </div>
         </Card>
 
         {/* Tasks Table */}
         <Card className="border border-border/40 shadow-sm overflow-hidden">
-          <Table>
-            <TableHeader>
+                <Table>
+                  <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-12">
+                      <TableHead className="w-12">
                   <Checkbox
                     checked={selectedTasks.length === filteredTasks.length}
                     onCheckedChange={(checked) => {
@@ -458,17 +458,17 @@ function Tasks() {
                       }
                     }}
                   />
-                </TableHead>
+                      </TableHead>
                 <TableHead>Task</TableHead>
                 <TableHead className="hidden md:table-cell">Assignees</TableHead>
-                <TableHead>Status</TableHead>
+                      <TableHead>Status</TableHead>
                 <TableHead className="hidden sm:table-cell">Priority</TableHead>
                 <TableHead className="hidden lg:table-cell">Due Date</TableHead>
                 <TableHead className="hidden xl:table-cell">Progress</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
               {filteredTasks.map((task) => (
                 <TableRow 
                   key={task.id} 
@@ -503,9 +503,9 @@ function Tasks() {
                               {tag}
                             </Badge>
                           ))}
-                        </div>
-                      )}
-                    </div>
+            </div>
+          )}
+        </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                     <div className="flex -space-x-2">
@@ -579,7 +579,7 @@ function Tasks() {
                       <span className="text-xs tabular-nums text-muted-foreground">
                         {task.progress}%
                       </span>
-                    </div>
+      </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-2">
@@ -631,95 +631,95 @@ function Tasks() {
         </Card>
 
         {/* Task Creation Dialog */}
-        <Dialog open={showNewTaskDialog} onOpenChange={setShowNewTaskDialog}>
+      <Dialog open={showNewTaskDialog} onOpenChange={setShowNewTaskDialog}>
           <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
+          <DialogHeader>
               <DialogTitle>Create New Task</DialogTitle>
               <DialogDescription>
                 Add a new task to track work and progress
               </DialogDescription>
-            </DialogHeader>
+          </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="title">Task Title</Label>
-                <Input
-                  id="title"
+              <Input
+                id="title"
                   placeholder="Enter task title"
-                  value={newTask.title}
+                value={newTask.title}
                   onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                />
-              </div>
+              />
+            </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={newTask.status}
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={newTask.status}
                     onValueChange={(value) =>
                       setNewTask({ ...newTask, status: value as Task["status"] })
                     }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
                       <SelectItem value="working">In Progress</SelectItem>
                       <SelectItem value="done">Completed</SelectItem>
                       <SelectItem value="stuck">Blocked</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                </SelectContent>
+              </Select>
+            </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="priority">Priority</Label>
-                  <Select
-                    value={newTask.priority}
+              <Label htmlFor="priority">Priority</Label>
+              <Select
+                value={newTask.priority}
                     onValueChange={(value) =>
                       setNewTask({ ...newTask, priority: value as Task["priority"] })
                     }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="dueDate">Due Date</Label>
-                <Input
-                  id="dueDate"
-                  type="date"
-                  value={newTask.dueDate}
+              <Label htmlFor="dueDate">Due Date</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                value={newTask.dueDate}
                   onChange={(e) =>
                     setNewTask({ ...newTask, dueDate: e.target.value })
                   }
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
                   placeholder="Add any additional details..."
-                  value={newTask.notes}
+                value={newTask.notes}
                   onChange={(e) =>
                     setNewTask({ ...newTask, notes: e.target.value })
                   }
-                />
-              </div>
+              />
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowNewTaskDialog(false)}>
-                Cancel
-              </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewTaskDialog(false)}>
+              Cancel
+            </Button>
               <Button onClick={handleAddTask} disabled={!newTask.title}>
                 Create Task
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -758,12 +758,12 @@ function Tasks() {
         {/* Edit Task Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Edit Task</DialogTitle>
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
               <DialogDescription>
                 Make changes to the task details
               </DialogDescription>
-            </DialogHeader>
+          </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="edit-title">Task Title</Label>
@@ -778,8 +778,8 @@ function Tasks() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-status">Status</Label>
-                  <Select
+                <Label htmlFor="edit-status">Status</Label>
+                <Select
                     value={editingTask?.status || "working"}
                     onValueChange={(value: Task['status']) =>
                       setEditingTask(editingTask ? { ...editingTask, status: value } : null)
@@ -787,17 +787,17 @@ function Tasks() {
                   >
                     <SelectTrigger id="edit-status">
                       <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
+                  </SelectTrigger>
+                  <SelectContent>
                       <SelectItem value="working">In Progress</SelectItem>
                       <SelectItem value="done">Completed</SelectItem>
                       <SelectItem value="stuck">Blocked</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  </SelectContent>
+                </Select>
+              </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-priority">Priority</Label>
-                  <Select
+                <Label htmlFor="edit-priority">Priority</Label>
+                <Select
                     value={editingTask?.priority || "medium"}
                     onValueChange={(value: Task['priority']) =>
                       setEditingTask(editingTask ? { ...editingTask, priority: value } : null)
@@ -805,14 +805,14 @@ function Tasks() {
                   >
                     <SelectTrigger id="edit-priority">
                       <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-due-date">Due Date</Label>
@@ -837,16 +837,16 @@ function Tasks() {
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                Cancel
-              </Button>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
               <Button onClick={handleEditTask} disabled={!editingTask?.title}>
                 Save Changes
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   )
