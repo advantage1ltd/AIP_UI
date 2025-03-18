@@ -26,8 +26,7 @@ const Tasks = lazy(() => import('./pages/crm/Tasks'))
 // Recruitment
 const Vetting = lazy(() => import('./pages/recruitment/Vetting'))
 const CBT = lazy(() => import('./pages/recruitment/CBT'))
-const Starters = lazy(() => import('./pages/recruitment/Starters'))
-const Leavers = lazy(() => import('./pages/recruitment/Leavers'))
+
 
 // Operations
 const IncidentReportPage = lazy(() => import('./pages/operations/IncidentReportPage'))
@@ -42,22 +41,20 @@ const OfficerSupportPage = lazy(() => import('./pages/operations/OfficerSupportP
 const OfficerExpensesPage = lazy(() => import('./pages/operations/OfficerExpensesPage'))
 
 // Employee
-const UniformEquipmentPage = lazy(() => import('./pages/employee/UniformEquipment'))
-const DisciplinaryPage = lazy(() => import('./pages/employee/Disciplinary'))
-const EmployeeDiaryPage = lazy(() => import('./pages/employee/EmployeeDiary'))
-const TrainingRecordPage = lazy(() => import('./pages/employee/TrainingRecord'))
+const UniformEquipmentPage = lazy(() => import('./pages/employee/UniformEquipmentPage'))
+const DisciplinaryPage = lazy(() => import('./pages/employee/DisciplinaryPage'))
+const EmployeeDiaryPage = lazy(() => import('./pages/employee/EmployeeDiaryPage'))
+
 
 // Management
-const CustomerReportingPage = lazy(() => import('./pages/management/CustomerReporting'))
-const ManagerCustomerReportPage = lazy(() => import('./pages/management/ManagerCustomerReport'))
-const ManagerSupportPage = lazy(() => import('./pages/management/ManagerSupport'))
-const IncidentsReportPage = lazy(() => import('./pages/management/IncidentsReport'))
+const CustomerReportingPage = lazy(() => import('./pages/management/CustomerReportingPage'))
+const ManagerSupportPage = lazy(() => import('./pages/management/ManagerSupportPage'))
+const IncidentsReportPage = lazy(() => import('./pages/management/IncidentsReportPage'))
 
 // Compliance
-const GuardCertificationPage = lazy(() => import('./pages/compliance/GuardCertification'))
-const ContractRenewalPage = lazy(() => import('./pages/compliance/ContractRenewal'))
-const PasswordRegisterPage = lazy(() => import('./pages/compliance/PasswordRegister'))
-const AssetRegisterPage = lazy(() => import('./pages/compliance/AssetRegister'))
+const ContractRenewalPage = lazy(() => import('./pages/compliance/ContractRenewalPage'))
+const PasswordRegisterPage = lazy(() => import('./pages/compliance/PasswordRegisterPage'))
+const AssetRegisterPage = lazy(() => import('./pages/compliance/AssetRegisterPage'))
 
 const AppRoutes = () => {
   return (
@@ -91,8 +88,7 @@ const AppRoutes = () => {
           {/* Recruitment Routes */}
           <Route path="/recruitment/vetting" element={<Vetting />} />
           <Route path="/recruitment/cbt" element={<CBT />} />
-          <Route path="/recruitment/starters" element={<Starters />} />
-          <Route path="/recruitment/leavers" element={<Leavers />} />
+       
 
           {/* Operations Routes */}
           <Route path="/operations/incident-report" element={<IncidentReportPage />} />
@@ -110,16 +106,14 @@ const AppRoutes = () => {
           <Route path="/employee/uniform-equipment" element={<UniformEquipmentPage />} />
           <Route path="/employee/disciplinary" element={<DisciplinaryPage />} />
           <Route path="/employee/diary" element={<EmployeeDiaryPage />} />
-          <Route path="/employee/training" element={<TrainingRecordPage />} />
+     
 
           {/* Management Routes */}
           <Route path="/management/customer-reporting" element={<CustomerReportingPage />} />
-          <Route path="/management/manager-customer-report" element={<ManagerCustomerReportPage />} />
           <Route path="/management/manager-support" element={<ManagerSupportPage />} />
           <Route path="/management/incidents-report" element={<IncidentsReportPage />} />
 
           {/* Compliance Routes */}
-          <Route path="/compliance/guard-certification" element={<GuardCertificationPage />} />
           <Route path="/compliance/contract-renewal" element={<ContractRenewalPage />} />
           <Route path="/compliance/password-register" element={<PasswordRegisterPage />} />
           <Route path="/compliance/asset-register" element={<AssetRegisterPage />} />

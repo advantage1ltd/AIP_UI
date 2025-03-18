@@ -108,40 +108,40 @@ const incidentTypeData: IncidentTypeData[] = [
   { code: 'R', type: 'Police Failed to Attend', count: 3, description: 'Police non-attendance cases' }
 ];
 
-// Update color palette for better 3D effect
+// Update color palette for better 3D effect with more vibrant colors
 const colorPalette = [
-  '#2563eb', // Primary Blue
-  '#4f46e5', // Indigo
-  '#7c3aed', // Purple
-  '#db2777', // Pink
-  '#f59e0b', // Amber
-  '#10b981', // Emerald
   '#3b82f6', // Blue
   '#8b5cf6', // Purple
   '#ec4899', // Pink
+  '#f97316', // Orange
+  '#10b981', // Emerald
   '#06b6d4', // Cyan
+  '#6366f1', // Indigo
+  '#f43f5e', // Rose
+  '#facc15', // Yellow
+  '#14b8a6', // Teal
 ];
 
-// Update action code colors for better distinction
+// Update action code colors for better distinction and vibrancy
 const actionCodeColors: Record<string, string> = {
-  'A': '#FF4444', // Bright Red for Arrests
-  'B': '#33B5E5', // Bright Blue for Deterrent
-  'C': '#AA66CC', // Purple for Theft
-  'D': '#FFBB33', // Orange for Criminal Damage
-  'E': '#00C851', // Green for Fraud
-  'F': '#FF8800', // Dark Orange for Suspicious
-  'G': '#2BBBAD', // Teal for Underage
-  'H': '#4285F4', // Royal Blue for Anti-Social
-  'I': '#ff6b6b', // Coral for Other
-  'J': '#5E35B1', // Deep Purple for Self Scan
-  'K': '#FB3640', // Red-Orange for Abusive
-  'L': '#FF4081', // Pink for Threats
-  'M': '#00BCD4', // Cyan for Spitting
-  'N': '#673AB7', // Deep Purple for Bans
-  'O': '#E53935', // Deep Red for Violent
-  'P': '#26A69A', // Teal for Scan and Go
-  'Q': '#3949AB', // Indigo for Police
-  'R': '#EC407A'  // Pink for Failed Police
+  'A': '#ef4444', // Red for Arrests
+  'B': '#3b82f6', // Blue for Deterrent
+  'C': '#8b5cf6', // Purple for Theft
+  'D': '#f97316', // Orange for Criminal Damage
+  'E': '#10b981', // Green for Fraud
+  'F': '#f59e0b', // Amber for Suspicious
+  'G': '#14b8a6', // Teal for Underage
+  'H': '#6366f1', // Indigo for Anti-Social
+  'I': '#f43f5e', // Rose for Other
+  'J': '#7c3aed', // Violet for Self Scan
+  'K': '#dc2626', // Red for Abusive
+  'L': '#ec4899', // Pink for Threats
+  'M': '#06b6d4', // Cyan for Spitting
+  'N': '#7c3aed', // Violet for Bans
+  'O': '#b91c1c', // Dark Red for Violent
+  'P': '#0d9488', // Teal for Scan and Go
+  'Q': '#4f46e5', // Indigo for Police
+  'R': '#db2777'  // Pink for Failed Police
 };
 
 // Define regions and their stores
@@ -168,7 +168,7 @@ const IncidentGraph = () => {
   const [data, setData] = useState<IncidentData[]>(mockIncidentData)
   const [totalSaved, setTotalSaved] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const storesPerPage = 20
+  const [storesPerPage, setStoresPerPage] = useState(20)
   const [filteredTotal, setFilteredTotal] = useState(0)
 
   // Add logging for initial mount
@@ -177,6 +177,28 @@ const IncidentGraph = () => {
     // Calculate total saved
     const total = mockIncidentData.reduce((acc, curr) => acc + curr.valueRecovered, 0)
     setTotalSaved(total)
+    
+    // Set responsive storesPerPage based on screen size
+    const handleResize = () => {
+      if (window.innerWidth < 640) { // Mobile
+        setStoresPerPage(5);
+      } else if (window.innerWidth < 1024) { // Tablet/iPad
+        setStoresPerPage(10);
+      } else { // Desktop
+        setStoresPerPage(20);
+      }
+    };
+    
+    // Initial call
+    handleResize();
+    
+    // Add event listener for window resize
+    window.addEventListener('resize', handleResize);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, [])
 
   const getTimeFilteredData = useCallback((inputData: IncidentData[]): IncidentData[] => {
@@ -314,7 +336,7 @@ const IncidentGraph = () => {
       
       // Apply mock time filtering (in real app, this would use actual dates)
       if (timeFilter !== 'all') {
-        const filterFactor = timeFilter === 'week' ? 0.8 : // Increased from 0.2 to 0.8 to show more data for current week
+        const filterFactor = timeFilter === 'week' ? 0.8 : 
                            timeFilter === 'month' ? 0.5 : 0.8;
         
         filteredIncidents = incidentTypeData.map(item => ({
@@ -342,56 +364,76 @@ const IncidentGraph = () => {
       }
 
       chartData = filteredIncidents.map(item => ({
-        name: item.type,
+        name: item.type.length > 12 ? item.type.substring(0, 10) + '...' : item.type, // Truncate long names for better display
         code: item.code,
         count: item.count,
-        originalCode: item.code
+        originalCode: item.code,
+        fullName: item.type // Keep the full name for tooltips
       }));
       barName = 'Incident Count';
     } else {
-      chartData = paginatedData;
+      // For location-based charts, truncate location names for better display on mobile
+      chartData = paginatedData.map(item => ({
+        location: window.innerWidth < 640 ? 
+          (item.location.split(' - ')[0]) : // Just show store number on mobile
+          (item.location.length > 20 ? item.location.substring(0, 18) + '...' : item.location),
+        value: item.value,
+        quantity: item.quantity,
+        fullLocation: item.location // Keep the full location for tooltips
+      }));
       barName = officerType === 'uniform' ? 'Uniform Officer' :
                 officerType === 'detective' ? 'Store Detective' :
                 'Total Value';
     }
 
-    // Calculate container width based on screen size
-    const containerWidth = window.innerWidth < 640 ? window.innerWidth - 48 : // sm
-                         window.innerWidth < 768 ? window.innerWidth - 64 : // md
-                         window.innerWidth < 1024 ? window.innerWidth - 96 : // lg
-                         window.innerWidth - 128; // xl and above
+    // Improve responsive calculations for container width
+    const containerWidth = window.innerWidth < 640 ? window.innerWidth - 32 : // sm
+                         window.innerWidth < 768 ? window.innerWidth - 48 : // md
+                         window.innerWidth < 1024 ? window.innerWidth - 64 : // lg
+                         window.innerWidth - 96; // xl and above
 
-    // Calculate available width for bars (accounting for margins and axes)
-    const availableWidth = containerWidth - (window.innerWidth < 768 ? 100 : 140);
+    // Adjust available width calculation for better mobile display
+    const availableWidth = containerWidth - (window.innerWidth < 640 ? 60 : 
+                                           window.innerWidth < 768 ? 80 : 120);
 
-    // Calculate optimal bar size based on number of items and available width
-    const itemCount = chartData.length;
-    const maxBarsInView = graphType === 'type' ? incidentTypeData.length : paginatedData.length;
+    // Adjust spacing for better mobile display
+    const spacing = window.innerWidth < 640 ? 1.5 : 2; // Reduce spacing on mobile
     
-    // Calculate bar size with spacing consideration
-    const spacing = 2; // Space between bars as a multiplier
-    const calculatedBarSize = (availableWidth / maxBarsInView) / spacing;
+    // Calculate maxBarsInView based on chart type and screen size
+    const maxBarsInView = graphType === 'type' ? 
+                         (window.innerWidth < 640 ? Math.min(8, incidentTypeData.length) : incidentTypeData.length) : 
+                         paginatedData.length;
     
-    // Set minimum and maximum bar sizes based on number of items
-    const minBarSize = Math.max(20, availableWidth / 100);
-    const maxBarSize = Math.min(100, availableWidth / (maxBarsInView * spacing));
-    
-    // Final bar size calculation with bounds
-    const dynamicBarSize = Math.max(
-      minBarSize,
-      Math.min(
-        maxBarSize,
-        calculatedBarSize
-      )
+    // Adjust bar size calculations for mobile
+    const minBarSize = Math.max(15, availableWidth / (window.innerWidth < 640 ? 80 : 100));
+    const maxBarSize = Math.min(
+      window.innerWidth < 640 ? 40 : 100, 
+      availableWidth / (maxBarsInView * spacing)
     );
-
-    // Calculate dynamic height based on bar size and number of items
-    const baseHeight = window.innerWidth < 768 ? 300 : 400;
-    const heightPerItem = dynamicBarSize * 2;
-    const minHeight = Math.max(baseHeight, heightPerItem * maxBarsInView / 2);
-    const maxHeight = window.innerWidth < 768 ? 500 : 900;
     
+    // Adjust height calculations for better mobile display
+    const baseHeight = window.innerWidth < 640 ? 250 : 
+                     window.innerWidth < 768 ? 300 : 400;
+    const maxHeight = window.innerWidth < 640 ? 400 : 
+                     window.innerWidth < 768 ? 500 : 900;
+    
+    // Calculate dynamic height based on bar size and number of items
+    const itemCount = chartData.length;
+    const heightPerItem = maxBarSize * 2;
+    const minHeight = Math.max(baseHeight, heightPerItem * itemCount / 2);
     const dynamicHeight = Math.min(maxHeight, minHeight);
+
+    // Calculate optimal X-axis angle based on screen size and number of items
+    const xAxisAngle = window.innerWidth < 640 ? 
+                      (chartData.length > 5 ? -60 : -45) : 
+                      (chartData.length > 10 ? -45 : -30);
+
+    // Calculate optimal X-axis height based on screen size and label length
+    const xAxisHeight = window.innerWidth < 640 ? 
+                      (chartData.length > 5 ? 70 : 60) : 
+                      window.innerWidth < 768 ? 
+                        (chartData.length > 10 ? 90 : 80) : 
+                        (chartData.length > 15 ? 110 : 100);
 
     const getBarFill = (entry: any, index: number) => {
       if (graphType === 'type' && entry.originalCode) {
@@ -402,211 +444,356 @@ const IncidentGraph = () => {
 
     const formatValue = (value: number) => {
       if (graphType === 'value') {
+        // Format currency values more compactly on mobile
+        if (window.innerWidth < 640) {
+          if (value >= 1000) {
+            return `£${(value / 1000).toFixed(1)}k`;
+          }
+          return `£${Number(value).toFixed(0)}`;
+        }
         return `£${Number(value).toFixed(0)}`;
       }
       return value.toString();
     };
 
+    // Create style tag for animations - simplified approach
+    const animationClass = "animate-pulse-slow";
+
     return (
-      <div className="space-y-6">
-        <div className="bg-slate-900/90 dark:bg-slate-950/90 rounded-xl p-2 sm:p-4 md:p-6 shadow-2xl border border-slate-800/50">
-          <ResponsiveContainer width="100%" height={dynamicHeight}>
-            <BarChart
-              data={chartData}
-              margin={{
-                top: 30,
-                right: window.innerWidth < 768 ? 20 : 40,
-                left: window.innerWidth < 768 ? 60 : 80,
-                bottom: window.innerWidth < 768 ? 80 : 100
-              }}
-              barSize={dynamicBarSize}
-              barGap={0}
-              barCategoryGap={dynamicBarSize / 2}
-            >
-              <defs>
-                {chartData.map((entry, index) => {
-                  const baseColor = getBarFill(entry, index);
-                  // Create unique gradient IDs for each bar
-                  return (
-                    <React.Fragment key={index}>
-                      {/* Front face gradient - more vibrant with subtle shading */}
-                      <linearGradient id={`frontGradient${index}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={baseColor} stopOpacity={1} />
-                        <stop offset="45%" stopColor={baseColor} stopOpacity={0.95} />
-                        <stop offset="100%" stopColor={baseColor} stopOpacity={0.85} />
-                      </linearGradient>
-                      {/* Right side face gradient - darker with depth */}
-                      <linearGradient id={`sideGradient${index}`} x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor={baseColor} stopOpacity={0.7} />
-                        <stop offset="40%" stopColor={baseColor} stopOpacity={0.6} />
-                        <stop offset="100%" stopColor={baseColor} stopOpacity={0.4} />
-                      </linearGradient>
-                      {/* Top face gradient - lighter with highlight */}
-                      <linearGradient id={`topGradient${index}`} x1="0" y1="1" x2="1" y2="0">
-                        <stop offset="0%" stopColor={baseColor} stopOpacity={0.9} />
-                        <stop offset="40%" stopColor={baseColor} stopOpacity={0.85} />
-                        <stop offset="100%" stopColor={baseColor} stopOpacity={0.95} />
-                      </linearGradient>
-                    </React.Fragment>
-                  );
-                })}
-                <filter id="shadow">
-                  <feDropShadow dx="3" dy="6" stdDeviation="4" floodOpacity="0.25" />
-                </filter>
-              </defs>
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                stroke="rgba(255,255,255,0.1)"
-                vertical={false}
-              />
-              <XAxis 
-                dataKey={graphType === 'type' ? 'name' : 'location'}
-                angle={-45}
-                textAnchor="end"
-                height={window.innerWidth < 768 ? 80 : 100}
-                interval={0}
-                tick={{ 
-                  fontSize: window.innerWidth < 768 ? 
-                    (chartData.length > 10 ? 8 : 10) : 
-                    (chartData.length > 10 ? 11 : 12),
-                  fill: '#E2E8F0' 
-                }}
-                axisLine={{ stroke: '#475569' }}
-              />
-              <YAxis 
-                label={{ 
-                  value: graphType === 'type' ? 'Number of Incidents' : 
-                         graphType === 'value' ? 'Amount Recovered (£)' : 
-                         'Number of Items',
-                  angle: -90,
-                  position: 'insideLeft',
-                  offset: window.innerWidth < 768 ? -45 : -60,
-                  fill: '#94A3B8',
-                  fontSize: window.innerWidth < 768 ? 12 : 14
-                }}
-                tickFormatter={formatValue}
-                tick={{ 
-                  fontSize: window.innerWidth < 768 ? 10 : 12,
-                  fill: '#94A3B8' 
-                }}
-                axisLine={{ stroke: '#475569' }}
-              />
-              <Tooltip 
-                formatter={(value: any, name: string) => {
-                  if (graphType === 'type') {
-                    return [`${value} incidents`, name];
-                  }
-                  return [formatValue(value), name];
-                }}
-                contentStyle={{
-                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                  border: '1px solid rgba(148, 163, 184, 0.2)',
-                  borderRadius: '8px',
-                  padding: '12px',
-                  color: '#E2E8F0',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)'
-                }}
-              />
-              <Legend 
-                wrapperStyle={{
-                  paddingTop: '20px'
-                }}
-                formatter={(value) => <span style={{ color: '#94A3B8' }}>{value}</span>}
-              />
-              <Bar 
-                dataKey={graphType === 'type' ? 'count' : graphType === 'value' ? 'value' : 'quantity'}
-                name={barName}
-                radius={[0, 0, 0, 0]}
-                style={{
-                  transform: 'perspective(1500px) rotateY(-22deg) rotateX(8deg)',
-                  transformOrigin: 'center',
-                  filter: 'url(#shadow)'
-                }}
-                minPointSize={0}
-                shape={(props) => {
-                  const { x, y, width, height, index } = props;
-                  const depth = width * 0.35; // Optimized depth for better proportion
-                  const topHeight = depth * 0.5; // Height of the top face slope
-                  
-                  return (
-                    <g>
-                      {/* Right side face */}
-                      <path 
-                        d={`
-                          M ${x + width} ${y}
-                          l ${depth} ${-topHeight}
-                          l 0 ${height}
-                          l ${-depth} ${depth * 0.3}
-                          Z
-                        `}
-                        fill={`url(#sideGradient${index})`}
+      <div className="space-y-4 sm:space-y-6">
+        <div className="bg-slate-900/90 dark:bg-slate-950/90 rounded-xl p-2 sm:p-4 md:p-6 lg:p-8 shadow-2xl border border-slate-800/50 relative overflow-hidden">
+          {/* Add subtle background pattern for depth */}
+          <div className="absolute inset-0 bg-grid-slate-800/20 [mask-image:linear-gradient(0deg,rgba(0,0,0,0.7),rgba(0,0,0,0.5))]"></div>
+          
+          {/* Add subtle glow effect */}
+          <div className="absolute -inset-[1px] bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 rounded-xl blur-sm"></div>
+          
+          <div className="relative">
+            {/* Add horizontal scrolling container for mobile */}
+            <div className={cn(
+              "w-full overflow-hidden",
+              graphType !== 'type' && chartData.length > 5 && window.innerWidth < 640 ? 'overflow-x-auto pb-4' : ''
+            )}>
+              <div className={cn(
+                "w-full",
+                graphType !== 'type' && chartData.length > 5 && window.innerWidth < 640 ? 'min-w-[400px]' : ''
+              )}>
+                <ResponsiveContainer 
+                  width="100%" 
+                  height={window.innerWidth < 640 ? 300 : window.innerWidth < 1024 ? 400 : 500}
+                  className="mt-4"
+                >
+                  <BarChart
+                    data={chartData}
+                    margin={{
+                      top: window.innerWidth < 640 ? 15 : 20,
+                      right: window.innerWidth < 640 ? 10 : window.innerWidth < 1024 ? 20 : 30,
+                      left: window.innerWidth < 640 ? 35 : window.innerWidth < 1024 ? 50 : 60,
+                      bottom: window.innerWidth < 640 ? 60 : window.innerWidth < 1024 ? 80 : 100
+                    }}
+                    barSize={window.innerWidth < 640 ? 25 : window.innerWidth < 1024 ? 35 : maxBarSize}
+                    barGap={0}
+                    barCategoryGap={window.innerWidth < 640 ? 15 : window.innerWidth < 1024 ? 25 : maxBarSize}
+                  >
+                    <defs>
+                      {chartData.map((entry, index) => {
+                        const baseColor = getBarFill(entry, index);
+                        // Create unique gradient IDs for each bar
+                        return (
+                          <React.Fragment key={index}>
+                            {/* Front face gradient - more vibrant with enhanced shading */}
+                            <linearGradient id={`frontGradient${index}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={baseColor} stopOpacity={1} />
+                              <stop offset="45%" stopColor={baseColor} stopOpacity={0.95} />
+                              <stop offset="100%" stopColor={baseColor} stopOpacity={0.85} />
+                            </linearGradient>
+                            
+                            {/* Right side face gradient - darker with enhanced depth */}
+                            <linearGradient id={`sideGradient${index}`} x1="0" y1="0" x2="1" y2="0">
+                              <stop offset="0%" stopColor={baseColor} stopOpacity={0.7} />
+                              <stop offset="40%" stopColor={baseColor} stopOpacity={0.5} />
+                              <stop offset="100%" stopColor={baseColor} stopOpacity={0.3} />
+                            </linearGradient>
+                            
+                            {/* Top face gradient - lighter with enhanced highlight */}
+                            <linearGradient id={`topGradient${index}`} x1="0" y1="1" x2="1" y2="0">
+                              <stop offset="0%" stopColor={baseColor} stopOpacity={1} />
+                              <stop offset="40%" stopColor={baseColor} stopOpacity={0.95} />
+                              <stop offset="100%" stopColor={baseColor} stopOpacity={1} />
+                            </linearGradient>
+                            
+                            {/* Reflection gradient that uses the bar's own color instead of white */}
+                            <linearGradient id={`reflectionGradient${index}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={baseColor} stopOpacity={0.2} />
+                              <stop offset="20%" stopColor={baseColor} stopOpacity={0.1} />
+                              <stop offset="100%" stopColor={baseColor} stopOpacity={0} />
+                            </linearGradient>
+                          </React.Fragment>
+                        );
+                      })}
+                      
+                      {/* Enhanced shadow filter */}
+                      <filter id="shadow" filterUnits="userSpaceOnUse">
+                        <feDropShadow dx="4" dy="6" stdDeviation="5" floodOpacity="0.3" floodColor="#000000" />
+                      </filter>
+                      
+                      {/* Glow filter for hover effect - using blue instead of white */}
+                      <filter id="glow" filterUnits="userSpaceOnUse">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feFlood floodColor="#3b82f6" floodOpacity="0.3" result="color" />
+                        <feComposite in="color" in2="blur" operator="in" result="glow" />
+                        <feMerge>
+                          <feMergeNode in="glow" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
+                    </defs>
+                    
+                    {/* Enhanced grid with subtle animation - removed animation class */}
+                    <CartesianGrid 
+                      strokeDasharray="3 3" 
+                      stroke="rgba(255,255,255,0.1)"
+                      vertical={false}
+                    />
+                    
+                    <XAxis 
+                      dataKey={graphType === 'type' ? 'name' : 'location'}
+                      angle={window.innerWidth < 640 ? -45 : window.innerWidth < 1024 ? -30 : -20}
+                      textAnchor="end"
+                      height={window.innerWidth < 640 ? 50 : window.innerWidth < 1024 ? 60 : 80}
+                      interval={0}
+                      tick={{ 
+                        fontSize: window.innerWidth < 640 ? 8 : 
+                                 window.innerWidth < 1024 ? 10 : 12,
+                        fill: '#E2E8F0',
+                        fontWeight: 500,
+                        dy: window.innerWidth < 640 ? 2 : 3
+                      }}
+                      axisLine={{ stroke: '#475569' }}
+                      tickLine={{ stroke: '#475569' }}
+                    />
+                    
+                    <YAxis 
+                      label={{ 
+                        value: graphType === 'type' ? 'Number of Incidents' : 
+                               graphType === 'value' ? 'Amount Recovered (£)' : 
+                               'Number of Items',
+                        angle: -90,
+                        position: 'insideLeft',
+                        offset: window.innerWidth < 640 ? -25 : 
+                                window.innerWidth < 1024 ? -35 : -45,
+                        fill: '#94A3B8',
+                        fontSize: window.innerWidth < 640 ? 8 : 
+                                 window.innerWidth < 1024 ? 10 : 12,
+                        fontWeight: 500
+                      }}
+                      tickFormatter={formatValue}
+                      tick={{ 
+                        fontSize: window.innerWidth < 640 ? 8 : 
+                                 window.innerWidth < 1024 ? 10 : 12,
+                        fill: '#94A3B8',
+                        fontWeight: 500
+                      }}
+                      axisLine={{ stroke: '#475569' }}
+                      tickLine={{ stroke: '#475569' }}
+                    />
+                    
+                    {/* Enhanced tooltip with glass effect */}
+                    <Tooltip 
+                      formatter={(val: any, name: string, props: any) => {
+                        if (graphType === 'type') {
+                          // Show full name in tooltip
+                          const fullName = props.payload.fullName || props.payload.name;
+                          return [`${val} incidents`, fullName];
+                        }
+                        // Show full location in tooltip
+                        const fullLocation = props.payload.fullLocation || props.payload.location;
+                        return [formatValue(val), fullLocation];
+                      }}
+                      contentStyle={{
+                        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                        backdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        color: '#E2E8F0',
+                        boxShadow: '0 4px 20px -1px rgba(0, 0, 0, 0.4), 0 2px 10px -1px rgba(0, 0, 0, 0.3)'
+                      }}
+                      itemStyle={{
+                        padding: '4px 0',
+                        color: '#E2E8F0'
+                      }}
+                      labelStyle={{
+                        fontWeight: 600,
+                        marginBottom: '6px',
+                        color: '#F8FAFC'
+                      }}
+                    />
+                    
+                    <Legend 
+                      wrapperStyle={{
+                        paddingTop: window.innerWidth < 640 ? '10px' : '20px',
+                        fontSize: window.innerWidth < 640 ? '10px' : 'inherit'
+                      }}
+                      formatter={(value) => <span style={{ 
+                        color: '#94A3B8', 
+                        fontWeight: 500,
+                        fontSize: window.innerWidth < 640 ? '10px' : 'inherit'
+                      }}>{value}</span>}
+                      iconSize={window.innerWidth < 640 ? 8 : 10}
+                      iconType="circle"
+                    />
+                    
+                    <Bar 
+                      dataKey={graphType === 'type' ? 'count' : graphType === 'value' ? 'value' : 'quantity'}
+                      name={barName}
+                      radius={[0, 0, 0, 0]}
+                      style={{
+                        transform: 'perspective(1500px) rotateY(0deg) rotateX(0deg)',
+                        transformOrigin: 'center',
+                        filter: 'url(#shadow)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      minPointSize={0}
+                      shape={(props) => {
+                        const { x, y, width, height, index } = props;
+                        // Adjust depth for mobile screens
+                        const depth = width * (window.innerWidth < 640 ? 0.15 : 0.2);
+                        const topHeight = depth * 0.5;
+                        
+                        return (
+                          <g className="bar-group" style={{ transition: 'all 0.3s ease' }}>
+                            {/* Right side face */}
+                            <path 
+                              d={`
+                                M ${x + width} ${y}
+                                l ${depth} ${-topHeight}
+                                l 0 ${height}
+                                l ${-depth} ${depth * 0.3}
+                                Z
+                              `}
+                              fill={`url(#sideGradient${index})`}
+                              className="side-face"
+                              style={{ transition: 'all 0.3s ease' }}
+                            />
+                            
+                            {/* Top face */}
+                            <path 
+                              d={`
+                                M ${x} ${y}
+                                l ${width} 0
+                                l ${depth} ${-topHeight}
+                                l ${-width} 0
+                                Z
+                              `}
+                              fill={`url(#topGradient${index})`}
+                              className="top-face"
+                              style={{ transition: 'all 0.3s ease' }}
+                            />
+                            
+                            {/* Front face */}
+                            <path 
+                              d={`
+                                M ${x} ${y}
+                                l ${width} 0
+                                l 0 ${height}
+                                l ${-width} 0
+                                Z
+                              `}
+                              fill={`url(#frontGradient${index})`}
+                              className="front-face"
+                              style={{ transition: 'all 0.3s ease' }}
+                            />
+                            
+                            {/* Reflection overlay */}
+                            <path 
+                              d={`
+                                M ${x} ${y}
+                                l ${width} 0
+                                l 0 ${height * 0.3}
+                                l ${-width} 0
+                                Z
+                              `}
+                              fill={`url(#reflectionGradient${index})`}
+                              className="reflection"
+                              style={{ transition: 'all 0.3s ease' }}
+                            />
+                          </g>
+                        );
+                      }}
+                      onMouseOver={(data, index) => {
+                        // Add hover effect using CSS but without the white glow
+                        document.querySelectorAll('.bar-group').forEach((el, i) => {
+                          if (i === index) {
+                            // Just scale the bar slightly without adding the glow filter
+                            el.setAttribute('transform', 'scale(1.03)');
+                            
+                            // Add a subtle shadow effect instead of the white glow
+                            const paths = el.querySelectorAll('path');
+                            paths.forEach(path => {
+                              path.style.filter = 'brightness(1.2)';
+                            });
+                          }
+                        });
+                      }}
+                      onMouseOut={(data, index) => {
+                        // Remove hover effect
+                        document.querySelectorAll('.bar-group').forEach((el) => {
+                          el.setAttribute('transform', 'scale(1)');
+                          
+                          // Reset the brightness
+                          const paths = el.querySelectorAll('path');
+                          paths.forEach(path => {
+                            path.style.filter = 'none';
+                          });
+                        });
+                      }}
+                    >
+                      <LabelList 
+                        dataKey={graphType === 'type' ? 'count' : graphType === 'value' ? 'value' : 'quantity'}
+                        position="top"
+                        offset={window.innerWidth < 640 ? 5 : 
+                                window.innerWidth < 1024 ? 8 : 12}
+                        formatter={formatValue}
+                        style={{ 
+                          fontSize: window.innerWidth < 640 ? '8px' : 
+                                   window.innerWidth < 1024 ? '10px' : '12px',
+                          fill: '#FFFFFF',
+                          fontWeight: 600,
+                          textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                        }}
                       />
-                      {/* Top face */}
-                      <path 
-                        d={`
-                          M ${x} ${y}
-                          l ${width} 0
-                          l ${depth} ${-topHeight}
-                          l ${-width} 0
-                          Z
-                        `}
-                        fill={`url(#topGradient${index})`}
-                      />
-                      {/* Front face */}
-                      <path 
-                        d={`
-                          M ${x} ${y}
-                          l ${width} 0
-                          l 0 ${height}
-                          l ${-width} 0
-                          Z
-                        `}
-                        fill={`url(#frontGradient${index})`}
-                      />
-                    </g>
-                  );
-                }}
-              >
-                <LabelList 
-                  dataKey={graphType === 'type' ? 'count' : graphType === 'value' ? 'value' : 'quantity'}
-                  position="top"
-                  offset={10}
-                  formatter={formatValue}
-                  style={{ 
-                    fontSize: chartData.length > 10 ? '10px' : '12px',
-                    fill: '#FFFFFF',
-                    fontWeight: 600,
-                    textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                  }}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Action Codes Legend */}
+        {/* Action Codes Legend - Enhanced with better styling */}
         {graphType === 'type' && (
           <Card className="relative overflow-hidden bg-slate-800/80 border-slate-700/50">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10" />
-            <CardContent className="relative p-6">
-              <h3 className="text-lg font-medium text-slate-100 mb-4 text-center">
+            <CardContent className="relative p-3 sm:p-6">
+              <h3 className="text-base sm:text-lg font-medium text-slate-100 mb-2 sm:mb-4 text-center">
                 Action Codes Reference
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-9 gap-3 bg-slate-700/50 rounded-lg p-4 border border-slate-600/50">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-9 gap-2 sm:gap-3 bg-slate-700/50 rounded-lg p-2 sm:p-4 border border-slate-600/50 overflow-x-auto">
                 {incidentTypeData.map((item) => (
                   <div 
                     key={item.code}
-                    className="flex items-center gap-2 p-2 rounded-md bg-slate-800/60 border border-slate-600/30 hover:bg-slate-700/60 transition-colors"
+                    className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2 rounded-md bg-slate-800/60 border border-slate-600/30 hover:bg-slate-700/60 transition-colors"
                   >
                     <div 
-                      className="w-3 h-3 rounded-sm shadow-sm flex-shrink-0"
+                      className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm shadow-sm flex-shrink-0"
                       style={{ backgroundColor: actionCodeColors[item.code] }}
                     />
                     <div className="min-w-0">
-                      <span className="text-xs font-medium text-slate-100">
+                      <span className="text-[10px] sm:text-xs font-medium text-slate-100">
                         {item.code}
                       </span>
-                      <span className="text-[10px] text-slate-300 block truncate max-w-[100px]">
+                      <span className="text-[8px] sm:text-[10px] text-slate-300 block truncate max-w-[80px] sm:max-w-[100px]">
                         {item.type}
                       </span>
                     </div>
@@ -617,23 +804,24 @@ const IncidentGraph = () => {
           </Card>
         )}
 
-        {/* Pagination - Keep only this instance */}
+        {/* Pagination - Make more responsive */}
         {graphType !== 'type' && (
-          <div className="flex justify-between items-center px-4 text-slate-300">
-            <div className="text-sm">
+          <div className="flex flex-col sm:flex-row justify-between items-center px-2 sm:px-4 text-slate-300 gap-2 sm:gap-0">
+            <div className="text-xs sm:text-sm text-center sm:text-left">
               Showing stores {((currentPage - 1) * storesPerPage) + 1} to {Math.min(currentPage * storesPerPage, data.length)} of {data.length}
+              {window.innerWidth < 768 && <span className="ml-1">(10 per page on mobile)</span>}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1 sm:gap-2">
               <Button
                 variant="outline"
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="text-sm border-slate-700 hover:bg-slate-800 text-slate-300"
+                className="text-xs sm:text-sm border-slate-700 hover:bg-slate-800 text-slate-300 h-8 px-2 sm:px-3"
               >
                 Previous
               </Button>
-              <div className="flex items-center gap-2">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              <div className="flex items-center gap-1 sm:gap-2">
+                {Array.from({ length: Math.min(window.innerWidth < 640 ? 3 : 5, totalPages) }, (_, i) => {
                   const pageNum = i + 1;
                   return (
                     <Button
@@ -641,7 +829,7 @@ const IncidentGraph = () => {
                       variant={currentPage === pageNum ? "default" : "outline"}
                       onClick={() => setCurrentPage(pageNum)}
                       className={cn(
-                        "w-8 h-8 p-0 text-sm",
+                        "w-6 h-6 sm:w-8 sm:h-8 p-0 text-xs sm:text-sm",
                         currentPage === pageNum 
                           ? "bg-indigo-500 hover:bg-indigo-600 text-white" 
                           : "border-slate-700 hover:bg-slate-800 text-slate-300"
@@ -651,14 +839,14 @@ const IncidentGraph = () => {
                     </Button>
                   );
                 })}
-                {totalPages > 5 && (
+                {totalPages > (window.innerWidth < 640 ? 3 : 5) && (
                   <>
                     <span className="text-slate-500">...</span>
                     <Button
                       variant={currentPage === totalPages ? "default" : "outline"}
                       onClick={() => setCurrentPage(totalPages)}
                       className={cn(
-                        "w-8 h-8 p-0 text-sm",
+                        "w-6 h-6 sm:w-8 sm:h-8 p-0 text-xs sm:text-sm",
                         currentPage === totalPages 
                           ? "bg-indigo-500 hover:bg-indigo-600 text-white" 
                           : "border-slate-700 hover:bg-slate-800 text-slate-300"
@@ -673,7 +861,7 @@ const IncidentGraph = () => {
                 variant="outline"
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="text-sm border-slate-700 hover:bg-slate-800 text-slate-300"
+                className="text-xs sm:text-sm border-slate-700 hover:bg-slate-800 text-slate-300 h-8 px-2 sm:px-3"
               >
                 Next
               </Button>
@@ -713,29 +901,23 @@ const IncidentGraph = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="container mx-auto px-4 py-8 space-y-6">
-        {/* Header Section */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 p-8 backdrop-blur-sm border border-white/10">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm -z-10" />
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+      <div className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 p-3 sm:p-4 md:p-8 backdrop-blur-sm border border-white/10">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 sm:gap-4">
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <h1 className="text-xl sm:text-2xl md:text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                 Incident Analytics Dashboard
               </h1>
-              <p className="text-slate-400 mt-2 text-lg">
+              <p className="text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base md:text-lg">
                 Track and analyze security incidents across locations
               </p>
             </div>
-            <div className="bg-slate-800/80 p-6 rounded-xl border border-white/10">
-              <h2 className="text-xl font-semibold text-slate-200">
+            <div className="bg-slate-800/80 p-3 sm:p-4 md:p-6 rounded-xl border border-white/10 w-full lg:w-auto">
+              <h2 className="text-base sm:text-lg md:text-xl font-semibold text-slate-200">
                 {getTotalSavedTitle()}
               </h2>
-              <p className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent mt-2">
-                {graphType === 'type' ? (
-                  `${filteredTotal} Incidents`
-                ) : (
-                  `£${filteredTotal.toFixed(2)}`
-                )}
+              <p className="text-xl sm:text-2xl md:text-4xl font-bold bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent mt-1 sm:mt-2">
+                {graphType === 'type' ? `${filteredTotal} Incidents` : `£${filteredTotal.toFixed(2)}`}
               </p>
             </div>
           </div>
@@ -743,25 +925,22 @@ const IncidentGraph = () => {
 
         {/* Filters Card */}
         <Card className="relative overflow-hidden bg-slate-900/90 border-slate-800">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-pink-500/5" />
-          <CardHeader className="relative pb-2">
-            <CardTitle className="text-xl font-semibold text-slate-200">
+          <CardHeader className="py-2 px-3 sm:px-4">
+            <CardTitle className="text-base sm:text-lg md:text-xl font-semibold text-slate-200">
               Filters & Controls
             </CardTitle>
           </CardHeader>
-          <CardContent className="relative pt-0">
-            <div className="grid gap-4">
-              {/* Main Controls Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                {/* Left Section - Region and Graph Type */}
-                <div className="md:col-span-4 space-y-4">
+          <CardContent className="pt-0 px-3 sm:px-4 md:px-6">
+            <div className="grid gap-3 sm:gap-4 md:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4 md:gap-6">
+                <div className="sm:col-span-1 lg:col-span-4 space-y-2 sm:space-y-3">
                   <div>
-                    <Label className="text-sm font-medium text-slate-300 mb-2 block">Region</Label>
+                    <Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Region</Label>
                     <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                      <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-200">
+                      <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-200 h-8 sm:h-10 text-xs sm:text-sm">
                         <SelectValue placeholder="Select region" />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-slate-700">
+                      <SelectContent className="bg-slate-800 border-slate-700 text-xs sm:text-sm">
                         <SelectItem value="all">All Regions</SelectItem>
                         <SelectItem value="north">North Region</SelectItem>
                         <SelectItem value="south">South Region</SelectItem>
@@ -772,94 +951,90 @@ const IncidentGraph = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-slate-300 mb-2 block">Graph Type</Label>
+                    <Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Graph Type</Label>
                     <RadioGroup
                       defaultValue="value"
                       value={graphType}
                       onValueChange={(value: GraphType) => setGraphType(value)}
-                      className="flex flex-wrap gap-3"
+                      className="flex flex-wrap gap-2 sm:gap-3"
                     >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="value" id="value" className="border-slate-700 text-indigo-500" />
-                        <Label htmlFor="value" className="text-sm text-slate-300">Value Recovered</Label>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RadioGroupItem value="value" id="value" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
+                        <Label htmlFor="value" className="text-xs sm:text-sm text-slate-300">Value Recovered</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="quantity" id="quantity" className="border-slate-700 text-indigo-500" />
-                        <Label htmlFor="quantity" className="text-sm text-slate-300">Items Recovered</Label>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RadioGroupItem value="quantity" id="quantity" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
+                        <Label htmlFor="quantity" className="text-xs sm:text-sm text-slate-300">Items Recovered</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="type" id="type" className="border-slate-700 text-indigo-500" />
-                        <Label htmlFor="type" className="text-sm text-slate-300">Action Types</Label>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RadioGroupItem value="type" id="type" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
+                        <Label htmlFor="type" className="text-xs sm:text-sm text-slate-300">Action Types</Label>
                       </div>
                     </RadioGroup>
                   </div>
                 </div>
-
-                {/* Center Section - Time Period Controls */}
-                <div className="md:col-span-5 space-y-4">
+                <div className="sm:col-span-1 lg:col-span-5 space-y-2 sm:space-y-3">
                   <div>
-                    <Label className="text-sm font-medium text-slate-300 mb-2 block">Time Period</Label>
+                    <Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Time Period</Label>
                     <RadioGroup
                       defaultValue="ytd"
                       value={timeFilter}
                       onValueChange={handleTimeFilterChange}
-                      className="grid grid-cols-2 gap-x-4 gap-y-2"
+                      className="grid grid-cols-2 gap-x-2 sm:gap-x-4 gap-y-1 sm:gap-y-2"
                     >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="ytd" id="ytd" className="border-slate-700 text-indigo-500" />
-                        <Label htmlFor="ytd" className="text-sm text-slate-300">Year to Date</Label>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RadioGroupItem value="ytd" id="ytd" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
+                        <Label htmlFor="ytd" className="text-xs sm:text-sm text-slate-300">Year to Date</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="month" id="month" className="border-slate-700 text-indigo-500" />
-                        <Label htmlFor="month" className="text-sm text-slate-300">Current Month</Label>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RadioGroupItem value="month" id="month" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
+                        <Label htmlFor="month" className="text-xs sm:text-sm text-slate-300">Current Month</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="week" id="week" className="border-slate-700 text-indigo-500" />
-                        <Label htmlFor="week" className="text-sm text-slate-300">Current Week</Label>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RadioGroupItem value="week" id="week" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
+                        <Label htmlFor="week" className="text-xs sm:text-sm text-slate-300">Current Week</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="custom" id="custom" className="border-slate-700 text-indigo-500" />
-                        <Label htmlFor="custom" className="text-sm text-slate-300">Custom Range</Label>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RadioGroupItem value="custom" id="custom" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
+                        <Label htmlFor="custom" className="text-xs sm:text-sm text-slate-300">Custom Range</Label>
                       </div>
                     </RadioGroup>
                   </div>
                   {timeFilter === 'custom' && (
-                    <div className="flex gap-3">
-          <DatePicker
-            date={startDate}
-            setDate={setStartDate}
-            placeholder="Start date"
-          />
-          <DatePicker
-            date={endDate}
-            setDate={setEndDate}
-            placeholder="End date"
-          />
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                      <DatePicker
+                        date={startDate}
+                        setDate={setStartDate}
+                        placeholder="Start date"
+                      />
+                      <DatePicker
+                        date={endDate}
+                        setDate={setEndDate}
+                        placeholder="End date"
+                      />
                     </div>
                   )}
                 </div>
-
-                {/* Right Section - Officer Type and Action Button */}
-                <div className="md:col-span-3 space-y-4">
+                <div className="sm:col-span-2 lg:col-span-3 space-y-2 sm:space-y-3">
                   <div>
-                    <Label className="text-sm font-medium text-slate-300 mb-2 block">Officer Type</Label>
+                    <Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Officer Type</Label>
                     <RadioGroup
                       defaultValue="all"
                       value={officerType}
                       onValueChange={setOfficerType}
-                      className="flex flex-col gap-2"
+                      className="flex flex-col gap-1 sm:gap-2"
                     >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="all" id="all" className="border-slate-700 text-indigo-500" />
-                        <Label htmlFor="all" className="text-sm text-slate-300">All Officers</Label>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RadioGroupItem value="all" id="all" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
+                        <Label htmlFor="all" className="text-xs sm:text-sm text-slate-300">All Officers</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="uniform" id="uniform" className="border-slate-700 text-indigo-500" />
-                        <Label htmlFor="uniform" className="text-sm text-slate-300">Uniform Officers</Label>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RadioGroupItem value="uniform" id="uniform" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
+                        <Label htmlFor="uniform" className="text-xs sm:text-sm text-slate-300">Uniform Officers</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="detective" id="detective" className="border-slate-700 text-indigo-500" />
-                        <Label htmlFor="detective" className="text-sm text-slate-300">Store Detectives</Label>
+                      <div className="flex items-center space-x-1 sm:space-x-2">
+                        <RadioGroupItem value="detective" id="detective" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
+                        <Label htmlFor="detective" className="text-xs sm:text-sm text-slate-300">Store Detectives</Label>
                       </div>
                     </RadioGroup>
                   </div>
@@ -874,21 +1049,20 @@ const IncidentGraph = () => {
                         timeFilter
                       })
                     }}
-                    className="w-full bg-indigo-500 hover:bg-indigo-600 text-white transition-colors"
+                    className="w-full bg-indigo-500 hover:bg-indigo-600 text-white transition-colors h-8 sm:h-10 text-xs sm:text-sm"
                   >
                     Update Graph
                   </Button>
                 </div>
-        </div>
-      </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         {/* Graph Card */}
         <Card className="relative overflow-hidden bg-slate-900/90 border-slate-800">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-pink-500/5" />
-          <CardHeader className="relative">
-            <CardTitle className="text-2xl font-semibold text-slate-200">
+          <CardHeader className="py-2 px-3 sm:px-4">
+            <CardTitle className="text-base sm:text-lg md:text-xl font-semibold text-slate-200">
               {graphType === 'type' ? (
                 `${selectedRegion === 'all' ? 'All Regions' : `${selectedRegion.charAt(0).toUpperCase() + selectedRegion.slice(1)} Region`} - Incident Types Distribution`
               ) : (
@@ -899,13 +1073,13 @@ const IncidentGraph = () => {
               )}
             </CardTitle>
             {startDate && endDate && (
-              <p className="text-slate-400 mt-1">
-                Period: {format(startDate, 'PPP')} - {format(endDate, 'PPP')}
+              <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                Period: {format(startDate, 'PP')} - {format(endDate, 'PP')}
               </p>
             )}
-        </CardHeader>
-          <CardContent className="relative">
-            <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50">
+          </CardHeader>
+          <CardContent className="relative px-2 sm:px-4">
+            <div className="bg-slate-800/50 rounded-lg p-2 sm:p-4 md:p-6 border border-slate-700/50">
               {renderGraph()}
             </div>
           </CardContent>
