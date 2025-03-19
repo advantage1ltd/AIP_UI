@@ -209,7 +209,7 @@ export function SitesTable({ selectedCustomerId }: SitesTableProps) {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         site={selectedSite}
-        customerId={selectedCustomerId}
+        selectedCustomerId={selectedCustomerId}
       />
     </div>
   )
