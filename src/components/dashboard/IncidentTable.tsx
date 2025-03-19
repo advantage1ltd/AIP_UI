@@ -31,6 +31,14 @@ export function IncidentTable({ data }: DataTableProps) {
   const filteredAndSortedData = useMemo(() => {
     let processed = [...data]
 
+    // Debug logging
+    console.log('Data received in IncidentTable:', data)
+
+    // If data is empty, return empty array
+    if (!data || data.length === 0) {
+      return [];
+    }
+
     // Filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
@@ -62,10 +70,13 @@ export function IncidentTable({ data }: DataTableProps) {
             : bValue - aValue
         }
 
-        if (aValue instanceof Date && bValue instanceof Date) {
+        // Convert string dates to Date objects for comparison
+        if (sortConfig.key === 'date') {
+          const aDate = new Date(aValue as string)
+          const bDate = new Date(bValue as string)
           return sortConfig.direction === 'asc'
-            ? aValue.getTime() - bValue.getTime()
-            : bValue.getTime() - aValue.getTime()
+            ? aDate.getTime() - bDate.getTime()
+            : bDate.getTime() - aDate.getTime()
         }
 
         return 0
@@ -82,71 +93,93 @@ export function IncidentTable({ data }: DataTableProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between py-4">
+      <div className="flex items-center justify-between py-2 md:py-4">
         <div className="flex items-center gap-2">
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search incidents..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 w-[150px] lg:w-[250px]"
+            className="h-8 w-[150px] text-xs md:text-sm lg:w-[250px]"
           />
         </div>
       </div>
-      <div className="rounded-md border bg-slate-50/50 dark:bg-slate-900/20">
-        <table className="w-full caption-bottom text-sm">
+      <div className="rounded-md border">
+        <table className="w-full caption-bottom text-[13px] md:text-sm">
           <thead>
-            <tr className="border-b bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800">
+            <tr className="border-b bg-muted/50">
               <th 
-                className="h-12 px-4 text-left align-middle font-medium text-white cursor-pointer hover:bg-slate-700/50"
+                className="h-10 px-2 text-left align-middle font-semibold tracking-tight text-muted-foreground cursor-pointer hover:bg-muted/70 md:h-12 md:px-4"
                 onClick={() => sortData('customerName')}
               >
-                Customer Name {getSortIcon('customerName')}
+                <div className="flex items-center gap-1">
+                  Customer {getSortIcon('customerName')}
+                </div>
               </th>
               <th 
-                className="h-12 px-4 text-left align-middle font-medium text-white cursor-pointer hover:bg-slate-700/50"
+                className="h-10 px-2 text-left align-middle font-semibold tracking-tight text-muted-foreground cursor-pointer hover:bg-muted/70 md:h-12 md:px-4"
                 onClick={() => sortData('store')}
               >
-                Store {getSortIcon('store')}
+                <div className="flex items-center gap-1">
+                  Store {getSortIcon('store')}
+                </div>
               </th>
               <th 
-                className="h-12 px-4 text-left align-middle font-medium text-white cursor-pointer hover:bg-slate-700/50"
+                className="h-10 px-2 text-left align-middle font-semibold tracking-tight text-muted-foreground cursor-pointer hover:bg-muted/70 md:h-12 md:px-4"
                 onClick={() => sortData('officerName')}
               >
-                Officer Name {getSortIcon('officerName')}
+                <div className="flex items-center gap-1">
+                  Officer {getSortIcon('officerName')}
+                </div>
               </th>
               <th 
-                className="h-12 px-4 text-left align-middle font-medium text-white cursor-pointer hover:bg-slate-700/50"
+                className="h-10 px-2 text-left align-middle font-semibold tracking-tight text-muted-foreground cursor-pointer hover:bg-muted/70 md:h-12 md:px-4"
                 onClick={() => sortData('date')}
               >
-                Date {getSortIcon('date')}
+                <div className="flex items-center gap-1">
+                  Date {getSortIcon('date')}
+                </div>
               </th>
               <th 
-                className="h-12 px-4 text-right align-middle font-medium text-white cursor-pointer hover:bg-slate-700/50"
+                className="h-10 px-2 text-right align-middle font-semibold tracking-tight text-muted-foreground cursor-pointer hover:bg-muted/70 md:h-12 md:px-4"
                 onClick={() => sortData('amount')}
               >
-                Amount {getSortIcon('amount')}
+                <div className="flex items-center justify-end gap-1">
+                  Amount {getSortIcon('amount')}
+                </div>
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="tracking-normal">
+            {filteredAndSortedData.length === 0 && data.length > 0 && (
+              <tr>
+                <td colSpan={5} className="h-12 text-center text-sm text-amber-600">
+                  Data available but filtered out: {data.length} records found
+                </td>
+              </tr>
+            )}
+            
             {filteredAndSortedData.length > 0 ? (
               filteredAndSortedData.map((report) => (
-                <tr key={report.id} className="border-b transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/50">
-                  <td className="p-4 align-middle">{report.customerName}</td>
-                  <td className="p-4 align-middle">{report.store}</td>
-                  <td className="p-4 align-middle">{report.officerName}</td>
-                  <td className="p-4 align-middle">{new Date(report.date).toLocaleDateString()}</td>
-                  <td className="p-4 align-middle text-right">£{report.amount.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}</td>
+                <tr key={report.id} className="border-b transition-colors hover:bg-muted/50">
+                  <td className="p-2 align-middle font-medium leading-relaxed md:p-4">{report.customerName}</td>
+                  <td className="p-2 align-middle text-muted-foreground leading-relaxed md:p-4">{report.store}</td>
+                  <td className="p-2 align-middle text-muted-foreground leading-relaxed md:p-4">{report.officerName}</td>
+                  <td className="p-2 align-middle text-muted-foreground tabular-nums leading-relaxed md:p-4">
+                    {new Date(report.date).toLocaleDateString()}
+                  </td>
+                  <td className="p-2 align-middle text-right font-medium tabular-nums leading-relaxed text-green-600 dark:text-green-400 md:p-4">
+                    £{report.amount.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={5} className="h-24 text-center">
-                  No results found.
+                <td colSpan={5} className="h-24 text-center text-sm text-muted-foreground">
+                  No results found. Data length: {data.length}
                 </td>
               </tr>
             )}

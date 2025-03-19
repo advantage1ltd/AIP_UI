@@ -1,9 +1,9 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Button } from '../components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar'
-import { Badge } from '../components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { 
   Activity, 
   AlertCircle, 
@@ -31,12 +31,12 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../components/ui/select"
-import { TaskCard } from '../components/dashboard/TaskCard'
-import { IncidentTable } from '../components/dashboard/IncidentTable'
-import { OfficerPerformance } from '../components/dashboard/OfficerPerformance'
+} from "@/components/ui/select"
+import { TaskCard } from '@/components/dashboard/TaskCard'
+import { IncidentTable } from '@/components/dashboard/IncidentTable'
+import { OfficerPerformance } from '@/components/dashboard/OfficerPerformance'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
-import { cn } from '../lib/utils'
+import { cn } from '@/lib/utils'
 
 // Customer-specific data
 const customerData = {
@@ -181,6 +181,30 @@ const customerData = {
         officerName: 'Chris Taylor',
         date: '2025-01-28',
         amount: 2300.00
+      },
+      {
+        id: '4',
+        customerName: 'Midcounties COOP',
+        store: 'Store #9015',
+        officerName: 'Rachel Parker',
+        date: '2025-01-27',
+        amount: 1850.00
+      },
+      {
+        id: '5',
+        customerName: 'Midcounties COOP',
+        store: 'Store #9016',
+        officerName: 'Mark Thompson',
+        date: '2025-01-26',
+        amount: 2100.00
+      },
+      {
+        id: '6',
+        customerName: 'Midcounties COOP',
+        store: 'Store #9017',
+        officerName: 'Sophie Anderson',
+        date: '2025-01-25',
+        amount: 1950.00
       }
     ]
   }
@@ -326,322 +350,294 @@ const officerStats = [
 const Index = () => {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
-  const [selectedCustomer, setSelectedCustomer] = React.useState<string>(customers[0].id);
+  const [selectedCustomer, setSelectedCustomer] = React.useState<string>(customers[2].id);
+  const customer = customerData[selectedCustomer as keyof typeof customerData];
+
+  // Log customer selection and data
+  React.useEffect(() => {
+    console.log('Selected customer:', selectedCustomer);
+    console.log('Customer data:', customer);
+    console.log('Incident reports:', customer.incidentReports);
+  }, [selectedCustomer, customer]);
 
   // Get current month to determine which 6-month window to show
-  const currentMonth = new Date().getMonth(); // 0-11
-  const isSecondHalf = currentMonth >= 6;
+  const currentMonth = new Date().getMonth();
+  const lastSixMonths = customer.monthlyIncidents.slice(
+    currentMonth >= 6 ? currentMonth - 6 : 0,
+    currentMonth >= 6 ? currentMonth : 6
+  );
 
-  // Get the current customer's data or use default data if no customer is selected
-  const currentCustomerData = selectedCustomer ? customerData[selectedCustomer as keyof typeof customerData] : customerData.customer1;
-
-  // Use the current customer's data
-  const metrics = currentCustomerData.metrics;
-  const allMonthlyIncidents = currentCustomerData.monthlyIncidents;
-  const monthlyIncidents = isSecondHalf 
-    ? allMonthlyIncidents.slice(6, 12)  // Jul-Dec
-    : allMonthlyIncidents.slice(0, 6);   // Jan-Jun
-
-  const incidentReports = currentCustomerData.incidentReports;
-
-  const getMetricColor = (color: string) => {
-    const colors = {
-      blue: 'bg-blue-50 text-blue-700 ring-blue-600/10 dark:bg-blue-900/20 dark:text-blue-300',
-      red: 'bg-red-50 text-red-700 ring-red-600/10 dark:bg-red-900/20 dark:text-red-300',
-      green: 'bg-green-50 text-green-700 ring-green-600/10 dark:bg-green-900/20 dark:text-green-300',
-      yellow: 'bg-yellow-50 text-yellow-700 ring-yellow-600/10 dark:bg-yellow-900/20 dark:text-yellow-300'
+  // Derive data for component
+  const { metrics, incidentReports } = customer;
+  
+  // In a real app, we would fetch user-specific tasks from an API or context
+  // This simulates loading user-specific tasks, which could be empty
+  const [userTasks, setUserTasks] = React.useState<typeof tasks | []>([]);
+  
+  // Simulate loading tasks (in a real app, this would be an API call)
+  React.useEffect(() => {
+    // Simulate API call to get tasks
+    const loadTasks = () => {
+      // For demo purposes: randomly decide if the user has tasks
+      const hasAssignedTasks = Math.random() > 0.3; // 70% chance to have tasks
+      
+      if (hasAssignedTasks) {
+        setUserTasks(tasks);
+      } else {
+        setUserTasks([]);
+      }
     };
-    return colors[color as keyof typeof colors] || colors.blue;
+    
+    loadTasks();
+    
+    // In a real app, we would include dependencies like user ID
+  }, []);
+  
+  // Officer stats for the table
+  const officerStats = [
+    {
+      id: '1',
+      name: 'John Smith',
+      incidents: 45,
+      valueSaved: 25600,
+      responseRate: 92,
+      status: 'excellent'
+    },
+    {
+      id: '2',
+      name: 'Jane Doe',
+      incidents: 38,
+      valueSaved: 19200,
+      responseRate: 85,
+      status: 'good'
+    },
+    {
+      id: '3',
+      name: 'David Johnson',
+      incidents: 12,
+      valueSaved: 5300,
+      responseRate: 45,
+      status: 'needs-improvement'
+    },
+    {
+      id: '4',
+      name: 'Sarah Wilson',
+      incidents: 5,
+      valueSaved: 2100,
+      responseRate: 20,
+      status: 'non-reporter'
+    }
+  ] as const;
+
+  // Define background colors for each stat card based on type
+  const getStatCardColor = (color: string) => {
+    switch(color) {
+      case 'green': return 'bg-emerald-800';
+      case 'yellow': return 'bg-amber-800';
+      case 'red': return 'bg-rose-800';
+      case 'blue': return 'bg-blue-800';
+      default: return 'bg-slate-800';
+    }
   };
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto">
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back to your dashboard</p>
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden">
+      <div className="container mx-auto px-2 md:px-4 space-y-4 max-w-full md:max-w-7xl">
+        {/* Customer Selection */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
+          <h1 className="text-base font-semibold md:text-lg lg:text-xl">Dashboard</h1>
+          <div className="w-full md:w-auto">
+            <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+              <SelectTrigger className="w-full text-sm md:w-[200px]">
+                <SelectValue placeholder="Select customer" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map((c) => (
+                  <SelectItem key={c.id} value={c.id} className="text-sm">
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <Select value={selectedCustomer} onValueChange={(value: string) => setSelectedCustomer(value)}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select customer" />
-          </SelectTrigger>
-          <SelectContent>
-            {customers.map((customer) => (
-              <SelectItem key={customer.id} value={customer.id}>
-                {customer.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
 
-      {/* Metrics Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {metrics.map((metric, index) => {
-          const Icon = metric.icon
-          const gradients = {
-            'Total Saved YTD': "from-slate-800 via-slate-700 to-slate-800",
-            'Customer Satisfaction': "from-slate-800 via-indigo-900 to-slate-800",
-            'Incidents Today': "from-slate-800 via-rose-900 to-slate-800",
-            'Active Guards': "from-slate-800 via-blue-900 to-slate-800"
-          }
-          return (
-            <Card key={metric.title} className={cn(
-              `bg-gradient-to-br ${gradients[metric.title as keyof typeof gradients]} dark:from-slate-900 dark:to-slate-800 border-slate-600/50`,
-              "transition-all hover:shadow-lg hover:-translate-y-0.5"
-            )}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-white">
-                  {metric.title}
-                </CardTitle>
-                <Icon className="h-4 w-4 text-white" />
+        {/* Metrics */}
+        <div className="grid grid-cols-2 gap-2 md:gap-4">
+          {metrics.map((metric, index) => {
+            // Define background colors for each stat card
+            const bgColors = {
+              green: 'bg-emerald-800',
+              yellow: 'bg-amber-800',
+              red: 'bg-rose-800',
+              blue: 'bg-blue-800'
+            };
+            
+            return (
+              <Card 
+                key={index} 
+                className={`min-w-[140px] ${getStatCardColor(metric.color)} text-white border-0 shadow-md`}
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 p-2 md:p-4">
+                  <CardTitle className="text-xs font-medium md:text-sm text-white">
+                    {metric.title}
+                  </CardTitle>
+                  <metric.icon className="h-4 w-4 text-white" />
+                </CardHeader>
+                <CardContent className="p-2 md:p-4">
+                  <div className="text-base font-bold md:text-lg lg:text-xl text-white">{metric.value}</div>
+                  <p className={`text-xs flex items-center ${metric.trend === 'up' ? 'text-emerald-300' : 'text-rose-300'}`}>
+                    {metric.trend === 'up' ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                    {metric.change}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
+          {/* Tasks and Incidents Section */}
+          <div className="lg:col-span-5 space-y-4">
+            {/* Monthly Incidents Chart */}
+            <Card>
+              <CardHeader className="p-2 md:p-4">
+                <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Monthly Incidents</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">
-                  {metric.value}
-                </div>
-                <p className={cn(
-                  "text-xs",
-                  metric.trend === 'up' ? 'text-emerald-300' : 'text-red-300'
-                )}>
-                  {metric.change}
-                </p>
+              <CardContent className="h-[160px] md:h-[250px] lg:h-[300px] p-2 md:p-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={lastSixMonths} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorIncidents" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" tick={{ fontSize: 8 }} />
+                    <YAxis tick={{ fontSize: 8 }} />
+                    <Tooltip />
+                    <Area
+                      type="monotone"
+                      dataKey="incidents"
+                      stroke="#0ea5e9"
+                      fillOpacity={1}
+                      fill="url(#colorIncidents)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
-          )
-        })}
-      </div>
 
-      {/* Tasks and Trends Section */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Tasks Section */}
-        <Card className={cn(
-          "bg-white dark:bg-slate-800",
-          "transition-all hover:shadow-lg"
-        )}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-lg font-medium">Recent Tasks</CardTitle>
-            <Button variant="ghost" size="sm">
-              View All
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {tasks.map((task) => (
-                <TaskCard key={task.id} task={task} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+            {/* Recent Incidents */}
+            <Card>
+              <CardHeader className="p-2 md:p-4">
+                <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Recent Incidents</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {/* Debug data info */}
+                <div className="p-2 text-xs text-muted-foreground">
+                  Data count: {incidentReports.length} incidents
+                </div>
+                <div className="overflow-visible">
+                  <IncidentTable data={incidentReports.slice()} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Incidents Chart */}
-        <Card className={cn(
-          "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700",
-          "transition-all hover:shadow-lg"
-        )}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <div>
-              <CardTitle className="text-lg font-medium dark:text-white">Incident Trends</CardTitle>
-              <p className="text-sm text-muted-foreground dark:text-slate-400">
-                Monthly incident reports
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyIncidents} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="incidentGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid 
-                    strokeDasharray="3 3" 
-                    vertical={false}
-                    stroke="#334155" 
-                    opacity={0.2} 
-                  />
-                  <XAxis 
-                    dataKey="month" 
-                    stroke="#94a3b8"
-                    fontSize={12}
-                    tickLine={true}
-                    axisLine={true}
-                    padding={{ left: 10, right: 10 }}
-                  />
-                  <YAxis 
-                    stroke="#94a3b8"
-                    fontSize={12}
-                    tickLine={true}
-                    axisLine={true}
-                    tickCount={5}
-                    domain={[0, 60]}
-                    padding={{ top: 20, bottom: 20 }}
-                  />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="rounded-lg bg-slate-800 p-2 shadow-sm border border-slate-700">
-                            <p className="text-sm text-white">{`${payload[0].value} Incidents`}</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="incidents"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    fill="url(#incidentGradient)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Sidebar Content */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Tasks - Only show if there are tasks or if we explicitly want to show the empty state */}
+            <Card>
+              <CardHeader className="p-2 md:p-4 flex flex-row items-center justify-between">
+                <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Tasks</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  asChild 
+                  className="text-xs h-8 px-2"
+                >
+                  <Link to="/action-calendar">
+                    <Calendar className="h-3.5 w-3.5 mr-1" />
+                    View All
+                  </Link>
+                </Button>
+              </CardHeader>
+              <CardContent className="p-2 space-y-2 md:p-4">
+                {userTasks.length > 0 ? (
+                  userTasks.map((task) => (
+                    <TaskCard key={task.id} task={task} />
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
+                    <Clock className="h-10 w-10 mb-2 text-muted-foreground/50" />
+                    <p className="text-sm">No tasks assigned</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      asChild 
+                      className="mt-4"
+                    >
+                      <Link to="/action-calendar">
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Add New Task
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-      {/* Reports and Equipment Section */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Incident Reports Table */}
-        <Card className={cn(
-          "bg-white dark:bg-slate-800",
-          "transition-all hover:shadow-lg"
-        )}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-lg font-medium">Recent Incident Reports</CardTitle>
-            <Button variant="ghost" size="sm">
-              View All Reports
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <IncidentTable data={incidentReports} />
-          </CardContent>
-        </Card>
-
-        {/* Equipment Status Chart */}
-        <Card className={cn(
-          "bg-white dark:bg-slate-800",
-          "transition-all hover:shadow-lg"
-        )}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <div>
-              <CardTitle className="text-lg font-medium">Equipment Status</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Total Equipment: {equipmentData.reduce((acc, curr) => acc + curr.value, 0)} units
-              </p>
-            </div>
-            <Button variant="ghost" size="sm">
-              View Details
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={equipmentData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={90}
-                    paddingAngle={4}
-                    dataKey="value"
-                    label={({ name, value }) => `${name} (${value})`}
-                    labelLine={false}
-                  >
-                    {equipmentData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={entry.color}
-                        className="stroke-background hover:opacity-80 transition-opacity"
-                        strokeWidth={2}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        const total = equipmentData.reduce((acc, curr) => acc + curr.value, 0);
-                        const percentage = ((data.value / total) * 100).toFixed(1);
-                        return (
-                          <div className="rounded-lg border bg-background p-2 shadow-sm">
-                            <div className="grid grid-cols-1 gap-2">
-                              <div className="flex flex-col">
-                                <span className="text-[0.70rem] uppercase text-muted-foreground">
-                                  Equipment
-                                </span>
-                                <span className="font-bold text-muted-foreground">
-                                  {data.name}
-                                </span>
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-[0.70rem] uppercase text-muted-foreground">
-                                  Count
-                                </span>
-                                <span className="font-bold" style={{ color: data.color }}>
-                                  {data.value} units ({percentage}%)
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      }
-                      return null
-                    }}
-                  />
-                  <Legend 
-                    verticalAlign="middle" 
-                    align="right"
-                    layout="vertical"
-                    formatter={(value, entry: any) => (
-                      <span className="text-sm">
-                        <span style={{ color: entry.color }} className="font-medium">{value}</span>
-                        <span className="text-muted-foreground ml-2">
-                          ({entry.payload.value} units)
-                        </span>
-                      </span>
-                    )}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Officer Performance Table */}
-      <div className="mt-6">
-        <Card className={cn(
-          "bg-white dark:bg-slate-800",
-          "transition-all hover:shadow-lg"
-        )}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <div>
-              <CardTitle className="text-lg font-medium">Officer Performance</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Top performing officers and reporting status
-              </p>
-            </div>
-            <Button variant="ghost" size="sm">
-              View All Officers
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <OfficerPerformance data={officerStats} />
-          </CardContent>
-        </Card>
+            {/* Equipment Distribution */}
+            <Card>
+              <CardHeader className="p-2 md:p-4">
+                <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Equipment Distribution</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[240px] md:h-[240px] lg:h-[280px] p-2 md:p-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={equipmentData}
+                      cx="50%"
+                      cy="45%"
+                      innerRadius={30}
+                      outerRadius={60}
+                      paddingAngle={4}
+                      dataKey="value"
+                      labelLine={false}
+                      label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                      fontSize={10}
+                    >
+                      {equipmentData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={1} />
+                      ))}
+                    </Pie>
+                    <Legend 
+                      layout="horizontal" 
+                      verticalAlign="bottom" 
+                      align="center"
+                      wrapperStyle={{ 
+                        fontSize: '11px', 
+                        paddingTop: '15px',
+                        width: '100%',
+                        display: 'flex',
+                        justifyContent: 'center'
+                      }}
+                      iconSize={10}
+                      iconType="circle"
+                    />
+                    <Tooltip 
+                      formatter={(value, name) => [`${value} units`, name]} 
+                      contentStyle={{ fontSize: '11px', padding: '8px' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   )

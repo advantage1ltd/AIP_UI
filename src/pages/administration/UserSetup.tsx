@@ -40,7 +40,7 @@ import {
 } from 'lucide-react'
 import { UserDialog } from '@/components/administration/UserDialog'
 import { addUser, updateUser, deleteUser } from '@/store/features/users/usersSlice'
-import { User, CreateUserInput, UpdateUserInput } from '@/types/user'
+import { CreateUserInput, UpdateUserInput } from '@/types/user'
 import { useToast } from '@/hooks/use-toast'
 import { UserStats } from "@/components/user-setup/UserStats"
 import { UsersTable } from "@/components/user-setup/UsersTable"
@@ -55,12 +55,12 @@ const UserSetup = () => {
   const [searchQuery, setSearchQuery] = useState('')
 
   // Get users from Redux store
-  const users = useAppSelector((state: RootState) => state.users)
+  const reduxUsers = useAppSelector((state: RootState) => state.users)
 
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.department.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredUsers = reduxUsers.filter(user =>
+    (user.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.department || '').toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const getPageTitle = () => {
@@ -68,7 +68,7 @@ const UserSetup = () => {
       case 'new':
         return 'Add New User'
       case 'edit':
-        return `Edit User: ${selectedUser?.name}`
+        return `Edit User: ${selectedUser?.username}`
       default:
         return 'User Management'
     }
@@ -175,27 +175,33 @@ const UserSetup = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
-      <div className="space-y-8 p-6 md:p-8 lg:p-12 max-w-[1600px] mx-auto">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-indigo-100/80 via-purple-50/80 to-pink-100/80">
+      <div className="container mx-auto px-2 md:px-6 lg:px-8 py-4 md:py-6 lg:py-8 space-y-4 md:space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
           <div className="space-y-1">
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
               {getPageTitle()}
             </h1>
-            <p className="text-gray-500">Manage your team members and their account permissions here</p>
+            <p className="text-sm md:text-base text-gray-500">Manage your team members and their account permissions here</p>
           </div>
         </div>
 
         {/* Stats Section */}
-        <UserStats users={localUsers} />
+        <div className="w-full overflow-hidden">
+          <UserStats users={localUsers} />
+        </div>
 
-        {/* Users Table */}
-        <UsersTable 
-          users={localUsers}
-          onCreateUser={handleCreateLocalUser}
-          onUpdateUser={handleUpdateLocalUser}
-          onDeleteUser={handleDeleteLocalUser}
-        />
+        {/* Users Table - Responsive Container */}
+        <div className="w-full overflow-x-auto rounded-lg">
+          <div className="min-w-[320px]">
+            <UsersTable 
+              users={localUsers}
+              onCreateUser={handleCreateLocalUser}
+              onUpdateUser={handleUpdateLocalUser}
+              onDeleteUser={handleDeleteLocalUser}
+            />
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -23,25 +23,25 @@ const activities: Activity[] = [
 
 export const RecentActivity = () => {
   return (
-    <div className="rounded-xl border">
-      <div className="p-6 border-b">
-        <h2 className="text-lg font-semibold text-foreground">Recent Activity</h2>
+    <div className="rounded-lg sm:rounded-xl border">
+      <div className="p-2 sm:p-3 md:p-4 border-b">
+        <h2 className="text-sm sm:text-base md:text-lg font-semibold text-foreground">Recent Activity</h2>
       </div>
       <div className="divide-y">
         {activities.map((activity) => (
-          <div key={activity.id} className="p-6 hover:bg-accent/5">
-            <div className="flex items-center justify-between">
-              <h3 className="font-medium text-foreground">{activity.title}</h3>
-              <span className="text-sm text-muted-foreground">
+          <div key={activity.id} className="p-2 sm:p-3 md:p-4 hover:bg-accent/5">
+            <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-0.5 xs:gap-0">
+              <h3 className="text-xs sm:text-sm md:text-base font-medium text-foreground">{activity.title}</h3>
+              <span className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground">
                 {formatDistanceToNow(activity.timestamp, { addSuffix: true })}
               </span>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-0.5 sm:mt-1 text-[10px] xs:text-xs sm:text-sm text-muted-foreground">
               {activity.description}
             </p>
             {activity.status && (
               <span className={`
-                mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                mt-1 sm:mt-2 inline-flex items-center px-1.5 py-0.5 sm:px-2 sm:py-0.5 rounded-full text-[10px] xs:text-xs font-medium
                 ${activity.status === 'completed' ? 'bg-green-100 text-green-700' : 
                   activity.status === 'failed' ? 'bg-red-100 text-red-700' : 
                   'bg-yellow-100 text-yellow-700'}
