@@ -3,8 +3,11 @@ import { Routes, Route } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 
 
-// Lazy load page components
-const Index = lazy(() => import('./pages/Index'))
+// Lazy load page components with error handling
+const Index = lazy(() => import('@/pages/Index').catch(err => {
+  console.error('Error loading Index page:', err)
+  return { default: () => <div>Error loading page</div> }
+}))
 const ActionCalendar = lazy(() => import('./pages/ActionCalendar'))
 const Profile = lazy(() => import('./pages/Profile'))
 const Settings = lazy(() => import('./pages/Settings'))
@@ -66,7 +69,15 @@ const AppRoutes = () => {
       }>
         <Routes>
           {/* Core Routes */}
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={
+            <Suspense fallback={
+              <div className="flex items-center justify-center h-screen">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            }>
+              <Index />
+            </Suspense>
+          } />
           <Route path="/action-calendar" element={<ActionCalendar />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />

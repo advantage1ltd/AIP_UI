@@ -62,7 +62,6 @@ const UserSetup = lazy(() => import("./pages/administration/UserSetup"))
 const EmployeeRegistration = lazy(() => import("./pages/administration/EmployeeRegistration"))
 const CustomerSetup = lazy(() => import("./pages/administration/CustomerSetup"))
 const StockControl = lazy(() => import("./pages/administration/StockControl"))
-const DashboardPage = lazy(() => import('@/pages/Dashboard/DashboardPage'))
 const IncidentReportPage = lazy(() => import('@/pages/operations/IncidentReportPage'))
 const MysteryShopperPage = lazy(() => import('@/pages/operations/MysteryShopperPage'))
 const SiteVisitPage = lazy(() => import('@/pages/operations/SiteVisitPage'))
@@ -107,15 +106,11 @@ const App: React.FC = () => {
             <Suspense fallback={<div className="flex h-screen w-full items-center justify-center">Loading...</div>}>
               <Routes>
                 <Route path="/" element={<Layout><Outlet /></Layout>}>
-                  <Route index element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/dashboard" element={<Index />} />
+                  <Route index element={<Index />} />
                   <Route path="/action-calendar" element={<ActionCalendar />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/configure-views" element={<ConfigureViews />} />
-
-                  {/* Core Routes */}
-                  <Route path="/dashboard" element={<DashboardPage />} />
 
                   {/* Administration Routes */}
                   <Route path="/administration">
