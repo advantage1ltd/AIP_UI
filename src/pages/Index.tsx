@@ -540,7 +540,7 @@ const Index = () => {
                 <div className="p-2 text-xs text-muted-foreground">
                   Data count: {incidentReports.length} incidents
                 </div>
-                <div className="overflow-visible">
+                <div className="px-2 pb-4 md:px-4 overflow-visible">
                   <IncidentTable data={incidentReports.slice()} />
                 </div>
               </CardContent>

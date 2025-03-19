@@ -1,8 +1,7 @@
 import { useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { TableActions } from "../customer-setup/table-components/TableActions"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Pencil, Trash2, Search } from "lucide-react"
+import { ChevronLeft, ChevronRight, Pencil, Trash2, Search, Plus } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -95,10 +94,10 @@ export function UsersTable({ users, onCreateUser, onUpdateUser, onDeleteUser }: 
 
   return (
     <div className="space-y-2 md:space-y-4">
-      {/* Custom Table Actions - Without New Button */}
+      {/* Custom Table Actions - With New Button */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex-1 w-full sm:w-[400px]">
-          <div className="relative">
+        <div className="flex flex-1 w-full">
+          <div className="relative flex-1 w-full sm:w-[400px]">
             <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
             <Input 
               placeholder="Search users..."
@@ -110,14 +109,20 @@ export function UsersTable({ users, onCreateUser, onUpdateUser, onDeleteUser }: 
               }}
             />
           </div>
+          <div className="ml-2 flex-shrink-0 hidden md:block">
+            <span className="inline-flex h-11 items-center px-3 py-1 text-sm bg-gray-100 rounded-lg">
+              {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
+            </span>
+          </div>
         </div>
-        <div className="text-sm text-gray-500">
-          {filteredUsers.length > 0 ? (
-            <span>Showing {filteredUsers.length} users</span>
-          ) : (
-            <span>No users found</span>
-          )}
-        </div>
+        <Button 
+          onClick={handleNewUser} 
+          style={{ backgroundColor: '#324053' }} 
+          className="w-full sm:w-auto h-11 px-4 sm:px-6 hover:opacity-90 shadow-sm"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Add New User
+        </Button>
       </div>
 
       <div className="rounded-lg border bg-white shadow">
