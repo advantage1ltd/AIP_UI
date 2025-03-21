@@ -626,7 +626,7 @@ const Index = () => {
                     {metric.title}
                   </CardTitle>
                   <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
-                    <metric.icon className="h-4 w-4 text-white" />
+                  <metric.icon className="h-4 w-4 text-white" />
                   </div>
                 </CardHeader>
                 <CardContent className="p-3 md:p-4 pt-1 md:pt-2 z-10 relative">
@@ -638,7 +638,7 @@ const Index = () => {
                         : 'bg-white/20 text-white'
                     }`}>
                       {metric.trend === 'up' ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
-                      {metric.change}
+                    {metric.change}
                     </span>
                     <span className="ml-2 text-xs text-white/70">{metric.trend === 'up' ? 'increase' : 'decrease'}</span>
                   </div>
@@ -880,29 +880,29 @@ const Index = () => {
               <CardContent className="pt-5 px-2 pb-2 md:pt-6 md:px-4 md:pb-4">
                 <div className="flex flex-col md:flex-row items-center gap-4">
                   <div className="w-full md:w-1/2 h-[180px] sm:h-[200px] md:h-[230px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={equipmentData}
-                          cx="50%"
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={equipmentData}
+                      cx="50%"
                           cy="50%"
                           innerRadius={45}
                           outerRadius={70}
-                          paddingAngle={4}
-                          dataKey="value"
+                      paddingAngle={4}
+                      dataKey="value"
                           cornerRadius={4}
                           stroke="transparent"
-                        >
-                          {equipmentData.map((entry, index) => (
+                    >
+                      {equipmentData.map((entry, index) => (
                             <Cell 
                               key={`cell-${index}`} 
                               fill={entry.color} 
                               className="drop-shadow-sm hover:opacity-90 transition-opacity"
                             />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          formatter={(value, name) => [`${value} units`, name]} 
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value, name) => [`${value} units`, name]} 
                           contentStyle={{ 
                             backgroundColor: 'white', 
                             borderRadius: '0.5rem', 
@@ -911,9 +911,9 @@ const Index = () => {
                             fontSize: '0.75rem',
                             padding: '8px'
                           }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
                   </div>
                   <div className="w-full md:w-1/2">
                     <div className="divide-y">

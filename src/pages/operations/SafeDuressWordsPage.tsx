@@ -26,10 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { 
   Shield, 
   AlertTriangle, 
@@ -45,6 +43,7 @@ import {
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
+// Define types
 interface CodeWord {
   word: string;
   updatedAt: string;
@@ -61,7 +60,373 @@ interface WordHistory {
   reason: string;
 }
 
+// Reusable components
+const PageHeader = ({ onShowHistory, onShowUpdateDialog }) => (
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
+    <div className="flex items-center gap-2 sm:gap-3">
+      <div className="bg-blue-100 p-1.5 sm:p-2 rounded-lg">
+        <Shield className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-blue-600" />
+      </div>
+      <div>
+        <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Safe and Duress Words</h1>
+        <p className="text-xs sm:text-sm text-gray-500">Secure communication protocols for security personnel</p>
+      </div>
+    </div>
+    <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+      <Button
+        variant="outline"
+        className="text-xs sm:text-sm h-8 sm:h-9 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center"
+        onClick={onShowHistory}
+      >
+        <History className="w-3.5 h-3.5" />
+        <span>View History</span>
+      </Button>
+      <Button
+        className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm h-8 sm:h-9 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center"
+        onClick={onShowUpdateDialog}
+      >
+        <KeyRound className="w-3.5 h-3.5" />
+        <span>Update Words</span>
+      </Button>
+    </div>
+  </div>
+);
+
+const ImportantNotice = () => (
+  <Alert className="mb-4 md:mb-6 border-red-200 bg-red-50">
+    <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
+    <AlertTitle className="text-sm sm:text-base text-red-600 font-semibold">Confidential Information</AlertTitle>
+    <AlertDescription className="text-xs sm:text-sm text-red-700">
+      This information is strictly confidential and should only be shared with authorized security personnel.
+      Memorize these words and never write them down or store them digitally outside secure systems.
+    </AlertDescription>
+  </Alert>
+);
+
+const CodeWordCard = ({ type, word, updatedAt, updatedBy }) => {
+  const isafe = type === 'safe';
+  const bgColor = isafe ? 'from-green-50 to-green-100 border-green-200' : 'from-red-50 to-red-100 border-red-200';
+  const textColor = isafe ? 'text-green-800' : 'text-red-800';
+  const iconColor = isafe ? 'text-green-600' : 'text-red-600';
+  const borderColor = isafe ? 'border-green-200' : 'border-red-200';
+  const descColor = isafe ? 'text-green-700' : 'text-red-700';
+  
+  return (
+    <Card className={`bg-gradient-to-br ${bgColor}`}>
+      <CardHeader className="p-3 sm:p-4">
+        <CardTitle className={`flex items-center gap-2 ${textColor} text-sm sm:text-base`}>
+          {isafe ? (
+            <CheckCircle className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />
+          ) : (
+            <AlertTriangle className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />
+          )}
+          {isafe ? 'Safe Word' : 'Duress Word'}
+        </CardTitle>
+        <CardDescription className={`${descColor} text-xs sm:text-sm`}>
+          {isafe ? 'Use to indicate all clear/no threat' : 'Use to indicate danger/threat present'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-3 sm:p-4">
+        <div className={`bg-white rounded-lg p-3 sm:p-4 border ${borderColor}`}>
+          <span className={`text-xl sm:text-2xl font-bold ${descColor}`}>{word}</span>
+        </div>
+      </CardContent>
+      <CardFooter className={`p-3 sm:p-4 text-xs sm:text-sm ${descColor}`}>
+        <div className="flex items-center gap-1.5">
+          <Calendar className="w-3.5 h-3.5" />
+          Last updated: {updatedAt} by {updatedBy}
+        </div>
+      </CardFooter>
+    </Card>
+  );
+};
+
+const GuidelineItem = ({ icon, title, items }) => (
+  <div className="space-y-2 sm:space-y-3">
+    <h3 className="font-semibold text-gray-900 flex items-center gap-1.5 text-sm sm:text-base">
+      {icon}
+      {title}
+    </h3>
+    <ul className="space-y-2 text-xs sm:text-sm text-gray-600">
+      {items.map((item, index) => (
+        <li key={index} className="flex items-start gap-2">
+          <span className="rounded-full h-1.5 w-1.5 bg-blue-600 mt-1.5 flex-shrink-0" />
+          {item}
+        </li>
+      ))}
+    </ul>
+  </div>
+);
+
+const HistoryDialog = ({ isOpen, onClose, history }) => (
+  <Dialog open={isOpen} onOpenChange={onClose}>
+    <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden w-[calc(100%-16px)] p-0">
+      <DialogHeader className="space-y-3 p-3 sm:p-4 md:p-6 pb-3 border-b">
+        <div className="flex items-center gap-2">
+          <div className="bg-blue-100 p-1.5 sm:p-2 rounded-lg">
+            <History className="h-4 w-4 text-blue-600" />
+          </div>
+          <div>
+            <DialogTitle className="text-base sm:text-lg md:text-xl">Code Word Change History</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm text-gray-500">
+              Comprehensive record of all security word modifications
+            </DialogDescription>
+          </div>
+        </div>
+      </DialogHeader>
+      <div className="p-3 sm:p-4 md:p-6 overflow-y-auto max-h-[calc(90vh-130px)]">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <StatsCard 
+            title="Total Changes" 
+            value={history.length} 
+            icon={<History className="h-3.5 w-3.5 text-gray-400" />} 
+            bgColor="bg-gray-50" 
+          />
+          <StatsCard 
+            title="Safe Word Changes" 
+            value={history.filter(h => h.type === 'safe').length} 
+            icon={<CheckCircle className="h-3.5 w-3.5 text-green-500" />} 
+            bgColor="bg-green-50" 
+            titleColor="text-green-600"
+            valueColor="text-green-700"
+          />
+          <StatsCard 
+            title="Duress Word Changes" 
+            value={history.filter(h => h.type === 'duress').length} 
+            icon={<AlertTriangle className="h-3.5 w-3.5 text-red-500" />} 
+            bgColor="bg-red-50" 
+            titleColor="text-red-600"
+            valueColor="text-red-700"
+          />
+        </div>
+
+        <div className="rounded-lg border bg-white overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50 hover:bg-gray-50">
+                  <TableHead className="font-medium text-xs sm:text-sm p-2 sm:p-3 whitespace-nowrap">Date & Time</TableHead>
+                  <TableHead className="font-medium text-xs sm:text-sm p-2 sm:p-3 whitespace-nowrap">Type</TableHead>
+                  <TableHead className="font-medium text-xs sm:text-sm p-2 sm:p-3">Word Change</TableHead>
+                  <TableHead className="font-medium text-xs sm:text-sm p-2 sm:p-3">Changed By</TableHead>
+                  <TableHead className="font-medium text-xs sm:text-sm p-2 sm:p-3">Reason</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.length > 0 ? (
+                  history.map((item) => (
+                    <HistoryRow key={item.id} item={item} />
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-32 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <History className="h-8 w-8 text-gray-400" />
+                        <p className="text-gray-500 text-xs sm:text-sm">No change history available</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </div>
+    </DialogContent>
+  </Dialog>
+);
+
+const StatsCard = ({ title, value, icon, bgColor, titleColor = "text-gray-500", valueColor = "text-gray-900" }) => (
+  <Card className={bgColor}>
+    <CardHeader className="py-2 px-3 sm:py-3 sm:px-4">
+      <div className="flex items-center justify-between">
+        <CardTitle className={`text-xs sm:text-sm font-medium ${titleColor}`}>{title}</CardTitle>
+        {icon}
+      </div>
+    </CardHeader>
+    <CardContent className="py-1 px-3 sm:py-2 sm:px-4">
+      <div className={`text-xl sm:text-2xl font-bold ${valueColor}`}>{value}</div>
+    </CardContent>
+  </Card>
+);
+
+const HistoryRow = ({ item }) => {
+  const isafe = item.type === 'safe';
+  const badgeStyles = isafe 
+    ? 'bg-green-100 text-green-700 hover:bg-green-100 border-green-200' 
+    : 'bg-red-100 text-red-700 hover:bg-red-100 border-red-200';
+  
+  return (
+    <TableRow className="hover:bg-gray-50 transition-colors">
+      <TableCell className="whitespace-nowrap font-medium text-xs sm:text-sm p-2 sm:p-3">
+        <div className="flex items-center gap-1.5">
+          <Calendar className="h-3.5 w-3.5 text-gray-400" />
+          {item.changedAt}
+        </div>
+      </TableCell>
+      <TableCell className="text-xs sm:text-sm p-2 sm:p-3">
+        <Badge 
+          className={cn(
+            "px-1.5 py-0.5 text-xs font-medium",
+            badgeStyles
+          )}
+        >
+          {isafe ? 'Safe Word' : 'Duress Word'}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-xs sm:text-sm p-2 sm:p-3">
+        <div className="flex items-center gap-1.5">
+          <span className="text-gray-500">{item.oldWord}</span>
+          <svg className="h-3.5 w-3.5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          </svg>
+          <span className="font-medium text-gray-900">{item.newWord}</span>
+        </div>
+      </TableCell>
+      <TableCell className="text-xs sm:text-sm p-2 sm:p-3">
+        <div className="flex items-center gap-1.5">
+          <div className="h-5 w-5 rounded-full bg-gray-100 flex items-center justify-center">
+            <User className="h-3 w-3 text-gray-600" />
+          </div>
+          <span className="text-gray-900">{item.changedBy}</span>
+        </div>
+      </TableCell>
+      <TableCell className="text-xs sm:text-sm p-2 sm:p-3">
+        <div className="flex items-start gap-1.5">
+          <Info className="h-3.5 w-3.5 text-gray-400 mt-0.5" />
+          <span className="text-gray-600 line-clamp-2">{item.reason}</span>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+};
+
+const UpdateDialog = ({ isOpen, onClose, updateType, setUpdateType, newWord, setNewWord, reason, setReason, authorizedCode, setAuthorizedCode, onUpdate }) => (
+  <Dialog open={isOpen} onOpenChange={onClose}>
+    <DialogContent className="sm:max-w-[425px] w-[calc(100%-16px)] p-3 sm:p-4 md:p-6">
+      <DialogHeader>
+        <DialogTitle className="text-base sm:text-lg">Update Code Word</DialogTitle>
+        <DialogDescription className="text-xs sm:text-sm">
+          Enter the new code word and provide authorization. This action will be logged.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-3 py-3">
+        <div className="grid gap-1.5">
+          <Label className="text-xs sm:text-sm">Select Type</Label>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={updateType === 'safe' ? 'default' : 'outline'}
+              className={`text-xs sm:text-sm h-9 flex-1 ${updateType === 'safe' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+              onClick={() => setUpdateType('safe')}
+            >
+              Safe Word
+            </Button>
+            <Button
+              type="button"
+              variant={updateType === 'duress' ? 'default' : 'outline'}
+              className={`text-xs sm:text-sm h-9 flex-1 ${updateType === 'duress' ? 'bg-red-600 hover:bg-red-700' : ''}`}
+              onClick={() => setUpdateType('duress')}
+            >
+              Duress Word
+            </Button>
+          </div>
+        </div>
+        <div className="grid gap-1.5">
+          <Label className="text-xs sm:text-sm">New Word</Label>
+          <Input
+            value={newWord}
+            onChange={(e) => setNewWord(e.target.value)}
+            placeholder="Enter new code word"
+            className="h-9 text-xs sm:text-sm"
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label className="text-xs sm:text-sm">Reason for Change</Label>
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Enter reason for change"
+            className="h-9 text-xs sm:text-sm"
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label className="text-xs sm:text-sm">Authorization Code</Label>
+          <Input
+            type="password"
+            value={authorizedCode}
+            onChange={(e) => setAuthorizedCode(e.target.value)}
+            placeholder="Enter authorization code"
+            className="h-9 text-xs sm:text-sm"
+          />
+        </div>
+      </div>
+      <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 pt-2">
+        <Button 
+          variant="outline" 
+          onClick={onClose}
+          className="w-full sm:w-auto h-9 text-xs sm:text-sm"
+        >
+          Cancel
+        </Button>
+        <Button 
+          onClick={onUpdate}
+          className="w-full sm:w-auto h-9 text-xs sm:text-sm bg-blue-600 hover:bg-blue-700"
+          disabled={!updateType || !newWord || !reason || !authorizedCode}
+        >
+          Update Word
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
+
+const UsageExampleTable = () => (
+  <div className="overflow-x-auto">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="text-xs sm:text-sm p-2 sm:p-3 w-1/4">Scenario</TableHead>
+          <TableHead className="text-xs sm:text-sm p-2 sm:p-3 w-2/4">Example Usage</TableHead>
+          <TableHead className="text-xs sm:text-sm p-2 sm:p-3 w-1/4">Type</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        <TableRow>
+          <TableCell className="font-medium text-xs sm:text-sm p-2 sm:p-3">Regular Check</TableCell>
+          <TableCell className="text-xs sm:text-sm p-2 sm:p-3">"Just saw a cat near the loading bay, all quiet here."</TableCell>
+          <TableCell className="text-xs sm:text-sm p-2 sm:p-3">
+            <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs">Safe Word</Badge>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell className="font-medium text-xs sm:text-sm p-2 sm:p-3">Suspicious Activity</TableCell>
+          <TableCell className="text-xs sm:text-sm p-2 sm:p-3">"There's a dog barking outside, can you check CCTV?"</TableCell>
+          <TableCell className="text-xs sm:text-sm p-2 sm:p-3">
+            <Badge className="bg-red-100 text-red-700 hover:bg-red-100 text-xs">Duress Word</Badge>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell className="font-medium text-xs sm:text-sm p-2 sm:p-3">End of Shift</TableCell>
+          <TableCell className="text-xs sm:text-sm p-2 sm:p-3">"Just like my cat at home, everything's peaceful here."</TableCell>
+          <TableCell className="text-xs sm:text-sm p-2 sm:p-3">
+            <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs">Safe Word</Badge>
+          </TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell className="font-medium text-xs sm:text-sm p-2 sm:p-3">Potential Threat</TableCell>
+          <TableCell className="text-xs sm:text-sm p-2 sm:p-3">"That dog from yesterday is back, might need backup."</TableCell>
+          <TableCell className="text-xs sm:text-sm p-2 sm:p-3">
+            <Badge className="bg-red-100 text-red-700 hover:bg-red-100 text-xs">Duress Word</Badge>
+          </TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
+  </div>
+);
+
 const SafeDuressWordsPage: React.FC = () => {
+  // State management
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [updateType, setUpdateType] = useState<'safe' | 'duress' | null>(null);
@@ -135,409 +500,109 @@ const SafeDuressWordsPage: React.FC = () => {
     setShowUpdateDialog(false);
   };
 
+  // Communication protocol guidelines
+  const communicationProtocolItems = [
+    'Use these words naturally in conversation',
+    'Incorporate into regular radio checks',
+    'Maintain normal tone of voice'
+  ];
+  
+  // Team response guidelines
+  const teamResponseItems = [
+    'Acknowledge receipt without repeating the word',
+    'Follow established response procedures',
+    'Maintain situational awareness'
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6 max-w-[1280px]">
         {/* Header Section */}
-        <div className="flex justify-between items-start mb-8">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-100 p-2 rounded-lg">
-              <Shield className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Safe and Duress Words</h1>
-              <p className="text-gray-500">Secure communication protocols for security personnel</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex items-center gap-2"
-              onClick={() => setShowHistory(true)}
-            >
-              <History className="w-4 h-4" />
-              View History
-            </Button>
-            <Button
-              className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-              onClick={() => setShowUpdateDialog(true)}
-            >
-              <KeyRound className="w-4 h-4" />
-              Update Words
-            </Button>
-          </div>
-        </div>
+        <PageHeader 
+          onShowHistory={() => setShowHistory(true)} 
+          onShowUpdateDialog={() => setShowUpdateDialog(true)} 
+        />
 
         {/* Important Notice */}
-        <Alert className="mb-6 border-red-200 bg-red-50">
-          <AlertTriangle className="h-5 w-5 text-red-600" />
-          <AlertTitle className="text-red-600 font-semibold">Confidential Information</AlertTitle>
-          <AlertDescription className="text-red-700">
-            This information is strictly confidential and should only be shared with authorized security personnel.
-            Memorize these words and never write them down or store them digitally outside secure systems.
-          </AlertDescription>
-        </Alert>
+        <ImportantNotice />
 
-        {/* Current Words Card */}
-        <div className="grid gap-6 md:grid-cols-2 mb-6">
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-green-800">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                Safe Word
-              </CardTitle>
-              <CardDescription className="text-green-700">Use to indicate all clear/no threat</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-white rounded-lg p-4 border border-green-200">
-                <span className="text-2xl font-bold text-green-700">{currentWords.safe.word}</span>
-              </div>
-            </CardContent>
-            <CardFooter className="text-sm text-green-700">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Last updated: {currentWords.safe.updatedAt} by {currentWords.safe.updatedBy}
-              </div>
-            </CardFooter>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-800">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-                Duress Word
-              </CardTitle>
-              <CardDescription className="text-red-700">Use to indicate danger/threat present</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-white rounded-lg p-4 border border-red-200">
-                <span className="text-2xl font-bold text-red-700">{currentWords.duress.word}</span>
-              </div>
-            </CardContent>
-            <CardFooter className="text-sm text-red-700">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Last updated: {currentWords.duress.updatedAt} by {currentWords.duress.updatedBy}
-              </div>
-            </CardFooter>
-          </Card>
+        {/* Current Words Cards */}
+        <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 mb-4 md:mb-6">
+          <CodeWordCard 
+            type="safe" 
+            word={currentWords.safe.word}
+            updatedAt={currentWords.safe.updatedAt}
+            updatedBy={currentWords.safe.updatedBy}
+          />
+          <CodeWordCard 
+            type="duress" 
+            word={currentWords.duress.word}
+            updatedAt={currentWords.duress.updatedAt}
+            updatedBy={currentWords.duress.updatedBy}
+          />
         </div>
 
         {/* Guidelines Section */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-blue-600" />
+        <Card className="mb-4 md:mb-6">
+          <CardHeader className="p-3 sm:p-4">
+            <CardTitle className="flex items-center gap-1.5 text-sm sm:text-base">
+              <Info className="h-4 w-4 text-blue-600" />
               Usage Guidelines
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-4">
-                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Radio className="h-4 w-4 text-blue-600" />
-                  Communication Protocols
-                </h3>
-                <ul className="space-y-2 text-gray-600">
-                  <li className="flex items-start gap-2">
-                    <span className="rounded-full h-1.5 w-1.5 bg-blue-600 mt-2 flex-shrink-0" />
-                    Use these words naturally in conversation
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="rounded-full h-1.5 w-1.5 bg-blue-600 mt-2 flex-shrink-0" />
-                    Incorporate into regular radio checks
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="rounded-full h-1.5 w-1.5 bg-blue-600 mt-2 flex-shrink-0" />
-                    Maintain normal tone of voice
-                  </li>
-                </ul>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Users className="h-4 w-4 text-blue-600" />
-                  Team Response
-                </h3>
-                <ul className="space-y-2 text-gray-600">
-                  <li className="flex items-start gap-2">
-                    <span className="rounded-full h-1.5 w-1.5 bg-blue-600 mt-2 flex-shrink-0" />
-                    Acknowledge receipt without repeating the word
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="rounded-full h-1.5 w-1.5 bg-blue-600 mt-2 flex-shrink-0" />
-                    Follow established response procedures
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="rounded-full h-1.5 w-1.5 bg-blue-600 mt-2 flex-shrink-0" />
-                    Maintain situational awareness
-                  </li>
-                </ul>
-              </div>
+          <CardContent className="p-3 sm:p-4 space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <GuidelineItem 
+                icon={<Radio className="h-3.5 w-3.5 text-blue-600" />}
+                title="Communication Protocols"
+                items={communicationProtocolItems}
+              />
+              <GuidelineItem 
+                icon={<Users className="h-3.5 w-3.5 text-blue-600" />}
+                title="Team Response"
+                items={teamResponseItems}
+              />
             </div>
           </CardContent>
         </Card>
 
         {/* Usage Examples */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock className="h-5 w-5 text-blue-600" />
+          <CardHeader className="p-3 sm:p-4">
+            <CardTitle className="flex items-center gap-1.5 text-sm sm:text-base">
+              <Lock className="h-4 w-4 text-blue-600" />
               Secure Communication Examples
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Examples of how to naturally incorporate code words into conversation
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Scenario</TableHead>
-                  <TableHead>Example Usage</TableHead>
-                  <TableHead>Type</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium">Regular Check</TableCell>
-                  <TableCell>"Just saw a cat near the loading bay, all quiet here."</TableCell>
-                  <TableCell>
-                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Safe Word</Badge>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Suspicious Activity</TableCell>
-                  <TableCell>"There's a dog barking outside, can you check CCTV?"</TableCell>
-                  <TableCell>
-                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Duress Word</Badge>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">End of Shift</TableCell>
-                  <TableCell>"Just like my cat at home, everything's peaceful here."</TableCell>
-                  <TableCell>
-                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Safe Word</Badge>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Potential Threat</TableCell>
-                  <TableCell>"That dog from yesterday is back, might need backup."</TableCell>
-                  <TableCell>
-                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Duress Word</Badge>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+          <CardContent className="p-0">
+            <UsageExampleTable />
           </CardContent>
         </Card>
 
         {/* Update Dialog */}
-        <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Update Code Word</DialogTitle>
-              <DialogDescription>
-                Enter the new code word and provide authorization. This action will be logged.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Select Type</Label>
-                <div className="flex gap-4">
-                  <Button
-                    type="button"
-                    variant={updateType === 'safe' ? 'default' : 'outline'}
-                    className={updateType === 'safe' ? 'bg-green-600 hover:bg-green-700' : ''}
-                    onClick={() => setUpdateType('safe')}
-                  >
-                    Safe Word
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={updateType === 'duress' ? 'default' : 'outline'}
-                    className={updateType === 'duress' ? 'bg-red-600 hover:bg-red-700' : ''}
-                    onClick={() => setUpdateType('duress')}
-                  >
-                    Duress Word
-                  </Button>
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label>New Word</Label>
-                <Input
-                  value={newWord}
-                  onChange={(e) => setNewWord(e.target.value)}
-                  placeholder="Enter new code word"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Reason for Change</Label>
-                <Input
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Enter reason for change"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Authorization Code</Label>
-                <Input
-                  type="password"
-                  value={authorizedCode}
-                  onChange={(e) => setAuthorizedCode(e.target.value)}
-                  placeholder="Enter authorization code"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowUpdateDialog(false)}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleUpdateWord}
-                className="bg-blue-600 hover:bg-blue-700"
-                disabled={!updateType || !newWord || !reason || !authorizedCode}
-              >
-                Update Word
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <UpdateDialog 
+          isOpen={showUpdateDialog}
+          onClose={() => setShowUpdateDialog(false)}
+          updateType={updateType}
+          setUpdateType={setUpdateType}
+          newWord={newWord}
+          setNewWord={setNewWord}
+          reason={reason}
+          setReason={setReason}
+          authorizedCode={authorizedCode}
+          setAuthorizedCode={setAuthorizedCode}
+          onUpdate={handleUpdateWord}
+        />
 
         {/* History Dialog */}
-        <Dialog open={showHistory} onOpenChange={setShowHistory}>
-          <DialogContent className="sm:max-w-[800px] max-h-[80vh]">
-            <DialogHeader className="space-y-4 pb-4 border-b">
-              <div className="flex items-center gap-2">
-                <div className="bg-blue-100 p-2 rounded-lg">
-                  <History className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <DialogTitle className="text-xl">Code Word Change History</DialogTitle>
-                  <DialogDescription className="text-gray-500">
-                    Comprehensive record of all security word modifications
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
-            <div className="py-6">
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <Card className="bg-gray-50">
-                  <CardHeader className="py-4 px-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium text-gray-500">Total Changes</CardTitle>
-                      <History className="h-4 w-4 text-gray-400" />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="py-2 px-4">
-                    <div className="text-2xl font-bold text-gray-900">{wordHistory.length}</div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-green-50">
-                  <CardHeader className="py-4 px-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium text-green-600">Safe Word Changes</CardTitle>
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="py-2 px-4">
-                    <div className="text-2xl font-bold text-green-700">
-                      {wordHistory.filter(h => h.type === 'safe').length}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-red-50">
-                  <CardHeader className="py-4 px-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium text-red-600">Duress Word Changes</CardTitle>
-                      <AlertTriangle className="h-4 w-4 text-red-500" />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="py-2 px-4">
-                    <div className="text-2xl font-bold text-red-700">
-                      {wordHistory.filter(h => h.type === 'duress').length}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="rounded-lg border bg-white overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50 hover:bg-gray-50">
-                      <TableHead className="w-[180px] font-semibold">Date & Time</TableHead>
-                      <TableHead className="w-[120px] font-semibold">Type</TableHead>
-                      <TableHead className="font-semibold">Word Change</TableHead>
-                      <TableHead className="font-semibold">Changed By</TableHead>
-                      <TableHead className="font-semibold">Reason</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {wordHistory.map((history) => (
-                      <TableRow 
-                        key={history.id}
-                        className="hover:bg-gray-50 transition-colors"
-                      >
-                        <TableCell className="whitespace-nowrap font-medium text-gray-900">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-gray-400" />
-                            {history.changedAt}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            className={cn(
-                              "px-2 py-1 font-medium",
-                              history.type === 'safe' 
-                                ? 'bg-green-100 text-green-700 hover:bg-green-100' 
-                                : 'bg-red-100 text-red-700 hover:bg-red-100'
-                            )}
-                          >
-                            {history.type === 'safe' ? 'Safe Word' : 'Duress Word'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-500">{history.oldWord}</span>
-                            <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                            </svg>
-                            <span className="font-medium text-gray-900">{history.newWord}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center">
-                              <User className="h-4 w-4 text-gray-600" />
-                            </div>
-                            <span className="text-gray-900">{history.changedBy}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="max-w-[200px]">
-                          <div className="flex items-start gap-2">
-                            <Info className="h-4 w-4 text-gray-400 mt-0.5" />
-                            <span className="text-gray-600 line-clamp-2">{history.reason}</span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {wordHistory.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-32 text-center">
-                          <div className="flex flex-col items-center gap-2">
-                            <History className="h-8 w-8 text-gray-400" />
-                            <p className="text-gray-500 text-sm">No change history available</p>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
+        <HistoryDialog 
+          isOpen={showHistory}
+          onClose={() => setShowHistory(false)}
+          history={wordHistory}
+        />
       </div>
     </div>
   );

@@ -40,6 +40,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { v4 as uuidv4 } from "uuid"
+import React from "react"
 
 const formSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
@@ -52,7 +53,7 @@ const formSchema = z.object({
   timeOfIncident: z.string().min(1, "Time of incident is required"),
   incidentType: z.string().min(1, "Incident type is required"),
   description: z.string().min(10, "Description must be at least 10 characters"),
-  incidentDetails: z.string().min(10, "Incident details must be at least 10 characters"),
+  incidentDetails: z.string().min(10, "Incident details must be at least 10 characters").optional(),
   storeComments: z.string().optional(),
   incidentInvolved: z.array(z.string()).min(1, "At least one incident type must be selected"),
   policeInvolvement: z.boolean().default(false),
@@ -161,7 +162,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       timeOfIncident: initialData?.timeOfIncident || "",
       incidentType: initialData?.incidentType || "",
       description: initialData?.description || "",
-      incidentDetails: initialData?.incidentDetails || "",
+      incidentDetails: initialData?.incidentDetails || initialData?.description || "",
       storeComments: initialData?.storeComments || "",
       incidentInvolved: initialData?.incidentInvolved || [],
       policeInvolvement: initialData?.policeInvolvement || false,
@@ -193,7 +194,22 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
     },
   })
 
+  // Add useEffect to update totalValueRecovered when stolen items change
+  React.useEffect(() => {
+    const totalValue = stolenItems.reduce((sum, item) => sum + item.totalAmount, 0);
+    form.setValue('totalValueRecovered', totalValue.toString(), { shouldValidate: false });
+  }, [stolenItems, form]);
+
+  // Update incidentDetails value whenever description changes
+  const descriptionValue = form.watch('description')
+  React.useEffect(() => {
+    form.setValue('incidentDetails', descriptionValue, { shouldValidate: true })
+  }, [descriptionValue, form])
+
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    // Calculate total value from stolen items
+    const totalFromStolenItems = stolenItems.reduce((sum, item) => sum + item.totalAmount, 0);
+    
     const formattedData: Incident = {
       id: initialData?.id || uuidv4(),
       customerName: values.customerName,
@@ -204,13 +220,15 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       timeOfIncident: values.timeOfIncident,
       incidentType: values.incidentType,
       description: values.description,
-      incidentDetails: values.incidentDetails,
+      incidentDetails: values.description,
       storeComments: values.storeComments,
       incidentInvolved: values.incidentInvolved,
       policeInvolvement: values.policeInvolvement,
       urnNumber: values.urnNumber,
       stolenItems,
-      totalValueRecovered: values.totalValueRecovered ? parseFloat(values.totalValueRecovered) : 0,
+      totalValueRecovered: values.totalValueRecovered 
+        ? parseFloat(values.totalValueRecovered) 
+        : totalFromStolenItems,
       dutyManagerName: values.dutyManagerName,
       status: values.status,
       priority: values.priority,
@@ -264,28 +282,28 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
 
   return (
     <Form {...form}>
-      <div className="min-h-screen bg-[#F8F3F1]">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="min-h-screen bg-[#F8F3F1]">
+        <div className="w-full max-w-[95%] sm:max-w-[90%] lg:max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
           {/* Header */}
-          <div className="space-y-1 mb-8">
-            <h1 className="text-2xl font-semibold text-gray-900">New Incident Report</h1>
-            <p className="text-sm text-gray-500">Fill in the details of the security incident below. All fields marked with * are required.</p>
+          <div className="space-y-2 mb-4 sm:mb-6 lg:mb-8">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900">New Incident Report</h1>
+            <p className="text-sm sm:text-base text-gray-500">Fill in the details of the security incident below. All fields marked with * are required.</p>
           </div>
 
           {/* Form Content */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-5 lg:space-y-6">
             {/* Main Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
               {/* Basic Information */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-8 w-8 text-blue-600">📋</div>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-5">
+                <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                  <div className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600">📋</div>
                   <div>
-                    <h2 className="text-lg font-medium text-gray-900">Basic Information</h2>
+                    <h2 className="text-base sm:text-lg lg:text-xl font-medium text-gray-900">Basic Information</h2>
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <FormField
                     control={form.control}
                     name="customerName"
@@ -403,15 +421,15 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
               </div>
 
               {/* Incident Details */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-8 w-8 text-blue-600">🕒</div>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-5">
+                <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                  <div className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600">🕒</div>
                   <div>
-                    <h2 className="text-lg font-medium text-gray-900">Incident Details</h2>
+                    <h2 className="text-base sm:text-lg lg:text-xl font-medium text-gray-900">Incident Details</h2>
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <FormField
                     control={form.control}
                     name="dateOfIncident"
@@ -493,15 +511,15 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
               </div>
 
               {/* Description */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-8 w-8 text-blue-600">📝</div>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-5">
+                <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                  <div className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600">📝</div>
                   <div>
-                    <h2 className="text-lg font-medium text-gray-900">Description</h2>
+                    <h2 className="text-base sm:text-lg lg:text-xl font-medium text-gray-900">Description</h2>
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <FormField
                     control={form.control}
                     name="description"
@@ -517,6 +535,15 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                         </FormControl>
                         <FormMessage />
                       </FormItem>
+                    )}
+                  />
+
+                  {/* Hidden field for incidentDetails */}
+                  <FormField
+                    control={form.control}
+                    name="incidentDetails"
+                    render={({ field }) => (
+                      <input type="hidden" {...field} />
                     )}
                   />
 
@@ -542,23 +569,23 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
             </div>
 
             {/* Police Involvement */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-8 w-8 text-blue-600">👮</div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                <div className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600">👮</div>
                 <div>
-                  <h2 className="text-lg font-medium text-gray-900">Police Involvement</h2>
+                  <h2 className="text-base sm:text-lg lg:text-xl font-medium text-gray-900">Police Involvement</h2>
                 </div>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <FormField
                   control={form.control}
                   name="policeInvolvement"
                   render={({ field }) => (
                     <FormItem>
-                      <div className="flex items-center gap-8">
-                        <FormLabel className="text-base font-medium min-w-[150px]">Was Police Involved?</FormLabel>
-                        <div className="flex items-center gap-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 lg:gap-8">
+                        <FormLabel className="text-base font-medium sm:min-w-[150px] lg:min-w-[180px]">Was Police Involved?</FormLabel>
+                        <div className="flex items-center gap-4 sm:gap-6">
                           <div className="flex items-center gap-2">
                             <input
                               type="radio"
@@ -584,50 +611,52 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                 />
 
                 {form.watch('policeInvolvement') && (
-                  <div className="space-y-4 pt-4 border-t">
-                    <FormField
-                      control={form.control}
-                      name="urnNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base font-medium">URN Number</FormLabel>
-                          <FormControl>
-                            <Input className="h-11" {...field} placeholder="Enter URN Number" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <div className="space-y-3 sm:space-y-4 pt-4 border-t">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="urnNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-medium">URN Number</FormLabel>
+                            <FormControl>
+                              <Input className="h-11" {...field} placeholder="Enter URN Number" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="crimeRefNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base font-medium">Crime Reference Number</FormLabel>
-                          <FormControl>
-                            <Input className="h-11" {...field} placeholder="Enter reference number" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="crimeRefNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-medium">Crime Reference Number</FormLabel>
+                            <FormControl>
+                              <Input className="h-11" {...field} placeholder="Enter reference number" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Offender Details */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-8 w-8 text-blue-600">👤</div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                <div className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600">👤</div>
                 <div>
-                  <h2 className="text-lg font-medium text-gray-900">Offender Details</h2>
+                  <h2 className="text-base sm:text-lg lg:text-xl font-medium text-gray-900">Offender Details</h2>
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="offenderName"
@@ -705,7 +734,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                   />
                 </div>
 
-                <div className="space-y-4 pt-4 border-t">
+                <div className="space-y-3 sm:space-y-4 pt-4 border-t">
                   <FormField
                     control={form.control}
                     name="offenderAddress.numberAndStreet"
@@ -720,7 +749,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     )}
                   />
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="offenderAddress.town"
@@ -754,15 +783,15 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
             </div>
 
             {/* Incident Categories */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-8 w-8 text-blue-600">🏷️</div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                <div className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600">🏷️</div>
                 <div>
-                  <h2 className="text-lg font-medium text-gray-900">Incident Categories</h2>
+                  <h2 className="text-base sm:text-lg lg:text-xl font-medium text-gray-900">Incident Categories</h2>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {incidentInvolved.map((type) => (
                   <FormField
                     key={type}
@@ -794,12 +823,12 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
             </div>
 
             {/* Stolen Items */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 text-blue-600">💰</div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600">💰</div>
                   <div>
-                    <h2 className="text-lg font-medium text-gray-900">Stolen Items</h2>
+                    <h2 className="text-base sm:text-lg lg:text-xl font-medium text-gray-900">Stolen Items</h2>
                   </div>
                 </div>
                 <Button
@@ -807,7 +836,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                   onClick={addStolenItem}
                   variant="outline"
                   size="lg"
-                  className="flex items-center gap-2"
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px]"
                 >
                   <PlusCircle className="h-5 w-5" />
                   Add Item
@@ -815,7 +844,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
               </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-12 gap-4">
+                <div className="hidden sm:grid sm:grid-cols-12 gap-4">
                   <div className="col-span-3">
                     <Label className="text-base font-medium">Category</Label>
                   </div>
@@ -834,10 +863,11 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                 </div>
 
                 {stolenItems.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {stolenItems.map((item, index) => (
-                      <div key={index} className="grid grid-cols-12 gap-4 items-center">
-                        <div className="col-span-3">
+                      <div key={index} className="flex flex-col sm:grid sm:grid-cols-12 gap-3 sm:gap-4 items-start sm:items-center border-b sm:border-0 pb-4 sm:pb-0">
+                        <div className="w-full sm:col-span-3">
+                          <Label className="sm:hidden mb-1 block text-sm font-medium">Category</Label>
                           <Select
                             value={item.category}
                             onValueChange={(value) => updateStolenItem(index, "category", value)}
@@ -854,7 +884,8 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="col-span-4">
+                        <div className="w-full sm:col-span-4">
+                          <Label className="sm:hidden mb-1 block text-sm font-medium">Description</Label>
                           <Input
                             className="h-11"
                             value={item.description}
@@ -862,7 +893,8 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                             placeholder="Item description"
                           />
                         </div>
-                        <div className="col-span-2">
+                        <div className="w-full sm:col-span-2">
+                          <Label className="sm:hidden mb-1 block text-sm font-medium">Cost</Label>
                           <Input
                             className="h-11"
                             type="number"
@@ -872,7 +904,8 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                             placeholder="0.00"
                           />
                         </div>
-                        <div className="col-span-1">
+                        <div className="w-full sm:col-span-1">
+                          <Label className="sm:hidden mb-1 block text-sm font-medium">Quantity</Label>
                           <Input
                             className="h-11"
                             type="number"
@@ -881,48 +914,52 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                             placeholder="1"
                           />
                         </div>
-                        <div className="col-span-2 flex items-center gap-2">
-                          <Input
-                            className="h-11 text-right"
-                            type="number"
-                            value={item.totalAmount}
-                            disabled
-                          />
+                        <div className="w-full sm:col-span-2 flex items-center gap-2">
+                          <div className="flex-1">
+                            <Label className="sm:hidden mb-1 block text-sm font-medium">Total</Label>
+                            <Input
+                              className="h-11 text-right"
+                              type="number"
+                              value={item.totalAmount}
+                              disabled
+                            />
+                          </div>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             onClick={() => removeStolenItem(index)}
-                            className="text-red-500 hover:text-red-600"
+                            className="text-red-500 hover:text-red-600 h-12 w-12 flex items-center justify-center"
                           >
-                            <Trash2 className="h-5 w-5" />
+                            <Trash2 className="h-7 w-7" />
                           </Button>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-12 border border-dashed rounded-lg">
+                  <div className="text-center py-6 sm:py-8 lg:py-12 border border-dashed rounded-lg">
                     <div className="flex justify-center mb-4">
-                      <Package className="h-12 w-12 text-gray-400" />
+                      <Package className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400" />
                     </div>
                     <p className="text-base text-gray-600">No items added</p>
                     <p className="text-sm text-gray-500">Click "Add Item" to start recording stolen items</p>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between pt-6 border-t mt-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 sm:pt-6 border-t mt-4 sm:mt-6">
                   <div className="flex items-center gap-2">
                     <span className="text-base font-medium">Total Items:</span>
                     <span className="text-lg font-semibold">{stolenItems.length}</span>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                     <span className="text-base font-medium">Total Value Recovered:</span>
                     <div className="flex items-center gap-1">
-                      <span className="text-xl font-semibold">£</span>
-                      <span className="text-xl font-semibold">
+                      <span className="text-lg sm:text-xl font-semibold">£</span>
+                      <span className="text-lg sm:text-xl font-semibold">
                         {stolenItems.reduce((sum, item) => sum + item.totalAmount, 0).toFixed(2)}
                       </span>
+                      <span className="text-sm text-gray-500 ml-1">(Auto-saved)</span>
                     </div>
                   </div>
                 </div>
@@ -930,28 +967,27 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
             </div>
 
             {/* Form Actions */}
-            <div className="flex justify-end gap-4 pt-2">
+            <div className="flex flex-col xs:flex-row justify-end gap-3 sm:gap-4 pt-4">
               <Button 
                 type="button" 
                 variant="outline" 
                 size="lg"
                 onClick={onCancel}
-                className="min-w-[100px]"
+                className="w-full xs:w-auto min-h-[44px] sm:min-w-[120px]"
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
                 size="lg"
-                className="min-w-[100px] bg-green-600 hover:bg-green-700 text-white"
-                onClick={form.handleSubmit(handleSubmit)}
+                className="w-full xs:w-auto min-h-[44px] sm:min-w-[120px] bg-green-600 hover:bg-green-700 text-white"
               >
                 Save Incident
               </Button>
             </div>
           </div>
         </div>
-      </div>
+      </form>
     </Form>
   )
 })

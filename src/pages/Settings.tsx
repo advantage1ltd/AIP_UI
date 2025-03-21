@@ -129,6 +129,7 @@ const Settings = () => {
     'customer-reporting': 'Management',
     'manager-support': 'Management',
     'incidents-report': 'Management',
+    'officer-performance': 'Management',
     'incident-report': 'Operations',
     'mystery-shopper': 'Operations',
     'site-visit': 'Operations',
