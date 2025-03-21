@@ -48,10 +48,20 @@ import {
   AlertCircle,
   CheckCircle,
   Download,
-  Edit2
+  Edit2,
+  Info,
+  User
 } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Update {
   id: string;
@@ -78,7 +88,7 @@ interface SignatureData {
   signature: string;
 }
 
-const mockUpdates: Update[] = [
+const MOCK_UPDATES: Update[] = [
   {
     id: '1',
     name: 'New Security Protocol 2024',
@@ -103,7 +113,7 @@ const mockUpdates: Update[] = [
   }
 ];
 
-const mockDeclarations: Declaration[] = [
+const MOCK_DECLARATIONS: Declaration[] = [
   {
     id: '1',
     updateId: '1',
@@ -120,29 +130,128 @@ const mockDeclarations: Declaration[] = [
   }
 ];
 
+const PageHeader = ({ onAddClick }) => (
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
+    <div className="flex items-center gap-2 sm:gap-3">
+      <div className="bg-blue-100 p-2 rounded-lg">
+        <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+      </div>
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Officer Support</h1>
+        <p className="text-sm text-gray-500">Manage and track security officer documentation and declarations</p>
+      </div>
+    </div>
+    <Button
+      onClick={onAddClick}
+      className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 h-9 sm:h-10"
+    >
+      <Plus className="w-4 h-4" />
+      Add New Update
+    </Button>
+  </div>
+);
+
+const StatsCard = ({ title, value, icon, color }) => {
+  const colors = {
+    blue: {
+      bg: "bg-gradient-to-br from-blue-800 to-blue-900",
+      border: "border-blue-700",
+      iconBg: "bg-blue-700/50",
+      textAccent: "text-blue-200"
+    },
+    green: {
+      bg: "bg-gradient-to-br from-green-800 to-green-900",
+      border: "border-green-700",
+      iconBg: "bg-green-700/50",
+      textAccent: "text-green-200"
+    },
+    purple: {
+      bg: "bg-gradient-to-br from-purple-800 to-purple-900",
+      border: "border-purple-700",
+      iconBg: "bg-purple-700/50",
+      textAccent: "text-purple-200"
+    }
+  };
+  
+  const colorStyle = colors[color];
+  
+  return (
+    <Card className={`${colorStyle.bg} ${colorStyle.border} border h-full`}>
+      <div className="p-3 md:p-4 flex flex-row items-center gap-3">
+        <div className={`${colorStyle.iconBg} p-2 rounded-full shrink-0`}>
+          {React.cloneElement(icon, { className: "h-5 w-5 text-white" })}
+        </div>
+        <div className="flex-1">
+          <CardTitle className="text-xs sm:text-sm font-medium text-white mb-1">{title}</CardTitle>
+          <div className="flex items-baseline gap-1">
+            <div className="text-xl sm:text-2xl font-bold text-white">{value}</div>
+            <div className={`text-xs ${colorStyle.textAccent}`}>
+              {title === "Total Updates" ? "documents" : title === "Active Updates" ? "active" : "officers"}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+const FormField = ({ label, children }) => (
+  <div className="grid gap-2">
+    <Label>{label}</Label>
+    {children}
+  </div>
+);
+
+const FileUploadField = ({ onChange, currentFileName }) => (
+  <div className="flex items-center gap-4">
+    <Input
+      type="file"
+      onChange={onChange}
+      className="hidden"
+      id="file-upload"
+      accept=".pdf,.doc,.docx"
+    />
+    <Label
+      htmlFor="file-upload"
+      className="cursor-pointer flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-gray-50"
+    >
+      <Upload className="h-4 w-4" />
+      Choose File
+    </Label>
+    {currentFileName && (
+      <span className="text-sm text-gray-600">{currentFileName}</span>
+    )}
+  </div>
+);
+
+const EmptyState = ({ message, actionLabel, onAction }) => (
+  <div className="flex flex-col items-center gap-2">
+    <FileSignature className="h-8 w-8 text-gray-400" />
+    <p className="text-gray-500 text-sm">{message}</p>
+    <Button
+      variant="link"
+      onClick={onAction}
+      className="text-blue-600"
+    >
+      {actionLabel}
+    </Button>
+  </div>
+);
+
 const OfficerSupportPage: React.FC = () => {
-  const [updates, setUpdates] = useState<Update[]>(mockUpdates);
+  const [updates, setUpdates] = useState<Update[]>(MOCK_UPDATES);
+  const [declarations, setDeclarations] = useState<Declaration[]>(MOCK_DECLARATIONS);
+  const [selectedUpdate, setSelectedUpdate] = useState<Update | null>(null);
+  const [signatureData, setSignatureData] = useState<SignatureData>({ officerName: '', signature: '' });
+  
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDeclarationsDialog, setShowDeclarationsDialog] = useState(false);
-  const [selectedUpdate, setSelectedUpdate] = useState<Update | null>(null);
-  const [declarations, setDeclarations] = useState<Declaration[]>(mockDeclarations);
   const [showDocumentPreview, setShowDocumentPreview] = useState(false);
   const [showSignDialog, setShowSignDialog] = useState(false);
-  const [signatureData, setSignatureData] = useState<SignatureData>({
-    officerName: '',
-    signature: ''
-  });
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [editFormData, setEditFormData] = useState({
-    name: '',
-    description: '',
-    effectiveDate: '',
-    file: null as File | null
-  });
 
-  // Form states
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -150,12 +259,26 @@ const OfficerSupportPage: React.FC = () => {
     file: null as File | null
   });
 
-  const handleAddUpdate = () => {
-    // In a real application, you would:
-    // 1. Upload the file to a server/storage
-    // 2. Create the update record in the database
-    // 3. Handle errors and show loading states
-    
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    description: '',
+    effectiveDate: '',
+    file: null as File | null
+  });
+
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 10;
+  
+  const totalPages = Math.ceil(updates.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = updates.slice(indexOfFirstItem, indexOfLastItem);
+  
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
+
+  const handleAddUpdate = useCallback(() => {
     const newUpdate: Update = {
       id: (updates.length + 1).toString(),
       name: formData.name,
@@ -164,7 +287,7 @@ const OfficerSupportPage: React.FC = () => {
       fileName: formData.file?.name || '',
       fileUrl: URL.createObjectURL(formData.file as Blob),
       createdAt: new Date().toISOString().split('T')[0],
-      totalDeclarations: declarations.filter(d => d.updateId === (updates.length + 1).toString()).length,
+      totalDeclarations: 0,
       status: 'active'
     };
 
@@ -176,28 +299,9 @@ const OfficerSupportPage: React.FC = () => {
       effectiveDate: '',
       file: null
     });
-  };
+  }, [formData, updates]);
 
-  const handleViewDeclarations = (update: Update) => {
-    setSelectedUpdate(update);
-    setShowDeclarationsDialog(true);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFormData(prev => ({
-        ...prev,
-        file: e.target.files![0]
-      }));
-    }
-  };
-
-  const handleViewDocument = (update: Update) => {
-    setSelectedUpdate(update);
-    setShowDocumentPreview(true);
-  };
-
-  const handleSignDeclaration = () => {
+  const handleSignDeclaration = useCallback(() => {
     if (!selectedUpdate || !signatureData.officerName || !signatureData.signature) return;
 
     const newDeclaration: Declaration = {
@@ -218,47 +322,15 @@ const OfficerSupportPage: React.FC = () => {
     setSignatureData({ officerName: '', signature: '' });
     setShowSignDialog(false);
     setShowDocumentPreview(false);
-  };
-
-  const handleViewDetails = (update: Update) => {
-    setSelectedUpdate(update);
-    setShowViewDialog(true);
-  };
-
-  const handleEditUpdate = (update: Update) => {
-    setSelectedUpdate(update);
-    setEditFormData({
-      name: update.name,
-      description: update.description,
-      effectiveDate: update.effectiveDate,
-      file: null
-    });
-    setShowEditDialog(true);
-  };
-
-  const handleDeleteUpdate = (update: Update) => {
-    setSelectedUpdate(update);
-    setShowDeleteDialog(true);
-  };
+  }, [selectedUpdate, signatureData, declarations, updates]);
 
   const handleConfirmDelete = useCallback(() => {
     if (!selectedUpdate) return;
 
-    // Remove the update
-    setUpdates(prevUpdates => 
-      prevUpdates.filter(u => u.id !== selectedUpdate.id)
-    );
-    
-    // Remove all declarations associated with this update
-    setDeclarations(prevDeclarations => 
-      prevDeclarations.filter(d => d.updateId !== selectedUpdate.id)
-    );
-
-    // Reset all related state
+    setUpdates(prevUpdates => prevUpdates.filter(u => u.id !== selectedUpdate.id));
+    setDeclarations(prevDeclarations => prevDeclarations.filter(d => d.updateId !== selectedUpdate.id));
     setShowDeleteDialog(false);
     setSelectedUpdate(null);
-    setShowDeclarationsDialog(false);
-    setShowDocumentPreview(false);
   }, [selectedUpdate]);
 
   const handleSaveEdit = useCallback(() => {
@@ -275,34 +347,25 @@ const OfficerSupportPage: React.FC = () => {
             fileName: editFormData.file?.name || update.fileName,
             fileUrl: editFormData.file 
               ? URL.createObjectURL(editFormData.file) 
-              : update.fileUrl,
-            totalDeclarations: declarations.filter(
-              d => d.updateId === update.id
-            ).length
+              : update.fileUrl
           };
         }
         return update;
       })
     );
 
-    // Clean up state
     setShowEditDialog(false);
     setSelectedUpdate(null);
-    setShowDeclarationsDialog(false);
-    
-    // Reset edit form data
     setEditFormData({
       name: '',
       description: '',
       effectiveDate: '',
       file: null
     });
-  }, [selectedUpdate, editFormData, declarations]);
+  }, [selectedUpdate, editFormData]);
 
-  // Add cleanup for file URLs
   useEffect(() => {
     return () => {
-      // Cleanup any created object URLs when component unmounts
       updates.forEach(update => {
         if (update.fileUrl.startsWith('blob:')) {
           URL.revokeObjectURL(update.fileUrl);
@@ -312,619 +375,605 @@ const OfficerSupportPage: React.FC = () => {
   }, [updates]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {/* Header Section */}
-        <div className="flex justify-between items-start mb-8">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-100 p-2 rounded-lg">
-              <FileText className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Officer Support</h1>
-              <p className="text-gray-500">Manage and track security officer documentation and declarations</p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+      <div className="container mx-auto px-2 sm:px-4 lg:px-6 py-2 sm:py-4 lg:py-6 max-w-full sm:max-w-[1400px] flex-grow">
+        <PageHeader onAddClick={() => setShowAddDialog(true)} />
+
+        <div className="space-y-4 md:space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4">
+            <StatsCard
+              title="Total Updates"
+              value={updates.length}
+              icon={<FileText />}
+              color="blue"
+            />
+            <StatsCard
+              title="Active Updates"
+              value={updates.filter(u => u.status === 'active').length}
+              icon={<CheckCircle />}
+              color="green"
+            />
+            <StatsCard
+              title="Total Declarations"
+              value={declarations.length}
+              icon={<FileSignature />}
+              color="purple"
+            />
           </div>
-          <Button
-            onClick={() => setShowAddDialog(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Add New Update
-          </Button>
-        </div>
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3 mb-6">
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-blue-900">Total Updates</CardTitle>
-              <FileText className="h-4 w-4 text-blue-600" />
+          <Card className="w-full shadow-sm">
+            <CardHeader className="p-2 md:p-4">
+              <CardTitle className="text-base sm:text-xl flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                Security Updates & Declarations
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                Track and manage security updates and officer declarations
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-700">{updates.length}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-green-900">Active Updates</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-700">
-                {updates.filter(u => u.status === 'active').length}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-purple-900">Total Declarations</CardTitle>
-              <FileSignature className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-700">
-                {declarations.length}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Updates Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-blue-600" />
-              Security Updates & Declarations
-            </CardTitle>
-            <CardDescription>
-              Track and manage security updates and officer declarations
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50 hover:bg-gray-50">
-                    <TableHead className="font-semibold text-gray-900">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-gray-500" />
-                        Update Name
-                      </div>
-                    </TableHead>
-                    <TableHead className="font-semibold text-gray-900">Description</TableHead>
-                    <TableHead className="font-semibold text-gray-900">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        Effective Date
-                      </div>
-                    </TableHead>
-                    <TableHead className="font-semibold text-gray-900">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-gray-500" />
-                        Declarations
-                      </div>
-                    </TableHead>
-                    <TableHead className="font-semibold text-gray-900 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {updates.map((update) => (
-                    <TableRow 
-                      key={update.id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <TableCell className="font-medium text-gray-900">{update.name}</TableCell>
-                      <TableCell className="text-gray-600 max-w-md truncate">
-                        {update.description}
-                      </TableCell>
-                      <TableCell className="text-gray-600">
-                        {new Date(update.effectiveDate).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto" style={{ minWidth: "100%", maxWidth: "100%" }}>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50 hover:bg-gray-50">
+                      <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 w-[35%] sm:w-[30%] lg:w-[25%]">
                         <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-gray-500" />
+                          Update
+                        </div>
+                      </TableHead>
+                      <TableHead className="font-semibold text-gray-900 p-2 md:p-4 w-[45%] sm:w-[40%] lg:w-[35%]">Description</TableHead>
+                      <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 hidden md:table-cell w-[15%]">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-gray-500" />
+                          Date
+                        </div>
+                      </TableHead>
+                      <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 hidden md:table-cell w-[15%]">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-gray-500" />
+                          Signed
+                        </div>
+                      </TableHead>
+                      <TableHead className="font-semibold text-gray-900 text-right p-2 md:p-4 w-[90px] md:w-[120px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentItems.map((update) => (
+                      <TableRow 
+                        key={update.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <TableCell className="font-medium text-gray-900 p-2 md:p-4 truncate max-w-[100px] sm:max-w-[150px] md:max-w-none">
+                          {update.name}
+                        </TableCell>
+                        <TableCell className="text-gray-600 p-2 md:p-4 truncate max-w-[100px] sm:max-w-[150px] md:max-w-md">
+                          {update.description}
+                        </TableCell>
+                        <TableCell className="text-gray-600 whitespace-nowrap p-2 md:p-4 hidden md:table-cell">
+                          {new Date(update.effectiveDate).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
+                        </TableCell>
+                        <TableCell className="p-2 md:p-4 hidden md:table-cell">
                           <Badge 
                             variant="secondary"
-                            className="bg-blue-50 text-blue-700 hover:bg-blue-50"
+                            className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs sm:text-sm whitespace-nowrap"
                           >
                             {declarations.filter(d => d.updateId === update.id).length} Officers
                           </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewDocument(update)}
-                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditUpdate(update)}
-                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteUpdate(update)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {updates.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8">
-                        <p className="text-gray-500">No updates found</p>
-                        <Button
-                          variant="link"
-                          onClick={() => setShowAddDialog(true)}
-                          className="text-blue-600 hover:text-blue-700 mt-2"
-                        >
-                          Create your first update
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Add Update Dialog */}
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Add New Update</DialogTitle>
-              <DialogDescription>
-                Create a new security update and document for officer declarations
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Update Name</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Enter update name"
-                />
+                        </TableCell>
+                        <TableCell className="text-right p-1 md:p-2 w-[90px] md:w-[120px]">
+                          <div className="flex items-center justify-end gap-1 md:gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedUpdate(update);
+                                setShowDocumentPreview(true);
+                              }}
+                              className="h-7 w-7 md:h-8 md:w-8 text-blue-600 border border-blue-200 hover:bg-blue-50 p-0 flex items-center justify-center"
+                              title="View Document"
+                            >
+                              <Eye className="h-3 w-3 md:h-4 md:w-4" />
+                              <span className="sr-only">View</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedUpdate(update);
+                                setEditFormData({
+                                  name: update.name,
+                                  description: update.description,
+                                  effectiveDate: update.effectiveDate,
+                                  file: null
+                                });
+                                setShowEditDialog(true);
+                              }}
+                              className="h-7 w-7 md:h-8 md:w-8 text-green-600 border border-green-200 hover:bg-green-50 p-0 flex items-center justify-center"
+                              title="Edit Update"
+                            >
+                              <Edit2 className="h-3 w-3 md:h-4 md:w-4" />
+                              <span className="sr-only">Edit</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedUpdate(update);
+                                setShowDeleteDialog(true);
+                              }}
+                              className="h-7 w-7 md:h-8 md:w-8 text-red-600 border border-red-200 hover:bg-red-50 p-0 flex items-center justify-center"
+                              title="Delete Update"
+                            >
+                              <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                              <span className="sr-only">Delete</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {updates.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-32 text-center p-2 md:p-4">
+                          <EmptyState
+                            message="No updates found"
+                            actionLabel="Create your first update"
+                            onAction={() => setShowAddDialog(true)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
-              <div className="grid gap-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Enter update description"
-                  rows={4}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Effective Date</Label>
-                <Input
-                  type="date"
-                  value={formData.effectiveDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, effectiveDate: e.target.value }))}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Upload Document</Label>
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="file"
-                    onChange={handleFileChange}
-                    className="hidden"
-                    id="file-upload"
-                    accept=".pdf,.doc,.docx"
-                  />
-                  <Label
-                    htmlFor="file-upload"
-                    className="cursor-pointer flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-gray-50"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Choose File
-                  </Label>
-                  {formData.file && (
-                    <span className="text-sm text-gray-600">{formData.file.name}</span>
-                  )}
+              
+              {updates.length > itemsPerPage && (
+                <div className="py-2 md:py-4 border-t">
+                  <Pagination>
+                    <PaginationContent className="flex flex-wrap justify-center gap-1 md:gap-2">
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                          className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(page => {
+                          if (window.innerWidth < 640) {
+                            return page === 1 || page === totalPages || 
+                                  Math.abs(page - currentPage) <= 1;
+                          }
+                          return true;
+                        })
+                        .map((page) => (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(page)}
+                              isActive={page === currentPage}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))
+                      }
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))} 
+                          className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAddUpdate}
-                className="bg-blue-600 hover:bg-blue-700"
-                disabled={!formData.name || !formData.description || !formData.effectiveDate || !formData.file}
-              >
-                Add Update
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-        {/* Declarations Dialog */}
-        <Dialog open={showDeclarationsDialog} onOpenChange={setShowDeclarationsDialog}>
-          <DialogContent className="sm:max-w-[800px]">
-            <DialogHeader>
-              <DialogTitle>Officer Declarations</DialogTitle>
-              <DialogDescription>
-                View all officer declarations for {selectedUpdate?.name}
-              </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="h-[400px] rounded-md border p-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Officer Name</TableHead>
-                    <TableHead>Signature Date</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {declarations
-                    .filter(declaration => declaration.updateId === selectedUpdate?.id)
-                    .map((declaration) => (
-                    <TableRow key={declaration.id}>
-                      <TableCell className="font-medium">{declaration.officerName}</TableCell>
-                      <TableCell>{declaration.signatureDate}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          className={declaration.acknowledged 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-yellow-100 text-yellow-700'}
-                        >
-                          {declaration.acknowledged ? 'Signed' : 'Pending'}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
+      <footer className="w-full bg-white border-t border-gray-200 py-4 mt-auto">
+        <div className="container mx-auto px-4 md:px-6">
+          {/* Footer content removed */}
+        </div>
+      </footer>
 
-        {/* Document Preview Dialog */}
-        <Dialog open={showDocumentPreview} onOpenChange={setShowDocumentPreview}>
-          <DialogContent className="max-w-7xl h-[90vh] p-0">
-            <div className="flex flex-col h-full">
-              <div className="flex items-center justify-between px-6 py-4 border-b">
-                <div className="flex items-center gap-4">
-                  <FileText className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <h2 className="text-lg font-semibold">{selectedUpdate?.name}</h2>
-                    <p className="text-sm text-gray-500">Effective from: {selectedUpdate?.effectiveDate}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowSignDialog(true)}
-                    className="flex items-center gap-2"
-                  >
-                    <FileSignature className="h-4 w-4" />
-                    Sign Declaration
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <Download className="h-4 w-4" />
-                    Download
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setShowDocumentPreview(false)}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              </div>
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="w-[calc(100%-32px)] sm:max-w-[600px] p-2 md:p-4 max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-base sm:text-lg">Add New Update</DialogTitle>
+            <DialogDescription className="text-sm">
+              Create a new security update and document for officer declarations
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 md:gap-4 py-2 md:py-4">
+            <FormField label="Update Name">
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter update name"
+                className="h-9"
+              />
+            </FormField>
+            <FormField label="Description">
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter update description"
+                rows={4}
+                className="h-20"
+              />
+            </FormField>
+            <FormField label="Effective Date">
+              <Input
+                type="date"
+                value={formData.effectiveDate}
+                onChange={(e) => setFormData(prev => ({ ...prev, effectiveDate: e.target.value }))}
+                className="h-9"
+              />
+            </FormField>
+            <FormField label="Upload Document">
+              <FileUploadField
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setFormData(prev => ({ ...prev, file: e.target.files![0] }));
+                  }
+                }}
+                currentFileName={formData.file?.name}
+              />
+            </FormField>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAddDialog(false)}
+              className="w-full sm:w-auto h-9"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddUpdate}
+              className="w-full sm:w-auto h-9 bg-blue-600 hover:bg-blue-700"
+              disabled={!formData.name || !formData.description || !formData.effectiveDate || !formData.file}
+            >
+              Add Update
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-              <Tabs defaultValue="document" className="flex-1 flex flex-col">
-                <div className="px-6 border-b">
-                  <TabsList>
-                    <TabsTrigger value="document">Document</TabsTrigger>
-                    <TabsTrigger value="declarations">Declarations ({declarations.filter(d => d.updateId === selectedUpdate?.id).length})</TabsTrigger>
-                  </TabsList>
-                </div>
-                <TabsContent value="document" className="flex-1 p-6">
-                  <div className="h-full border rounded-md bg-white overflow-hidden">
-                    <iframe
-                      src={selectedUpdate?.fileUrl}
-                      className="w-full h-full"
-                      title={selectedUpdate?.name}
-                    />
-                  </div>
-                </TabsContent>
-                <TabsContent value="declarations" className="p-6">
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-semibold">Officer Declarations</h3>
-                        <p className="text-sm text-gray-500">
-                          Officers who have signed this document
-                        </p>
-                      </div>
-                      <Button
-                        onClick={() => setShowSignDialog(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
+      <Dialog open={showDeclarationsDialog} onOpenChange={setShowDeclarationsDialog}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>Officer Declarations</DialogTitle>
+            <DialogDescription>
+              View all officer declarations for {selectedUpdate?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[400px] rounded-md border p-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Officer Name</TableHead>
+                  <TableHead>Signature Date</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {declarations
+                  .filter(declaration => declaration.updateId === selectedUpdate?.id)
+                  .map((declaration) => (
+                  <TableRow key={declaration.id}>
+                    <TableCell className="font-medium">{declaration.officerName}</TableCell>
+                    <TableCell>{declaration.signatureDate}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        className={declaration.acknowledged 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-yellow-100 text-yellow-700'}
                       >
-                        Sign Declaration
-                      </Button>
+                        {declaration.acknowledged ? 'Signed' : 'Pending'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDocumentPreview} onOpenChange={setShowDocumentPreview}>
+        <DialogContent className="w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-[90vw] h-[90vh] p-0">
+          <div className="flex flex-col h-full">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2 md:p-4 border-b gap-3 sm:gap-0">
+              <div className="flex items-center gap-2 md:gap-3 overflow-hidden">
+                <FileText className="h-5 w-5 text-blue-600 shrink-0" />
+                <div className="overflow-hidden">
+                  <h2 className="text-base sm:text-lg font-semibold truncate">{selectedUpdate?.name}</h2>
+                  <p className="text-xs sm:text-sm text-gray-500 truncate">Effective from: {selectedUpdate?.effectiveDate}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSignDialog(true)}
+                  className="flex items-center gap-2 flex-1 sm:flex-none justify-center h-9"
+                >
+                  <FileSignature className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sign Declaration</span>
+                  <span className="sm:hidden">Sign</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-2 flex-1 sm:flex-none justify-center h-9"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Download</span>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowDocumentPreview(false)}
+                  className="h-9"
+                >
+                  ✕
+                </Button>
+              </div>
+            </div>
+
+            <Tabs defaultValue="document" className="flex-1 flex flex-col">
+              <div className="px-2 md:px-6 border-b overflow-x-auto">
+                <TabsList className="w-full sm:w-auto">
+                  <TabsTrigger value="document" className="flex-1 sm:flex-none">Document</TabsTrigger>
+                  <TabsTrigger value="declarations" className="flex-1 sm:flex-none">Declarations ({declarations.filter(d => d.updateId === selectedUpdate?.id).length})</TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="document" className="flex-1 p-2 md:p-6">
+                <div className="h-full border rounded-md bg-white overflow-hidden">
+                  <iframe
+                    src={selectedUpdate?.fileUrl}
+                    className="w-full h-full"
+                    title={selectedUpdate?.name}
+                  />
+                </div>
+              </TabsContent>
+              <TabsContent value="declarations" className="p-2 md:p-6 overflow-auto">
+                <div className="space-y-3 md:space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 md:gap-3">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-semibold">Officer Declarations</h3>
+                      <p className="text-xs sm:text-sm text-gray-500">
+                        Officers who have signed this document
+                      </p>
                     </div>
-                    
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Officer Name</TableHead>
-                            <TableHead>Signature Date</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {declarations
-                            .filter(d => d.updateId === selectedUpdate?.id)
-                            .map((declaration) => (
-                              <TableRow key={declaration.id}>
-                                <TableCell className="font-medium">
-                                  {declaration.officerName}
-                                </TableCell>
-                                <TableCell>{declaration.signatureDate}</TableCell>
-                                <TableCell>
-                                  <Badge className="bg-green-100 text-green-700">
-                                    Signed
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          {declarations.filter(d => d.updateId === selectedUpdate?.id).length === 0 && (
-                            <TableRow>
-                              <TableCell colSpan={3} className="h-24 text-center">
-                                <div className="flex flex-col items-center gap-2">
-                                  <FileSignature className="h-8 w-8 text-gray-400" />
-                                  <p className="text-gray-500 text-sm">No declarations yet</p>
-                                  <Button
-                                    variant="link"
-                                    onClick={() => setShowSignDialog(true)}
-                                    className="text-blue-600"
-                                  >
-                                    Be the first to sign
-                                  </Button>
-                                </div>
+                    <Button
+                      onClick={() => setShowSignDialog(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
+                    >
+                      Sign Declaration
+                    </Button>
+                  </div>
+                  
+                  <div className="overflow-x-auto min-w-[320px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="p-2 md:p-4 w-[40%]">Officer Name</TableHead>
+                          <TableHead className="p-2 md:p-4 w-[40%]">Signature Date</TableHead>
+                          <TableHead className="p-2 md:p-4 w-[20%]">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {declarations
+                          .filter(d => d.updateId === selectedUpdate?.id)
+                          .map((declaration) => (
+                            <TableRow key={declaration.id}>
+                              <TableCell className="font-medium p-2 md:p-4">
+                                {declaration.officerName}
+                              </TableCell>
+                              <TableCell className="p-2 md:p-4">{declaration.signatureDate}</TableCell>
+                              <TableCell className="p-2 md:p-4">
+                                <Badge className="bg-green-100 text-green-700">
+                                  Signed
+                                </Badge>
                               </TableCell>
                             </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
+                          ))}
+                        {declarations.filter(d => d.updateId === selectedUpdate?.id).length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={3} className="h-24 text-center p-2 md:p-4">
+                              <div className="flex flex-col items-center gap-2">
+                                <FileSignature className="h-8 w-8 text-gray-400" />
+                                <p className="text-gray-500 text-sm">No declarations yet</p>
+                                <Button
+                                  variant="link"
+                                  onClick={() => setShowSignDialog(true)}
+                                  className="text-blue-600"
+                                >
+                                  Be the first to sign
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
                   </div>
-                </TabsContent>
-              </Tabs>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showSignDialog} onOpenChange={setShowSignDialog}>
+        <AlertDialogContent className="w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-[500px] p-2 md:p-4 max-h-[90vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base sm:text-lg">Sign Declaration</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs sm:text-sm">
+              By signing this declaration, you confirm that you have read and understood the document: {selectedUpdate?.name}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-2 md:gap-4 py-2 md:py-4">
+            <div className="grid gap-2">
+              <Label>Officer Name</Label>
+              <Input
+                value={signatureData.officerName}
+                onChange={(e) => setSignatureData(prev => ({ ...prev, officerName: e.target.value }))}
+                placeholder="Enter your full name"
+                className="h-9"
+              />
             </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Sign Declaration Dialog */}
-        <AlertDialog open={showSignDialog} onOpenChange={setShowSignDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Sign Declaration</AlertDialogTitle>
-              <AlertDialogDescription>
-                By signing this declaration, you confirm that you have read and understood the document: {selectedUpdate?.name}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Officer Name</Label>
-                <Input
-                  value={signatureData.officerName}
-                  onChange={(e) => setSignatureData(prev => ({ ...prev, officerName: e.target.value }))}
-                  placeholder="Enter your full name"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Digital Signature</Label>
-                <Input
-                  value={signatureData.signature}
-                  onChange={(e) => setSignatureData(prev => ({ ...prev, signature: e.target.value }))}
-                  placeholder="Type your full name as signature"
-                />
-              </div>
-              <div className="bg-gray-50 p-4 rounded-md text-sm text-gray-600">
-                <p>I hereby declare that:</p>
-                <ul className="list-disc pl-5 mt-2 space-y-1">
-                  <li>I have read and fully understood the contents of this document</li>
-                  <li>I agree to comply with all procedures and guidelines outlined</li>
-                  <li>I understand that this declaration will be recorded and stored</li>
-                </ul>
-              </div>
+            <div className="grid gap-2">
+              <Label>Digital Signature</Label>
+              <Input
+                value={signatureData.signature}
+                onChange={(e) => setSignatureData(prev => ({ ...prev, signature: e.target.value }))}
+                placeholder="Type your full name as signature"
+                className="h-9"
+              />
             </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setShowSignDialog(false)}>
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleSignDeclaration}
-                className="bg-blue-600 hover:bg-blue-700"
-                disabled={!signatureData.officerName || !signatureData.signature}
-              >
-                Sign Declaration
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+            <div className="bg-gray-50 p-2 md:p-4 rounded-md text-xs sm:text-sm text-gray-600">
+              <p>I hereby declare that:</p>
+              <ul className="list-disc pl-4 md:pl-5 mt-2 space-y-1">
+                <li>I have read and fully understood the contents of this document</li>
+                <li>I agree to comply with all procedures and guidelines outlined</li>
+                <li>I understand that this declaration will be recorded and stored</li>
+              </ul>
+            </div>
+          </div>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <AlertDialogCancel onClick={() => setShowSignDialog(false)} className="w-full sm:w-auto h-9">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSignDeclaration}
+              className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto h-9"
+              disabled={!signatureData.officerName || !signatureData.signature}
+            >
+              Sign Declaration
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-        {/* View Details Dialog */}
-        <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Update Details</DialogTitle>
-            </DialogHeader>
-            {selectedUpdate && (
-              <div className="space-y-6">
-                <div className="grid gap-2">
-                  <Label className="text-gray-500">Update Name</Label>
-                  <p className="text-gray-900 font-medium">{selectedUpdate.name}</p>
-                </div>
-                <div className="grid gap-2">
-                  <Label className="text-gray-500">Description</Label>
-                  <p className="text-gray-900">{selectedUpdate.description}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-gray-500">Effective Date</Label>
-                    <p className="text-gray-900">{selectedUpdate.effectiveDate}</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-500">Status</Label>
-                    <Badge 
-                      className={
-                        selectedUpdate.status === 'active' 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-gray-100 text-gray-700'
-                      }
-                    >
-                      {selectedUpdate.status === 'active' ? 'Active' : 'Archived'}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label className="text-gray-500">Document</Label>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-gray-400" />
-                    <span className="text-gray-900">{selectedUpdate.fileName}</span>
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label className="text-gray-500">Total Declarations</Label>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-gray-400" />
-                    <span className="text-gray-900">
-                      {declarations.filter(d => d.updateId === selectedUpdate.id).length} Officers
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit Dialog */}
-        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Edit Update</DialogTitle>
-              <DialogDescription>
-                Make changes to the security update
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Update Name</Label>
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-[600px] p-2 md:p-4 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Edit Update</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Make changes to the security update
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 md:gap-4 py-2 md:py-4">
+            <div className="grid gap-2">
+              <Label>Update Name</Label>
+              <Input
+                value={editFormData.name}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter update name"
+                className="h-9"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Description</Label>
+              <Textarea
+                value={editFormData.description}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter update description"
+                rows={4}
+                className="h-20"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Effective Date</Label>
+              <Input
+                type="date"
+                value={editFormData.effectiveDate}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, effectiveDate: e.target.value }))}
+                className="h-9"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Update Document (Optional)</Label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                 <Input
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Enter update name"
+                  type="file"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setEditFormData(prev => ({ ...prev, file: e.target.files![0] }));
+                    }
+                  }}
+                  className="hidden"
+                  id="edit-file-upload"
+                  accept=".pdf,.doc,.docx"
                 />
-              </div>
-              <div className="grid gap-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={editFormData.description}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Enter update description"
-                  rows={4}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Effective Date</Label>
-                <Input
-                  type="date"
-                  value={editFormData.effectiveDate}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, effectiveDate: e.target.value }))}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Update Document (Optional)</Label>
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="file"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setEditFormData(prev => ({ ...prev, file: e.target.files![0] }));
-                      }
-                    }}
-                    className="hidden"
-                    id="edit-file-upload"
-                    accept=".pdf,.doc,.docx"
-                  />
-                  <Label
-                    htmlFor="edit-file-upload"
-                    className="cursor-pointer flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-gray-50"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Choose New File
-                  </Label>
+                <Label
+                  htmlFor="edit-file-upload"
+                  className="cursor-pointer flex items-center justify-center gap-2 px-4 py-2 border rounded-md hover:bg-gray-50 w-full sm:w-auto"
+                >
+                  <Upload className="h-4 w-4" />
+                  Choose New File
+                </Label>
+                <div className="text-sm text-gray-600 truncate">
                   {editFormData.file ? (
-                    <span className="text-sm text-gray-600">{editFormData.file.name}</span>
+                    <span>{editFormData.file.name}</span>
                   ) : (
-                    <span className="text-sm text-gray-600">Current: {selectedUpdate?.fileName}</span>
+                    <span>Current: {selectedUpdate?.fileName}</span>
                   )}
                 </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSaveEdit}
-                className="bg-blue-600 hover:bg-blue-700"
-                disabled={!editFormData.name || !editFormData.description || !editFormData.effectiveDate}
-              >
-                Save Changes
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowEditDialog(false)}
+              className="w-full sm:w-auto h-9"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              className="w-full sm:w-auto h-9 bg-blue-600 hover:bg-blue-700"
+              disabled={!editFormData.name || !editFormData.description || !editFormData.effectiveDate}
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Update</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete this update? This action cannot be undone.
-                All associated declarations will also be removed.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleConfirmDelete}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-      </div>
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-[500px] p-2 md:p-4">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base sm:text-lg">Delete Update</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs sm:text-sm">
+              Are you sure you want to delete this update? This action cannot be undone.
+              All associated declarations will also be removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <AlertDialogCancel 
+              onClick={() => setShowDeleteDialog(false)}
+              className="w-full sm:w-auto h-9"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto h-9"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -3,7 +3,7 @@ export const USER_DATA = {
   name: "David Ibanga",
   role: "IT manager",
   email: "David.Ibanga@advantage1.co.uk",
-  avatar: "https://github.com/shadcn-ui/ui/blob/main/apps/www/public/avatars/01.png?raw=true",
+  avatar: "https://avatars.githubusercontent.com/u/47346863?s=400&u=f3910523f6f994655d3d57ef1cbcbbef491f3bea&v=4",
   initials: "DI"
 } as const;
 

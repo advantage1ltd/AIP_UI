@@ -100,34 +100,43 @@ export default function EmployeeRegistration() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
-      <div className="space-y-8 p-6 md:p-8 lg:p-12 max-w-[1600px] mx-auto">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-indigo-100/80 via-purple-50/80 to-pink-100/80">
+      <div className="container mx-auto px-2 md:px-6 lg:px-8 py-4 md:py-6 lg:py-8 space-y-4 md:space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
           <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-[#324053]">
+            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-[#324053]">
               Employee Registration
             </h1>
-            <p className="text-gray-500">Register and manage employee information</p>
+            <p className="text-sm md:text-base text-gray-500">Register and manage employee information</p>
           </div>
         </div>
 
-        <EmployeeStats employees={employees} />
+        {/* Employee Stats - Responsive Grid */}
+        <div className="w-full overflow-hidden">
+          <EmployeeStats employees={employees} />
+        </div>
 
-        <Card className="bg-white/70 backdrop-blur-lg border-none shadow-lg">
-          <CardContent className="p-6">
-            <EmployeesTable
-              employees={employees}
-              onNewEmployee={handleNewEmployee}
-              onEditEmployee={handleEditEmployee}
-              onDeleteEmployee={handleDeleteEmployee}
-            />
-          </CardContent>
-        </Card>
+        {/* Main Content - Responsive Container */}
+        <div className="w-full overflow-x-auto rounded-lg">
+          <div className="min-w-[320px]">
+            <Card className="bg-white/70 backdrop-blur-lg border border-gray-100 shadow-md">
+              <CardContent className="p-2 md:p-4 lg:p-6">
+                <EmployeesTable
+                  employees={employees}
+                  onNewEmployee={handleNewEmployee}
+                  onEditEmployee={handleEditEmployee}
+                  onDeleteEmployee={handleDeleteEmployee}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
+        {/* Employee Form Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-[95vw] sm:max-w-[500px] p-4 sm:p-6">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="text-lg md:text-xl">
                 {selectedEmployee ? "Edit Employee" : "New Employee"}
               </DialogTitle>
             </DialogHeader>

@@ -211,6 +211,13 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         category: 'reports',
         path: '/management/incidents-report'
       },
+      {
+        id: 'officer-performance',
+        name: 'Officer Performance',
+        description: 'Monitor and evaluate officer performance metrics',
+        category: 'management',
+        path: '/management/officer-performance'
+      },
       
       // Customer pages
       {
@@ -398,7 +405,8 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       // Management pages
       'customer-reporting',
       'manager-support',
-      'incidents-report'
+      'incidents-report',
+      'officer-performance'
     ],
     'administrator': availablePages.map(page => page.id),
     'customer-site': [

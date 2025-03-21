@@ -1,6 +1,5 @@
 import { Settings as SettingsIcon, LogOut, User } from 'lucide-react';
 import { Button } from '../ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +9,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuGroup,
 } from '../ui/dropdown-menu';
+import { USER_DATA } from '@/constants/header';
+import { UserAvatar } from '../common/UserAvatar';
 
 interface UserMenuProps {
   className?: string;
@@ -19,19 +20,16 @@ export const UserMenu = ({ className = '' }: UserMenuProps) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className={`relative h-8 w-8 rounded-full ${className}`}>
-          <Avatar className="h-8 w-8">
-            <AvatarImage src="/avatars/01.png" alt="@davidibanga" />
-            <AvatarFallback>DI</AvatarFallback>
-          </Avatar>
+        <Button variant="ghost" className={`relative rounded-full ${className}`}>
+          <UserAvatar size="sm" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm leading-none">David Ibanga</p>
+            <p className="text-sm leading-none">{USER_DATA.name}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              david.ibanga@example.com
+              {USER_DATA.email}
             </p>
           </div>
         </DropdownMenuLabel>

@@ -152,7 +152,8 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
   const managementPaths = [
     '/management/customer-reporting',
     '/management/manager-support',
-    '/management/incidents-report'
+    '/management/incidents-report',
+    '/management/officer-performance'
   ];
   
   const customerPaths = [
@@ -393,6 +394,12 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                     to="/management/incidents-report"
                     icon={<FileWarning className="h-4 w-4" />}
                     label="Incidents Report"
+                    onClick={onNavigate}
+                  />
+                  <NavItem
+                    to="/management/officer-performance"
+                    icon={<UserCheck className="h-4 w-4" />}
+                    label="Officer Performance"
                     onClick={onNavigate}
                   />
                 </div>

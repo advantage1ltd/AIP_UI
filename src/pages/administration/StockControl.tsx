@@ -174,18 +174,18 @@ const StockControl = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-[#303D51]">Stock Control</h1>
+    <div className="w-full max-w-[100vw] overflow-x-hidden px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#303D51]">Stock Control</h1>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button 
-              className="bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-600 hover:to-slate-700 text-white"
+              className="bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-600 hover:to-slate-700 text-white w-full sm:w-auto"
             >
               <Plus className="mr-2 h-4 w-4" /> Add New
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="w-[calc(100%-2rem)] sm:w-auto max-w-md mx-auto">
             <DialogHeader>
               <DialogTitle>Add New Item</DialogTitle>
               <DialogDescription>
@@ -199,12 +199,12 @@ const StockControl = () => {
 
       <StockStats items={stockItems} />
 
-      <Card className="shadow-lg">
-        <CardHeader>
+      <Card className="shadow-lg overflow-hidden">
+        <CardHeader className="p-4 sm:p-6">
           <CardTitle>Inventory List</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 mb-4">
+        <CardContent className="p-2 sm:p-4 md:p-6">
+          <div className="flex gap-2 sm:gap-4 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -216,20 +216,22 @@ const StockControl = () => {
             </div>
           </div>
 
-          <StockTable 
-            items={paginatedItems}
-            onSort={handleSort}
-            onEdit={setSelectedItem}
-            onDelete={handleDeleteItem}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-          />
+          <div className="overflow-x-auto -mx-2 px-2">
+            <StockTable 
+              items={paginatedItems}
+              onSort={handleSort}
+              onEdit={setSelectedItem}
+              onDelete={handleDeleteItem}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          </div>
         </CardContent>
       </Card>
 
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100%-2rem)] sm:w-auto max-w-md mx-auto">
           <DialogHeader>
             <DialogTitle>Edit Item</DialogTitle>
             <DialogDescription>

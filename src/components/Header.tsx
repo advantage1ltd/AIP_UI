@@ -62,6 +62,7 @@ import { USER_DATA, BUTTON_STYLES, COMMON_CLASSES } from "@/constants/header";
 import { NotificationBell } from "./header/NotificationBell";
 import { Logo } from "./header/Logo";
 import { SearchInput } from "./header/SearchInput";
+import { UserAvatar } from "./common/UserAvatar";
 
 // Define navigation items structure
 interface NavItem {
@@ -187,16 +188,10 @@ const NavigationMenu = ({
 const UserProfileSection = () => (
   <div className="border-t border-blue-900 p-6 mt-auto bg-blue-900/50">
     <div className="flex items-center gap-4">
-      <Avatar className="h-14 w-14 border border-blue-700">
-        <AvatarImage 
-          src="https://github.com/shadcn-ui/ui/blob/main/apps/www/public/avatars/01.png?raw=true" 
-          alt="David Ibanga" 
-        />
-        <AvatarFallback className="bg-blue-700 text-white text-xl">DI</AvatarFallback>
-      </Avatar>
+      <UserAvatar size="lg" showBorder={true} />
       <div className="flex-1 min-w-0">
-        <p className="text-[17px] font-medium text-white truncate">David Ibanga</p>
-        <p className="text-[14px] text-blue-200 truncate">IT manager</p>
+        <p className="text-[17px] font-medium text-white truncate">{USER_DATA.name}</p>
+        <p className="text-[14px] text-blue-200 truncate">{USER_DATA.role}</p>
       </div>
       <Button 
         variant="ghost" 
@@ -579,19 +574,17 @@ export function Header() {
         <Logo variant="mobile" containerClassName="w-65" />
         
         {/* Right: User Avatar */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className={BUTTON_STYLES.ghost.desktop}>
-              <Avatar className="h-14 w-14">
-                <AvatarImage src={USER_DATA.avatar} alt={USER_DATA.name} />
-                <AvatarFallback className="bg-gray-200 text-gray-500 text-xl">
-                  {USER_DATA.initials}
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <UserProfileDropdown />
-        </DropdownMenu>
+        <div className="flex items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 focus:outline-none">
+                <UserAvatar size="md" />
+                <ChevronDown className="h-4 w-4 text-gray-500" />
+              </button>
+            </DropdownMenuTrigger>
+            <UserProfileDropdown />
+          </DropdownMenu>
+        </div>
       </div>
       
       {/* Desktop/Tablet Header */}
@@ -670,17 +663,12 @@ export function Header() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <div className="flex items-center gap-2 cursor-pointer">
-                    <Avatar className="h-10 w-10 border border-blue-700">
-                      <AvatarImage 
-                        src="https://github.com/shadcn-ui/ui/blob/main/apps/www/public/avatars/01.png?raw=true" 
-                        alt="David Ibanga" 
-                      />
-                      <AvatarFallback className="bg-gray-200 text-white text-lg">DI</AvatarFallback>
-                    </Avatar>
-                    <div className="text-sm block">
-                      <p className="font-medium text-white">David Ibanga</p>
-                      <p className="text-xs text-blue-200">IT manager</p>
+                    <UserAvatar size="md" showBorder={true} />
+                    <div className="hidden md:block text-sm">
+                      <p className="font-medium text-gray-900 dark:text-white">David Ibanga</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-300">IT manager</p>
                     </div>
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
                   </div>
                 </DropdownMenuTrigger>
                 <UserProfileDropdown />
@@ -742,17 +730,12 @@ export function Header() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <div className="flex items-center gap-2 cursor-pointer">
-                <Avatar className="h-9 w-9 border border-gray-200">
-                  <AvatarImage 
-                    src="https://github.com/shadcn-ui/ui/blob/main/apps/www/public/avatars/01.png?raw=true" 
-                    alt="David Ibanga" 
-                  />
-                  <AvatarFallback className="bg-orange-500 text-white">DI</AvatarFallback>
-                </Avatar>
+                <UserAvatar size="md" showBorder={true} />
                 <div className="hidden md:block text-sm">
-                  <p className="font-medium text-gray-900">David Ibanga</p>
-                  <p className="text-xs text-gray-500">IT manager</p>
+                  <p className="font-medium text-gray-900 dark:text-white">David Ibanga</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-300">IT manager</p>
                 </div>
+                <ChevronDown className="h-4 w-4 text-gray-400" />
               </div>
             </DropdownMenuTrigger>
             <UserProfileDropdown />
