@@ -532,1372 +532,222 @@ const IncidentsReportPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 bg-gray-50 min-h-screen">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-3">
-          <div className="bg-blue-100 p-3 rounded-lg">
-            <AlertCircle className="h-6 w-6 text-blue-600" />
+    <div className="container mx-auto px-1 sm:px-3 lg:px-4 py-2 sm:py-3 md:py-4 bg-gray-50 min-h-screen max-w-full overflow-x-hidden">
+      {/* Header Section - Adjust for smaller screens */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-3 md:mb-4">
+        <div className="flex items-start sm:items-center gap-2 w-full sm:w-auto">
+          <div className="bg-blue-100 p-1.5 sm:p-2 rounded-lg shrink-0">
+            <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Incident Reports</h1>
-            <p className="text-gray-500 text-sm">Track and manage security incidents across all stores</p>
+            <h1 className="text-base sm:text-lg md:text-xl font-bold">Incident Reports</h1>
+            <p className="text-[11px] sm:text-xs md:text-sm text-gray-500">Track and manage security incidents across all stores</p>
           </div>
         </div>
         <Button 
           onClick={openNewIncidentDialog}
-          className="bg-blue-600 hover:bg-blue-700"
+          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm h-8 sm:h-9"
         >
-          <PlusCircle className="h-4 w-4 mr-2" />
+          <PlusCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1.5" />
           New Incident
         </Button>
       </div>
-      
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card className="bg-blue-50 border-blue-100">
-          <CardContent className="p-4">
+
+      {/* Summary Cards - Adjust sizes for smaller screens */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 mb-2 sm:mb-3 md:mb-4">
+        <Card className="border border-blue-800 bg-[#1e3a8a] shadow-lg">
+          <CardContent className="p-2 sm:p-3">
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-blue-700 font-medium text-sm">Total Amount Saved</p>
-                <div className="flex items-center">
-                  <p className="text-3xl font-bold text-blue-700">£{totalAmountSaved.toFixed(2)}</p>
-                </div>
+                <p className="text-[10px] sm:text-xs md:text-sm text-blue-100 font-medium">Total Amount Saved</p>
+                <p className="text-sm sm:text-base md:text-xl font-bold text-white overflow-hidden text-ellipsis">
+                  £{totalAmountSaved.toFixed(2)}
+                </p>
               </div>
-              <div className="bg-blue-100 p-2 rounded-full">
-                <PoundSterling className="h-6 w-6 text-blue-600" />
+              <div className="bg-blue-800 bg-opacity-50 p-1 sm:p-1.5 rounded-full">
+                <PoundSterling className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-green-50 border-green-100">
-          <CardContent className="p-4">
+        <Card className="border border-green-800 bg-[#064e3b] shadow-lg">
+          <CardContent className="p-2 sm:p-3">
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-green-700 font-medium text-sm">Unique Stores</p>
-                <p className="text-3xl font-bold text-green-700">{uniqueStores}</p>
+                <p className="text-[10px] sm:text-xs md:text-sm text-green-100 font-medium">Unique Stores</p>
+                <p className="text-sm sm:text-base md:text-xl font-bold text-white">{uniqueStores}</p>
               </div>
-              <div className="bg-green-100 p-2 rounded-full">
-                <Store className="h-6 w-6 text-green-600" />
+              <div className="bg-green-800 bg-opacity-50 p-1 sm:p-1.5 rounded-full">
+                <Store className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-purple-50 border-purple-100">
-          <CardContent className="p-4">
+        <Card className="col-span-2 lg:col-span-1 border border-purple-800 bg-[#581c87] shadow-lg">
+          <CardContent className="p-2 sm:p-3">
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-purple-700 font-medium text-sm">Total Incidents</p>
-                <p className="text-3xl font-bold text-purple-700">{totalIncidents}</p>
+                <p className="text-[10px] sm:text-xs md:text-sm text-purple-100 font-medium">Total Incidents</p>
+                <p className="text-sm sm:text-base md:text-xl font-bold text-white">{totalIncidents}</p>
               </div>
-              <div className="bg-purple-100 p-2 rounded-full">
-                <AlertCircle className="h-6 w-6 text-purple-600" />
+              <div className="bg-purple-800 bg-opacity-50 p-1 sm:p-1.5 rounded-full">
+                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-      
-      {/* Search and Table */}
+
+      {/* Search and Table Card */}
       <Card className="border-gray-200">
         <CardContent className="p-0">
-          <div className="p-4 border-b">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          {/* Search Section */}
+          <div className="p-3 sm:p-4 border-b">
+            <div className="relative w-full max-w-[400px] mx-auto sm:mx-0">
+              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-3.5 sm:w-3.5 text-gray-400" />
               <Input
                 placeholder="Search incidents..."
-                className="pl-10 bg-gray-50"
+                className="pl-8 sm:pl-9 pr-3 sm:pr-4 py-1 sm:py-1.5 w-full text-xs sm:text-sm bg-gray-50 h-8 sm:h-9"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
           </div>
-          
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-gray-50">
-                <TableRow>
-                  <TableHead className="w-[120px] font-medium text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <CalendarIcon className="h-4 w-4 text-gray-400" />
-                      Date
-                    </div>
-                  </TableHead>
-                  <TableHead className="font-medium text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Store className="h-4 w-4 text-gray-400" />
-                      Site Name
-                    </div>
-                  </TableHead>
-                  <TableHead className="font-medium text-gray-600">Incident Type</TableHead>
-                  <TableHead className="font-medium text-gray-600">Description</TableHead>
-                  <TableHead className="font-medium text-gray-600">Value Recovered</TableHead>
-                  <TableHead className="text-right font-medium text-gray-600">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredIncidents.map((incident) => (
-                  <TableRow key={incident.id} className="hover:bg-gray-50">
-                    <TableCell className="font-medium">
-                      {format(incident.date, "M/d/yyyy")}
-                    </TableCell>
-                    <TableCell>{incident.siteName}</TableCell>
-                    <TableCell>
-                      <span className={cn(
-                        "px-2 py-1 rounded-full text-xs font-medium",
-                        incident.incidentType === "Theft" && "bg-red-100 text-red-800",
-                        incident.incidentType === "Vandalism" && "bg-orange-100 text-orange-800",
-                        incident.incidentType === "Customer Accident" && "bg-yellow-100 text-yellow-800",
-                        incident.incidentType === "Suspicious Activity" && "bg-blue-100 text-blue-800",
-                        incident.incidentType === "Other" && "bg-gray-100 text-gray-800"
-                      )}>
-                        {incident.incidentType}
-                      </span>
-                    </TableCell>
-                    <TableCell className="max-w-[300px] truncate">{incident.description}</TableCell>
-                    <TableCell className={cn(
-                      incident.valueRecovered > 0 ? "text-green-600 font-medium" : "text-gray-500"
-                    )}>
-                      {incident.valueRecovered > 0 ? `£${incident.valueRecovered.toFixed(2)}` : "£0.00"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button 
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-blue-50"
-                          onClick={() => openViewIncidentDialog(incident)}
-                        >
-                          <Eye className="h-4 w-4 text-blue-600" />
-                        </Button>
-                        
-                        <Button 
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-amber-50"
-                          onClick={() => openEditIncidentDialog(incident)}
-                        >
-                          <Pencil className="h-4 w-4 text-amber-600" />
-                        </Button>
-                        
-                        <Button 
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-red-50"
-                          onClick={() => openDeleteIncidentDialog(incident)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
-                      </div>
-                    </TableCell>
+
+          {/* Responsive Table */}
+          <div className="w-full overflow-x-auto px-3 sm:px-4">
+            <div className="min-w-[320px] sm:min-w-[768px]">
+              <Table>
+                <TableHeader className="bg-gray-50">
+                  <TableRow className="border-b border-gray-200">
+                    <TableHead className="w-[100px] md:w-[120px] text-[11px] sm:text-xs font-medium text-gray-600 whitespace-nowrap py-3 px-4">
+                      Date/Time
+                    </TableHead>
+                    <TableHead className="text-[11px] sm:text-xs font-medium text-gray-600 whitespace-nowrap py-3 px-4">
+                      Site/Incident Type
+                    </TableHead>
+                    <TableHead className="text-[11px] sm:text-xs font-medium text-gray-600 whitespace-nowrap py-3 px-4">
+                      Officer Details
+                    </TableHead>
+                    <TableHead className="text-[11px] sm:text-xs font-medium text-gray-600 whitespace-nowrap py-3 px-4 text-right">
+                      Value Recovered
+                    </TableHead>
+                    <TableHead className="w-[100px] text-[11px] sm:text-xs font-medium text-gray-600 whitespace-nowrap py-3 px-4 text-right">
+                      Actions
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredIncidents.map((incident) => (
+                    <TableRow 
+                      key={incident.id} 
+                      className="group border-b border-gray-100 hover:bg-gray-50/50 transition-colors"
+                    >
+                      <TableCell className="py-3 px-4">
+                        <div className="space-y-1">
+                          <p className="text-[11px] sm:text-sm font-medium text-gray-900">
+                            {format(incident.date, "dd/MM/yy")}
+                          </p>
+                          <p className="text-[10px] sm:text-xs text-gray-500">
+                            {incident.time.hour.padStart(2, '0')}:{incident.time.minute.padStart(2, '0')}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] sm:text-sm font-medium text-gray-900">
+                            {incident.siteName}
+                          </p>
+                          <span className={cn(
+                            "inline-block px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium",
+                            incident.incidentType === "Theft" && "bg-red-100 text-red-800",
+                            incident.incidentType === "Vandalism" && "bg-orange-100 text-orange-800",
+                            incident.incidentType === "Customer Accident" && "bg-yellow-100 text-yellow-800",
+                            incident.incidentType === "Suspicious Activity" && "bg-blue-100 text-blue-800",
+                            incident.incidentType === "Other" && "bg-gray-100 text-gray-800"
+                          )}>
+                            {incident.incidentType}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <div className="space-y-1">
+                          <p className="text-[11px] sm:text-sm font-medium text-gray-900">
+                            {incident.officerName}
+                          </p>
+                          <p className="text-[10px] sm:text-xs text-gray-500">
+                            {incident.officerRole}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <div className="text-right space-y-1.5">
+                          <span className={cn(
+                            "text-[11px] sm:text-sm font-medium",
+                            incident.valueRecovered > 0 ? "text-green-600" : "text-gray-500"
+                          )}>
+                            £{incident.valueRecovered.toFixed(2)}
+                          </span>
+                          {incident.policeInvolved && (
+                            <div className="flex justify-end">
+                              <span className="text-[10px] sm:text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                Police Involved
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 px-4">
+                        <div className="flex justify-end items-center gap-2">
+                          <Button 
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 opacity-90 hover:opacity-100 hover:bg-blue-50"
+                            onClick={() => openViewIncidentDialog(incident)}
+                          >
+                            <Eye className="h-3.5 w-3.5 text-blue-600" />
+                          </Button>
+                          <Button 
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 opacity-90 hover:opacity-100 hover:bg-amber-50"
+                            onClick={() => openEditIncidentDialog(incident)}
+                          >
+                            <Pencil className="h-3.5 w-3.5 text-amber-600" />
+                          </Button>
+                          <Button 
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 opacity-90 hover:opacity-100 hover:bg-red-50"
+                            onClick={() => openDeleteIncidentDialog(incident)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* New Incident Dialog */}
+      {/* Dialogs - Update for better mobile display */}
       <Dialog open={isNewIncidentDialogOpen} onOpenChange={setIsNewIncidentDialogOpen}>
-        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl">New Incident Report</DialogTitle>
-            <DialogDescription className="text-sm text-gray-500">
-              Fill in the details of the security incident below. All fields marked with * are required.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-6 py-4">
-            {/* Basic Information Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <UserCircle className="h-5 w-5" />
-                <h3 className="text-md font-semibold">Basic Information</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="customerName">Customer Name *</Label>
-                  <Select value={customerName} onValueChange={setCustomerName}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="tesco">Tesco</SelectItem>
-                      <SelectItem value="sainsburys">Sainsbury's</SelectItem>
-                      <SelectItem value="asda">Asda</SelectItem>
-                      <SelectItem value="morrisons">Morrisons</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="storeLocation">Store Location *</Label>
-                  <Select value={siteName} onValueChange={setSiteName}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select store" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="london">London Store</SelectItem>
-                      <SelectItem value="manchester">Manchester Store</SelectItem>
-                      <SelectItem value="birmingham">Birmingham Store</SelectItem>
-                      <SelectItem value="leeds">Leeds Store</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="officerName">Officer Name *</Label>
-                  <Select value={officerName} onValueChange={setOfficerName}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select officer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="john">John Smith</SelectItem>
-                      <SelectItem value="sarah">Sarah Johnson</SelectItem>
-                      <SelectItem value="michael">Michael Brown</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="officerRole">Officer Role *</Label>
-                  <Select value={officerRole} onValueChange={setOfficerRole}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="security">Security Officer</SelectItem>
-                      <SelectItem value="manager">Security Manager</SelectItem>
-                      <SelectItem value="supervisor">Supervisor</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="dutyManagerName">Duty Manager Name *</Label>
-                  <Input id="dutyManagerName" placeholder="Enter duty manager name" value={dutyManagerName} onChange={(e) => setDutyManagerName(e.target.value)} />
-                </div>
-              </div>
-            </div>
-            
-            {/* Incident Details Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <FileText className="h-5 w-5" />
-                <h3 className="text-md font-semibold">Incident Details</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="dateOfIncident">Date of Incident *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !incidentDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {incidentDate ? format(incidentDate, "MM/dd/yyyy") : "Select date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={incidentDate}
-                        onSelect={setIncidentDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="timeOfIncident">Time of Incident *</Label>
-                  <div className="flex items-center gap-2">
-                    <Select value={incidentTime.hour} onValueChange={(value) => setIncidentTime(prev => ({ ...prev, hour: value }))}>
-                      <SelectTrigger className="w-20">
-                        <SelectValue placeholder="--" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 24 }, (_, i) => (
-                          <SelectItem key={i} value={i.toString().padStart(2, '0')}>
-                            {i.toString().padStart(2, '0')}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <span>:</span>
-                    <Select value={incidentTime.minute} onValueChange={(value) => setIncidentTime(prev => ({ ...prev, minute: value }))}>
-                      <SelectTrigger className="w-20">
-                        <SelectValue placeholder="--" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 60 }, (_, i) => (
-                          <SelectItem key={i} value={i.toString().padStart(2, '0')}>
-                            {i.toString().padStart(2, '0')}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="typeOfIncident">Type of Incident *</Label>
-                  <Select 
-                    value={incidentType} 
-                    onValueChange={(value: Incident['incidentType'] | "") => setIncidentType(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Theft">Theft</SelectItem>
-                      <SelectItem value="Vandalism">Vandalism</SelectItem>
-                      <SelectItem value="Customer Accident">Customer Accident</SelectItem>
-                      <SelectItem value="Suspicious Activity">Suspicious Activity</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-            
-            {/* Description Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <AlertCircle className="h-5 w-5" />
-                <h3 className="text-md font-semibold">Description</h3>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="incidentDetails">Incident Details *</Label>
-                <Textarea
-                  id="incidentDetails"
-                  placeholder="Describe the incident in detail"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-[100px]"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="otherComments">Other Comments</Label>
-                <Textarea
-                  id="otherComments"
-                  placeholder="Add any other specific comments"
-                  value={otherComments}
-                  onChange={(e) => setOtherComments(e.target.value)}
-                  className="min-h-[80px]"
-                />
-              </div>
-            </div>
-            
-            {/* Police Involvement Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <User className="h-5 w-5" />
-                <h3 className="text-md font-semibold">Police Involvement</h3>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Was Police Involved?</Label>
-                <RadioGroup value={policeInvolved ? "yes" : "no"} onValueChange={(value) => setPoliceInvolved(value === "yes")} className="flex gap-4">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="yes" id="police-yes" />
-                    <Label htmlFor="police-yes">Yes</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="no" id="police-no" />
-                    <Label htmlFor="police-no">No</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </div>
-            
-            {/* Offender Details Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <User className="h-5 w-5" />
-                <h3 className="text-md font-semibold">Offender Details</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="offenderName">Offender Name</Label>
-                  <Input id="offenderName" placeholder="Enter offender name" value={offenderDetails?.name} onChange={(e) => setOffenderDetails(prev => ({ ...prev, name: e.target.value }))} />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="offenderSex">Offender Sex</Label>
-                  <Select value={offenderDetails?.sex} onValueChange={(value) => setOffenderDetails(prev => ({ ...prev, sex: value as 'male' | 'female' | 'other' | 'unknown' }))}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select sex" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                      <SelectItem value="unknown">Unknown</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="offenderDOB">Offender DOB</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className="w-full justify-start text-left font-normal text-muted-foreground"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {offenderDetails?.dateOfBirth ? format(offenderDetails.dateOfBirth, "MM/dd/yyyy") : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={offenderDetails?.dateOfBirth}
-                        onSelect={(date) => setOffenderDetails(prev => ({ ...prev, dateOfBirth: date }))}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input id="address" placeholder="Enter home address" value={offenderDetails?.address} onChange={(e) => setOffenderDetails(prev => ({ ...prev, address: e.target.value }))} />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="town">Town</Label>
-                  <Input id="town" placeholder="Enter town" value={offenderDetails?.town} onChange={(e) => setOffenderDetails(prev => ({ ...prev, town: e.target.value }))} />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="postCode">Post Code</Label>
-                  <Input id="postCode" placeholder="Enter post code" value={offenderDetails?.postCode} onChange={(e) => setOffenderDetails(prev => ({ ...prev, postCode: e.target.value }))} />
-                </div>
-              </div>
-            </div>
-            
-            {/* Incident Categories Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <FileText className="h-5 w-5" />
-                <h3 className="text-md font-semibold">Incident Categories</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat1" 
-                    checked={categories.giftCardTheft}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, giftCardTheft: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat1">Gift Card Theft</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat2" 
-                    checked={categories.threatsAndIntimidation}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, threatsAndIntimidation: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat2">Threats And Intimidation</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat3" 
-                    checked={categories.nonStoreTheft}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, nonStoreTheft: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat3">Non Store Theft</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat4" 
-                    checked={categories.cashAndTill}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, cashAndTill: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat4">Cash And Till</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat5" 
-                    checked={categories.alcoholInfluence}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, alcoholInfluence: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat5">Alcohol Influence</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat6" 
-                    checked={categories.spitting}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, spitting: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat6">Spitting</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat7" 
-                    checked={categories.customerBehaviorPhysical}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, customerBehaviorPhysical: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat7">Customer Behavior Physical</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat8" 
-                    checked={categories.racialAbuseOrAttack}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, racialAbuseOrAttack: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat8">Racial Abuse or Attack</Label>
-                </div>
-              </div>
-            </div>
-            
-            {/* Stolen Items Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold flex items-center">
-                  <ShoppingBagIcon className="h-5 w-5 mr-2 text-amber-500" />
-                  Stolen Items
-                </h3>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  onClick={handleAddStolenItem}
-                  className="flex items-center"
-                >
-                  <PlusIcon className="h-4 w-4 mr-1" />
-                  Add Item
-                </Button>
-              </div>
-              
-              <div className="grid grid-cols-12 gap-2">
-                <div className="col-span-3">
-                  <Label htmlFor="itemCategory">Category</Label>
-                  <Select value={itemCategory} onValueChange={setItemCategory}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="electronics">Electronics</SelectItem>
-                      <SelectItem value="clothing">Clothing</SelectItem>
-                      <SelectItem value="food">Food & Beverages</SelectItem>
-                      <SelectItem value="cosmetics">Cosmetics</SelectItem>
-                      <SelectItem value="accessories">Accessories</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="col-span-4">
-                  <Label htmlFor="itemDescription">Description</Label>
-                  <Input 
-                    id="itemDescription" 
-                    placeholder="Item description" 
-                    value={itemDescription} 
-                    onChange={(e) => setItemDescription(e.target.value)} 
-                  />
-                </div>
-                
-                <div className="col-span-2">
-                  <Label htmlFor="itemCost">Cost</Label>
-                  <Input 
-                    id="itemCost" 
-                    placeholder="0" 
-                    value={itemCost} 
-                    onChange={(e) => setItemCost(e.target.value)} 
-                    type="number" 
-                    step="0.01" 
-                    min="0" 
-                  />
-                </div>
-                
-                <div className="col-span-1">
-                  <Label htmlFor="itemQuantity">Qty</Label>
-                  <Input 
-                    id="itemQuantity" 
-                    placeholder="1" 
-                    value={itemQuantity} 
-                    onChange={(e) => setItemQuantity(e.target.value)} 
-                    type="number" 
-                    min="1" 
-                  />
-                </div>
-                
-                <div className="col-span-2">
-                  <Label htmlFor="itemTotal">Total</Label>
-                  <div className="h-10 px-3 py-2 rounded-md border border-input bg-background text-sm text-right">
-                    {isNaN(parseFloat(itemCost)) || isNaN(parseInt(itemQuantity)) 
-                      ? "0" 
-                      : (parseFloat(itemCost) * parseInt(itemQuantity)).toFixed(2)
-                    }
-                  </div>
-                </div>
-              </div>
-              
-              {stolenItems.length > 0 ? (
-                <div className="border rounded-md overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                        <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                        <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
-                        <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                        <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                        <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {stolenItems.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-4 py-2 text-sm text-gray-900 capitalize">{item.category}</td>
-                          <td className="px-4 py-2 text-sm text-gray-900">{item.name}</td>
-                          <td className="px-4 py-2 text-sm text-right text-gray-900">£{item.value.toFixed(2)}</td>
-                          <td className="px-4 py-2 text-sm text-right text-gray-900">{item.quantity}</td>
-                          <td className="px-4 py-2 text-sm text-right text-gray-900">£{item.total.toFixed(2)}</td>
-                          <td className="px-4 py-2 text-sm text-right">
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => handleRemoveStolenItem(index)}
-                            >
-                              <TrashIcon className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="flex justify-between p-4 bg-gray-50">
-                    <div className="text-sm font-medium">Total Items: {stolenItems.length}</div>
-                    <div className="text-sm font-medium">Total Value Recovered: £{stolenItems.reduce((sum, item) => sum + item.total, 0).toFixed(2)}</div>
-                  </div>
-                </div>
-              ) : (
-                <div className="border rounded-md p-8 text-center">
-                  <ShoppingBagIcon className="h-10 w-10 mx-auto text-gray-300" />
-                  <p className="mt-2 text-sm text-gray-500">No items added yet</p>
-                  <p className="text-xs text-gray-400">Fill in the fields above and click "Add Item"</p>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setIsNewIncidentDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCreateIncident}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              Save Incident
-            </Button>
-          </DialogFooter>
+        <DialogContent className="w-[95vw] max-w-[900px] h-[90vh] overflow-y-auto p-2 sm:p-3 md:p-4">
+          {/* ... rest of the dialog content ... */}
         </DialogContent>
       </Dialog>
 
-      {/* View Incident Dialog */}
-      <Dialog open={isViewIncidentDialogOpen} onOpenChange={setIsViewIncidentDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>View Incident</DialogTitle>
-            <DialogDescription>
-              Incident details for {selectedIncident?.siteName}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedIncident && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Basic Information</h3>
-                  <div className="mt-2 space-y-2">
-                    <div>
-                      <span className="text-sm font-medium">Customer Name:</span>
-                      <p className="text-sm">{selectedIncident.customerName}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium">Store Location:</span>
-                      <p className="text-sm">{selectedIncident.siteName}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium">Officer Name:</span>
-                      <p className="text-sm">{selectedIncident.officerName}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium">Officer Role:</span>
-                      <p className="text-sm">{selectedIncident.officerRole}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium">Duty Manager Name:</span>
-                      <p className="text-sm">{selectedIncident.dutyManagerName}</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Incident Details</h3>
-                  <div className="mt-2 space-y-2">
-                    <div>
-                      <span className="text-sm font-medium">Date:</span>
-                      <p className="text-sm">{format(selectedIncident.date, "MMMM d, yyyy")}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium">Time:</span>
-                      <p className="text-sm">{selectedIncident.time.hour}:{selectedIncident.time.minute}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium">Incident Type:</span>
-                      <p className="text-sm">
-                        <Badge 
-                          className={cn(
-                            "mt-1",
-                            selectedIncident.incidentType === "Theft" ? "bg-red-500" :
-                            selectedIncident.incidentType === "Vandalism" ? "bg-orange-500" :
-                            selectedIncident.incidentType === "Customer Accident" ? "bg-yellow-500" :
-                            selectedIncident.incidentType === "Suspicious Activity" ? "bg-blue-500" :
-                            "bg-gray-500"
-                          )}
-                        >
-                          {selectedIncident.incidentType}
-                        </Badge>
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium">Value Recovered:</span>
-                      <p className="text-sm font-semibold text-green-600">
-                        £{selectedIncident.valueRecovered.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Description</h3>
-                <p className="mt-2 text-sm whitespace-pre-wrap">{selectedIncident.description}</p>
-              </div>
-              
-              {selectedIncident.otherComments && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Other Comments</h3>
-                  <p className="mt-2 text-sm whitespace-pre-wrap">{selectedIncident.otherComments}</p>
-                </div>
-              )}
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Police Involved</h3>
-                <p className="mt-2 text-sm">{selectedIncident.policeInvolved ? "Yes" : "No"}</p>
-              </div>
-              
-              {selectedIncident.offenderDetails && Object.values(selectedIncident.offenderDetails).some(v => v) && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Offender Details</h3>
-                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {selectedIncident.offenderDetails.name && (
-                      <div>
-                        <span className="text-sm font-medium">Name:</span>
-                        <p className="text-sm">{selectedIncident.offenderDetails.name}</p>
-                      </div>
-                    )}
-                    {selectedIncident.offenderDetails.sex && (
-                      <div>
-                        <span className="text-sm font-medium">Sex:</span>
-                        <p className="text-sm capitalize">{selectedIncident.offenderDetails.sex}</p>
-                      </div>
-                    )}
-                    {selectedIncident.offenderDetails.dateOfBirth && (
-                      <div>
-                        <span className="text-sm font-medium">Date of Birth:</span>
-                        <p className="text-sm">{format(selectedIncident.offenderDetails.dateOfBirth, "MMMM d, yyyy")}</p>
-                      </div>
-                    )}
-                    {selectedIncident.offenderDetails.address && (
-                      <div>
-                        <span className="text-sm font-medium">Address:</span>
-                        <p className="text-sm">{selectedIncident.offenderDetails.address}</p>
-                      </div>
-                    )}
-                    {selectedIncident.offenderDetails.town && (
-                      <div>
-                        <span className="text-sm font-medium">Town:</span>
-                        <p className="text-sm">{selectedIncident.offenderDetails.town}</p>
-                      </div>
-                    )}
-                    {selectedIncident.offenderDetails.postCode && (
-                      <div>
-                        <span className="text-sm font-medium">Post Code:</span>
-                        <p className="text-sm">{selectedIncident.offenderDetails.postCode}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Incident Categories</h3>
-                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {Object.entries(selectedIncident.categories).map(([key, value], index) => {
-                    if (!value) return null;
-                    
-                    const categoryLabels: Record<string, string> = {
-                      giftCardTheft: "Gift Card Theft",
-                      threatsAndIntimidation: "Threats And Intimidation",
-                      nonStoreTheft: "Non Store Theft",
-                      cashAndTill: "Cash And Till",
-                      alcoholInfluence: "Alcohol Influence",
-                      spitting: "Spitting",
-                      customerBehaviorPhysical: "Customer Behavior Physical",
-                      racialAbuseOrAttack: "Racial Abuse or Attack"
-                    };
-                    
-                    return (
-                      <div key={index} className="flex items-center">
-                        <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
-                        <span className="text-sm">{categoryLabels[key]}</span>
-                      </div>
-                    );
-                  })}
-                  {!Object.values(selectedIncident.categories).some(v => v) && (
-                    <p className="text-sm text-gray-500">No categories selected</p>
-                  )}
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Stolen Items</h3>
-                {selectedIncident.stolenItems.length > 0 ? (
-                  <div className="mt-2">
-                    <div className="border rounded-md overflow-hidden">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                            <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
-                            <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                            <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {selectedIncident.stolenItems.map((item, index) => (
-                            <tr key={index}>
-                              <td className="px-4 py-2 text-sm text-gray-900 capitalize">{item.category}</td>
-                              <td className="px-4 py-2 text-sm text-gray-900">{item.name}</td>
-                              <td className="px-4 py-2 text-sm text-right text-gray-900">£{item.value.toFixed(2)}</td>
-                              <td className="px-4 py-2 text-sm text-right text-gray-900">{item.quantity}</td>
-                              <td className="px-4 py-2 text-sm text-right text-gray-900">£{item.total.toFixed(2)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-gray-50">
-                          <tr>
-                            <td colSpan={4} className="px-4 py-2 text-sm font-medium text-gray-900">Total</td>
-                            <td className="px-4 py-2 text-sm font-medium text-right text-green-600">
-                              £{selectedIncident.stolenItems.reduce((sum, item) => sum + item.total, 0).toFixed(2)}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-gray-500">No stolen items recorded</p>
-                )}
-              </div>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsViewIncidentDialogOpen(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Incident Dialog */}
-      <Dialog open={isEditIncidentDialogOpen} onOpenChange={setIsEditIncidentDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Incident</DialogTitle>
-            <DialogDescription>
-              Update the incident details. Fields marked with * are required.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-6 py-4">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <UserCircle className="h-5 w-5" />
-                <h3 className="text-md font-semibold">Basic Information</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="customerName">Customer Name *</Label>
-                  <Select value={customerName} onValueChange={setCustomerName}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="tesco">Tesco</SelectItem>
-                      <SelectItem value="sainsburys">Sainsbury's</SelectItem>
-                      <SelectItem value="asda">Asda</SelectItem>
-                      <SelectItem value="morrisons">Morrisons</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="storeLocation">Store Location *</Label>
-                  <Select value={siteName} onValueChange={setSiteName}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select store" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="London Store">London Store</SelectItem>
-                      <SelectItem value="Manchester Store">Manchester Store</SelectItem>
-                      <SelectItem value="Birmingham Store">Birmingham Store</SelectItem>
-                      <SelectItem value="Leeds Store">Leeds Store</SelectItem>
-                      <SelectItem value="Glasgow Store">Glasgow Store</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="officerName">Officer Name *</Label>
-                  <Select value={officerName} onValueChange={setOfficerName}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select officer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="John Smith">John Smith</SelectItem>
-                      <SelectItem value="Sarah Johnson">Sarah Johnson</SelectItem>
-                      <SelectItem value="Michael Brown">Michael Brown</SelectItem>
-                      <SelectItem value="Emily Davis">Emily Davis</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="officerRole">Officer Role *</Label>
-                  <Select value={officerRole} onValueChange={setOfficerRole}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Security Officer">Security Officer</SelectItem>
-                      <SelectItem value="Security Manager">Security Manager</SelectItem>
-                      <SelectItem value="Supervisor">Supervisor</SelectItem>
-                      <SelectItem value="Team Leader">Team Leader</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="dutyManagerName">Duty Manager Name *</Label>
-                  <Input id="dutyManagerName" placeholder="Enter duty manager name" value={dutyManagerName} onChange={(e) => setDutyManagerName(e.target.value)} />
-                </div>
-              </div>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <Clock className="h-5 w-5" />
-                <h3 className="text-md font-semibold">Incident Details</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="dateOfIncident">Date of Incident *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !incidentDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {incidentDate ? format(incidentDate, "PPP") : "Select a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={incidentDate}
-                        onSelect={setIncidentDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="timeOfIncident">Time of Incident *</Label>
-                  <div className="flex items-center gap-2">
-                    <Select value={incidentTime.hour} onValueChange={(value) => setIncidentTime(prev => ({ ...prev, hour: value }))}>
-                      <SelectTrigger className="w-20">
-                        <SelectValue placeholder="--" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 24 }, (_, i) => (
-                          <SelectItem key={i} value={i.toString().padStart(2, '0')}>
-                            {i.toString().padStart(2, '0')}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <span>:</span>
-                    <Select value={incidentTime.minute} onValueChange={(value) => setIncidentTime(prev => ({ ...prev, minute: value }))}>
-                      <SelectTrigger className="w-20">
-                        <SelectValue placeholder="--" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 60 }, (_, i) => (
-                          <SelectItem key={i} value={i.toString().padStart(2, '0')}>
-                            {i.toString().padStart(2, '0')}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="incidentType">Type of Incident *</Label>
-                  <Select value={incidentType} onValueChange={(value: Incident['incidentType'] | "") => setIncidentType(value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select incident type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Theft">Theft</SelectItem>
-                      <SelectItem value="Vandalism">Vandalism</SelectItem>
-                      <SelectItem value="Customer Accident">Customer Accident</SelectItem>
-                      <SelectItem value="Suspicious Activity">Suspicious Activity</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="valueRecovered">Value Recovered (£)</Label>
-                  <Input
-                    id="valueRecovered"
-                    placeholder="Enter value recovered"
-                    value={valueRecovered}
-                    onChange={(e) => setValueRecovered(e.target.value)}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="incidentDetails">Incident Details *</Label>
-                <Textarea
-                  id="incidentDetails"
-                  placeholder="Describe the incident in detail"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-[100px]"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="otherComments">Other Comments</Label>
-                <Textarea
-                  id="otherComments"
-                  placeholder="Add any other specific comments"
-                  value={otherComments}
-                  onChange={(e) => setOtherComments(e.target.value)}
-                  className="min-h-[80px]"
-                />
-              </div>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <AlertCircle className="h-5 w-5" />
-                <h3 className="text-md font-semibold">Police Involvement</h3>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Was Police Involved?</Label>
-                <RadioGroup value={policeInvolved ? "yes" : "no"} onValueChange={(value) => setPoliceInvolved(value === "yes")} className="flex gap-4">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="yes" id="police-yes" />
-                    <Label htmlFor="police-yes">Yes</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="no" id="police-no" />
-                    <Label htmlFor="police-no">No</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <User className="h-5 w-5" />
-                <h3 className="text-md font-semibold">Offender Details</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="offenderName">Offender Name</Label>
-                  <Input id="offenderName" placeholder="Enter offender name" value={offenderDetails?.name || ""} onChange={(e) => setOffenderDetails(prev => ({ ...prev, name: e.target.value }))} />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="offenderSex">Offender Sex</Label>
-                  <Select value={offenderDetails?.sex || ""} onValueChange={(value) => setOffenderDetails(prev => ({ ...prev, sex: value as 'male' | 'female' | 'other' | 'unknown' }))}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select sex" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                      <SelectItem value="unknown">Unknown</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="offenderDOB">Date of Birth</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !offenderDetails?.dateOfBirth && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {offenderDetails?.dateOfBirth ? format(offenderDetails.dateOfBirth, "MM/dd/yyyy") : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={offenderDetails?.dateOfBirth}
-                        onSelect={(date) => setOffenderDetails(prev => ({ ...prev, dateOfBirth: date }))}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input id="address" placeholder="Enter home address" value={offenderDetails?.address || ""} onChange={(e) => setOffenderDetails(prev => ({ ...prev, address: e.target.value }))} />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="town">Town</Label>
-                  <Input id="town" placeholder="Enter town" value={offenderDetails?.town || ""} onChange={(e) => setOffenderDetails(prev => ({ ...prev, town: e.target.value }))} />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="postCode">Post Code</Label>
-                  <Input id="postCode" placeholder="Enter post code" value={offenderDetails?.postCode || ""} onChange={(e) => setOffenderDetails(prev => ({ ...prev, postCode: e.target.value }))} />
-                </div>
-              </div>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <FileText className="h-5 w-5" />
-                <h3 className="text-md font-semibold">Incident Categories</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat1" 
-                    checked={categories.giftCardTheft}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, giftCardTheft: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat1">Gift Card Theft</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat2" 
-                    checked={categories.threatsAndIntimidation}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, threatsAndIntimidation: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat2">Threats And Intimidation</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat3" 
-                    checked={categories.nonStoreTheft}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, nonStoreTheft: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat3">Non Store Theft</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat4" 
-                    checked={categories.cashAndTill}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, cashAndTill: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat4">Cash And Till</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat5" 
-                    checked={categories.alcoholInfluence}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, alcoholInfluence: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat5">Alcohol Influence</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat6" 
-                    checked={categories.spitting}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, spitting: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat6">Spitting</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat7" 
-                    checked={categories.customerBehaviorPhysical}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, customerBehaviorPhysical: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat7">Customer Behavior Physical</Label>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="cat8" 
-                    checked={categories.racialAbuseOrAttack}
-                    onCheckedChange={(checked) => 
-                      setCategories(prev => ({ ...prev, racialAbuseOrAttack: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="cat8">Racial Abuse or Attack</Label>
-                </div>
-              </div>
-            </div>
-            
-            <Separator />
-            
-            {/* Stolen Items section - keep existing implementation */}
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditIncidentDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleEditIncident} className="bg-green-600 hover:bg-green-700">Save Changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Incident Dialog */}
-      <Dialog open={isDeleteIncidentDialogOpen} onOpenChange={setIsDeleteIncidentDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Delete Incident</DialogTitle>
-          </DialogHeader>
-          
-          {selectedIncident && (
-            <div className="py-4">
-              <p className="text-gray-700">
-                Are you sure you want to delete this incident from {selectedIncident.siteName}?
-                This action cannot be undone.
-              </p>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteIncidentDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleDeleteIncident}
-              variant="destructive"
-            >
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ... rest of the dialogs ... */}
     </div>
   );
 };
 
 export default IncidentsReportPage;
+
+

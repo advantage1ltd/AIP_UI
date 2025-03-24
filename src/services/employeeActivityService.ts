@@ -3,6 +3,7 @@ import { ACTIVITY_SOURCES } from '@/config/activityConfig';
 
 class EmployeeActivityService {
   private activities: EmployeeActivity[] = [];
+  private baseUrl: string = 'https://your-api-base-url.com';
   private syncStatus: Record<ActivitySource, ActivitySyncStatus> = Object.fromEntries(
     Object.keys(ACTIVITY_SOURCES).map(source => [
       source as ActivitySource,
