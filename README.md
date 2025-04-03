@@ -39,7 +39,7 @@ Clone the Repository:
 
 bash
 Copy
-git clone https://github.com/your-username/aip.git
+git clone https://github.com/dibanga2800/aip.git
 Install Dependencies:
 
 For the frontend, run:
@@ -76,7 +76,7 @@ License:
 This project is licensed under the MIT License - see the LICENSE.md file for details.
 
 Contact:
-For questions or support, feel free to open an issue on GitHub or reach out to your-email@example.com.
+For questions or support, feel free to open an issue on GitHub or reach out to dibanga2800@gmail.com.
 
 This description is designed to be informative, easy to understand, and welcoming to potential contributors. Let me know if you'd like to adjust or add any more details!
 
