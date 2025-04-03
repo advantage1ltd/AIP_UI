@@ -132,7 +132,7 @@ Clone the Repository:
 
 bash
 Copy
-git clone https://github.com/your-username/aip.git
+git clone https://github.com/dibanga2800/aip.git
 Install Dependencies:
 
 For the frontend, run:
