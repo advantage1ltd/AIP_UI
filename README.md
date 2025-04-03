@@ -1,69 +1,179 @@
-# Welcome to your Lovable project
+Advantage One Interactive Portal (AIP)
+Advantage One Interactive Portal (AIP) is an advanced, full-featured crime and incident management software designed to streamline and automate various aspects of incident reporting, management, and follow-up. Built as an API-centric solution, AIP leverages a modern technology stack including React, Vite, and a .NET backend to deliver fast, scalable, and robust functionality across various modules.
 
-## Project info
+Key Features:
+Crime & Incident Management: Capture, track, and resolve incidents efficiently with features designed to enhance user workflows.
 
-**URL**: https://lovable.dev/projects/c7d8b4a3-3d58-4228-9a4a-df03d0e4c95a
+CRM (Customer Relationship Management): Manage client interactions, track communication, and ensure a smooth flow of information.
 
-## How can I edit this code?
+CBT (Computer-Based Training): Implement training programs for personnel, ensuring staff are properly equipped to handle incidents.
 
-There are several ways of editing your application.
+Incident Reporting: Users can easily submit reports with incident details, creating an efficient tracking system.
 
-**Use Lovable**
+Satisfaction Surveys: Collect feedback from stakeholders to measure satisfaction and identify areas for improvement.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/c7d8b4a3-3d58-4228-9a4a-df03d0e4c95a) and start prompting.
+Advanced Reporting: Generate reports with detailed insights, aiding in decision-making and transparency.
 
-Changes made via Lovable will be committed automatically to this repo.
+Stock Management: Manage and track inventory, ensuring that necessary resources are available when needed.
 
-**Use your preferred IDE**
+Recruitment Management: Handle recruitment processes, from applications to selection, helping manage staffing needs.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Holiday Management: Plan and track employee holidays for improved workforce scheduling.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Technologies Used:
+Frontend: React, Vite – Fast, modern frontend framework for building interactive UIs.
 
-Follow these steps:
+Backend: .NET – Robust and scalable backend API for handling complex business logic.
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Database: (Specify the type of database you are using, e.g., SQL Server, PostgreSQL, etc.)
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Authentication: (e.g., JWT, OAuth, or any authentication method you are using)
 
-# Step 3: Install the necessary dependencies.
-npm i
+Why AIP?
+AIP is designed to be a comprehensive solution that addresses the needs of both public safety agencies and organizations dealing with crime and incident management. Whether it's tracking a reported crime, managing employee schedules, or gathering stakeholder feedback, AIP empowers organizations to streamline operations and improve overall efficiency. The flexible, modular architecture ensures that the platform can evolve and scale as new features or requirements emerge.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+Getting Started:
+To get started with AIP, follow these instructions:
+
+Clone the Repository:
+
+bash
+Copy
+git clone https://github.com/your-username/aip.git
+Install Dependencies:
+
+For the frontend, run:
+
+bash
+Copy
+cd frontend
+npm install
+For the backend, run:
+
+bash
+Copy
+cd backend
+dotnet restore
+Run the Project:
+
+Frontend:
+
+bash
+Copy
 npm run dev
-```
+Backend:
 
-**Edit a file directly in GitHub**
+bash
+Copy
+dotnet run
+Configuration:
+Update configuration files as necessary (e.g., database connections, API keys).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Contributing:
+We welcome contributions to improve Advantage One Interactive Portal (AIP). If you have ideas, fixes, or features to propose, feel free to fork the repository, create a branch, and submit a pull request. Please refer to the CONTRIBUTING.md for contribution guidelines.
 
-**Use GitHub Codespaces**
+License:
+This project is licensed under the MIT License - see the LICENSE.md file for details.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Contact:
+For questions or support, feel free to open an issue on GitHub or reach out to your-email@example.com.
 
-## What technologies are used for this project?
+This description is designed to be informative, easy to understand, and welcoming to potential contributors. Let me know if you'd like to adjust or add any more details!
 
-This project is built with .
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+You said:
+the database is MSSQL and i will be using entity framework and CORS in the project
 
-## How can I deploy this project?
+ChatGPT said:
+Great! Here's an updated version of the GitHub project description incorporating your use of MSSQL, Entity Framework, and CORS:
 
-Simply open [Lovable](https://lovable.dev/projects/c7d8b4a3-3d58-4228-9a4a-df03d0e4c95a) and click on Share -> Publish.
+Advantage One Interactive Portal (AIP)
+Advantage One Interactive Portal (AIP) is an advanced, full-featured crime and incident management software designed to streamline and automate various aspects of incident reporting, management, and follow-up. Built as an API-centric solution, AIP leverages a modern technology stack including React, Vite, .NET (with Entity Framework), and MSSQL for robust, scalable, and high-performance functionality across various modules.
 
-## I want to use a custom domain - is that possible?
+Key Features:
+Crime & Incident Management: Capture, track, and resolve incidents efficiently with features designed to enhance user workflows.
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+CRM (Customer Relationship Management): Manage client interactions, track communication, and ensure a smooth flow of information.
+
+CBT (Computer-Based Training): Implement training programs for personnel, ensuring staff are properly equipped to handle incidents.
+
+Incident Reporting: Users can easily submit reports with incident details, creating an efficient tracking system.
+
+Satisfaction Surveys: Collect feedback from stakeholders to measure satisfaction and identify areas for improvement.
+
+Advanced Reporting: Generate reports with detailed insights, aiding in decision-making and transparency.
+
+Stock Management: Manage and track inventory, ensuring that necessary resources are available when needed.
+
+Recruitment Management: Handle recruitment processes, from applications to selection, helping manage staffing needs.
+
+Holiday Management: Plan and track employee holidays for improved workforce scheduling.
+
+Technologies Used:
+Frontend: React, Vite – Fast, modern frontend framework for building interactive UIs.
+
+Backend: .NET – Robust and scalable backend API for handling complex business logic.
+
+Database: MSSQL – A reliable, high-performance relational database for managing and querying data.
+
+ORM: Entity Framework – A powerful Object-Relational Mapper (ORM) for seamless database interaction with C#.
+
+Authentication: (e.g., JWT, OAuth, or any authentication method you are using)
+
+CORS: Cross-Origin Resource Sharing (CORS) configured to allow secure interactions between frontend and backend during development and production.
+
+Why AIP?
+AIP is designed to be a comprehensive solution that addresses the needs of both public safety agencies and organizations dealing with crime and incident management. Whether it's tracking a reported crime, managing employee schedules, or gathering stakeholder feedback, AIP empowers organizations to streamline operations and improve overall efficiency. The flexible, modular architecture ensures that the platform can evolve and scale as new features or requirements emerge.
+
+Getting Started:
+To get started with AIP, follow these instructions:
+
+Clone the Repository:
+
+bash
+Copy
+git clone https://github.com/your-username/aip.git
+Install Dependencies:
+
+For the frontend, run:
+
+bash
+Copy
+cd frontend
+npm install
+For the backend, run:
+
+bash
+Copy
+cd backend
+dotnet restore
+Configure the Database:
+Ensure that your MSSQL database is set up correctly. You can configure your connection string in appsettings.json (for the backend), and update any database migration commands using Entity Framework.
+
+Run the Project:
+
+Frontend:
+
+bash
+Copy
+npm run dev
+Backend:
+
+bash
+Copy
+dotnet run
+CORS Configuration:
+CORS is enabled to allow cross-origin requests between your frontend and backend. Make sure the frontend runs on the correct URL or update the CORS policy in the backend to match your needs.
+
+Configuration:
+Update any configuration files as necessary, such as API keys, database connections, and authentication settings.
+
+Contributing:
+We welcome contributions to improve Advantage One Interactive Portal (AIP). If you have ideas, fixes, or features to propose, feel free to fork the repository, create a branch, and submit a pull request. Please refer to the CONTRIBUTING.md for contribution guidelines.
+
+License:
+This project is licensed under the MIT License - see the LICENSE.md file for details.
+
+Contact:
+For questions or support, feel free to open an issue on GitHub or reach out to dibanga2800@gmail.com.
+
