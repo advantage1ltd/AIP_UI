@@ -1,4 +1,3 @@
-Advantage One Interactive Portal (AIP)
 Advantage One Interactive Portal (AIP) is an advanced, full-featured crime and incident management software designed to streamline and automate various aspects of incident reporting, management, and follow-up. Built as an API-centric solution, AIP leverages a modern technology stack including React, Vite, and a .NET backend to deliver fast, scalable, and robust functionality across various modules.
 
 Key Features:
