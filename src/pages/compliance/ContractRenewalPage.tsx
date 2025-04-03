@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { cn } from '@/lib/utils'
 
 interface Contract {
   id: string
@@ -114,13 +115,44 @@ const ContractRenewalPage = () => {
   }
 
   // Calculate statistics
-  const stats = {
-    totalContracts: contracts.length,
-    expiringCritical: contracts.filter(c => getExpiryStatus(c.expiryDate) === 'Critical').length,
-    expiringSoon: contracts.filter(c => getExpiryStatus(c.expiryDate) === 'Expiring Soon').length,
-    active: contracts.filter(c => getExpiryStatus(c.expiryDate) === 'Active').length,
-    totalValue: contracts.reduce((sum, contract) => sum + parseFloat(contract.cost), 0)
-  }
+  const stats = [
+    {
+      label: 'Total Contracts',
+      value: contracts.length,
+      subLabel: 'Active contracts',
+      textColorSubtle: 'text-indigo-200',
+      bgColor: 'bg-indigo-700',
+      iconBgColor: 'bg-indigo-600',
+      icon: FileText
+    },
+    {
+      label: 'Critical Expiry',
+      value: contracts.filter(c => getExpiryStatus(c.expiryDate) === 'Critical').length,
+      subLabel: 'Expires &lt; 2 months',
+      textColorSubtle: 'text-red-200',
+      bgColor: 'bg-red-700',
+      iconBgColor: 'bg-red-600',
+      icon: AlertCircle
+    },
+    {
+      label: 'Expiring Soon',
+      value: contracts.filter(c => getExpiryStatus(c.expiryDate) === 'Expiring Soon').length,
+      subLabel: 'Expires &lt; 3 months',
+      textColorSubtle: 'text-amber-100',
+      bgColor: 'bg-amber-600',
+      iconBgColor: 'bg-amber-500',
+      icon: Clock
+    },
+    {
+      label: 'Total Value',
+      value: contracts.reduce((sum, contract) => sum + parseFloat(contract.cost), 0),
+      subLabel: 'Annual contract value',
+      textColorSubtle: 'text-emerald-200',
+      bgColor: 'bg-emerald-700',
+      iconBgColor: 'bg-emerald-600',
+      icon: FileText
+    }
+  ]
 
   const handleAddContract = (data: any) => {
     const newContract: Contract = {
@@ -177,130 +209,180 @@ const ContractRenewalPage = () => {
   const startIndex = (currentPage - 1) * pageSize
   const paginatedContracts = filteredContracts.slice(startIndex, startIndex + pageSize)
 
+  const renderPaginationButtons = (currentPage: number, totalPages: number, setCurrentPage: React.Dispatch<React.SetStateAction<number>>) => {
+    const buttons = []
+    let start = Math.max(currentPage - 2, 1)
+    let end = Math.min(currentPage + 2, totalPages)
+
+    if (end - start + 1 > 5) {
+      end = start + 4
+    }
+
+    if (start > 1) {
+      buttons.push(
+        <Button
+          key={1}
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentPage(1)}
+          className={`w-8 h-8 ${currentPage === 1 ? 'bg-blue-600 text-white' : ''}`}
+        >
+          1
+        </Button>
+      )
+    }
+
+    if (start > 2) {
+      buttons.push(
+        <Button
+          key="ellipsis-start"
+          variant="outline"
+          size="sm"
+          className="w-8 h-8"
+        >
+          ...
+        </Button>
+      )
+    }
+
+    for (let i = start; i <= end; i++) {
+      buttons.push(
+        <Button
+          key={i}
+          variant={currentPage === i ? "default" : "outline"}
+          size="sm"
+          onClick={() => setCurrentPage(i)}
+          className={`w-8 h-8 ${currentPage === i ? 'bg-blue-600 text-white' : ''}`}
+        >
+          {i}
+        </Button>
+      )
+    }
+
+    if (end < totalPages - 1) {
+      buttons.push(
+        <Button
+          key="ellipsis-end"
+          variant="outline"
+          size="sm"
+          className="w-8 h-8"
+        >
+          ...
+        </Button>
+      )
+    }
+
+    if (end < totalPages) {
+      buttons.push(
+        <Button
+          key={totalPages}
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentPage(totalPages)}
+          className={`w-8 h-8 ${currentPage === totalPages ? 'bg-blue-600 text-white' : ''}`}
+        >
+          {totalPages}
+        </Button>
+      )
+    }
+
+    return buttons
+  }
+
   return (
-    <div className="container mx-auto p-6">
-      <div className="space-y-6">
+    <div className="container mx-auto p-2 sm:p-6">
+      <div className="space-y-3 sm:space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Contract Renewal Tracker</h1>
-            <p className="text-sm text-gray-500 mt-1">Track and manage contract renewals</p>
+            <h1 className="text-lg sm:text-2xl font-bold">Contract Renewal Tracker</h1>
+            <p className="text-xs text-gray-500 mt-0.5 sm:mt-1">Track and manage contract renewals</p>
           </div>
-          <Button onClick={() => setIsFormOpen(true)}>Add New Contract</Button>
+          <Button 
+            onClick={() => setIsFormOpen(true)} 
+            className="w-full sm:w-auto h-8 sm:h-auto text-xs sm:text-sm"
+          >
+            Add New Contract
+          </Button>
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-white hover:shadow-md transition-shadow">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Total Contracts</p>
-                  <p className="text-2xl font-bold mt-1">{stats.totalContracts}</p>
-                  <p className="text-sm text-gray-500 mt-1">Active contracts</p>
-                </div>
-                <div className="bg-blue-100 p-3 rounded-full">
-                  <FileText className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white hover:shadow-md transition-shadow">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Critical Expiry</p>
-                  <p className="text-2xl font-bold mt-1">{stats.expiringCritical}</p>
-                  <p className="text-sm text-gray-500 mt-1">Expires within 2 months</p>
-                </div>
-                <div className="bg-red-100 p-3 rounded-full">
-                  <AlertCircle className="h-6 w-6 text-red-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white hover:shadow-md transition-shadow">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Expiring Soon</p>
-                  <p className="text-2xl font-bold mt-1">{stats.expiringSoon}</p>
-                  <p className="text-sm text-gray-500 mt-1">Expires within 3 months</p>
-                </div>
-                <div className="bg-yellow-100 p-3 rounded-full">
-                  <Clock className="h-6 w-6 text-yellow-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white hover:shadow-md transition-shadow">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Total Value</p>
-                  <p className="text-2xl font-bold mt-1">£{stats.totalValue.toLocaleString()}</p>
-                  <p className="text-sm text-gray-500 mt-1">Annual contract value</p>
-                </div>
-                <div className="bg-green-100 p-3 rounded-full">
-                  <FileText className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+          {stats.map((stat, index) => {
+            const isLastOddCard = index === stats.length - 1 && stats.length % 2 !== 0
+            return (
+              <Card 
+                key={stat.label} 
+                className={cn(
+                  "text-white hover:shadow-lg transition-shadow rounded-lg",
+                  stat.bgColor,
+                  isLastOddCard ? "col-span-2 lg:col-span-1" : "lg:col-span-1"
+                )}
+              >
+                <CardContent className="pt-3 sm:pt-5 pb-2 sm:pb-4 px-3 sm:px-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={cn("text-xs font-medium", stat.textColorSubtle)}>{stat.label}</p>
+                      <p className="text-lg sm:text-2xl font-bold mt-0 sm:mt-1">{stat.value}</p>
+                      <p className={cn("text-[10px] mt-0 sm:mt-1", stat.textColorSubtle)}>{stat.subLabel}</p>
+                    </div>
+                    <div className={cn("p-2 rounded-full", stat.iconBgColor)}>
+                      <stat.icon className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
 
         {/* Filters */}
-        <Card className="border-none shadow-sm">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                  <input
-                    type="text"
-                    placeholder="Search contracts..."
-                    className="pl-8 h-10 w-[300px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Filter by type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="Antivirus">Antivirus</SelectItem>
-                    <SelectItem value="Cyber Essentials">Cyber Essentials</SelectItem>
-                    <SelectItem value="Software Subscription">Software Subscription</SelectItem>
-                    <SelectItem value="Hardware Maintenance">Hardware Maintenance</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
+        <Card className="border-none shadow-sm bg-white rounded-lg">
+          <CardContent className="pt-3 pb-3 px-3 sm:px-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
+              <div className="relative flex-grow">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Search contracts..."
+                  className="pl-8 h-8 sm:h-10 w-full rounded-md border border-input bg-background px-3 py-1 text-xs sm:text-sm ring-offset-background"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="w-full sm:w-[200px] h-8 sm:h-10 text-xs sm:text-sm">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="Antivirus">Antivirus</SelectItem>
+                  <SelectItem value="Cyber Essentials">Cyber Essentials</SelectItem>
+                  <SelectItem value="Software Subscription">Software Subscription</SelectItem>
+                  <SelectItem value="Hardware Maintenance">Hardware Maintenance</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
 
         {/* Contracts Table */}
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="bg-white rounded-lg shadow-sm overflow-hidden border">
+          <CardContent className="p-0">
             <div className="relative overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead>
+              <table className="w-full text-xs text-left">
+                <thead className="bg-gray-50 text-xs">
                   <tr className="border-b">
-                    <th className="px-6 py-3">Contract Name</th>
-                    <th className="px-6 py-3">Type</th>
-                    <th className="px-6 py-3">Provider</th>
-                    <th className="px-6 py-3">Start Date</th>
-                    <th className="px-6 py-3">Expiry Date</th>
-                    <th className="px-6 py-3">Cost (£)</th>
-                    <th className="px-6 py-3">Time Remaining</th>
-                    <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3">Actions</th>
+                    <th className="px-2 py-2">Contract</th>
+                    <th className="px-2 py-2 hidden sm:table-cell">Type</th>
+                    <th className="px-2 py-2 hidden md:table-cell">Provider</th>
+                    <th className="px-2 py-2 hidden lg:table-cell">Start Date</th>
+                    <th className="px-2 py-2">Expiry</th>
+                    <th className="px-2 py-2 hidden md:table-cell">Cost (£)</th>
+                    <th className="px-2 py-2 hidden lg:table-cell">Remaining</th>
+                    <th className="px-2 py-2">Status</th>
+                    <th className="px-2 py-2 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -310,38 +392,44 @@ const ContractRenewalPage = () => {
                     
                     return (
                       <tr key={contract.id} className="border-b hover:bg-gray-50">
-                        <td className="px-6 py-4 font-medium">{contract.contractName}</td>
-                        <td className="px-6 py-4">{contract.contractType}</td>
-                        <td className="px-6 py-4">{contract.provider}</td>
-                        <td className="px-6 py-4">{format(contract.startDate, 'dd/MM/yyyy')}</td>
-                        <td className="px-6 py-4">{format(contract.expiryDate, 'dd/MM/yyyy')}</td>
-                        <td className="px-6 py-4">{parseFloat(contract.cost).toLocaleString()}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <Progress 
-                              value={monthsRemaining * 33.33} 
-                              className={`h-2 w-24 ${getProgressColor(monthsRemaining)}`}
-                            />
-                            <span>{monthsRemaining} months</span>
+                        {/* Mobile: Combine Name/Provider */}
+                        <td className="px-2 py-2 font-medium">
+                          <div className="flex flex-col">
+                            <span className="font-semibold line-clamp-2">{contract.contractName}</span>
+                            <span className="text-gray-500 sm:hidden">{contract.provider}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <Badge className={getStatusColor(status)}>
+                        <td className="px-2 py-2 hidden sm:table-cell">{contract.contractType}</td>
+                        <td className="px-2 py-2 hidden md:table-cell">{contract.provider}</td>
+                        <td className="px-2 py-2 hidden lg:table-cell">{format(contract.startDate, 'dd/MM/yy')}</td>
+                        <td className="px-2 py-2 whitespace-nowrap">{format(contract.expiryDate, 'dd/MM/yy')}</td>
+                        <td className="px-2 py-2 hidden md:table-cell">{parseFloat(contract.cost).toLocaleString()}</td>
+                        <td className="px-2 py-2 hidden lg:table-cell">
+                          <div className="flex items-center gap-1">
+                            <Progress 
+                              value={monthsRemaining * 33.33} 
+                              className={`h-1.5 w-12 ${getProgressColor(monthsRemaining)}`}
+                            />
+                            <span className="whitespace-nowrap">{monthsRemaining} mo</span>
+                          </div>
+                        </td>
+                        <td className="px-2 py-2">
+                          <Badge className={`text-[10px] px-1.5 py-0.5 ${getStatusColor(status)}`}>
                             {status}
                           </Badge>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
+                        <td className="px-2 py-2 text-right">
+                          <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                             <Button
                               variant="ghost"
-                              size="sm"
+                              className="inline-flex items-center justify-center h-7 w-7 p-0"
                               onClick={() => openEditForm(contract)}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              className="inline-flex items-center justify-center h-7 w-7 p-0"
                               onClick={() => openDeleteDialog(contract)}
                             >
                               <Trash2 className="h-4 w-4 text-red-500" />
@@ -355,44 +443,32 @@ const ContractRenewalPage = () => {
               </table>
             </div>
 
-            {/* Add Pagination Controls */}
-            <div className="border-t border-gray-200 px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-500">
-                  Showing {startIndex + 1} to {Math.min(startIndex + pageSize, filteredContracts.length)} of {filteredContracts.length} entries
+            {/* Pagination Controls */}
+            <div className="border-t border-gray-200 px-2 py-2 sm:px-4 sm:py-3">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+                <div className="text-[10px] sm:text-sm text-gray-500">
+                  Showing {startIndex + 1}-{Math.min(startIndex + pageSize, filteredContracts.length)} of {filteredContracts.length}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-1">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    className="flex items-center gap-1"
+                    className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                   >
                     <ChevronLeft className="h-4 w-4" />
-                    Previous
                   </Button>
                   <div className="flex items-center gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <Button
-                        key={page}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-8 h-8 ${currentPage === page ? 'bg-blue-600 text-white' : ''}`}
-                      >
-                        {page}
-                      </Button>
-                    ))}
+                    {renderPaginationButtons(currentPage, totalPages, setCurrentPage)}
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                     disabled={currentPage === totalPages}
-                    className="flex items-center gap-1"
+                    className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                   >
-                    Next
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>

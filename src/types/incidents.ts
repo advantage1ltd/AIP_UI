@@ -33,11 +33,12 @@ export interface OffenderAddress {
 
 export interface StolenItem {
   id: string
+  category: string
   description: string
+  productName: string
   cost: number
   quantity: number
   totalAmount: number
-  category: string
 }
 
 export interface Incident {

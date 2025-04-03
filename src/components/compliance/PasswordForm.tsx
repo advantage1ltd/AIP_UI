@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import {
   Form,
@@ -20,12 +21,32 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { RotateCcw } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
+
+// Password Generation Utility
+const generatePassword = (length: number = 16): string => {
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-="
+  let password = ""
+  for (let i = 0, n = charset.length; i < length; ++i) {
+    password += charset.charAt(Math.floor(Math.random() * n))
+  }
+  // Ensure password complexity (optional, basic example)
+  // You might want more robust checks here
+  if (!/[A-Z]/.test(password)) password += 'A'
+  if (!/[a-z]/.test(password)) password += 'a'
+  if (!/[0-9]/.test(password)) password += '1'
+  if (!/[!@#$%^&*()_+~`|}{[\]:;?><,./-="]/.test(password)) password += '!'
+  
+  // Shuffle and truncate to desired length
+  return password.split('').sort(() => 0.5 - Math.random()).join('').substring(0, length)
+}
 
 const passwordFormSchema = z.object({
   title: z.string().min(2, 'Title is required'),
   userName: z.string().min(2, 'Username is required'),
-  password: z.string().min(1, 'Password is required'),
-  url: z.string().optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  url: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   notes: z.string().optional(),
 })
 
@@ -50,14 +71,49 @@ export function PasswordForm({ open, onClose, onSubmit, initialData }: PasswordF
     },
   })
 
+  // State for password visibility
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+  useEffect(() => {
+    if (open && initialData) {
+      form.reset(initialData)
+    } else if (open) {
+      form.reset({
+        title: '',
+        userName: '',
+        password: '',
+        url: '',
+        notes: '',
+      })
+    }
+  }, [open, initialData, form])
+
+  const handleGeneratePassword = () => {
+    const newPassword = generatePassword();
+    form.setValue('password', newPassword, { shouldValidate: true });
+  };
+
+  // Function to toggle password visibility
+  const togglePasswordVisibility = () => {
+    setIsPasswordVisible((prev) => !prev);
+  };
+
+  function processSubmit(values: PasswordFormValues) {
+    onSubmit(values)
+    onClose()
+  }
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
           <DialogTitle>{initialData ? 'Edit Password' : 'Add New Password'}</DialogTitle>
+          <DialogDescription>
+            {initialData ? 'Update the details for this password record.' : 'Fill in the details to add a new password record.'}
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(processSubmit)} className="space-y-4 py-4">
             <FormField
               control={form.control}
               name="title"
@@ -90,13 +146,34 @@ export function PasswordForm({ open, onClose, onSubmit, initialData }: PasswordF
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="password" 
-                      placeholder="Enter password" 
-                      {...field} 
-                    />
-                  </FormControl>
+                  <div className="flex items-center gap-2">
+                    <FormControl>
+                      <Input 
+                        type={isPasswordVisible ? "text" : "password"}
+                        placeholder="Enter password" 
+                        {...field} 
+                        className="flex-grow"
+                      />
+                    </FormControl>
+                    <Button 
+                      type="button"
+                      variant="default"
+                      onClick={handleGeneratePassword}
+                      title="Generate Password"
+                      className="h-9 bg-blue-600 hover:bg-blue-700 text-white text-xs whitespace-nowrap"
+                    >
+                      Generate
+                    </Button>
+                    <Button 
+                      type="button"
+                      variant="secondary"
+                      onClick={togglePasswordVisibility}
+                      title={isPasswordVisible ? "Hide Password" : "Show Password"}
+                      className="h-9 text-xs whitespace-nowrap"
+                    >
+                      {isPasswordVisible ? "Hide" : "Show"}
+                    </Button>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

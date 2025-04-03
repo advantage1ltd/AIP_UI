@@ -131,21 +131,21 @@ const MOCK_DECLARATIONS: Declaration[] = [
 ];
 
 const PageHeader = ({ onAddClick }) => (
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
-    <div className="flex items-center gap-2 sm:gap-3">
-      <div className="bg-blue-100 p-2 rounded-lg">
-        <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6 xl:mb-8">
+    <div className="flex items-center gap-2 sm:gap-3 xl:gap-4">
+      <div className="bg-blue-100 p-2 xl:p-3 rounded-lg">
+        <FileText className="w-5 h-5 sm:w-6 sm:h-6 xl:w-7 xl:h-7 text-blue-600" />
       </div>
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Officer Support</h1>
-        <p className="text-sm text-gray-500">Manage and track security officer documentation and declarations</p>
+        <h1 className="text-xl sm:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-gray-900">Officer Support</h1>
+        <p className="text-sm xl:text-base text-gray-500">Manage and track security officer documentation and declarations</p>
       </div>
     </div>
     <Button
       onClick={onAddClick}
-      className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 h-9 sm:h-10"
+      className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 h-9 sm:h-10 xl:h-12 px-4 xl:px-6 text-sm xl:text-base"
     >
-      <Plus className="w-4 h-4" />
+      <Plus className="w-4 h-4 xl:w-5 xl:h-5" />
       Add New Update
     </Button>
   </div>
@@ -376,11 +376,28 @@ const OfficerSupportPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
-      <div className="container mx-auto px-2 sm:px-4 lg:px-6 py-2 sm:py-4 lg:py-6 max-w-full sm:max-w-[1400px] flex-grow">
-        <PageHeader onAddClick={() => setShowAddDialog(true)} />
+      <div className="container mx-auto px-2 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 py-2 sm:py-4 lg:py-6 xl:py-8 2xl:py-10 max-w-screen-2xl flex-grow">
+        <div className="space-y-4 md:space-y-6 xl:space-y-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6 xl:mb-8">
+            <div className="flex items-center gap-2 sm:gap-3 xl:gap-4">
+              <div className="bg-blue-100 p-2 xl:p-3 rounded-lg">
+                <FileText className="w-5 h-5 sm:w-6 sm:h-6 xl:w-7 xl:h-7 text-blue-600" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-gray-900">Officer Support</h1>
+                <p className="text-sm xl:text-base text-gray-500">Manage and track security officer documentation and declarations</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => setShowAddDialog(true)}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 h-9 sm:h-10 xl:h-12 px-4 xl:px-6 text-sm xl:text-base"
+            >
+              <Plus className="w-4 h-4 xl:w-5 xl:h-5" />
+              Add New Update
+            </Button>
+          </div>
 
-        <div className="space-y-4 md:space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 xl:gap-6">
             <StatsCard
               title="Total Updates"
               value={updates.length}
@@ -402,40 +419,40 @@ const OfficerSupportPage: React.FC = () => {
           </div>
 
           <Card className="w-full shadow-sm">
-            <CardHeader className="p-2 md:p-4">
-              <CardTitle className="text-base sm:text-xl flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+            <CardHeader className="p-2 md:p-4 xl:p-6">
+              <CardTitle className="text-base sm:text-xl xl:text-2xl flex items-center gap-2 xl:gap-3">
+                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 xl:h-6 xl:w-6 text-blue-600" />
                 Security Updates & Declarations
               </CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
+              <CardDescription className="text-xs sm:text-sm xl:text-base">
                 Track and manage security updates and officer declarations
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto" style={{ minWidth: "100%", maxWidth: "100%" }}>
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50 hover:bg-gray-50">
-                      <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 w-[35%] sm:w-[30%] lg:w-[25%]">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-gray-500" />
-                          Update
+                      <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 xl:p-6 w-[35%] sm:w-[30%] lg:w-[25%]">
+                        <div className="flex items-center gap-2 xl:gap-3">
+                          <FileText className="w-4 h-4 xl:w-5 xl:h-5 text-gray-500" />
+                          <span className="text-sm xl:text-base">Update</span>
                         </div>
                       </TableHead>
-                      <TableHead className="font-semibold text-gray-900 p-2 md:p-4 w-[45%] sm:w-[40%] lg:w-[35%]">Description</TableHead>
-                      <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 hidden md:table-cell w-[15%]">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-gray-500" />
-                          Date
+                      <TableHead className="font-semibold text-gray-900 p-2 md:p-4 xl:p-6 w-[45%] sm:w-[40%] lg:w-[35%] text-sm xl:text-base">Description</TableHead>
+                      <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 xl:p-6 hidden md:table-cell w-[15%]">
+                        <div className="flex items-center gap-2 xl:gap-3">
+                          <Calendar className="w-4 h-4 xl:w-5 xl:h-5 text-gray-500" />
+                          <span className="text-sm xl:text-base">Date</span>
                         </div>
                       </TableHead>
-                      <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 hidden md:table-cell w-[15%]">
-                        <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-gray-500" />
-                          Signed
+                      <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 xl:p-6 hidden md:table-cell w-[15%]">
+                        <div className="flex items-center gap-2 xl:gap-3">
+                          <Users className="w-4 h-4 xl:w-5 xl:h-5 text-gray-500" />
+                          <span className="text-sm xl:text-base">Signed</span>
                         </div>
                       </TableHead>
-                      <TableHead className="font-semibold text-gray-900 text-right p-2 md:p-4 w-[90px] md:w-[120px]">Actions</TableHead>
+                      <TableHead className="font-semibold text-gray-900 text-right p-2 md:p-4 xl:p-6 w-[90px] md:w-[120px] xl:w-[150px] text-sm xl:text-base">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -444,25 +461,25 @@ const OfficerSupportPage: React.FC = () => {
                         key={update.id}
                         className="hover:bg-gray-50 transition-colors"
                       >
-                        <TableCell className="font-medium text-gray-900 p-2 md:p-4 truncate max-w-[100px] sm:max-w-[150px] md:max-w-none">
+                        <TableCell className="font-medium text-gray-900 p-2 md:p-4 xl:p-6 truncate max-w-[100px] sm:max-w-[150px] md:max-w-none text-sm xl:text-base">
                           {update.name}
                         </TableCell>
-                        <TableCell className="text-gray-600 p-2 md:p-4 truncate max-w-[100px] sm:max-w-[150px] md:max-w-md">
+                        <TableCell className="text-gray-600 p-2 md:p-4 xl:p-6 truncate max-w-[100px] sm:max-w-[150px] md:max-w-md text-sm xl:text-base">
                           {update.description}
                         </TableCell>
-                        <TableCell className="text-gray-600 whitespace-nowrap p-2 md:p-4 hidden md:table-cell">
+                        <TableCell className="text-gray-600 whitespace-nowrap p-2 md:p-4 xl:p-6 hidden md:table-cell text-sm xl:text-base">
                           {new Date(update.effectiveDate).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
                         </TableCell>
-                        <TableCell className="p-2 md:p-4 hidden md:table-cell">
+                        <TableCell className="p-2 md:p-4 xl:p-6 hidden md:table-cell">
                           <Badge 
                             variant="secondary"
-                            className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs sm:text-sm whitespace-nowrap"
+                            className="bg-blue-50 text-blue-700 hover:bg-blue-50 text-xs sm:text-sm xl:text-base whitespace-nowrap"
                           >
                             {declarations.filter(d => d.updateId === update.id).length} Officers
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right p-1 md:p-2 w-[90px] md:w-[120px]">
-                          <div className="flex items-center justify-end gap-1 md:gap-2">
+                        <TableCell className="text-right p-1 md:p-2 xl:p-4">
+                          <div className="flex items-center justify-end gap-1 md:gap-2 xl:gap-3">
                             <Button
                               variant="outline"
                               size="sm"
@@ -470,10 +487,10 @@ const OfficerSupportPage: React.FC = () => {
                                 setSelectedUpdate(update);
                                 setShowDocumentPreview(true);
                               }}
-                              className="h-7 w-7 md:h-8 md:w-8 text-blue-600 border border-blue-200 hover:bg-blue-50 p-0 flex items-center justify-center"
+                              className="h-7 w-7 md:h-8 md:w-8 xl:h-10 xl:w-10 p-0 text-blue-600 border border-blue-200 hover:bg-blue-50"
                               title="View Document"
                             >
-                              <Eye className="h-3 w-3 md:h-4 md:w-4" />
+                              <Eye className="h-3 w-3 md:h-4 md:w-4 xl:h-5 xl:w-5" />
                               <span className="sr-only">View</span>
                             </Button>
                             <Button
@@ -489,10 +506,10 @@ const OfficerSupportPage: React.FC = () => {
                                 });
                                 setShowEditDialog(true);
                               }}
-                              className="h-7 w-7 md:h-8 md:w-8 text-green-600 border border-green-200 hover:bg-green-50 p-0 flex items-center justify-center"
+                              className="h-7 w-7 md:h-8 md:w-8 xl:h-10 xl:w-10 p-0 text-green-600 border border-green-200 hover:bg-green-50"
                               title="Edit Update"
                             >
-                              <Edit2 className="h-3 w-3 md:h-4 md:w-4" />
+                              <Edit2 className="h-3 w-3 md:h-4 md:w-4 xl:h-5 xl:w-5" />
                               <span className="sr-only">Edit</span>
                             </Button>
                             <Button
@@ -502,10 +519,10 @@ const OfficerSupportPage: React.FC = () => {
                                 setSelectedUpdate(update);
                                 setShowDeleteDialog(true);
                               }}
-                              className="h-7 w-7 md:h-8 md:w-8 text-red-600 border border-red-200 hover:bg-red-50 p-0 flex items-center justify-center"
+                              className="h-7 w-7 md:h-8 md:w-8 xl:h-10 xl:w-10 p-0 text-red-600 border border-red-200 hover:bg-red-50"
                               title="Delete Update"
                             >
-                              <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                              <Trash2 className="h-3 w-3 md:h-4 md:w-4 xl:h-5 xl:w-5" />
                               <span className="sr-only">Delete</span>
                             </Button>
                           </div>
@@ -514,7 +531,7 @@ const OfficerSupportPage: React.FC = () => {
                     ))}
                     {updates.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-32 text-center p-2 md:p-4">
+                        <TableCell colSpan={5} className="h-32 text-center p-2 md:p-4 xl:p-6">
                           <EmptyState
                             message="No updates found"
                             actionLabel="Create your first update"
@@ -528,13 +545,13 @@ const OfficerSupportPage: React.FC = () => {
               </div>
               
               {updates.length > itemsPerPage && (
-                <div className="py-2 md:py-4 border-t">
+                <div className="py-2 md:py-4 xl:py-6 border-t">
                   <Pagination>
-                    <PaginationContent className="flex flex-wrap justify-center gap-1 md:gap-2">
+                    <PaginationContent className="flex flex-wrap justify-center gap-1 md:gap-2 xl:gap-3">
                       <PaginationItem>
                         <PaginationPrevious 
                           onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                          className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          className={`${currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"} h-8 md:h-9 xl:h-11`}
                         />
                       </PaginationItem>
                       
@@ -551,7 +568,7 @@ const OfficerSupportPage: React.FC = () => {
                             <PaginationLink
                               onClick={() => handlePageChange(page)}
                               isActive={page === currentPage}
-                              className="cursor-pointer"
+                              className="cursor-pointer h-8 md:h-9 xl:h-11 w-8 md:w-9 xl:w-11 text-sm xl:text-base"
                             >
                               {page}
                             </PaginationLink>
@@ -562,7 +579,7 @@ const OfficerSupportPage: React.FC = () => {
                       <PaginationItem>
                         <PaginationNext 
                           onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))} 
-                          className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          className={`${currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"} h-8 md:h-9 xl:h-11`}
                         />
                       </PaginationItem>
                     </PaginationContent>
@@ -574,8 +591,8 @@ const OfficerSupportPage: React.FC = () => {
         </div>
       </div>
 
-      <footer className="w-full bg-white border-t border-gray-200 py-4 mt-auto">
-        <div className="container mx-auto px-4 md:px-6">
+      <footer className="w-full bg-white border-t border-gray-200 py-4 xl:py-6 mt-auto">
+        <div className="container mx-auto px-4 md:px-6 xl:px-8 max-w-screen-2xl">
           {/* Footer content removed */}
         </div>
       </footer>

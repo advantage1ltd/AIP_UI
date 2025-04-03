@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   Users, 
@@ -25,7 +26,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '@/store/store'
-import { useEffect, useState } from "react"
 import { useNavigate } from 'react-router-dom'
 import { toast } from "@/components/ui/use-toast"
 import { Progress } from "@/components/ui/progress"
@@ -37,8 +37,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ToastAction } from "@/components/ui/toast"
+import { cn } from "@/lib/utils"
 
-// Define types for our dashboard data
+// Types
 interface DashboardStats {
   totalLeads: number;
   activeContacts: number;
@@ -48,18 +49,9 @@ interface DashboardStats {
   contactGrowth: number;
   tasksDueToday: number;
   recentActivities: Activity[];
-  leadSources: {
-    source: string;
-    count: number;
-    percentage: number;
-  }[];
+  leadSources: LeadSource[];
   upcomingTasks: Task[];
-  performanceMetrics: {
-    metric: string;
-    value: number;
-    target: number;
-    change: number;
-  }[];
+  performanceMetrics: PerformanceMetric[];
 }
 
 interface Activity {
@@ -80,19 +72,388 @@ interface Task {
   contactId?: string;
 }
 
+interface LeadSource {
+  source: string;
+  count: number;
+  percentage: number;
+}
+
+interface PerformanceMetric {
+  metric: string;
+  value: number;
+  target: number;
+  change: number;
+}
+
+interface ScheduledEvent {
+  id: string;
+  title: string;
+  type: 'meeting' | 'call' | 'task' | 'reminder';
+  date: Date;
+  time: string;
+  duration: string;
+  description: string;
+  contactId?: string;
+  notificationSent: boolean;
+}
+
+// Helper functions
+const calculateStats = (leads: any[], contacts: any[], tasks: Task[]): DashboardStats => {
+  const openTasksCount = tasks.filter(task => !task.completed).length;
+  const tasksDueToday = tasks.filter(task => 
+    !task.completed && 
+    new Date(task.dueDate).toDateString() === new Date().toDateString()
+  ).length;
+  
+  const sourceCount: Record<string, number> = {};
+  leads.forEach(lead => {
+    sourceCount[lead.source] = (sourceCount[lead.source] || 0) + 1;
+  });
+  
+  const leadSources = Object.entries(sourceCount).map(([source, count]) => ({
+    source,
+    count,
+    percentage: Math.round((count / leads.length) * 100)
+  })).sort((a, b) => b.count - a.count);
+  
+  return {
+    totalLeads: leads.length,
+    activeContacts: contacts.length,
+    openTasks: openTasksCount,
+    conversionRate: 32,
+    leadGrowth: leads.length > 0 ? 8.2 : 0,
+    contactGrowth: contacts.length > 0 ? 12.4 : 0,
+    tasksDueToday,
+    recentActivities: generateRecentActivities(leads),
+    leadSources,
+    upcomingTasks: tasks.filter(task => !task.completed).slice(0, 5),
+    performanceMetrics: generatePerformanceMetrics()
+  };
+};
+
+const generateRecentActivities = (leads: any[]): Activity[] => [
+  {
+    id: '1',
+    type: 'lead',
+    title: 'New lead created',
+    description: `${leads[0]?.name || 'Unknown'} from ${leads[0]?.company || 'Unknown'}`,
+    timestamp: new Date(),
+    icon: <div className="rounded-full bg-blue-50 p-1.5 mt-0.5">
+            <UserPlus className="h-3.5 w-3.5 text-blue-600" />
+          </div>
+  },
+  // ... other activities
+];
+
+const generatePerformanceMetrics = (): PerformanceMetric[] => [
+  {
+    metric: 'Deals Closed',
+    value: 12,
+    target: 15,
+    change: 8.5
+  },
+  // ... other metrics
+];
+
+// Components
+const StatCard: React.FC<{
+  title: string;
+  value: string | number;
+  change?: number;
+  icon: React.ReactNode;
+  bgColor: string;
+  iconBgColor: string;
+}> = React.memo(({ title, value, change, icon, bgColor, iconBgColor }) => (
+  <Card className={`border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${bgColor}`}>
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 pt-2 sm:pb-2 sm:px-4 sm:pt-4">
+      <CardTitle className="text-[11px] sm:text-sm font-medium text-white">{title}</CardTitle>
+      <div className={`rounded-full ${iconBgColor} p-1`}>
+        {icon}
+      </div>
+    </CardHeader>
+    <CardContent className="px-2 pb-2 sm:px-4 sm:pb-4">
+      <div className="text-base sm:text-xl lg:text-2xl font-bold text-white">{value}</div>
+      {change !== undefined && (
+        <div className="flex items-center mt-0.5">
+          <span className="text-[9px] sm:text-xs text-white font-medium bg-opacity-30 px-1 py-0.5 rounded">
+            {change > 0 ? '+' : ''}{change}%
+          </span>
+          <span className="text-[9px] sm:text-xs text-white/70 ml-1">from last week</span>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+));
+
+const ActivityItem: React.FC<{ activity: Activity; isLast: boolean }> = React.memo(({ activity, isLast }) => (
+  <div key={activity.id}>
+    <div className="flex items-start gap-3">
+      {activity.icon}
+      <div className="flex-1">
+        <p className="text-sm font-medium">{activity.title}</p>
+        <p className="text-xs text-muted-foreground">{activity.description}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {format(activity.timestamp, 'PPp')}
+        </p>
+      </div>
+    </div>
+    {!isLast && <Separator className="my-4" />}
+  </div>
+));
+
+const LeadSourceChart: React.FC<{ sources: LeadSource[] }> = React.memo(({ sources }) => (
+  sources.length > 0 ? (
+    <div className="space-y-4">
+      {sources.map((source) => (
+        <div key={source.source} className="space-y-1">
+          <div className="flex justify-between text-sm">
+            <span>{source.source}</span>
+            <span className="font-medium">{source.count} leads ({source.percentage}%)</span>
+          </div>
+          <Progress value={source.percentage} className="h-2" />
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div className="flex flex-col items-center justify-center h-[250px]">
+      <PieChart className="h-16 w-16 text-muted-foreground/50" />
+      <p className="text-sm text-muted-foreground mt-4">No lead source data available</p>
+    </div>
+  )
+));
+
+// Calendar Day Component
+const CalendarDay: React.FC<{
+  day: Date | null;
+  currentDate: Date;
+  selectedDate: Date | null;
+  events: ScheduledEvent[];
+  onSelect: (date: Date) => void;
+}> = React.memo(({ day, currentDate, selectedDate, events, onSelect }) => {
+  if (!day) return <div className="h-16 md:h-24" />;
+  
+  const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+  const dayEvents = events.filter(event => isSameDay(new Date(event.date), day));
+  const isCurrentMonth = isSameMonth(day, currentDate);
+  
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(day)}
+      className={cn(
+        "h-16 md:h-24 w-full p-0.5 md:p-1 flex flex-col items-stretch rounded-md relative",
+        isSelected ? "bg-primary/20" : "hover:bg-muted/50",
+        !isCurrentMonth ? "opacity-50" : "",
+        "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
+      )}
+    >
+      <span className={cn(
+        "text-[10px] md:text-sm font-medium w-full text-center mb-0.5 md:mb-1",
+        isToday(day) ? "bg-primary text-primary-foreground" : "",
+        isSelected ? "text-primary-foreground" : ""
+      )}>
+        {format(day, 'd')}
+      </span>
+      
+      <div className="flex-1 overflow-hidden">
+        {dayEvents.slice(0, 2).map((event, index) => (
+          <div
+            key={event.id}
+            className={cn(
+              "text-[8px] md:text-[10px] px-1 py-0.5 mb-0.5 rounded truncate",
+              event.type === 'meeting' ? 'bg-blue-100 text-blue-800' :
+              event.type === 'call' ? 'bg-green-100 text-green-800' :
+              event.type === 'task' ? 'bg-amber-100 text-amber-800' :
+              'bg-indigo-100 text-indigo-800'
+            )}
+          >
+            {event.title}
+          </div>
+        ))}
+        {dayEvents.length > 2 && (
+          <div className="text-[8px] md:text-[10px] px-1 text-muted-foreground">
+            +{dayEvents.length - 2} more
+          </div>
+        )}
+      </div>
+    </button>
+  );
+});
+
+// Event Form Component
+const EventForm: React.FC<{
+  formData: typeof initialEventFormState;
+  onChange: (field: keyof typeof initialEventFormState, value: string) => void;
+  contacts: any[];
+}> = React.memo(({ formData, onChange, contacts }) => (
+  <div className="space-y-4">
+    <div>
+      <Label htmlFor="event-title" className="text-sm font-medium block mb-1.5">
+        Event Title
+      </Label>
+      <Input 
+        id="event-title" 
+        value={formData.title} 
+        onChange={(e) => onChange('title', e.target.value)} 
+        placeholder="Enter event title"
+        className="h-10"
+      />
+    </div>
+    
+    <div>
+      <Label htmlFor="event-type" className="text-sm font-medium block mb-1.5">
+        Event Type
+      </Label>
+      <Select 
+        value={formData.type} 
+        onValueChange={(value) => onChange('type', value)}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Select event type" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="meeting">Meeting</SelectItem>
+          <SelectItem value="call">Call</SelectItem>
+          <SelectItem value="task">Task</SelectItem>
+          <SelectItem value="reminder">Reminder</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+    
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="event-time" className="text-sm font-medium block mb-1.5">
+          Time
+        </Label>
+        <Select 
+          value={formData.time} 
+          onValueChange={(value) => onChange('time', value)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select time" />
+          </SelectTrigger>
+          <SelectContent>
+            {[
+              "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+              "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", 
+              "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"
+            ].map((time) => (
+              <SelectItem key={time} value={time}>{time}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div>
+        <Label htmlFor="event-duration" className="text-sm font-medium block mb-1.5">
+          Duration
+        </Label>
+        <Select 
+          value={formData.duration} 
+          onValueChange={(value) => onChange('duration', value)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select duration" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="15">15 minutes</SelectItem>
+            <SelectItem value="30">30 minutes</SelectItem>
+            <SelectItem value="45">45 minutes</SelectItem>
+            <SelectItem value="60">1 hour</SelectItem>
+            <SelectItem value="90">1.5 hours</SelectItem>
+            <SelectItem value="120">2 hours</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+    
+    <div>
+      <Label htmlFor="event-contact" className="text-sm font-medium block mb-1.5">
+        Related Contact
+      </Label>
+      <Select 
+        value={formData.contactId} 
+        onValueChange={(value) => onChange('contactId', value)}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Select contact" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">None</SelectItem>
+          {contacts.map(contact => (
+            <SelectItem key={contact.id} value={contact.id}>
+              {contact.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+    
+    <div>
+      <Label htmlFor="event-description" className="text-sm font-medium block mb-1.5">
+        Description
+      </Label>
+      <Textarea 
+        id="event-description" 
+        value={formData.description} 
+        onChange={(e) => onChange('description', e.target.value)} 
+        placeholder="Add details about this event"
+        rows={3}
+        className="resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
+      />
+    </div>
+  </div>
+));
+
+// Initial state
+const initialEventFormState = {
+  title: "",
+  type: "meeting" as const,
+  time: "09:00",
+  duration: "30",
+  description: "",
+  contactId: "none"
+};
+
+// Initial sample events
+const sampleEvents: ScheduledEvent[] = [
+  {
+    id: '1',
+    title: 'Follow-up call',
+    type: 'call',
+    date: new Date(),
+    time: '10:00',
+    duration: '15',
+    description: 'Discuss proposal details',
+    contactId: '1',
+    notificationSent: true
+  },
+  {
+    id: '2',
+    title: 'Product demo',
+    type: 'meeting',
+    date: addDays(new Date(), 1),
+    time: '14:00',
+    duration: '60',
+    description: 'Show new features',
+    contactId: '2',
+    notificationSent: true
+  }
+];
+
+// Main Component
 export default function CRMDashboard() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const contacts = useSelector((state: RootState) => state.contacts.contacts);
   
-  // Replace Redux selector with local state for leads
+  // State
   const [leads, setLeads] = useState<any[]>([
     { id: '1', name: 'John Doe', company: 'Acme Inc', status: 'New Lead', source: 'Website' },
     { id: '2', name: 'Jane Smith', company: 'XYZ Corp', status: 'Qualified', source: 'Referral' },
     { id: '3', name: 'Bob Johnson', company: 'ABC Ltd', status: 'Negotiation', source: 'LinkedIn' }
   ]);
   
-  // We would normally get these from Redux store as well
   const [tasks, setTasks] = useState<Task[]>([
     {
       id: '1',
@@ -132,112 +493,116 @@ export default function CRMDashboard() {
     }
   ]);
   
-  // Keep using the existing leads state but make it sync with Redux in the future
-  const [leadsState, setLeadsState] = useState([
-    { id: '1', name: 'John Smith', company: 'Acme Inc', status: 'New', source: 'Website' },
-    { id: '2', name: 'Sarah Johnson', company: 'Tech Solutions', status: 'Qualified', source: 'Referral' }
-  ]);
+  const [scheduledEvents, setScheduledEvents] = useState<ScheduledEvent[]>(sampleEvents);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [eventFormData, setEventFormData] = useState(initialEventFormState);
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+
+  // Memoized calculations
+  const stats = useMemo(() => calculateStats(leads, contacts, tasks), [leads, contacts, tasks]);
   
-  // Calculate dashboard statistics
-  const calculateStats = (): DashboardStats => {
-    // Count open tasks
-    const openTasksCount = tasks.filter(task => !task.completed).length;
-    const tasksDueToday = tasks.filter(task => 
-      !task.completed && 
-      new Date(task.dueDate).toDateString() === new Date().toDateString()
-    ).length;
-    
-    // Calculate lead sources using leads from Redux
-    const sourceCount: Record<string, number> = {};
-    leads.forEach(lead => {
-      sourceCount[lead.source] = (sourceCount[lead.source] || 0) + 1;
+  const upcomingEvents = useMemo(() => {
+    return scheduledEvents.filter(event => {
+      const eventDate = new Date(event.date);
+      const today = new Date();
+      return eventDate >= today && eventDate <= addDays(today, 1);
+    });
+  }, [scheduledEvents]);
+
+  // Effects
+  useEffect(() => {
+    if (upcomingEvents.length > 0) {
+      toast({
+        title: `You have ${upcomingEvents.length} upcoming event${upcomingEvents.length > 1 ? 's' : ''}`,
+        description: "Check your calendar for details",
+        action: <ToastAction altText="View" onClick={handleSchedule}>View</ToastAction>,
+      });
+    }
+  }, [upcomingEvents]);
+
+  useEffect(() => {
+    loadScheduledEvents();
+  }, []);
+
+  // Event Handlers
+  const handleSchedule = useCallback(() => {
+    setIsScheduleDialogOpen(true);
+  }, []);
+
+  const handleEventFormChange = useCallback((field: keyof typeof initialEventFormState, value: string) => {
+    setEventFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleScheduleEvent = useCallback(() => {
+    if (!selectedDate || !eventFormData.title) {
+      toast({
+        title: "Missing information",
+        description: "Please provide an event title and select a date.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newEvent: ScheduledEvent = {
+      id: Date.now().toString(),
+      ...eventFormData,
+      date: selectedDate,
+      notificationSent: false
+    };
+
+    setScheduledEvents(prev => {
+      const updated = [...prev, newEvent];
+      try {
+        localStorage.setItem('crm_scheduled_events', JSON.stringify(updated));
+      } catch (error) {
+        console.error('Error saving events:', error);
+      }
+      return updated;
     });
     
-    const leadSources = Object.entries(sourceCount).map(([source, count]) => ({
-      source,
-      count,
-      percentage: Math.round((count / leads.length) * 100)
-    })).sort((a, b) => b.count - a.count);
+    toast({
+      title: "Event scheduled successfully",
+      description: `${eventFormData.title} on ${format(selectedDate, 'PPP')} at ${eventFormData.time}`,
+      action: <ToastAction altText="View" onClick={() => viewEventDetails(newEvent)}>View</ToastAction>,
+    });
+
+    setIsScheduleDialogOpen(false);
+    setEventFormData(initialEventFormState);
+    setSelectedDate(null);
     
-    // Generate recent activities
-    const recentActivities: Activity[] = [
-      {
-        id: '1',
-        type: 'lead',
-        title: 'New lead created',
-        description: `${leads[0]?.name || 'Unknown'} from ${leads[0]?.company || 'Unknown'}`,
-        timestamp: new Date(),
-        icon: <div className="rounded-full bg-blue-50 p-1.5 mt-0.5">
-                <UserPlus className="h-3.5 w-3.5 text-blue-600" />
-              </div>
-      },
-      {
-        id: '2',
-        type: 'task',
-        title: 'Task completed',
-        description: 'Follow-up call with Sarah Johnson',
-        timestamp: subDays(new Date(), 1),
-        icon: <div className="rounded-full bg-green-50 p-1.5 mt-0.5">
-                <CheckSquare className="h-3.5 w-3.5 text-green-600" />
-              </div>
-      },
-      {
-        id: '3',
-        type: 'deal',
-        title: 'Deal status updated',
-        description: 'Tech Solutions proposal moved to negotiation',
-        timestamp: subDays(new Date(), 2),
-        icon: <div className="rounded-full bg-amber-50 p-1.5 mt-0.5">
-                <Activity className="h-3.5 w-3.5 text-amber-600" />
-              </div>
+    // Simulate notification
+    setTimeout(() => {
+      toast({
+        title: "Notification sent",
+        description: `Email notification sent for "${newEvent.title}"`,
+      });
+    }, 2000);
+  }, [selectedDate, eventFormData]);
+
+  // Helper functions
+  const loadScheduledEvents = useCallback(() => {
+    try {
+      const storedEvents = localStorage.getItem('crm_scheduled_events');
+      if (storedEvents) {
+        const parsedEvents = JSON.parse(storedEvents);
+        const eventsWithDates = parsedEvents.map((event: any) => ({
+          ...event,
+          date: new Date(event.date)
+        }));
+        setScheduledEvents(eventsWithDates);
+      } else {
+        // If no stored events, initialize with sample events and save them
+        localStorage.setItem('crm_scheduled_events', JSON.stringify(sampleEvents));
+        setScheduledEvents(sampleEvents);
       }
-    ];
-    
-    // Performance metrics
-    const performanceMetrics = [
-      {
-        metric: 'Deals Closed',
-        value: 12,
-        target: 15,
-        change: 8.5
-      },
-      {
-        metric: 'Revenue',
-        value: 45600,
-        target: 50000,
-        change: 12.3
-      },
-      {
-        metric: 'Customer Satisfaction',
-        value: 4.7,
-        target: 4.8,
-        change: 2.1
-      },
-      {
-        metric: 'Response Time',
-        value: 3.2,
-        target: 3.0,
-        change: -5.2
-      }
-    ];
-    
-    return {
-      totalLeads: leads.length,
-      activeContacts: contacts.length,
-      openTasks: openTasksCount,
-      conversionRate: 32,
-      leadGrowth: leads.length > 0 ? 8.2 : 0,
-      contactGrowth: contacts.length > 0 ? 12.4 : 0,
-      tasksDueToday,
-      recentActivities,
-      leadSources,
-      upcomingTasks: tasks.filter(task => !task.completed).slice(0, 5),
-      performanceMetrics
-    };
-  };
-  
-  const stats = calculateStats();
-  
+    } catch (error) {
+      console.error('Error loading events:', error);
+      // Fallback to sample events if there's an error
+      setScheduledEvents(sampleEvents);
+    }
+  }, []);
+
   // Navigation functions
   const navigateToContacts = () => {
     navigate('/crm/contacts');
@@ -252,179 +617,51 @@ export default function CRMDashboard() {
     navigate('/crm/tasks');
   };
 
-  // Calendar state
-  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [eventTitle, setEventTitle] = useState("");
-  const [eventType, setEventType] = useState("meeting");
-  const [eventTime, setEventTime] = useState("09:00");
-  const [eventDuration, setEventDuration] = useState("30");
-  const [eventDescription, setEventDescription] = useState("");
-  const [selectedContact, setSelectedContact] = useState("");
-  const [scheduledEvents, setScheduledEvents] = useState<Array<{
-    id: string;
-    title: string;
-    type: string;
-    date: Date;
-    time: string;
-    duration: string;
-    description: string;
-    contactId?: string;
-    notificationSent: boolean;
-  }>>([
-    {
-      id: '1',
-      title: 'Follow-up call',
-      type: 'call',
-      date: new Date(),
-      time: '10:00',
-      duration: '15',
-      description: 'Discuss proposal details',
-      contactId: '1',
-      notificationSent: true
-    },
-    {
-      id: '2',
-      title: 'Product demo',
-      type: 'meeting',
-      date: addDays(new Date(), 1),
-      time: '14:00',
-      duration: '60',
-      description: 'Show new features',
-      contactId: '2',
-      notificationSent: true
-    }
-  ]);
-  
-  // Show upcoming events notification on component mount
-  useEffect(() => {
-    const upcomingEvents = scheduledEvents.filter(event => {
-      const eventDate = new Date(event.date);
-      const today = new Date();
-      return eventDate >= today && eventDate <= addDays(today, 1);
-    });
+  // Get days in month for calendar
+  const getDaysInMonth = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay(); // 0-6 (Sunday-Saturday)
+    const daysInMonth = new Date(year, month + 1, 0).getDate(); // Last day of month
     
-    if (upcomingEvents.length > 0) {
-      toast({
-        title: `You have ${upcomingEvents.length} upcoming event${upcomingEvents.length > 1 ? 's' : ''}`,
-        description: "Check your calendar for details",
-        action: (
-          <ToastAction altText="View" onClick={handleSchedule}>
-            View
-          </ToastAction>
-        ),
-      });
-    }
-  }, []);
-  
-  const handleSchedule = () => {
-    setIsScheduleDialogOpen(true);
-  };
-  
-  const handleCloseScheduleDialog = () => {
-    setIsScheduleDialogOpen(false);
-    resetScheduleForm();
-  };
-  
-  const resetScheduleForm = () => {
-    setSelectedDate(null);
-    setEventTitle("");
-    setEventType("meeting");
-    setEventTime("09:00");
-    setEventDuration("30");
-    setEventDescription("");
-    setSelectedContact("");
-  };
-  
-  const handlePreviousMonth = () => {
-    setCurrentDate(subMonths(currentDate, 1));
-  };
-  
-  const handleNextMonth = () => {
-    setCurrentDate(addMonths(currentDate, 1));
-  };
-  
-  const handleDateSelect = (date: Date) => {
-    setSelectedDate(date);
-  };
-  
-  const handleScheduleEvent = () => {
-    if (!selectedDate || !eventTitle) {
-      toast({
-        title: "Missing information",
-        description: "Please provide an event title and select a date.",
-        variant: "destructive"
-      });
-      return;
+    const days = [];
+    
+    // Add empty cells for days before the first day of month
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
     }
     
-    // Ensure the date is a proper Date object
-    const eventDate = new Date(selectedDate);
+    // Add days of month
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(year, month, i));
+    }
     
-    const newEvent = {
-      id: Date.now().toString(),
-      title: eventTitle,
-      type: eventType,
-      date: eventDate,
-      time: eventTime,
-      duration: eventDuration,
-      description: eventDescription,
-      contactId: selectedContact || undefined,
-      notificationSent: false
-    };
-    
-    // Add to local state
-    setScheduledEvents([...scheduledEvents, newEvent]);
-    
-    // In a real app, this would be an API call to save the event
-    // For demo purposes, we'll simulate a successful save
-    setTimeout(() => {
-      // Show success toast
-      toast({
-        title: "Event scheduled successfully",
-        description: `${eventTitle} on ${format(selectedDate, 'PPP')} at ${eventTime}`,
-        action: (
-          <ToastAction altText="View" onClick={() => viewEventDetails(newEvent)}>
-            View
-          </ToastAction>
-        ),
-      });
-      
-      // Simulate sending email notification
-      simulateSendNotification(newEvent);
-      
-      // Close dialog
-      handleCloseScheduleDialog();
-      
-      // Update local storage (in a real app, this would be a database)
-      const updatedEvents = [...scheduledEvents, newEvent];
-      localStorage.setItem('crm_scheduled_events', JSON.stringify(updatedEvents));
-      
-    }, 500);
+    return days;
   };
-  
-  // Simulate sending notification
-  const simulateSendNotification = (event: any) => {
-    console.log(`Email notification would be sent for: ${event.title}`);
-    
-    // In a real app, this would call an API endpoint to send an email
-    // For demo purposes, we'll just show a toast after a delay
-    setTimeout(() => {
-      toast({
-        title: "Notification sent",
-        description: `Email notification sent for "${event.title}"`,
-        variant: "default",
-      });
+
+  const getEventsForDate = (date: Date) => {
+    return scheduledEvents.filter(event => {
+      // Convert event.date to a Date object if it's not already
+      const eventDate = event.date instanceof Date 
+        ? event.date 
+        : new Date(event.date);
       
-      // Mark notification as sent
-      const updatedEvents = scheduledEvents.map(e => 
-        e.id === event.id ? { ...e, notificationSent: true } : e
+      // Compare year, month, and day to check if dates are the same
+      return (
+        eventDate.getFullYear() === date.getFullYear() &&
+        eventDate.getMonth() === date.getMonth() &&
+        eventDate.getDate() === date.getDate()
       );
-      setScheduledEvents(updatedEvents);
-    }, 2000);
+    });
   };
-  
+
+  const handleNewLead = () => {
+    toast({
+      title: "New Lead",
+      description: "Lead creation form coming soon.",
+    });
+  };
+
   // View event details
   const viewEventDetails = (event: any) => {
     // In a real app, this would open a detailed view of the event
@@ -455,371 +692,296 @@ export default function CRMDashboard() {
       ),
     });
   };
-  
-  // Load events from storage on component mount
-  useEffect(() => {
-    const storedEvents = localStorage.getItem('crm_scheduled_events');
-    if (storedEvents) {
-      try {
-        const parsedEvents = JSON.parse(storedEvents);
-        // Convert string dates back to Date objects
-        const eventsWithDates = parsedEvents.map((event: any) => ({
-          ...event,
-          date: new Date(event.date)
-        }));
-        setScheduledEvents(eventsWithDates);
-      } catch (error) {
-        console.error('Error parsing stored events:', error);
-      }
-    }
-  }, []);
-  
-  const getEventsForDate = (date: Date) => {
-    return scheduledEvents.filter(event => {
-      // Convert event.date to a Date object if it's not already
-      const eventDate = event.date instanceof Date 
-        ? event.date 
-        : new Date(event.date);
-      
-      // Compare year, month, and day to check if dates are the same
-      return (
-        eventDate.getFullYear() === date.getFullYear() &&
-        eventDate.getMonth() === date.getMonth() &&
-        eventDate.getDate() === date.getDate()
-      );
-    });
-  };
-  
-  const handleNewLead = () => {
-    toast({
-      title: "New Lead",
-      description: "Lead creation form coming soon.",
-    });
-  };
-
-  // Get days in month for calendar
-  const getDaysInMonth = () => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const firstDay = new Date(year, month, 1).getDay(); // 0-6 (Sunday-Saturday)
-    const daysInMonth = new Date(year, month + 1, 0).getDate(); // Last day of month
-    
-    const days = [];
-    
-    // Add empty cells for days before the first day of month
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null);
-    }
-    
-    // Add days of month
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(new Date(year, month, i));
-    }
-    
-    return days;
-  };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-8">
-        {/* Header with action buttons */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-border/40">
-          <div className="space-y-1 w-full sm:w-auto">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">CRM Dashboard</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-1 sm:px-2 md:px-4 lg:px-6 py-2 md:py-4 lg:py-6">
+        {/* Header */}
+        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between bg-white p-2 md:p-4 rounded-lg shadow-sm border border-border/40">
+          <div className="space-y-0.5">
+            <h1 className="text-sm md:text-xl lg:text-2xl font-bold tracking-tight text-primary">CRM Dashboard</h1>
+            <p className="text-[10px] md:text-sm text-muted-foreground">
               Overview of your customer relationships and sales performance
             </p>
           </div>
-          <div className="flex gap-3 w-full sm:w-auto justify-end">
-            <Button variant="outline" className="h-9" onClick={handleSchedule}>
-              <Calendar className="h-4 w-4 mr-2" />
+          <div className="flex gap-1">
+            <Button variant="outline" className="h-6 md:h-9 w-full md:w-auto text-[10px] md:text-sm" onClick={handleSchedule}>
+              <Calendar className="h-3 w-3 md:h-4 md:w-4 mr-1" />
               Schedule
             </Button>
           </div>
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-blue-600" onClick={navigateToLeads}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
-              <CardTitle className="text-xs sm:text-sm font-medium text-white">New Leads</CardTitle>
-              <div className="rounded-full bg-blue-500/30 p-1.5 sm:p-2">
-                <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-xl sm:text-2xl font-bold text-white">{stats.totalLeads}</div>
-              <div className="flex items-center mt-1">
-                <span className="text-xs text-white font-medium bg-blue-500/30 px-1.5 py-0.5 rounded">+{stats.leadGrowth}%</span>
-                <span className="text-xs text-blue-100 ml-1.5">from last week</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-indigo-600" onClick={navigateToContacts}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
-              <CardTitle className="text-xs sm:text-sm font-medium text-white">Active Contacts</CardTitle>
-              <div className="rounded-full bg-indigo-500/30 p-1.5 sm:p-2">
-                <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-xl sm:text-2xl font-bold text-white">{stats.activeContacts}</div>
-              <div className="flex items-center mt-1">
-                {stats.contactGrowth > 0 ? (
-                  <>
-                    <span className="text-xs text-white font-medium bg-indigo-500/30 px-1.5 py-0.5 rounded">+{stats.contactGrowth}%</span>
-                    <span className="text-xs text-indigo-100 ml-1.5">from last month</span>
-                  </>
-                ) : (
-                  <span className="text-xs text-indigo-100">No change from last month</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-amber-600" onClick={navigateToTasks}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
-              <CardTitle className="text-xs sm:text-sm font-medium text-white">Open Tasks</CardTitle>
-              <div className="rounded-full bg-amber-500/30 p-1.5 sm:p-2">
-                <CheckSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-xl sm:text-2xl font-bold text-white">{stats.openTasks}</div>
-              <div className="flex items-center mt-1">
-                <span className="text-xs text-white font-medium bg-amber-500/30 px-1.5 py-0.5 rounded">{stats.tasksDueToday}</span>
-                <span className="text-xs text-amber-100 ml-1.5">due today</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-emerald-600">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
-              <CardTitle className="text-xs sm:text-sm font-medium text-white">Conversion Rate</CardTitle>
-              <div className="rounded-full bg-emerald-500/30 p-1.5 sm:p-2">
-                <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-xl sm:text-2xl font-bold text-white">{stats.conversionRate}%</div>
-              <div className="flex items-center mt-1">
-                <span className="text-xs text-white font-medium bg-emerald-500/30 px-1.5 py-0.5 rounded">+2.5%</span>
-                <span className="text-xs text-emerald-100 ml-1.5">from last month</span>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-1 md:gap-4 mt-1 md:mt-4">
+          <StatCard
+            title="New Leads"
+            value={stats.totalLeads}
+            change={stats.leadGrowth}
+            icon={<UserPlus className="h-2.5 w-2.5 md:h-4 md:w-4 text-white" />}
+            bgColor="bg-blue-600"
+            iconBgColor="bg-blue-500/30"
+          />
+          <StatCard
+            title="Active Contacts"
+            value={stats.activeContacts}
+            change={stats.contactGrowth}
+            icon={<Users className="h-2.5 w-2.5 md:h-4 md:w-4 text-white" />}
+            bgColor="bg-indigo-600"
+            iconBgColor="bg-indigo-500/30"
+          />
+          <StatCard
+            title="Open Tasks"
+            value={stats.openTasks}
+            icon={<CheckSquare className="h-2.5 w-2.5 md:h-4 md:w-4 text-white" />}
+            bgColor="bg-amber-600"
+            iconBgColor="bg-amber-500/30"
+          />
+          <StatCard
+            title="Conversion Rate"
+            value={`${stats.conversionRate}%`}
+            change={2.5}
+            icon={<TrendingUp className="h-2.5 w-2.5 md:h-4 md:w-4 text-white" />}
+            bgColor="bg-emerald-600"
+            iconBgColor="bg-emerald-500/30"
+          />
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="overview" className="space-y-4">
-          <div className="flex overflow-x-auto pb-2 scrollbar-hide">
-            <TabsList className="h-9 w-full justify-start">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3">Overview</TabsTrigger>
-              <TabsTrigger value="leads" className="text-xs sm:text-sm px-2 sm:px-3">Leads</TabsTrigger>
-              <TabsTrigger value="tasks" className="text-xs sm:text-sm px-2 sm:px-3">Tasks</TabsTrigger>
-              <TabsTrigger value="performance" className="text-xs sm:text-sm px-2 sm:px-3">Performance</TabsTrigger>
-              <TabsTrigger value="calendar" className="text-xs sm:text-sm px-2 sm:px-3">Calendar</TabsTrigger>
-            </TabsList>
-          </div>
-          
-          <TabsContent value="overview" className="mt-4 sm:mt-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card className="border border-border/40 shadow-sm">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-medium">Recent Activities</CardTitle>
-                    <Button variant="ghost" size="sm" className="h-8 text-xs">View All</Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {stats.recentActivities.map((activity, index) => (
-                      <div key={activity.id}>
-                        <div className="flex items-start gap-3">
-                          {activity.icon}
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{activity.title}</p>
-                            <p className="text-xs text-muted-foreground">{activity.description}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {format(activity.timestamp, 'PPp')}
-                            </p>
-                          </div>
-                        </div>
-                        {index < stats.recentActivities.length - 1 && <Separator className="my-4" />}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+        <div className="mt-1 md:mt-4">
+          <Tabs defaultValue="overview" className="space-y-1 md:space-y-4">
+            {/* Tab List */}
+            <div className="overflow-x-auto -mx-1 md:mx-0">
+              <div className="min-w-[300px] px-1 md:px-0">
+                <TabsList className="h-6 md:h-9 w-full justify-start">
+                  <TabsTrigger value="overview" className="text-[10px] md:text-sm px-1 md:px-3">Overview</TabsTrigger>
+                  <TabsTrigger value="leads" className="text-[10px] md:text-sm px-1 md:px-3">Leads</TabsTrigger>
+                  <TabsTrigger value="tasks" className="text-[10px] md:text-sm px-1 md:px-3">Tasks</TabsTrigger>
+                  <TabsTrigger value="performance" className="text-[10px] md:text-sm px-1 md:px-3">Performance</TabsTrigger>
+                  <TabsTrigger value="calendar" className="text-[10px] md:text-sm px-1 md:px-3">Calendar</TabsTrigger>
+                </TabsList>
+              </div>
+            </div>
 
-              <Card className="border border-border/40 shadow-sm">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-medium">Lead Sources</CardTitle>
-                    <Button variant="ghost" size="sm" className="h-8 text-xs">Export</Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {stats.leadSources.length > 0 ? (
-                    <div className="space-y-4">
-                      {stats.leadSources.map((source) => (
-                        <div key={source.source} className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span>{source.source}</span>
-                            <span className="font-medium">{source.count} leads ({source.percentage}%)</span>
+            {/* Overview Tab */}
+            <TabsContent value="overview">
+              <div className="grid gap-1 md:gap-4">
+                {/* Activities and Lead Sources */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:gap-4">
+                  <Card className="border border-border/40 shadow-sm">
+                    <CardHeader className="p-2 md:p-4">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs md:text-base font-medium">Recent Activities</CardTitle>
+                        <Button variant="ghost" size="sm" className="h-6 md:h-8 text-[10px] md:text-xs">View All</Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-2 md:p-4">
+                      <div className="space-y-2 md:space-y-4">
+                        {stats.recentActivities.map((activity, index) => (
+                          <ActivityItem key={activity.id} activity={activity} isLast={index === stats.recentActivities.length - 1} />
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border border-border/40 shadow-sm">
+                    <CardHeader className="p-2 md:p-4">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xs md:text-base font-medium">Lead Sources</CardTitle>
+                        <Button variant="ghost" size="sm" className="h-6 md:h-8 text-[10px] md:text-xs">Export</Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-2 md:p-4">
+                      <LeadSourceChart sources={stats.leadSources} />
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Scheduled Events Table */}
+                <Card className="border border-border/40 shadow-sm">
+                  <CardHeader className="p-2 md:p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-1">
+                      <CardTitle className="text-xs md:text-base font-medium">Scheduled Events</CardTitle>
+                      <Button size="sm" className="h-6 md:h-8 w-full md:w-auto text-[10px] md:text-sm" onClick={handleSchedule}>
+                        <CalendarDays className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                        Schedule New Event
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {/* Mobile View */}
+                    <div className="block md:hidden">
+                      {scheduledEvents.map((event) => (
+                        <div key={event.id} className="border-b p-2 hover:bg-muted/30">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-[11px]">{event.title}</div>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <Badge className={cn(
+                                  "text-[9px]",
+                                  event.type === 'meeting' ? 'bg-blue-100 text-blue-800' :
+                                  event.type === 'call' ? 'bg-green-100 text-green-800' :
+                                  event.type === 'task' ? 'bg-amber-100 text-amber-800' :
+                                  'bg-indigo-100 text-indigo-800'
+                                )}>
+                                  {event.type.charAt(0).toUpperCase() + event.type.slice(1)}
+                                </Badge>
+                                <span className="text-[9px] text-muted-foreground">
+                                  {format(new Date(event.date), 'MMM d')} • {event.time}
+                                </span>
+                              </div>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6"
+                              onClick={() => viewEventDetails(event)}
+                            >
+                              <ArrowRight className="h-3 w-3" />
+                            </Button>
                           </div>
-                          <Progress value={source.percentage} className="h-2" />
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-[250px]">
-                      <PieChart className="h-16 w-16 text-muted-foreground/50" />
-                      <p className="text-sm text-muted-foreground mt-4">No lead source data available</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              
-              {/* Scheduled Events Card */}
-              <Card className="border border-border/40 shadow-sm md:col-span-2 mt-4">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-medium">Scheduled Events</CardTitle>
-                    <Button size="sm" className="h-8" onClick={handleSchedule}>
-                      <CalendarDays className="h-4 w-4 mr-2" />
-                      Schedule New Event
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {scheduledEvents.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    
+                    {/* Desktop View */}
+                    <div className="hidden md:block overflow-x-auto">
                       <table className="w-full">
                         <thead>
                           <tr className="border-b">
-                            <th className="text-left py-3 px-4 font-medium text-sm">Event</th>
-                            <th className="text-left py-3 px-4 font-medium text-sm">Type</th>
-                            <th className="text-left py-3 px-4 font-medium text-sm">Date & Time</th>
-                            <th className="text-left py-3 px-4 font-medium text-sm">Duration</th>
-                            <th className="text-left py-3 px-4 font-medium text-sm">Contact</th>
-                            <th className="text-right py-3 px-4 font-medium text-sm">Actions</th>
+                            <th className="text-left p-3 font-medium text-sm">Event</th>
+                            <th className="text-left p-3 font-medium text-sm">Type</th>
+                            <th className="text-left p-3 font-medium text-sm">Date & Time</th>
+                            <th className="text-left p-3 font-medium text-sm">Duration</th>
+                            <th className="text-left p-3 font-medium text-sm">Contact</th>
+                            <th className="text-right p-3 font-medium text-sm">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {scheduledEvents
-                            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                            .map((event) => {
-                              const eventDate = new Date(event.date);
-                              const isUpcoming = eventDate >= new Date();
-                              const relatedContact = contacts.find(c => c.id === event.contactId);
-                              
-                              return (
-                                <tr key={event.id} className="border-b hover:bg-muted/30">
-                                  <td className="py-3 px-4">
-                                    <div className="font-medium">{event.title}</div>
-                                    {event.description && (
-                                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                        {event.description}
-                                      </div>
-                                    )}
-                                  </td>
-                                  <td className="py-3 px-4">
-                                    <Badge className={
-                                      event.type === 'meeting' ? 'bg-blue-100 text-blue-800 hover:bg-blue-100' :
-                                      event.type === 'call' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
-                                      event.type === 'task' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100' :
-                                      'bg-indigo-100 text-indigo-800 hover:bg-indigo-100'
-                                    }>
-                                      {event.type.charAt(0).toUpperCase() + event.type.slice(1)}
-                                    </Badge>
-                                  </td>
-                                  <td className="py-3 px-4">
-                                    <div className="flex flex-col">
-                                      <span className={isUpcoming ? 'font-medium' : 'text-muted-foreground'}>
-                                        {format(eventDate, 'MMM d, yyyy')}
-                                      </span>
-                                      <span className="text-xs">
-                                        {event.time}
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td className="py-3 px-4">
-                                    {event.duration} min
-                                  </td>
-                                  <td className="py-3 px-4">
-                                    {relatedContact ? relatedContact.name : '-'}
-                                  </td>
-                                  <td className="py-3 px-4 text-right">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-8"
-                                      onClick={() => viewEventDetails(event)}
-                                    >
-                                      <ArrowRight className="h-4 w-4" />
-                                    </Button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
+                          {scheduledEvents.map((event) => (
+                            <tr key={event.id} className="border-b hover:bg-muted/30">
+                              <td className="p-3">
+                                <div className="font-medium text-sm">{event.title}</div>
+                                {event.description && (
+                                  <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                    {event.description}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                <Badge className={cn(
+                                  "text-xs",
+                                  event.type === 'meeting' ? 'bg-blue-100 text-blue-800' :
+                                  event.type === 'call' ? 'bg-green-100 text-green-800' :
+                                  event.type === 'task' ? 'bg-amber-100 text-amber-800' :
+                                  'bg-indigo-100 text-indigo-800'
+                                )}>
+                                  {event.type.charAt(0).toUpperCase() + event.type.slice(1)}
+                                </Badge>
+                              </td>
+                              <td className="p-3">
+                                <div className="text-sm">
+                                  {format(new Date(event.date), 'MMM d, yyyy')}
+                                </div>
+                                <div className="text-sm">
+                                  {event.time}
+                                </div>
+                              </td>
+                              <td className="p-3 text-sm">
+                                {event.duration} min
+                              </td>
+                              <td className="p-3 text-sm">
+                                {contacts.find(c => c.id === event.contactId)?.name || '-'}
+                              </td>
+                              <td className="p-3 text-right">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8"
+                                  onClick={() => viewEventDetails(event)}
+                                >
+                                  <ArrowRight className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8">
-                      <CalendarDays className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">No events scheduled</p>
-                      <Button className="mt-4" onClick={handleSchedule}>Schedule Your First Event</Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Leads Tab */}
+            <TabsContent value="leads">
+              <Card className="border border-border/40 shadow-sm">
+                <CardHeader className="p-2 md:p-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-1">
+                    <div>
+                      <CardTitle className="text-xs md:text-base font-medium">All Leads</CardTitle>
+                      <p className="text-[10px] md:text-sm text-muted-foreground">Manage and track your leads</p>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="leads" className="mt-4 sm:mt-6">
-            <Card className="border border-border/40 shadow-sm">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-medium">Lead Management</CardTitle>
-                  <Button size="sm" className="h-8">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add Lead
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {leads.length > 0 ? (
-                  <div className="overflow-x-auto">
+                    <Button size="sm" className="h-6 md:h-8 w-full md:w-auto text-[10px] md:text-sm" onClick={handleNewLead}>
+                      <UserPlus className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                      Add New Lead
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {/* Mobile View */}
+                  <div className="block md:hidden">
+                    {leads.map((lead) => (
+                      <div key={lead.id} className="border-b p-2 hover:bg-muted/30">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-[11px]">{lead.name}</div>
+                            <div className="text-[9px] text-muted-foreground">{lead.company}</div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Badge className="text-[9px] bg-blue-100 text-blue-800">
+                                {lead.status}
+                              </Badge>
+                              <span className="text-[9px] text-muted-foreground">
+                                via {lead.source}
+                              </span>
+                            </div>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6"
+                          >
+                            <ArrowRight className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop View */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left py-3 px-4 font-medium text-sm">Name</th>
-                          <th className="text-left py-3 px-4 font-medium text-sm">Company</th>
-                          <th className="text-left py-3 px-4 font-medium text-sm">Status</th>
-                          <th className="text-left py-3 px-4 font-medium text-sm">Source</th>
-                          <th className="text-right py-3 px-4 font-medium text-sm">Actions</th>
+                          <th className="text-left p-3 font-medium text-sm">Name</th>
+                          <th className="text-left p-3 font-medium text-sm">Company</th>
+                          <th className="text-left p-3 font-medium text-sm">Status</th>
+                          <th className="text-left p-3 font-medium text-sm">Source</th>
+                          <th className="text-right p-3 font-medium text-sm">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {leads.map((lead) => (
                           <tr key={lead.id} className="border-b hover:bg-muted/30">
-                            <td className="py-3 px-4">{lead.name}</td>
-                            <td className="py-3 px-4">{lead.company}</td>
-                            <td className="py-3 px-4">
-                              <Badge className={
-                                lead.status === 'New' ? 'bg-blue-100 text-blue-800 hover:bg-blue-100' :
-                                lead.status === 'Qualified' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
-                                lead.status === 'Negotiation' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100' :
-                                'bg-indigo-100 text-indigo-800 hover:bg-indigo-100'
-                              }>
+                            <td className="p-3 text-sm font-medium">{lead.name}</td>
+                            <td className="p-3 text-sm">{lead.company}</td>
+                            <td className="p-3">
+                              <Badge className="text-xs bg-blue-100 text-blue-800">
                                 {lead.status}
                               </Badge>
                             </td>
-                            <td className="py-3 px-4">{lead.source}</td>
-                            <td className="py-3 px-4 text-right">
+                            <td className="p-3 text-sm">{lead.source}</td>
+                            <td className="p-3 text-right">
                               <Button variant="ghost" size="sm" className="h-8">
                                 <ArrowRight className="h-4 w-4" />
                               </Button>
@@ -829,611 +991,376 @@ export default function CRMDashboard() {
                       </tbody>
                     </table>
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8">
-                    <UserPlus className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                    <p className="text-muted-foreground">No leads available</p>
-                    <Button className="mt-4">Add Your First Lead</Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="tasks" className="mt-4 sm:mt-6">
-            <Card className="border border-border/40 shadow-sm">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-medium">Task Calendar</CardTitle>
-                  <Button size="sm" className="h-8">
-                    <CheckSquare className="h-4 w-4 mr-2" />
-                    Add Task
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {tasks.filter(task => !task.completed).length > 0 ? (
-                  <div className="space-y-4">
-                    {tasks.filter(task => !task.completed).map((task) => (
-                      <div key={task.id} className="flex items-start p-3 rounded-md border hover:bg-muted/20">
-                        <div className={`rounded-full p-2 mr-3 ${
-                          task.priority === 'high' ? 'bg-red-50' :
-                          task.priority === 'medium' ? 'bg-amber-50' :
-                          'bg-blue-50'
-                        }`}>
-                          <Clock className={`h-4 w-4 ${
-                            task.priority === 'high' ? 'text-red-600' :
-                            task.priority === 'medium' ? 'text-amber-600' :
-                            'text-blue-600'
-                          }`} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between">
-                            <h4 className="text-sm font-medium">{task.title}</h4>
-                            <Badge variant="outline" className={
-                              task.priority === 'high' ? 'border-red-200 text-red-700' :
-                              task.priority === 'medium' ? 'border-amber-200 text-amber-700' :
-                              'border-blue-200 text-blue-700'
-                            }>
-                              {task.priority}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Due: {format(new Date(task.dueDate), 'PPP')}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8">
-                    <CheckSquare className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                    <p className="text-muted-foreground">No tasks available</p>
-                    <Button className="mt-4">Add Your First Task</Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="performance" className="mt-4 sm:mt-6">
-            <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
-              <Card className="border border-border/40 shadow-sm">
-                <CardHeader className="px-4 sm:px-6 py-4">
-                  <CardTitle className="text-base sm:text-lg font-medium">Performance Metrics</CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 sm:px-6 pb-4">
-                  <div className="space-y-4 sm:space-y-6">
-                    {stats.performanceMetrics.map((metric) => (
-                      <div key={metric.metric} className="space-y-2">
-                        <div className="flex justify-between">
-                          <div className="flex items-center">
-                            {metric.metric === 'Deals Closed' && <CheckSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 text-blue-600" />}
-                            {metric.metric === 'Revenue' && <PoundSterling className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 text-green-600" />}
-                            {metric.metric === 'Customer Satisfaction' && <Star className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 text-amber-600" />}
-                            {metric.metric === 'Response Time' && <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 text-indigo-600" />}
-                            <span className="text-xs sm:text-sm font-medium">{metric.metric}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <span className="text-xs sm:text-sm font-bold">
-                              {metric.metric === 'Revenue' ? `£${metric.value.toLocaleString()}` : 
-                               metric.metric === 'Customer Satisfaction' ? metric.value.toFixed(1) :
-                               metric.metric === 'Response Time' ? `${metric.value} hrs` :
-                               metric.value}
-                            </span>
-                            <span className="text-xs text-muted-foreground ml-2">
-                              / {metric.metric === 'Revenue' ? `£${metric.target.toLocaleString()}` : 
-                                 metric.metric === 'Customer Satisfaction' ? metric.target.toFixed(1) :
-                                 metric.metric === 'Response Time' ? `${metric.target} hrs` :
-                                 metric.target}
-                            </span>
-                          </div>
-                        </div>
-                        <Progress value={(metric.value / metric.target) * 100} className="h-1.5 sm:h-2" />
-                        <div className="flex justify-end">
-                          <span className={`text-xs ${metric.change > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {metric.change > 0 ? '+' : ''}{metric.change}% from last month
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </CardContent>
               </Card>
-              
+            </TabsContent>
+
+            {/* Tasks Tab */}
+            <TabsContent value="tasks">
               <Card className="border border-border/40 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-lg font-medium">Sales Forecast</CardTitle>
+                <CardHeader className="p-2 md:p-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-1">
+                    <div>
+                      <CardTitle className="text-xs md:text-base font-medium">Tasks</CardTitle>
+                      <p className="text-[10px] md:text-sm text-muted-foreground">Manage your tasks and follow-ups</p>
+                    </div>
+                    <Button size="sm" className="h-6 md:h-8 w-full md:w-auto text-[10px] md:text-sm">
+                      <CheckSquare className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                      Add Task
+                    </Button>
+                  </div>
                 </CardHeader>
-                <CardContent className="flex flex-col items-center justify-center h-[300px]">
-                  <BarChart3 className="h-16 w-16 text-muted-foreground/50" />
-                  <p className="text-sm text-muted-foreground mt-4">Sales forecast chart coming soon</p>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="calendar" className="mt-4 sm:mt-6">
-            {/* Calendar component */}
-            <Card className="border border-border/40 shadow-sm">
-              <CardHeader className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg font-medium">Calendar</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Manage your schedule and events
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={handlePreviousMonth}>
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Previous
-                  </Button>
-                  <div className="text-sm font-medium px-2">
-                    {format(currentDate, 'MMMM yyyy')}
-                  </div>
-                  <Button variant="outline" size="sm" onClick={handleNextMonth}>
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                  <Button size="sm" onClick={handleSchedule}>
-                    <CalendarDays className="h-4 w-4 mr-2" />
-                    New Event
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {/* Calendar Grid */}
-                <div className="border-t">
-                  {/* Days of week header */}
-                  <div className="grid grid-cols-7 border-b">
-                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
-                      <div key={day} className="py-2 text-center text-sm font-medium border-r last:border-r-0">
-                        <span className="hidden sm:inline">{day}</span>
-                        <span className="sm:hidden">{day.substring(0, 3)}</span>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Calendar grid */}
-                  <div className="grid grid-cols-7 auto-rows-fr">
-                    {getDaysInMonth().map((day, index) => {
-                      if (day === null) {
-                        return (
-                          <div key={`empty-${index}`} className="min-h-[120px] border-b border-r p-1 bg-muted/20" />
-                        );
-                      }
-                      
-                      const isCurrentMonth = isSameMonth(day, currentDate);
-                      const isCurrentDay = isToday(day);
-                      const dayEvents = getEventsForDate(day);
-                      
-                      // Debug log to verify events are being found
-                      if (dayEvents.length > 0) {
-                        console.log(`Events for ${format(day, 'yyyy-MM-dd')}:`, dayEvents);
-                      }
-                      
-                      return (
-                        <div 
-                          key={`day-${index}`} 
-                          className={`
-                            min-h-[120px] border-b border-r p-1 relative
-                            ${!isCurrentMonth ? 'bg-muted/20' : ''}
-                            ${isCurrentDay ? 'bg-blue-50' : ''}
-                            hover:bg-muted/10
-                          `}
-                          onClick={() => {
-                            handleDateSelect(day);
-                            handleSchedule();
-                          }}
-                        >
-                          <div className="flex justify-between items-start p-1">
-                            <span 
-                              className={`
-                                text-sm font-medium h-6 w-6 flex items-center justify-center rounded-full
-                                ${isCurrentDay ? 'bg-primary text-primary-foreground' : ''}
-                              `}
-                            >
-                              {format(day, 'd')}
-                            </span>
-                            {dayEvents.length > 0 && (
-                              <Badge variant="outline" className="text-xs bg-primary/10 border-primary/20">
-                                {dayEvents.length}
+                <CardContent className="p-0">
+                  {/* Mobile View */}
+                  <div className="block md:hidden">
+                    {tasks.map((task) => (
+                      <div key={task.id} className="border-b p-2 hover:bg-muted/30">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-[11px]">{task.title}</div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Badge className={cn(
+                                "text-[9px]",
+                                task.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                task.priority === 'medium' ? 'bg-amber-100 text-amber-800' :
+                                'bg-green-100 text-green-800'
+                              )}>
+                                {task.priority}
                               </Badge>
-                            )}
+                              <span className="text-[9px] text-muted-foreground">
+                                Due {format(new Date(task.dueDate), 'MMM d')}
+                              </span>
+                            </div>
                           </div>
-                          
-                          {/* Events for this day */}
-                          <div className="mt-1 space-y-1 max-h-[80px] overflow-y-auto">
-                            {dayEvents.map((event) => (
-                              <div 
-                                key={event.id}
-                                className={`
-                                  text-xs p-1 rounded truncate cursor-pointer
-                                  ${event.type === 'meeting' ? 'bg-blue-100 text-blue-800' : 
-                                    event.type === 'call' ? 'bg-green-100 text-green-800' : 
-                                    event.type === 'task' ? 'bg-amber-100 text-amber-800' : 
-                                    'bg-indigo-100 text-indigo-800'}
-                                `}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  viewEventDetails(event);
-                                }}
-                              >
-                                <div className="flex items-center">
-                                  <span className="font-medium">{event.time}</span>
-                                  <span className="mx-1">•</span>
-                                  <span className="truncate">{event.title}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6"
+                          >
+                            <Check className="h-3 w-3" />
+                          </Button>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Upcoming Events */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-              <Card className="border border-border/40 shadow-sm md:col-span-2">
-                <CardHeader className="px-6 py-4">
-                  <CardTitle className="text-base font-medium">Upcoming Events</CardTitle>
-                </CardHeader>
-                <CardContent className="px-6 pb-4">
-                  {scheduledEvents.length > 0 ? (
-                    <div className="space-y-3">
-                      {scheduledEvents
-                        .filter(event => new Date(event.date) >= new Date())
-                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                        .slice(0, 5)
-                        .map((event) => {
-                          const eventDate = new Date(event.date);
-                          const relatedContact = contacts.find(c => c.id === event.contactId);
-                          
-                          return (
-                            <div 
-                              key={event.id} 
-                              className="flex items-start p-3 rounded-md border hover:bg-muted/20 cursor-pointer"
-                              onClick={() => viewEventDetails(event)}
-                            >
-                              <div className={`
-                                rounded-full p-2 mr-3
-                                ${event.type === 'meeting' ? 'bg-blue-50' : 
+
+                  {/* Desktop View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-3 font-medium text-sm">Task</th>
+                          <th className="text-left p-3 font-medium text-sm">Due Date</th>
+                          <th className="text-left p-3 font-medium text-sm">Priority</th>
+                          <th className="text-left p-3 font-medium text-sm">Status</th>
+                          <th className="text-right p-3 font-medium text-sm">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tasks.map((task) => (
+                          <tr key={task.id} className="border-b hover:bg-muted/30">
+                            <td className="p-3">
+                              <div className="font-medium text-sm">{task.title}</div>
+                              {task.contactId && (
+                                <div className="text-xs text-muted-foreground">
+                                  {contacts.find(c => c.id === task.contactId)?.name}
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-3 text-sm">
+                              {format(new Date(task.dueDate), 'MMM d, yyyy')}
+                            </td>
+                            <td className="p-3">
+                              <Badge className={cn(
+                                "text-xs",
+                                task.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                task.priority === 'medium' ? 'bg-amber-100 text-amber-800' :
+                                'bg-green-100 text-green-800'
+                              )}>
+                                {task.priority}
+                              </Badge>
+                            </td>
+                            <td className="p-3">
+                              <Badge variant={task.completed ? "default" : "secondary"} className="text-xs">
+                                {task.completed ? 'Completed' : 'Pending'}
+                              </Badge>
+                            </td>
+                            <td className="p-3 text-right">
+                              <Button variant="ghost" size="sm" className="h-8">
+                                <Check className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Performance Tab */}
+            <TabsContent value="performance">
+              <div className="grid gap-1 md:gap-4">
+                <Card className="border border-border/40 shadow-sm">
+                  <CardHeader className="p-2 md:p-4">
+                    <CardTitle className="text-xs md:text-base font-medium">Performance Metrics</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-2 md:p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
+                      {stats.performanceMetrics.map((metric) => (
+                        <Card key={metric.metric} className="border border-border/40 shadow-sm">
+                          <CardHeader className="p-2 md:p-4">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-[11px] md:text-sm font-medium">{metric.metric}</CardTitle>
+                              <Badge className={cn(
+                                "text-[9px] md:text-xs",
+                                metric.change > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              )}>
+                                {metric.change > 0 ? '+' : ''}{metric.change}%
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="p-2 md:p-4">
+                            <div className="space-y-2">
+                              <div className="text-base md:text-xl font-bold">
+                                {metric.value}
+                              </div>
+                              <div className="text-[10px] md:text-xs text-muted-foreground">
+                                Target: {metric.target}
+                              </div>
+                              <Progress 
+                                value={(metric.value / metric.target) * 100} 
+                                className="h-1.5 md:h-2"
+                              />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Calendar Tab */}
+            <TabsContent value="calendar">
+              <div className="grid gap-1 md:gap-4">
+                <Card className="border border-border/40 shadow-sm">
+                  <CardHeader className="p-2 md:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <CardTitle className="text-xs md:text-base font-medium">Calendar</CardTitle>
+                        <p className="text-[10px] md:text-sm text-muted-foreground mt-0.5">
+                          Manage your schedule and events
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setCurrentDate(subMonths(currentDate, 1))}
+                          className="h-6 md:h-8 px-2 text-[10px] md:text-xs">
+                          <ChevronLeft className="h-3 w-3 md:h-4 md:w-4" />
+                          <span className="ml-1 hidden sm:inline">Prev</span>
+                        </Button>
+                        <div className="text-[11px] md:text-sm font-medium min-w-[100px] text-center">
+                          {format(currentDate, 'MMMM yyyy')}
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setCurrentDate(addMonths(currentDate, 1))}
+                          className="h-6 md:h-8 px-2 text-[10px] md:text-xs">
+                          <span className="mr-1 hidden sm:inline">Next</span>
+                          <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="border-t">
+                      {/* Calendar Grid */}
+                      <div className="grid grid-cols-7">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                          <div key={day} className="p-2 text-center text-[10px] md:text-sm font-medium border-b border-r last:border-r-0 bg-muted">
+                            {day}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-7 border-b border-l">
+                        {getDaysInMonth().map((day, index) => (
+                          <div key={day ? format(day, 'yyyy-MM-dd') : `empty-${index}`} className="border-r last:border-r-0">
+                            <CalendarDay
+                              day={day}
+                              currentDate={currentDate}
+                              selectedDate={selectedDate}
+                              events={scheduledEvents}
+                              onSelect={setSelectedDate}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Upcoming Events */}
+                <Card className="border border-border/40 shadow-sm">
+                  <CardHeader className="p-2 md:p-4">
+                    <CardTitle className="text-xs md:text-base font-medium">Upcoming Events</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-2 md:p-4">
+                    {scheduledEvents.length > 0 ? (
+                      <div className="space-y-2">
+                        {scheduledEvents
+                          .filter(event => new Date(event.date) >= new Date())
+                          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                          .slice(0, 5)
+                          .map((event) => {
+                            const eventDate = new Date(event.date);
+                            const relatedContact = contacts.find(c => c.id === event.contactId);
+                            
+                            return (
+                              <div 
+                                key={event.id} 
+                                className="flex items-start p-2 rounded-md border hover:bg-muted/20 cursor-pointer"
+                                onClick={() => viewEventDetails(event)}
+                              >
+                                <div className={cn(
+                                  "rounded-full p-1.5 mr-2",
+                                  event.type === 'meeting' ? 'bg-blue-50' : 
                                   event.type === 'call' ? 'bg-green-50' : 
                                   event.type === 'task' ? 'bg-amber-50' : 
-                                  'bg-indigo-50'}
-                              `}>
-                                <CalendarDays className={`
-                                  h-4 w-4
-                                  ${event.type === 'meeting' ? 'text-blue-600' : 
+                                  'bg-indigo-50'
+                                )}>
+                                  <CalendarDays className={cn(
+                                    "h-3 w-3",
+                                    event.type === 'meeting' ? 'text-blue-600' : 
                                     event.type === 'call' ? 'text-green-600' : 
                                     event.type === 'task' ? 'text-amber-600' : 
-                                    'text-indigo-600'}
-                                `} />
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex justify-between">
-                                  <h4 className="text-sm font-medium">{event.title}</h4>
-                                  <Badge className={`
-                                    text-xs
-                                    ${event.type === 'meeting' ? 'bg-blue-100 text-blue-800 hover:bg-blue-100' : 
-                                      event.type === 'call' ? 'bg-green-100 text-green-800 hover:bg-green-100' : 
-                                      event.type === 'task' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100' : 
-                                      'bg-indigo-100 text-indigo-800 hover:bg-indigo-100'}
-                                  `}>
-                                    {event.type.charAt(0).toUpperCase() + event.type.slice(1)}
-                                  </Badge>
+                                    'text-indigo-600'
+                                  )} />
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {format(eventDate, 'PPP')} at {event.time} ({event.duration} min)
-                                </p>
-                                {relatedContact && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    With: {relatedContact.name}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex justify-between items-start">
+                                    <h4 className="text-[11px] md:text-sm font-medium truncate">{event.title}</h4>
+                                    <Badge className={cn(
+                                      "text-[9px] md:text-xs ml-2",
+                                      event.type === 'meeting' ? 'bg-blue-100 text-blue-800' : 
+                                      event.type === 'call' ? 'bg-green-100 text-green-800' : 
+                                      event.type === 'task' ? 'bg-amber-100 text-amber-800' : 
+                                      'bg-indigo-100 text-indigo-800'
+                                    )}>
+                                      {event.type.charAt(0).toUpperCase() + event.type.slice(1)}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-[9px] md:text-xs text-muted-foreground mt-0.5">
+                                    {format(eventDate, 'MMM d')} at {event.time} ({event.duration} min)
                                   </p>
-                                )}
+                                  {relatedContact && (
+                                    <p className="text-[9px] md:text-xs text-muted-foreground mt-0.5">
+                                      With: {relatedContact.name}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8">
-                      <CalendarDays className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">No upcoming events</p>
-                      <Button className="mt-4" onClick={handleSchedule}>Schedule an Event</Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              
-              <Card className="border border-border/40 shadow-sm">
-                <CardHeader className="px-6 py-4">
-                  <CardTitle className="text-base font-medium">Event Statistics</CardTitle>
-                </CardHeader>
-                <CardContent className="px-6 pb-4">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="rounded-full bg-blue-50 p-1.5 mr-2">
-                          <CalendarDays className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <span className="text-sm">Total Events</span>
+                            );
+                          })}
                       </div>
-                      <span className="text-lg font-bold">{scheduledEvents.length}</span>
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Event Types</h4>
-                      <div className="space-y-1">
-                        {['meeting', 'call', 'task', 'reminder'].map(type => {
-                          const count = scheduledEvents.filter(e => e.type === type).length;
-                          const percentage = scheduledEvents.length > 0 
-                            ? Math.round((count / scheduledEvents.length) * 100) 
-                            : 0;
-                          
-                          return (
-                            <div key={type} className="space-y-1">
-                              <div className="flex justify-between text-xs">
-                                <span className="capitalize">{type}s</span>
-                                <span>{count} ({percentage}%)</span>
-                              </div>
-                              <Progress value={percentage} className="h-1.5" />
-                            </div>
-                          );
-                        })}
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-6">
+                        <CalendarDays className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                        <p className="text-[10px] md:text-sm text-muted-foreground">No upcoming events</p>
+                        <Button className="mt-2 h-6 md:h-8 text-[10px] md:text-xs" onClick={handleSchedule}>
+                          Schedule an Event
+                        </Button>
                       </div>
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">Upcoming</h4>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span>Today</span>
-                          <span className="font-medium">
-                            {scheduledEvents.filter(e => isToday(new Date(e.date))).length}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>This Week</span>
-                          <span className="font-medium">
-                            {scheduledEvents.filter(e => {
-                              const eventDate = new Date(e.date);
-                              const today = new Date();
-                              return eventDate >= today && eventDate <= addDays(today, 7);
-                            }).length}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>This Month</span>
-                          <span className="font-medium">
-                            {scheduledEvents.filter(e => {
-                              const eventDate = new Date(e.date);
-                              return isSameMonth(eventDate, new Date());
-                            }).length}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
-        
-        {/* Schedule Dialog */}
-        <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
-          <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
-            <DialogHeader className="px-6 pt-6 pb-4">
-              <DialogTitle className="text-xl font-semibold">Schedule Event</DialogTitle>
-              <DialogDescription>
-                Create a new event in your calendar. Fill out the details below.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="px-6 space-y-6">
-              {/* Calendar */}
-              <div>
-                <h3 className="text-sm font-medium mb-3">Select Date</h3>
-                <div className="flex items-center justify-between mb-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handlePreviousMonth}
-                    className="flex items-center justify-center h-8 px-2 border border-input rounded-md hover:bg-muted"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    <span className="ml-1">Prev</span>
-                  </Button>
-                  <span className="text-base font-medium">
-                    {format(currentDate, 'MMMM yyyy')}
-                  </span>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleNextMonth}
-                    className="flex items-center justify-center h-8 px-2 border border-input rounded-md hover:bg-muted"
-                  >
-                    <span className="mr-1">Next</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                <div className="grid grid-cols-7 gap-1 mb-4">
-                  {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
-                    <div key={day} className="text-xs font-medium text-center text-muted-foreground py-1">
-                      {day}
-                    </div>
-                  ))}
-                  
-                  {getDaysInMonth().map((day, index) => {
-                    if (day === null) {
-                      return <div key={`empty-${index}`} className="h-10" />;
-                    }
-                    
-                    const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
-                    const dayEvents = getEventsForDate(day);
-                    const isCurrentMonth = isSameMonth(day, currentDate);
-                    
-                    return (
-                      <button
-                        key={`day-${index}`}
-                        type="button"
-                        onClick={() => handleDateSelect(day)}
-                        className={`
-                          h-10 w-full flex items-center justify-center rounded-md text-sm relative
-                          ${isToday(day) ? 'text-blue-600 font-medium' : ''}
-                          ${isSelected ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50'}
-                          ${!isCurrentMonth ? 'text-muted-foreground/50' : ''}
-                          focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1
-                        `}
-                      >
-                        <span>{format(day, 'd')}</span>
-                        {dayEvents.length > 0 && (
-                          <span className={`absolute bottom-1 h-1 w-1 rounded-full ${isSelected ? 'bg-primary-foreground' : 'bg-primary'}`} />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-              
-              {/* Event Form */}
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="event-title" className="text-sm font-medium block mb-1.5">Event Title</Label>
-                  <Input 
-                    id="event-title" 
-                    value={eventTitle} 
-                    onChange={(e) => setEventTitle(e.target.value)} 
-                    placeholder="Enter event title"
-                    className="h-10"
-                  />
-                </div>
+            </TabsContent>
+
+            {/* Schedule Dialog */}
+            <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
+              <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden mx-1 md:mx-4">
+                <DialogHeader className="p-2 md:p-4">
+                  <DialogTitle className="text-sm md:text-lg font-semibold">Schedule Event</DialogTitle>
+                  <DialogDescription className="text-[10px] md:text-sm">
+                    Create a new event in your calendar
+                  </DialogDescription>
+                </DialogHeader>
                 
-                <div>
-                  <Label htmlFor="event-type" className="text-sm font-medium block mb-1.5">Event Type</Label>
-                  <div className="relative">
-                    <select 
-                      id="event-type"
-                      value={eventType}
-                      onChange={(e) => setEventType(e.target.value)}
-                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 pr-10"
-                    >
-                      <option value="meeting">Meeting</option>
-                      <option value="call">Call</option>
-                      <option value="task">Task</option>
-                      <option value="reminder">Reminder</option>
-                    </select>
-                    <ChevronRight className="h-4 w-4 absolute right-3 top-3 rotate-90 text-muted-foreground pointer-events-none" />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="event-time" className="text-sm font-medium block mb-1.5">Time</Label>
-                    <div className="relative">
-                      <select
-                        id="event-time"
-                        value={eventTime}
-                        onChange={(e) => setEventTime(e.target.value)}
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 pr-10"
+                {/* Make this div scrollable with a max height */}
+                <div className="p-2 md:p-4 space-y-2 md:space-y-4 overflow-y-auto max-h-[calc(80vh-10rem)]">
+                  {/* Calendar */}
+                  <div className="space-y-2">
+                    <h3 className="text-xs md:text-sm font-medium">Select Date</h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setCurrentDate(subMonths(currentDate, 1))}
+                        className="h-7 md:h-8 px-2 text-[10px] md:text-xs"
                       >
-                        {[
-                          "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-                          "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", 
-                          "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"
-                        ].map((time) => (
-                          <option key={time} value={time}>{time}</option>
-                        ))}
-                      </select>
-                      <ChevronRight className="h-4 w-4 absolute right-3 top-3 rotate-90 text-muted-foreground pointer-events-none" />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="event-duration" className="text-sm font-medium block mb-1.5">Duration</Label>
-                    <div className="relative">
-                      <select
-                        id="event-duration"
-                        value={eventDuration}
-                        onChange={(e) => setEventDuration(e.target.value)}
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 pr-10"
+                        <ChevronLeft className="h-3 w-3 md:h-4 md:w-4" />
+                        <span className="ml-1">Prev</span>
+                      </Button>
+                      <span className="text-xs md:text-sm font-medium">
+                        {format(currentDate, 'MMMM yyyy')}
+                      </span>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setCurrentDate(addMonths(currentDate, 1))}
+                        className="h-7 md:h-8 px-2 text-[10px] md:text-xs"
                       >
-                        <option value="15">15 minutes</option>
-                        <option value="30">30 minutes</option>
-                        <option value="45">45 minutes</option>
-                        <option value="60">1 hour</option>
-                        <option value="90">1.5 hours</option>
-                        <option value="120">2 hours</option>
-                      </select>
-                      <ChevronRight className="h-4 w-4 absolute right-3 top-3 rotate-90 text-muted-foreground pointer-events-none" />
+                        <span className="mr-1">Next</span>
+                        <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
+                      </Button>
                     </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <Label htmlFor="event-contact" className="text-sm font-medium block mb-1.5">Related Contact</Label>
-                  <div className="relative">
-                    <select
-                      id="event-contact"
-                      value={selectedContact}
-                      onChange={(e) => setSelectedContact(e.target.value)}
-                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 pr-10"
-                    >
-                      <option value="">None</option>
-                      {contacts.map(contact => (
-                        <option key={contact.id} value={contact.id}>{contact.name}</option>
+                    
+                    <div className="grid grid-cols-7 gap-0.5 md:gap-1">
+                      {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
+                        <div key={day} className="text-[9px] md:text-xs font-medium text-center text-muted-foreground py-1 bg-muted">
+                          {day}
+                        </div>
                       ))}
-                    </select>
-                    <ChevronRight className="h-4 w-4 absolute right-3 top-3 rotate-90 text-muted-foreground pointer-events-none" />
+                      
+                      {getDaysInMonth().map((day, index) => (
+                        <CalendarDay
+                          key={day ? format(day, 'yyyy-MM-dd') : `empty-${index}`}
+                          day={day}
+                          currentDate={currentDate}
+                          selectedDate={selectedDate}
+                          events={scheduledEvents}
+                          onSelect={setSelectedDate}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-                
-                <div>
-                  <Label htmlFor="event-description" className="text-sm font-medium block mb-1.5">Description</Label>
-                  <Textarea 
-                    id="event-description" 
-                    value={eventDescription} 
-                    onChange={(e) => setEventDescription(e.target.value)} 
-                    placeholder="Add details about this event"
-                    rows={3}
-                    className="resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
+                  
+                  {/* Event Form */}
+                  <EventForm
+                    formData={eventFormData}
+                    onChange={handleEventFormChange}
+                    contacts={contacts}
                   />
                 </div>
                 
-                <div className="pt-2">
-                  <div className="flex items-center text-xs text-muted-foreground">
-                    <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
-                    <span>Email notifications will be sent to all participants when this event is scheduled.</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <DialogFooter className="px-6 py-4 bg-muted/20 mt-6 flex items-center justify-end space-x-2">
-              <Button variant="outline" onClick={handleCloseScheduleDialog}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleScheduleEvent} 
-                disabled={!selectedDate || !eventTitle}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                <CalendarDays className="h-4 w-4 mr-2" />
-                Schedule Event
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+                <DialogFooter className="p-2 md:p-4 bg-muted/20 flex items-center justify-end gap-1 border-t">
+                  <Button variant="outline" className="text-[10px] md:text-sm h-6 md:h-9" onClick={() => setIsScheduleDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    className="text-[10px] md:text-sm h-6 md:h-9"
+                    onClick={handleScheduleEvent}
+                    disabled={!selectedDate || !eventFormData.title}
+                  >
+                    <CalendarDays className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                    Schedule Event
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </Tabs>
+        </div>
       </div>
     </div>
-  )
+  );
 }

@@ -495,46 +495,46 @@ export default function MysteryShopperPage() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-100 overflow-x-hidden">
-      <div className="container mx-auto py-2 xs:py-3 sm:py-4 lg:py-6 px-1 xs:px-2 sm:px-4 lg:px-6 max-w-full lg:max-w-7xl overflow-hidden">
+      <div className="container mx-auto py-2 xs:py-3 sm:py-4 lg:py-6 xl:py-8 2xl:py-10 px-1 xs:px-2 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 max-w-screen-2xl">
         {/* Header & Stats Section */}
-        <div className="flex flex-col space-y-2 sm:space-y-3 lg:space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
-            <div className="flex items-center gap-1.5 sm:gap-3">
-              <div className="bg-purple-100 p-1.5 sm:p-2 rounded-lg">
-                <ClipboardCheck className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-purple-600" />
+        <div className="flex flex-col space-y-2 sm:space-y-3 lg:space-y-6 xl:space-y-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 xl:gap-6">
+            <div className="flex items-center gap-1.5 sm:gap-3 xl:gap-4">
+              <div className="bg-purple-100 p-1.5 sm:p-2 xl:p-3 rounded-lg">
+                <ClipboardCheck className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 xl:w-7 xl:h-7 text-purple-600" />
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Mystery Shopper Evaluations</h1>
-                <p className="text-[10px] sm:text-xs lg:text-sm text-gray-500">Track officer performance through mystery shopper evaluations</p>
+                <h1 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-gray-900">Mystery Shopper Evaluations</h1>
+                <p className="text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-500">Track officer performance through mystery shopper evaluations</p>
               </div>
             </div>
             <Button 
               onClick={handleNewEvaluation}
-              className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm flex items-center gap-1 sm:gap-2 mt-2 sm:mt-0 w-full sm:w-auto px-2 sm:px-3 py-1 sm:py-2 h-8 sm:h-9 text-xs sm:text-sm"
+              className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm flex items-center gap-1 sm:gap-2 mt-2 sm:mt-0 w-full sm:w-auto px-2 sm:px-3 py-1 sm:py-2 h-8 sm:h-9 lg:h-10 xl:h-12 text-xs sm:text-sm xl:text-base"
             >
-              <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 lg:w-5 lg:h-5" />
+              <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 lg:w-5 lg:h-5 xl:w-6 xl:h-6" />
               New Evaluation
             </Button>
           </div>
 
-          {/* Stats Cards - Optimized for small screens */}
-          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-1.5 sm:gap-3 md:gap-4">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 sm:gap-3 md:gap-4 xl:gap-6">
             <Card className="bg-gradient-to-br from-purple-800 to-purple-900 border-purple-700 shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between p-1.5 sm:p-2 md:p-3 pb-0.5 sm:pb-1 md:pb-2">
-                <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-white">Total Evaluations</CardTitle>
-                <ClipboardCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 text-purple-300" />
+              <CardHeader className="flex flex-row items-center justify-between p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pb-0.5 sm:pb-1 md:pb-2 xl:pb-3">
+                <CardTitle className="text-[10px] sm:text-xs lg:text-sm xl:text-base font-medium text-white">Total Evaluations</CardTitle>
+                <ClipboardCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 xl:h-5 xl:w-5 text-purple-300" />
               </CardHeader>
-              <CardContent className="p-1.5 sm:p-2 md:p-3 pt-0 md:pt-1">
-                <div className="text-sm sm:text-base lg:text-lg font-bold text-white">{evaluations.length}</div>
+              <CardContent className="p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pt-0 md:pt-1 xl:pt-2">
+                <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">{evaluations.length}</div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-br from-blue-800 to-blue-900 border-blue-700 shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between p-1.5 sm:p-2 md:p-3 pb-0.5 sm:pb-1 md:pb-2">
-                <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-white">Avg Score</CardTitle>
-                <BarChart className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 text-blue-300" />
+              <CardHeader className="flex flex-row items-center justify-between p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pb-0.5 sm:pb-1 md:pb-2 xl:pb-3">
+                <CardTitle className="text-[10px] sm:text-xs lg:text-sm xl:text-base font-medium text-white">Avg Score</CardTitle>
+                <BarChart className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 xl:h-5 xl:w-5 text-blue-300" />
               </CardHeader>
-              <CardContent className="p-1.5 sm:p-2 md:p-3 pt-0 md:pt-1">
-                <div className="text-sm sm:text-base lg:text-lg font-bold text-white">
+              <CardContent className="p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pt-0 md:pt-1 xl:pt-2">
+                <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">
                   {evaluations.length > 0 
                     ? `${(evaluations.reduce((sum, ev) => sum + parseFloat(ev.percentage), 0) / evaluations.length).toFixed(1)}%` 
                     : '0%'
@@ -542,13 +542,13 @@ export default function MysteryShopperPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="col-span-2 lg:col-span-1 bg-gradient-to-br from-green-800 to-green-900 border-green-700 shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between p-1.5 sm:p-2 md:p-3 pb-0.5 sm:pb-1 md:pb-2">
-                <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-white">Unique Officers</CardTitle>
-                <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 text-green-300" />
+            <Card className="col-span-2 md:col-span-1 bg-gradient-to-br from-green-800 to-green-900 border-green-700 shadow-md">
+              <CardHeader className="flex flex-row items-center justify-between p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pb-0.5 sm:pb-1 md:pb-2 xl:pb-3">
+                <CardTitle className="text-[10px] sm:text-xs lg:text-sm xl:text-base font-medium text-white">Unique Officers</CardTitle>
+                <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 xl:h-5 xl:w-5 text-green-300" />
               </CardHeader>
-              <CardContent className="p-1.5 sm:p-2 md:p-3 pt-0 md:pt-1">
-                <div className="text-sm sm:text-base lg:text-lg font-bold text-white">
+              <CardContent className="p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pt-0 md:pt-1 xl:pt-2">
+                <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">
                   {new Set(evaluations.map(ev => ev.officerId)).size}
                 </div>
               </CardContent>
@@ -557,45 +557,44 @@ export default function MysteryShopperPage() {
         </div>
 
         {/* Table Section */}
-        <div className="mt-3 sm:mt-4 lg:mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="mt-3 sm:mt-4 lg:mt-6 xl:mt-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto -mx-1 sm:mx-0">
             <div className="min-w-[300px] max-w-full px-1 sm:px-0">
               <Table className="w-full table-auto">
                 <TableHeader>
                   <TableRow className="bg-gray-50 hover:bg-gray-50">
-                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm text-gray-900 py-1.5 sm:py-2 md:py-3 whitespace-nowrap">Officer</TableHead>
-                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm text-gray-900 py-1.5 sm:py-2 md:py-3 whitespace-nowrap hidden xs:table-cell">Customer</TableHead>
-                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm text-gray-900 py-1.5 sm:py-2 md:py-3 whitespace-nowrap hidden md:table-cell">Location</TableHead>
-                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm text-gray-900 py-1.5 sm:py-2 md:py-3 hidden lg:table-cell">Shopper</TableHead>
-                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm text-gray-900 py-1.5 sm:py-2 md:py-3 whitespace-nowrap hidden sm:table-cell">Date</TableHead>
-                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm text-gray-900 py-1.5 sm:py-2 md:py-3">Score</TableHead>
-                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm text-gray-900 py-1.5 sm:py-2 md:py-3 w-[60px] sm:w-[70px] text-right">Actions</TableHead>
+                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap">Officer</TableHead>
+                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap hidden xs:table-cell">Customer</TableHead>
+                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap hidden md:table-cell">Location</TableHead>
+                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4 hidden lg:table-cell">Shopper</TableHead>
+                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap hidden sm:table-cell">Date</TableHead>
+                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4">Score</TableHead>
+                    <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4 w-[60px] sm:w-[70px] lg:w-[80px] xl:w-[100px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedEvaluations.length > 0 ? (
                     paginatedEvaluations.map((evaluation) => (
-                      <TableRow key={evaluation.id} className="hover:bg-gray-50 transition-colors text-[10px] sm:text-xs lg:text-sm">
-                        <TableCell className="py-1.5 sm:py-2 md:py-3 font-medium">
+                      <TableRow key={evaluation.id} className="hover:bg-gray-50 transition-colors text-[10px] sm:text-xs lg:text-sm xl:text-base">
+                        <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4 font-medium">
                           {evaluation.officerName}
-                          {/* Show mobile-only content with smaller text and improved spacing */}
-                          <div className="xs:hidden text-[9px] text-gray-500 mt-0.5">
+                          <div className="xs:hidden text-[9px] lg:text-xs xl:text-sm text-gray-500 mt-0.5">
                             {evaluation.customerName}
                           </div>
-                          <div className="sm:hidden text-[9px] text-gray-500 mt-0.5">
+                          <div className="sm:hidden text-[9px] lg:text-xs xl:text-sm text-gray-500 mt-0.5">
                             {format(new Date(evaluation.date), 'MM/dd/yy')}
                           </div>
                         </TableCell>
-                        <TableCell className="py-1.5 sm:py-2 md:py-3 hidden xs:table-cell">{evaluation.customerName}</TableCell>
-                        <TableCell className="py-1.5 sm:py-2 md:py-3 hidden md:table-cell">{evaluation.locationName}</TableCell>
-                        <TableCell className="py-1.5 sm:py-2 md:py-3 hidden lg:table-cell">{evaluation.mysteryShopperName}</TableCell>
-                        <TableCell className="py-1.5 sm:py-2 md:py-3 whitespace-nowrap hidden sm:table-cell">
+                        <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4 hidden xs:table-cell">{evaluation.customerName}</TableCell>
+                        <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4 hidden md:table-cell">{evaluation.locationName}</TableCell>
+                        <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4 hidden lg:table-cell">{evaluation.mysteryShopperName}</TableCell>
+                        <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap hidden sm:table-cell">
                           {format(new Date(evaluation.date), 'MMM d, yyyy')}
                         </TableCell>
-                        <TableCell className="py-1.5 sm:py-2 md:py-3">
+                        <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4">
                           <div className="flex items-center">
                             <span 
-                              className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-xs font-medium ${
+                              className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-xs lg:text-sm xl:text-base font-medium ${
                                 parseFloat(evaluation.percentage) >= 85 
                                   ? 'bg-green-100 text-green-700' 
                                   : parseFloat(evaluation.percentage) >= 70 
@@ -607,24 +606,24 @@ export default function MysteryShopperPage() {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="py-1.5 sm:py-2 md:py-3">
-                          <div className="flex items-center justify-end gap-0.5 sm:gap-1 md:gap-2">
+                        <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4">
+                          <div className="flex items-center justify-end gap-0.5 sm:gap-1 md:gap-2 xl:gap-3">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleEditEvaluation(evaluation)}
-                              className="h-6 w-6 sm:h-7 sm:w-7 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                              className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 xl:h-10 xl:w-10 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
                             >
-                              <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4" />
+                              <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 xl:h-5 xl:w-5" />
                               <span className="sr-only">Edit</span>
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleDeleteEvaluation(evaluation)}
-                              className="h-6 w-6 sm:h-7 sm:w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                              className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 xl:h-10 xl:w-10 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                             >
-                              <Trash2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4" />
+                              <Trash2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 xl:h-5 xl:w-5" />
                               <span className="sr-only">Delete</span>
                             </Button>
                           </div>
@@ -633,12 +632,12 @@ export default function MysteryShopperPage() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-4 sm:py-6 md:py-8">
-                        <p className="text-gray-500 text-[10px] sm:text-xs lg:text-sm">No evaluations found</p>
+                      <TableCell colSpan={7} className="text-center py-4 sm:py-6 md:py-8 xl:py-12">
+                        <p className="text-gray-500 text-[10px] sm:text-xs lg:text-sm xl:text-base">No evaluations found</p>
                         <Button
                           variant="link"
                           onClick={handleNewEvaluation}
-                          className="text-purple-600 hover:text-purple-700 mt-1 sm:mt-2 text-[10px] sm:text-xs lg:text-sm"
+                          className="text-purple-600 hover:text-purple-700 mt-1 sm:mt-2 text-[10px] sm:text-xs lg:text-sm xl:text-base"
                         >
                           Create your first evaluation
                         </Button>
@@ -651,15 +650,15 @@ export default function MysteryShopperPage() {
           </div>
         </div>
 
-        {/* Pagination - Optimized for small screens */}
+        {/* Pagination */}
         {evaluations.length > itemsPerPage && (
-          <div className="flex justify-center py-2 sm:py-3 md:py-4 mt-2 sm:mt-3 md:mt-4 overflow-x-auto">
+          <div className="flex justify-center py-2 sm:py-3 md:py-4 xl:py-6 mt-2 sm:mt-3 md:mt-4 xl:mt-6 overflow-x-auto">
             <Pagination>
-              <PaginationContent className="flex flex-wrap items-center justify-center gap-0.5 sm:gap-1">
+              <PaginationContent className="flex flex-wrap items-center justify-center gap-0.5 sm:gap-1 xl:gap-2">
                 <PaginationItem>
                   <PaginationPrevious 
                     onClick={() => handlePageChange(currentPage - 1)}
-                    className={`${currentPage === 1 ? 'pointer-events-none opacity-50' : ''} h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-auto flex items-center justify-center text-[10px] sm:text-xs`}
+                    className={`${currentPage === 1 ? 'pointer-events-none opacity-50' : ''} h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-auto xl:h-12 xl:w-auto flex items-center justify-center text-[10px] sm:text-xs xl:text-base`}
                     aria-disabled={currentPage === 1}
                   >
                     <span className="sr-only">Go to previous page</span>
@@ -668,12 +667,12 @@ export default function MysteryShopperPage() {
                 
                 {/* Mobile Pagination Counter */}
                 <PaginationItem className="sm:hidden">
-                  <span className="h-7 px-2 flex items-center justify-center text-[10px] font-medium text-gray-600">
+                  <span className="h-7 px-2 flex items-center justify-center text-[10px] xl:text-sm font-medium text-gray-600">
                     {currentPage} / {totalPages}
                   </span>
                 </PaginationItem>
                 
-                {/* Desktop Pagination Numbers - Optimized */}
+                {/* Desktop Pagination Numbers */}
                 {(() => {
                   const paginationItems = [];
                   const totalButtons = Math.min(totalPages, 5);
@@ -696,7 +695,7 @@ export default function MysteryShopperPage() {
                         <PaginationLink
                           onClick={() => handlePageChange(pageNumber)}
                           isActive={currentPage === pageNumber}
-                          className="h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9 flex items-center justify-center rounded-md text-[10px] sm:text-xs"
+                          className="h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9 xl:h-12 xl:w-12 flex items-center justify-center rounded-md text-[10px] sm:text-xs xl:text-base"
                           aria-label={`Go to page ${pageNumber}`}
                         >
                           {pageNumber}
@@ -711,7 +710,7 @@ export default function MysteryShopperPage() {
                 <PaginationItem>
                   <PaginationNext 
                     onClick={() => handlePageChange(currentPage + 1)}
-                    className={`${currentPage === totalPages ? 'pointer-events-none opacity-50' : ''} h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-auto flex items-center justify-center text-[10px] sm:text-xs`}
+                    className={`${currentPage === totalPages ? 'pointer-events-none opacity-50' : ''} h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-auto xl:h-12 xl:w-auto flex items-center justify-center text-[10px] sm:text-xs xl:text-base`}
                     aria-disabled={currentPage === totalPages}
                   >
                     <span className="sr-only">Go to next page</span>
