@@ -21,8 +21,18 @@ export const mockIncidents: Incident[] = [
       discoveryTime: "14:30",
       reportedTime: "14:35",
       responseTime: "14:40"
-    }
+    },
+    customerName: "",
+    officerName: "",
+    officerRole: "",
+    dateOfIncident: "",
+    timeOfIncident: "",
+    incidentDetails: "",
+    incidentInvolved: [],
+    policeInvolvement: false,
+    dutyManagerName: ""
   },
+
   {
     id: "2",
     siteName: "Manchester Store",
@@ -37,7 +47,16 @@ export const mockIncidents: Incident[] = [
     locationDetails: {
       area: "External",
       specificLocation: "Rear parking area",
-    }
+    },
+    customerName: "",
+    officerName: "",
+    officerRole: "",
+    dateOfIncident: "",
+    timeOfIncident: "",
+    incidentDetails: "",
+    incidentInvolved: [],
+    policeInvolvement: false,
+    dutyManagerName: ""
   },
   {
     id: "3",
@@ -58,7 +77,16 @@ export const mockIncidents: Incident[] = [
       discoveryTime: "11:15",
       reportedTime: "11:15",
       responseTime: "11:17"
-    }
+    },
+    customerName: "",
+    officerName: "",
+    officerRole: "",
+    dateOfIncident: "",
+    timeOfIncident: "",
+    incidentDetails: "",
+    incidentInvolved: [],
+    policeInvolvement: false,
+    dutyManagerName: ""
   },
   {
     id: "4",
@@ -76,7 +104,16 @@ export const mockIncidents: Incident[] = [
     locationDetails: {
       area: "Checkout Area",
       specificLocation: "Till 4",
-    }
+    },
+    customerName: "",
+    officerName: "",
+    officerRole: "",
+    dateOfIncident: "",
+    timeOfIncident: "",
+    incidentDetails: "",
+    incidentInvolved: [],
+    policeInvolvement: false,
+    dutyManagerName: ""
   },
   {
     id: "5",
@@ -92,6 +129,15 @@ export const mockIncidents: Incident[] = [
     locationDetails: {
       area: "Store Wide",
       specificLocation: "Various locations",
-    }
+    },
+    customerName: "",
+    officerName: "",
+    officerRole: "",
+    dateOfIncident: "",
+    timeOfIncident: "",
+    incidentDetails: "",
+    incidentInvolved: [],
+    policeInvolvement: false,
+    dutyManagerName: ""
   }
 ]

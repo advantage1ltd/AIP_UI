@@ -381,11 +381,24 @@ const UniformEquipmentPage: React.FC = () => {
 
   return (
     <div className="w-full min-h-screen">
-      <div className="max-w-[1400px] mx-auto p-2 xs:p-3 sm:p-4 md:p-1 space-y-3 md:space-y-6">
-        <Card className="border shadow-sm pr-0 xs:pr-2 sm:pr-8 md:pr-10">
-          <CardHeader className="p-2 xs:p-3 sm:p-4 lg:p-6">
+      <div className="max-w-screen-2xl mx-auto p-2 xs:p-3 sm:p-4 md:p-6 lg:p-8 xl:p-10 2xl:p-12 space-y-3 md:space-y-6 xl:space-y-8">
+        <Card className="border shadow-sm">
+          <CardHeader className="p-2 xs:p-3 sm:p-4 lg:p-6 xl:p-8">
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <PageHeader onAddClick={() => setIsDialogOpen(true)} />
+              <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 md:gap-4 xl:gap-6">
+                <div className="flex-1">
+                  <CardTitle className="text-lg xs:text-xl sm:text-2xl xl:text-3xl 2xl:text-4xl font-bold">Uniform and Equipment Record</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm xl:text-base">Manage and track equipment issued to officers</CardDescription>
+                </div>
+                <div className="w-full xs:w-auto flex justify-end">
+                  <DialogTrigger asChild>
+                    <Button className="bg-blue-900 text-white hover:bg-blue-800 mt-2 xs:mt-0 h-8 xs:h-9 sm:h-10 xl:h-12 px-3 sm:px-4 xl:px-6 text-xs sm:text-sm xl:text-base">
+                      <Plus className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 mr-1 sm:mr-2" />
+                      Add New Equipment
+                    </Button>
+                  </DialogTrigger>
+                </div>
+              </div>
               <DialogContent className="w-[95%] max-w-[600px] p-2 xs:p-3 sm:p-4 lg:p-6 max-h-[90vh] overflow-y-auto">
                 <DialogHeader className="pb-2 sm:pb-4">
                   <DialogTitle className="text-sm xs:text-base sm:text-lg font-semibold">
@@ -458,77 +471,76 @@ const UniformEquipmentPage: React.FC = () => {
               </DialogContent>
             </Dialog>
           </CardHeader>
-          <CardContent className="p-2 xs:p-3 sm:p-4 lg:p-6 pr-2 xs:pr-4 sm:pr-10 md:pr-6 ">
-            {/* Stats Cards Grid - optimized for mobile view */}
-            <div className="grid grid-cols-2 xs:grid-cols-2 md:grid-cols-4 gap-2 xs:gap-3 sm:gap-4 mb-3 md:mb-6">
+          <CardContent className="p-2 xs:p-3 sm:p-4 lg:p-6 xl:p-8">
+            {/* Stats Cards Grid - optimized for mobile and extra large screens */}
+            <div className="grid grid-cols-2 xs:grid-cols-2 md:grid-cols-4 gap-2 xs:gap-3 sm:gap-4 xl:gap-6 mb-3 md:mb-6 xl:mb-8">
               {/* Total Equipment */}
               <Card className="bg-blue-900 border-0 shadow-sm">
-                <CardContent className="p-2 xs:p-3 flex items-center justify-between">
+                <CardContent className="p-2 xs:p-3 xl:p-4 2xl:p-5 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] xs:text-xs md:text-sm text-blue-200 font-medium">Total Equipment</p>
-                    <h3 className="text-sm xs:text-base md:text-xl font-bold text-white">{equipmentRecords.length}</h3>
+                    <p className="text-[10px] xs:text-xs md:text-sm xl:text-base text-blue-200 font-medium">Total Equipment</p>
+                    <h3 className="text-sm xs:text-base md:text-xl xl:text-2xl 2xl:text-3xl font-bold text-white">{equipmentRecords.length}</h3>
                   </div>
-                  <div className="bg-blue-800 rounded-full p-1.5">
-                    <Plus className="h-3 w-3 text-blue-200" />
+                  <div className="bg-blue-800 rounded-full p-1.5 xl:p-2">
+                    <Plus className="h-3 w-3 xl:h-4 xl:w-4 text-blue-200" />
                   </div>
                 </CardContent>
               </Card>
               {/* Boots */}
               <Card className="bg-green-900 border-0 shadow-sm">
-                <CardContent className="p-2 xs:p-3 flex items-center justify-between">
+                <CardContent className="p-2 xs:p-3 xl:p-4 2xl:p-5 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] xs:text-xs md:text-sm text-green-200 font-medium">Boots</p>
-                    <h3 className="text-sm xs:text-base md:text-xl font-bold text-white">
+                    <p className="text-[10px] xs:text-xs md:text-sm xl:text-base text-green-200 font-medium">Boots</p>
+                    <h3 className="text-sm xs:text-base md:text-xl xl:text-2xl 2xl:text-3xl font-bold text-white">
                       {equipmentRecords.filter(r => r.equipmentType === 'Boots').length}
                     </h3>
                   </div>
-                  <div className="bg-green-800 rounded-full p-1.5">
-                    <CalendarIcon className="h-3 w-3 text-green-200" />
+                  <div className="bg-green-800 rounded-full p-1.5 xl:p-2">
+                    <CalendarIcon className="h-3 w-3 xl:h-4 xl:w-4 text-green-200" />
                   </div>
                 </CardContent>
               </Card>
               {/* Uniforms Issued */}
               <Card className="bg-yellow-900 border-0 shadow-sm">
-                <CardContent className="p-2 xs:p-3 flex items-center justify-between">
+                <CardContent className="p-2 xs:p-3 xl:p-4 2xl:p-5 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] xs:text-xs md:text-sm text-yellow-200 font-medium">Uniforms</p>
-                    <h3 className="text-sm xs:text-base md:text-xl font-bold text-white">
+                    <p className="text-[10px] xs:text-xs md:text-sm xl:text-base text-yellow-200 font-medium">Uniforms</p>
+                    <h3 className="text-sm xs:text-base md:text-xl xl:text-2xl 2xl:text-3xl font-bold text-white">
                       {equipmentRecords.filter(r => r.equipmentType === 'Uniform').length}
                     </h3>
                   </div>
-                  <div className="bg-yellow-800 rounded-full p-1.5">
-                    <Search className="h-3 w-3 text-yellow-200" />
+                  <div className="bg-yellow-800 rounded-full p-1.5 xl:p-2">
+                    <Search className="h-3 w-3 xl:h-4 xl:w-4 text-yellow-200" />
                   </div>
                 </CardContent>
               </Card>
               {/* Badge */}
               <Card className="bg-purple-900 border-0 shadow-sm">
-                <CardContent className="p-2 xs:p-3 flex items-center justify-between">
+                <CardContent className="p-2 xs:p-3 xl:p-4 2xl:p-5 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] xs:text-xs md:text-sm text-purple-200 font-medium">Badge</p>
-                    <h3 className="text-sm xs:text-base md:text-xl font-bold text-white">
+                    <p className="text-[10px] xs:text-xs md:text-sm xl:text-base text-purple-200 font-medium">Badge</p>
+                    <h3 className="text-sm xs:text-base md:text-xl xl:text-2xl 2xl:text-3xl font-bold text-white">
                       {equipmentRecords.filter(r => r.equipmentType === 'Badge').length}
                     </h3>
                   </div>
-                  <div className="bg-purple-800 rounded-full p-1.5">
-                    <CalendarIcon className="h-3 w-3 text-purple-200" />
+                  <div className="bg-purple-800 rounded-full p-1.5 xl:p-2">
+                    <CalendarIcon className="h-3 w-3 xl:h-4 xl:w-4 text-purple-200" />
                   </div>
                 </CardContent>
               </Card>
             </div>
             
             {/* Search Bar */}
-            <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2 xs:gap-3 sm:gap-4 mb-3 md:mb-6">
-              <div className="relative w-full xs:max-w-[200px] sm:max-w-sm">
-                <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+            <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2 xs:gap-3 sm:gap-4 xl:gap-6 mb-3 md:mb-6 xl:mb-8">
+              <div className="relative w-full xs:max-w-[200px] sm:max-w-sm xl:max-w-md">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 xl:h-5 xl:w-5 text-muted-foreground" />
                 <Input
                   placeholder="Search records..."
-                  className="pl-7 xs:pl-8 bg-white h-8 xs:h-9 sm:h-10 w-full text-xs sm:text-sm"
+                  className="pl-8 xl:pl-10 bg-white h-8 xs:h-9 sm:h-10 xl:h-12 w-full text-xs sm:text-sm xl:text-base"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              {/* Could add filter controls here in the future */}
             </div>
 
             {/* Equipment Table */}
@@ -537,62 +549,62 @@ const UniformEquipmentPage: React.FC = () => {
                 <Table className="min-w-[300px]">
                   <TableHeader>
                     <TableRow className="bg-muted hover:bg-muted">
-                      <TableHead className="p-1 xs:p-2 sm:p-3 md:p-4 font-medium whitespace-nowrap text-xs sm:text-sm">Officer</TableHead>
-                      <TableHead className="p-1 xs:p-2 sm:p-3 md:p-4 font-medium whitespace-nowrap hidden xs:table-cell text-xs sm:text-sm">Issued By</TableHead>
-                      <TableHead className="p-1 xs:p-2 sm:p-3 md:p-4 font-medium whitespace-nowrap text-xs sm:text-sm">Type</TableHead>
-                      <TableHead className="p-1 xs:p-2 sm:p-3 md:p-4 font-medium whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm">Date</TableHead>
-                      <TableHead className="p-1 xs:p-2 sm:p-3 md:p-4 font-medium whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm">Qty</TableHead>
-                      <TableHead className="p-1 xs:p-2 sm:p-3 md:p-4 font-medium whitespace-nowrap text-xs sm:text-sm">Status</TableHead>
-                      <TableHead className="p-1 xs:p-2 sm:p-3 md:p-4 font-medium whitespace-nowrap hidden md:table-cell text-xs sm:text-sm">Notes</TableHead>
-                      <TableHead className="p-1 xs:p-2 sm:p-3 md:p-4 font-medium text-right text-xs sm:text-sm">Actions</TableHead>
+                      <TableHead className="p-2 xs:p-3 sm:p-4 xl:p-6 font-medium whitespace-nowrap text-xs sm:text-sm xl:text-base">Officer</TableHead>
+                      <TableHead className="p-2 xs:p-3 sm:p-4 xl:p-6 font-medium whitespace-nowrap hidden xs:table-cell text-xs sm:text-sm xl:text-base">Issued By</TableHead>
+                      <TableHead className="p-2 xs:p-3 sm:p-4 xl:p-6 font-medium whitespace-nowrap text-xs sm:text-sm xl:text-base">Type</TableHead>
+                      <TableHead className="p-2 xs:p-3 sm:p-4 xl:p-6 font-medium whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm xl:text-base">Date</TableHead>
+                      <TableHead className="p-2 xs:p-3 sm:p-4 xl:p-6 font-medium whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm xl:text-base">Qty</TableHead>
+                      <TableHead className="p-2 xs:p-3 sm:p-4 xl:p-6 font-medium whitespace-nowrap text-xs sm:text-sm xl:text-base">Status</TableHead>
+                      <TableHead className="p-2 xs:p-3 sm:p-4 xl:p-6 font-medium whitespace-nowrap hidden md:table-cell text-xs sm:text-sm xl:text-base">Notes</TableHead>
+                      <TableHead className="p-2 xs:p-3 sm:p-4 xl:p-6 font-medium text-right text-xs sm:text-sm xl:text-base">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedRecords.length > 0 ? (
                       paginatedRecords.map((record) => (
                         <TableRow key={record.id} className="hover:bg-muted/50">
-                          <TableCell className="p-1 xs:p-2 sm:p-3 md:p-4 font-medium truncate max-w-[80px] xs:max-w-[120px] sm:max-w-[150px] text-xs sm:text-sm">
+                          <TableCell className="p-2 xs:p-3 sm:p-4 xl:p-6 font-medium truncate max-w-[80px] xs:max-w-[120px] sm:max-w-[150px] xl:max-w-[200px] text-xs sm:text-sm xl:text-base">
                             {record.officerName}
                           </TableCell>
-                          <TableCell className="p-1 xs:p-2 sm:p-3 md:p-4 truncate max-w-[80px] xs:max-w-[120px] sm:max-w-[150px] hidden xs:table-cell text-xs sm:text-sm">
+                          <TableCell className="p-2 xs:p-3 sm:p-4 xl:p-6 truncate max-w-[80px] xs:max-w-[120px] sm:max-w-[150px] xl:max-w-[200px] hidden xs:table-cell text-xs sm:text-sm xl:text-base">
                             {record.issuedBy}
                           </TableCell>
-                          <TableCell className="p-1 xs:p-2 sm:p-3 md:p-4 text-xs sm:text-sm">
+                          <TableCell className="p-2 xs:p-3 sm:p-4 xl:p-6 text-xs sm:text-sm xl:text-base">
                             {record.equipmentType}
                           </TableCell>
-                          <TableCell className="p-1 xs:p-2 sm:p-3 md:p-4 hidden sm:table-cell whitespace-nowrap text-xs sm:text-sm">
+                          <TableCell className="p-2 xs:p-3 sm:p-4 xl:p-6 hidden sm:table-cell whitespace-nowrap text-xs sm:text-sm xl:text-base">
                             {format(record.dateIssued, 'PP')}
                           </TableCell>
-                          <TableCell className="p-1 xs:p-2 sm:p-3 md:p-4 hidden sm:table-cell text-xs sm:text-sm">
+                          <TableCell className="p-2 xs:p-3 sm:p-4 xl:p-6 hidden sm:table-cell text-xs sm:text-sm xl:text-base">
                             {record.quantity}
                           </TableCell>
-                          <TableCell className="p-1 xs:p-2 sm:p-3 md:p-4">
-                            <Badge className={cn("rounded-md text-[10px] xs:text-xs font-medium py-0.5 px-1.5", CONDITION_STYLES[record.condition] || 'bg-gray-100 text-gray-800')}>
+                          <TableCell className="p-2 xs:p-3 sm:p-4 xl:p-6">
+                            <Badge className={cn("rounded-md text-[10px] xs:text-xs xl:text-sm font-medium py-0.5 px-1.5 xl:px-2.5 xl:py-1", CONDITION_STYLES[record.condition] || 'bg-gray-100 text-gray-800')}>
                               {record.condition}
                             </Badge>
                           </TableCell>
-                          <TableCell className="p-1 xs:p-2 sm:p-3 md:p-4 max-w-[120px] md:max-w-[150px] lg:max-w-[200px] truncate hidden md:table-cell text-xs sm:text-sm">
+                          <TableCell className="p-2 xs:p-3 sm:p-4 xl:p-6 max-w-[120px] md:max-w-[150px] lg:max-w-[200px] xl:max-w-[300px] truncate hidden md:table-cell text-xs sm:text-sm xl:text-base">
                             {record.notes}
                           </TableCell>
-                          <TableCell className="p-1 xs:p-2 sm:p-3 md:p-4 text-right">
-                            <div className="flex justify-end gap-1 sm:gap-2">
+                          <TableCell className="p-2 xs:p-3 sm:p-4 xl:p-6 text-right">
+                            <div className="flex justify-end gap-1 sm:gap-2 xl:gap-3">
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleEdit(record)}
-                                className="h-6 w-6 xs:h-7 xs:w-7 sm:h-8 sm:w-8 p-0 hover:bg-blue-100 hover:text-blue-600"
+                                className="h-6 w-6 xs:h-7 xs:w-7 sm:h-8 sm:w-8 xl:h-10 xl:w-10 p-0 hover:bg-blue-100 hover:text-blue-600"
                                 aria-label="Edit record"
                               >
-                                <Pencil className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <Pencil className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleDelete(record.id)}
-                                className="h-6 w-6 xs:h-7 xs:w-7 sm:h-8 sm:w-8 p-0 hover:bg-red-100 hover:text-red-600"
+                                className="h-6 w-6 xs:h-7 xs:w-7 sm:h-8 sm:w-8 xl:h-10 xl:w-10 p-0 hover:bg-red-100 hover:text-red-600"
                                 aria-label="Delete record"
                               >
-                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5" />
                               </Button>
                             </div>
                           </TableCell>
@@ -600,14 +612,14 @@ const UniformEquipmentPage: React.FC = () => {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-4 sm:py-6">
-                          <div className="flex flex-col items-center justify-center gap-2 xs:gap-3">
-                            <p className="text-xs sm:text-sm text-gray-500">No equipment records found.</p>
+                        <TableCell colSpan={8} className="text-center py-4 sm:py-6 xl:py-8">
+                          <div className="flex flex-col items-center justify-center gap-2 xs:gap-3 xl:gap-4">
+                            <p className="text-xs sm:text-sm xl:text-base text-gray-500">No equipment records found.</p>
                             <Button 
                               onClick={() => setIsDialogOpen(true)}
-                              className="bg-blue-900 text-white hover:bg-blue-800 text-xs h-7 sm:h-8"
+                              className="bg-blue-900 text-white hover:bg-blue-800 text-xs sm:text-sm xl:text-base h-7 sm:h-8 xl:h-10"
                             >
-                              <Plus className="h-3 w-3 mr-1" />
+                              <Plus className="h-3 w-3 xl:h-4 xl:w-4 mr-1" />
                               Add New Equipment
                             </Button>
                           </div>
@@ -621,36 +633,32 @@ const UniformEquipmentPage: React.FC = () => {
 
             {/* Enhanced Pagination */}
             {filteredRecords.length > 0 && (
-              <div className="flex flex-col xs:flex-row justify-between items-center mt-3 xs:mt-4 gap-2 xs:gap-3 sm:gap-0">
-                <div className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground order-2 xs:order-1">
+              <div className="flex flex-col xs:flex-row justify-between items-center mt-3 xs:mt-4 xl:mt-6 gap-2 xs:gap-3 xl:gap-4">
+                <div className="text-[10px] xs:text-xs sm:text-sm xl:text-base text-muted-foreground order-2 xs:order-1">
                   Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredRecords.length)} of {filteredRecords.length} records
                 </div>
                 {filteredRecords.length > ITEMS_PER_PAGE && (
-                  <div className="flex items-center gap-2 order-1 xs:order-2 w-full xs:w-auto">
+                  <div className="flex items-center gap-2 xl:gap-3 order-1 xs:order-2 w-full xs:w-auto">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
                       disabled={currentPage === 1}
-                      className="flex-1 xs:flex-none h-7 xs:h-8 sm:h-9 text-xs"
+                      className="flex-1 xs:flex-none h-7 xs:h-8 sm:h-9 xl:h-11 text-xs sm:text-sm xl:text-base px-3 xl:px-4"
                     >
                       Previous
                     </Button>
                     
                     {/* Page Numbers */}
-                    <div className="hidden xs:flex gap-1">
+                    <div className="hidden xs:flex gap-1 xl:gap-2">
                       {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                        // Show first 2 pages, current page, and last 2 pages
                         let pageNum = i + 1;
                         if (totalPages > 5) {
                           if (currentPage <= 3) {
-                            // Near start, show first 5 pages
                             pageNum = i + 1;
                           } else if (currentPage >= totalPages - 2) {
-                            // Near end, show last 5 pages
                             pageNum = totalPages - 4 + i;
                           } else {
-                            // Middle, show current page and 2 on each side
                             pageNum = currentPage - 2 + i;
                           }
                         }
@@ -662,7 +670,7 @@ const UniformEquipmentPage: React.FC = () => {
                             size="sm"
                             onClick={() => setCurrentPage(pageNum)}
                             className={cn(
-                              "h-7 w-7 xs:h-8 xs:w-8 sm:h-9 sm:w-9 p-0 text-xs",
+                              "h-7 w-7 xs:h-8 xs:w-8 sm:h-9 sm:w-9 xl:h-11 xl:w-11 p-0 text-xs sm:text-sm xl:text-base",
                               currentPage === pageNum ? "bg-blue-900 text-white" : ""
                             )}
                           >
@@ -677,7 +685,7 @@ const UniformEquipmentPage: React.FC = () => {
                       size="sm"
                       onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
                       disabled={currentPage === totalPages}
-                      className="flex-1 xs:flex-none h-7 xs:h-8 sm:h-9 text-xs"
+                      className="flex-1 xs:flex-none h-7 xs:h-8 sm:h-9 xl:h-11 text-xs sm:text-sm xl:text-base px-3 xl:px-4"
                     >
                       Next
                     </Button>

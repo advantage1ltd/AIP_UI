@@ -88,6 +88,8 @@ const Deals = lazy(() => import('@/pages/crm/Deals'))
 const Pipeline = lazy(() => import('@/pages/crm/Pipeline'))
 const Vetting = lazy(() => import("./pages/recruitment/Vetting"))
 const CBT = lazy(() => import("./pages/recruitment/CBT"))
+const TakeTest = lazy(() => import("./pages/recruitment/TakeTest"))
+const TestSession = lazy(() => import("./pages/recruitment/TestSession"))
 const HolidayRequestPage = lazy(() => import('@/pages/operations/HolidayRequestPage'))
 const CustomerDAR = lazy(() => import('./pages/customer/CustomerDAR'))
 const IncidentGraph = lazy(() => import('./pages/customer/IncidentGraph'))
@@ -134,6 +136,8 @@ const App: React.FC = () => {
                   <Route path="/recruitment">
                     <Route path="vetting" element={<Vetting />} />
                     <Route path="cbt" element={<CBT />} />
+                    <Route path="take-test" element={<TakeTest />} />
+                    <Route path="test-session/:testId" element={<TestSession />} />
                   </Route>
 
                   {/* Operations Routes */}

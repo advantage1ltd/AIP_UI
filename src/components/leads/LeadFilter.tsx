@@ -1,10 +1,4 @@
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
+import { Filter } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -12,77 +6,45 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Filter, X } from "lucide-react"
-import { Lead } from "@/types/leads"
 
-interface LeadFilterProps {
-  filters: {
-    status?: Lead['status'];
-  };
-  onFilterChange: (filters: { status?: Lead['status'] }) => void;
-}
+type LeadStatus = "New Lead" | "Qualified" | "Negotiation" | "Won" | "Lost"
+type Filters = { status?: LeadStatus }
 
-const LEAD_STATUSES = [
-  "New Lead",
-  "Qualified",
-  "Negotiation",
-  "Won",
-  "Lost"
-] as const
-
-export function LeadFilter({ filters, onFilterChange }: LeadFilterProps) {
-  const handleClearFilters = () => {
-    onFilterChange({});
-  };
-
+export function LeadFilter({ 
+  filters, 
+  onFilterChange,
+  className = "" 
+}: { 
+  filters: Filters
+  onFilterChange: (filters: Filters) => void
+  className?: string
+}) {
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Filter className="h-4 w-4" />
-          Filter
-          {Object.keys(filters).length > 0 && (
-            <span className="ml-1 rounded-full bg-primary w-5 h-5 text-[10px] flex items-center justify-center text-primary-foreground">
-              {Object.keys(filters).length}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-medium leading-none">Filter Leads</h4>
-            {Object.keys(filters).length > 0 && (
-              <Button
-                variant="ghost"
-                className="h-8 px-2 text-muted-foreground"
-                onClick={handleClearFilters}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Clear filters
-              </Button>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select
-              value={filters.status}
-              onValueChange={(value) => onFilterChange({ ...filters, status: value as Lead['status'] })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                {LEAD_STATUSES.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+    <Select
+      value={filters.status || "all"}
+      onValueChange={(value) => onFilterChange({ status: value === "all" ? undefined : value as LeadStatus })}
+    >
+      <SelectTrigger 
+        className={`h-9 text-xs rounded-md border-slate-200 bg-white shadow-sm ${className}`}
+      >
+        <div className="flex items-center gap-1.5">
+          <Filter className="h-3.5 w-3.5 text-slate-400" />
+          <SelectValue placeholder="All Statuses" />
         </div>
-      </PopoverContent>
-    </Popover>
-  );
+      </SelectTrigger>
+      <SelectContent className="rounded-md border-slate-200 shadow-md">
+        <div className="p-1.5 border-b border-slate-100">
+          <h3 className="text-xs font-medium text-primary">Lead Status</h3>
+        </div>
+        <div className="p-1">
+          <SelectItem value="all" className="rounded-md text-xs py-1">All Statuses</SelectItem>
+          <SelectItem value="New Lead" className="rounded-md text-xs py-1">New Lead</SelectItem>
+          <SelectItem value="Qualified" className="rounded-md text-xs py-1">Qualified</SelectItem>
+          <SelectItem value="Negotiation" className="rounded-md text-xs py-1">Negotiation</SelectItem>
+          <SelectItem value="Won" className="rounded-md text-xs py-1">Won</SelectItem>
+          <SelectItem value="Lost" className="rounded-md text-xs py-1">Lost</SelectItem>
+        </div>
+      </SelectContent>
+    </Select>
+  )
 }

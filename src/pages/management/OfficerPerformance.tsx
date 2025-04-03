@@ -84,15 +84,15 @@ const getProgressColor = (rate: number): string => {
 // Components
 const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, icon, iconBgColor, iconColor }) => (
   <Card className={`${iconBgColor} hover:opacity-95 transition-all h-full`}>
-    <CardContent className="p-1.5 xs:p-2 sm:p-4">
-      <div className="flex items-center justify-between gap-1.5 xs:gap-2">
+    <CardContent className="p-1.5 xs:p-2 sm:p-4 lg:p-6">
+      <div className="flex items-center justify-between gap-1.5 xs:gap-2 lg:gap-4">
         <div className="min-w-0 flex-1">
-          <p className="text-[9px] xs:text-xs sm:text-sm font-medium text-white/80 truncate">{title}</p>
-          <p className="text-sm xs:text-xl sm:text-2xl font-bold mt-0.5 text-white truncate">{value}</p>
-          <p className="text-[8px] xs:text-xs sm:text-sm text-white/70 mt-0.5 truncate">{subtitle}</p>
+          <p className="text-[9px] xs:text-xs sm:text-sm lg:text-base font-medium text-white/80 truncate">{title}</p>
+          <p className="text-sm xs:text-xl sm:text-2xl lg:text-3xl font-bold mt-0.5 lg:mt-1 text-white truncate">{value}</p>
+          <p className="text-[8px] xs:text-xs sm:text-sm lg:text-base text-white/70 mt-0.5 lg:mt-1 truncate">{subtitle}</p>
         </div>
-        <div className={`${iconColor} p-1 xs:p-2.5 sm:p-3 rounded-full bg-white/10 flex-shrink-0`}>
-          {React.cloneElement(icon as React.ReactElement, { className: `h-3 w-3 xs:h-5 xs:w-5 sm:h-6 sm:w-6 text-white` })}
+        <div className={`${iconColor} p-1 xs:p-2.5 sm:p-3 lg:p-4 rounded-full bg-white/10 flex-shrink-0`}>
+          {React.cloneElement(icon as React.ReactElement, { className: `h-3 w-3 xs:h-5 xs:w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-white` })}
         </div>
       </div>
     </CardContent>
@@ -170,18 +170,18 @@ const OfficerPerformance = () => {
   ]
 
   return (
-    <div className="container mx-auto px-1 xs:px-3 sm:px-4 py-2 xs:py-4 sm:py-6 md:px-6 lg:px-8 max-w-7xl">
+    <div className="container mx-auto px-1 xs:px-3 sm:px-4 py-2 xs:py-4 sm:py-6 md:px-6 lg:px-8 xl:px-12 2xl:px-16 max-w-screen-2xl">
       <div className="space-y-2 xs:space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex flex-col xs:flex-row justify-between xs:items-center gap-2">
           <div>
-            <h1 className="text-base xs:text-xl sm:text-2xl font-bold">Officer Performance</h1>
-            <p className="text-[9px] xs:text-xs sm:text-sm text-gray-500 mt-0.5">Top performing officers and reporting status</p>
+            <h1 className="text-base xs:text-xl sm:text-2xl lg:text-3xl font-bold">Officer Performance</h1>
+            <p className="text-[9px] xs:text-xs sm:text-sm lg:text-base text-gray-500 mt-0.5 lg:mt-1">Top performing officers and reporting status</p>
           </div>
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-1 xs:gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-1 xs:gap-3 sm:gap-4 lg:gap-6">
           {statCards.map((card, index) => (
             <StatCard key={index} {...card} />
           ))}
@@ -189,32 +189,32 @@ const OfficerPerformance = () => {
 
         {/* Filters */}
         <Card className="border-none shadow-sm">
-          <CardContent className="p-1.5 xs:p-3 sm:p-4">
-            <div className="flex flex-col sm:flex-row sm:items-end gap-2 xs:gap-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 xs:gap-4 flex-1">
+          <CardContent className="p-1.5 xs:p-3 sm:p-4 lg:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-2 xs:gap-4 lg:gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 xs:gap-4 lg:gap-6 flex-1">
                 <div>
-                  <label className="block text-[9px] xs:text-xs sm:text-sm font-medium text-gray-600 mb-0.5 xs:mb-1">
+                  <label className="block text-[9px] xs:text-xs sm:text-sm lg:text-base font-medium text-gray-600 mb-0.5 xs:mb-1 lg:mb-2">
                     Start Date
                   </label>
                   <DatePicker date={startDate} setDate={setStartDate} placeholder="Start Date" />
                 </div>
                 <div>
-                  <label className="block text-[9px] xs:text-xs sm:text-sm font-medium text-gray-600 mb-0.5 xs:mb-1">
+                  <label className="block text-[9px] xs:text-xs sm:text-sm lg:text-base font-medium text-gray-600 mb-0.5 xs:mb-1 lg:mb-2">
                     End Date
                   </label>
                   <DatePicker date={endDate} setDate={setEndDate} placeholder="End Date" />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[9px] xs:text-xs sm:text-sm font-medium text-gray-600 mb-0.5 xs:mb-1">
+                  <label className="block text-[9px] xs:text-xs sm:text-sm lg:text-base font-medium text-gray-600 mb-0.5 xs:mb-1 lg:mb-2">
                     Customer
                   </label>
                   <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                    <SelectTrigger className="w-full h-7 xs:h-8 sm:h-9 text-[9px] xs:text-xs sm:text-sm">
+                    <SelectTrigger className="w-full h-7 xs:h-8 sm:h-9 lg:h-10 text-[9px] xs:text-xs sm:text-sm lg:text-base">
                       <SelectValue placeholder="Select Customer" />
                     </SelectTrigger>
                     <SelectContent>
                       {CUSTOMERS.map(customer => (
-                        <SelectItem key={customer.id} value={customer.id} className="text-[9px] xs:text-xs sm:text-sm">
+                        <SelectItem key={customer.id} value={customer.id} className="text-[9px] xs:text-xs sm:text-sm lg:text-base">
                           {customer.name}
                         </SelectItem>
                       ))}
@@ -222,37 +222,37 @@ const OfficerPerformance = () => {
                   </Select>
                 </div>
               </div>
-              <Button className="w-full sm:w-auto h-7 xs:h-8 sm:h-9 text-[9px] xs:text-xs sm:text-sm">Search</Button>
+              <Button className="w-full sm:w-auto h-7 xs:h-8 sm:h-9 lg:h-10 text-[9px] xs:text-xs sm:text-sm lg:text-base">Search</Button>
             </div>
           </CardContent>
         </Card>
 
         {/* Performance Tabs */}
-        <div className="space-y-2 xs:space-y-3 sm:space-y-4">
+        <div className="space-y-2 xs:space-y-3 sm:space-y-4 lg:space-y-6">
           <Tabs defaultValue="top-performers" onValueChange={value => {
             setActiveTab(value)
             setCurrentPage(1)
           }}>
-            <TabsList className="w-full xs:w-auto h-7 xs:h-8 sm:h-9">
-              <TabsTrigger value="top-performers" className="flex-1 xs:flex-none text-[9px] xs:text-xs sm:text-sm h-6 xs:h-7 sm:h-8">
+            <TabsList className="w-full xs:w-auto h-7 xs:h-8 sm:h-9 lg:h-10">
+              <TabsTrigger value="top-performers" className="flex-1 xs:flex-none text-[9px] xs:text-xs sm:text-sm lg:text-base h-6 xs:h-7 sm:h-8 lg:h-9">
                 Top Performers
               </TabsTrigger>
-              <TabsTrigger value="non-reporters" className="flex-1 xs:flex-none text-[9px] xs:text-xs sm:text-sm h-6 xs:h-7 sm:h-8">
+              <TabsTrigger value="non-reporters" className="flex-1 xs:flex-none text-[9px] xs:text-xs sm:text-sm lg:text-base h-6 xs:h-7 sm:h-8 lg:h-9">
                 Non-Reporters
               </TabsTrigger>
             </TabsList>
             
             {['top-performers', 'non-reporters'].map((tab) => (
-              <TabsContent key={tab} value={tab} className="mt-2">
+              <TabsContent key={tab} value={tab} className="mt-2 lg:mt-4">
                 <Card>
-                  <CardContent className="p-0 sm:p-4">
+                  <CardContent className="p-0 sm:p-4 lg:p-6">
                     <div className="relative overflow-x-auto -mx-1 xs:mx-0">
                       <div className="min-w-[360px] xs:min-w-full">
                         <table className="w-full text-left">
                           <thead className="bg-gray-50">
                             <tr className="border-b">
                               {['Officer', 'Incidents', 'Value Saved', 'Response Rate', 'Status'].map((header, index) => (
-                                <th key={index} className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 md:px-6 text-[9px] xs:text-xs whitespace-nowrap">
+                                <th key={index} className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs lg:text-sm whitespace-nowrap">
                                   {header}
                                 </th>
                               ))}
@@ -261,26 +261,26 @@ const OfficerPerformance = () => {
                           <tbody className="divide-y divide-gray-200">
                             {paginatedData.map((officer, index) => (
                               <tr key={index} className="bg-white hover:bg-gray-50">
-                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 md:px-6 text-[9px] xs:text-xs sm:text-sm font-medium">
+                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs sm:text-sm lg:text-base font-medium">
                                   {officer.name}
                                 </td>
-                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 md:px-6 text-[9px] xs:text-xs sm:text-sm">
+                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs sm:text-sm lg:text-base">
                                   {officer.incidents}
                                 </td>
-                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 md:px-6 text-[9px] xs:text-xs sm:text-sm">
+                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs sm:text-sm lg:text-base">
                                   £{officer.valueSaved.toLocaleString()}
                                 </td>
-                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 md:px-6">
-                                  <div className="flex items-center gap-1 xs:gap-2">
+                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6">
+                                  <div className="flex items-center gap-1 xs:gap-2 lg:gap-3">
                                     <Progress 
                                       value={officer.responseRate} 
-                                      className={`h-1 xs:h-1.5 sm:h-2 w-6 xs:w-16 sm:w-24 ${getProgressColor(officer.responseRate)}`}
+                                      className={`h-1 xs:h-1.5 sm:h-2 lg:h-2.5 w-6 xs:w-16 sm:w-24 lg:w-32 ${getProgressColor(officer.responseRate)}`}
                                     />
-                                    <span className="text-[9px] xs:text-xs sm:text-sm">{officer.responseRate}%</span>
+                                    <span className="text-[9px] xs:text-xs sm:text-sm lg:text-base">{officer.responseRate}%</span>
                                   </div>
                                 </td>
-                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 md:px-6">
-                                  <Badge className={`${STATUS_STYLES[officer.status]} text-[8px] xs:text-xs sm:text-sm px-1 py-0.5 xs:px-2`}>
+                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6">
+                                  <Badge className={`${STATUS_STYLES[officer.status]} text-[8px] xs:text-xs sm:text-sm lg:text-base px-1 py-0.5 xs:px-2 lg:px-3`}>
                                     {officer.status}
                                   </Badge>
                                 </td>
@@ -298,21 +298,21 @@ const OfficerPerformance = () => {
         </div>
 
         {/* Pagination */}
-        <div className="flex flex-col xs:flex-row items-center justify-between gap-2 px-1 xs:px-2">
-          <div className="text-[9px] xs:text-xs sm:text-sm text-gray-500 order-2 xs:order-1">
+        <div className="flex flex-col xs:flex-row items-center justify-between gap-2 px-1 xs:px-2 lg:px-4">
+          <div className="text-[9px] xs:text-xs sm:text-sm lg:text-base text-gray-500 order-2 xs:order-1">
             Showing {startIndex + 1} to {Math.min(startIndex + pageSize, filteredData.length)} of {filteredData.length} entries
           </div>
-          <div className="flex items-center space-x-1 xs:space-x-2 order-1 xs:order-2">
+          <div className="flex items-center space-x-1 xs:space-x-2 lg:space-x-3 order-1 xs:order-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="h-5 w-5 xs:h-8 xs:w-8"
+              className="h-5 w-5 xs:h-8 xs:w-8 lg:h-10 lg:w-10"
             >
-              <ChevronLeft className="h-2.5 w-2.5 xs:h-4 xs:w-4" />
+              <ChevronLeft className="h-2.5 w-2.5 xs:h-4 xs:w-4 lg:h-5 lg:w-5" />
             </Button>
-            <div className="text-[9px] xs:text-xs sm:text-sm min-w-[60px] xs:min-w-[100px] text-center">
+            <div className="text-[9px] xs:text-xs sm:text-sm lg:text-base min-w-[60px] xs:min-w-[100px] lg:min-w-[120px] text-center">
               Page {currentPage} of {totalPages}
             </div>
             <Button
@@ -320,9 +320,9 @@ const OfficerPerformance = () => {
               size="sm"
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
-              className="h-5 w-5 xs:h-8 xs:w-8"
+              className="h-5 w-5 xs:h-8 xs:w-8 lg:h-10 lg:w-10"
             >
-              <ChevronRight className="h-2.5 w-2.5 xs:h-4 xs:w-4" />
+              <ChevronRight className="h-2.5 w-2.5 xs:h-4 xs:w-4 lg:h-5 lg:w-5" />
             </Button>
           </div>
         </div>

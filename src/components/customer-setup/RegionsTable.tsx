@@ -192,7 +192,7 @@ export function RegionsTable({ selectedCustomerId }: RegionsTableProps) {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         region={selectedRegion}
-        customerId={selectedCustomerId}
+        selectedCustomerId={selectedCustomerId}
       />
     </div>
   )

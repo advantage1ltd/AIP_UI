@@ -6,7 +6,7 @@ export interface Page {
   id: string;
   name: string;
   description: string;
-  category: 'dashboard' | 'reports' | 'management' | 'customer' | 'settings';
+  category: 'dashboard' | 'reports' | 'management' | 'customer' | 'settings' | 'recruitment';
   path: string;
 }
 
@@ -280,6 +280,24 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         category: 'settings',
         path: '/settings'
       },
+      
+      // Take Test page
+      { 
+        id: 'take-test', 
+        name: 'Take Test', 
+        description: 'Test the application by viewing it as different user roles',
+        category: 'recruitment',
+        path: '/recruitment/take-test'
+      },
+      
+      // Test Session page
+      { 
+        id: 'test-session', 
+        name: 'Test Session', 
+        description: 'Active test taking session',
+        category: 'recruitment',
+        path: '/recruitment/test-session'
+      },
 
       // CRM pages
       { 
@@ -376,7 +394,10 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       'officer-expenses',
       // Employee pages
       'uniform-equipment',
-      'diary'
+      'diary',
+      // Recruitment pages - if take-test is enabled, test-session should be too
+      'take-test',
+      'test-session'
     ],
     'advantage-ho': [
       'dashboard', 
@@ -450,10 +471,27 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return true;
       }
       
+      // Fix for take-test path - ensure it's properly matched
+      const requestedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+      
       const allowedPageIds = pageAccessByRole[roleToCheck];
       if (!allowedPageIds) return false;
 
-      const page = availablePages.find(p => p.path === path);
+      // Look for matching page, handle special cases for dynamic routes
+      const page = availablePages.find(p => {
+        // Handle 'take-test' path aliases
+        if (p.id === 'take-test') {
+          return requestedPath === '/take-test' || requestedPath === '/recruitment/take-test';
+        }
+        
+        // Handle test-session dynamic routes
+        if (p.id === 'test-session' && requestedPath.startsWith('/recruitment/test-session/')) {
+          return true;
+        }
+        
+        return p.path === requestedPath;
+      });
+      
       if (!page) return false;
       
       return allowedPageIds.includes(page.id);
@@ -474,16 +512,14 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return;
         }
         
+        // Always allow access to the home page (index)
+        if (currentPath === '/') {
+          return;
+        }
+        
         if (!hasAccess(currentPath)) {
-          // Redirect to dashboard or first accessible page
-          const accessiblePages = availablePages.filter(page => {
-            const roleToCheck = isTestMode && testRole ? testRole : currentRole;
-            return pageAccessByRole[roleToCheck]?.includes(page.id);
-          });
-          
-          if (accessiblePages.length > 0) {
-            navigate(accessiblePages[0].path);
-          }
+          // Redirect all users to the home page if they don't have access to the current page
+          navigate('/');
         }
       }
     } catch (error) {

@@ -49,7 +49,12 @@ import {
   GraduationCap,
   BookOpen,
   LayoutGrid,
-  BarChart2
+  BarChart2,
+  LayoutDashboard,
+  UserPlus,
+  DollarSign,
+  GitBranch,
+  CheckSquare
 } from "lucide-react"
 import { usePageAccess } from "@/contexts/PageAccessContext"
 import { Badge } from "@/components/ui/badge"
@@ -70,6 +75,11 @@ interface NavItem {
   href: string;
   icon: React.ReactNode;
   roles: string[]; // Which roles can access this item
+}
+
+// Add HeaderProps interface
+interface HeaderProps {
+  onMobileMenuClick?: () => void;
 }
 
 // Reusable components
@@ -181,6 +191,18 @@ const NavigationMenu = ({
         </AccordionItem>
       );
     })}
+    
+    {/* Settings link - directly in mobile menu */}
+    <div className="px-4 py-2 mt-2">
+      <Link 
+        to="/settings"
+        className="flex items-center gap-4 rounded-md px-4 py-3 text-[16px] font-medium text-white bg-blue-800 hover:bg-blue-700"
+        onClick={handleNavigate}
+      >
+        <Settings className="h-6 w-6" />
+        Settings
+      </Link>
+    </div>
   </Accordion>
 );
 
@@ -205,7 +227,7 @@ const UserProfileSection = () => (
   </div>
 );
 
-export function Header() {
+export function Header({ onMobileMenuClick }: HeaderProps) {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   
@@ -244,6 +266,47 @@ export function Header() {
           title: "Action Calendar",
           href: "/action-calendar",
           icon: <Calendar className="h-4 w-4" />,
+          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
+        }
+      ]
+    },
+    {
+      section: "CRM",
+      items: [
+        {
+          title: "Dashboard",
+          href: "/crm/dashboard",
+          icon: <LayoutDashboard className="h-4 w-4" />,
+          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
+        },
+        {
+          title: "Leads",
+          href: "/crm/leads",
+          icon: <UserPlus className="h-4 w-4" />,
+          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
+        },
+        {
+          title: "Contacts",
+          href: "/crm/contacts",
+          icon: <Users className="h-4 w-4" />,
+          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
+        },
+        {
+          title: "Deals",
+          href: "/crm/deals",
+          icon: <DollarSign className="h-4 w-4" />,
+          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
+        },
+        {
+          title: "Pipeline",
+          href: "/crm/pipeline",
+          icon: <GitBranch className="h-4 w-4" />,
+          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
+        },
+        {
+          title: "Tasks",
+          href: "/crm/tasks",
+          icon: <CheckSquare className="h-4 w-4" />,
           roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
         }
       ]
@@ -524,6 +587,7 @@ export function Header() {
               size="icon" 
               className={BUTTON_STYLES.ghost.mobile}
               aria-label="Menu"
+              onClick={onMobileMenuClick}
             >
               <Menu className="h-10 w-10" />
             </Button>

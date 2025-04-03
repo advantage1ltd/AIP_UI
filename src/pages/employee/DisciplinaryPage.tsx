@@ -385,35 +385,35 @@ const DisciplinaryPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="container mx-auto px-1 sm:px-4 lg:px-6 py-2 sm:py-6 lg:py-8 max-w-screen-2xl">
+    <div className="container mx-auto px-1 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 py-2 sm:py-6 lg:py-8 xl:py-10 2xl:py-12 max-w-screen-2xl">
       <Card className="shadow-sm border">
-        <CardHeader className="p-2 sm:p-4 lg:p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3">
+        <CardHeader className="p-2 sm:p-4 lg:p-6 xl:p-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3 xl:gap-6">
             <div className="flex-1">
-              <CardTitle className="text-base sm:text-xl lg:text-2xl font-bold">Disciplinary Records</CardTitle>
-              <CardDescription className="text-xs sm:text-sm mt-0.5 sm:mt-1">Manage and track disciplinary actions for security officers</CardDescription>
+              <CardTitle className="text-base sm:text-xl lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold">Disciplinary Records</CardTitle>
+              <CardDescription className="text-xs sm:text-sm xl:text-base mt-0.5 sm:mt-1 xl:mt-2">Manage and track disciplinary actions for security officers</CardDescription>
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-blue-900 text-white hover:bg-blue-800 h-8 sm:h-10 px-2 sm:px-4 text-xs sm:text-sm w-full sm:w-auto">
-                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <Button className="bg-blue-900 text-white hover:bg-blue-800 h-8 sm:h-10 xl:h-12 px-2 sm:px-4 xl:px-6 text-xs sm:text-sm xl:text-base w-full sm:w-auto">
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 mr-1 sm:mr-2" />
                   Add New Record
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[95%] max-w-[600px] p-2 sm:p-4 lg:p-6 max-h-[95vh] overflow-y-auto">
-                <DialogHeader className="pb-2 sm:pb-4">
-                  <DialogTitle className="text-sm sm:text-lg font-semibold">
+              <DialogContent className="w-[95%] max-w-[600px] xl:max-w-[800px] p-2 sm:p-4 lg:p-6 xl:p-8 max-h-[95vh] overflow-y-auto">
+                <DialogHeader className="pb-2 sm:pb-4 xl:pb-6">
+                  <DialogTitle className="text-sm sm:text-lg xl:text-xl 2xl:text-2xl font-semibold">
                     {editingRecord ? 'Edit Disciplinary Record' : 'Add New Disciplinary Record'}
                   </DialogTitle>
-                  <DialogDescription className="text-xs sm:text-sm mt-0.5 sm:mt-1">
+                  <DialogDescription className="text-xs sm:text-sm xl:text-base mt-0.5 sm:mt-1 xl:mt-2">
                     {editingRecord 
                       ? 'Update the disciplinary record details below.' 
                       : 'Fill in the details to add a new disciplinary record.'}
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-2 sm:space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+                  <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-2 sm:space-y-4 xl:space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-4 xl:gap-6">
                       <FormSelectField 
                         control={form.control}
                         name="officerName"
@@ -480,19 +480,19 @@ const DisciplinaryPage: React.FC = () => {
                         placeholder="Add reference numbers for any evidence"
                       />
                     </div>
-                    <Separator className="my-2 sm:my-4" />
+                    <Separator className="my-2 sm:my-4 xl:my-6" />
                     <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
                       <Button 
                         type="button" 
                         variant="outline" 
                         onClick={closeDialog} 
-                        className="w-full sm:w-auto h-8 sm:h-10 text-xs sm:text-sm"
+                        className="w-full sm:w-auto h-8 sm:h-10 xl:h-12 text-xs sm:text-sm xl:text-base"
                       >
                         Cancel
                       </Button>
                       <Button 
                         type="submit" 
-                        className="bg-blue-900 text-white hover:bg-blue-800 w-full sm:w-auto h-8 sm:h-10 text-xs sm:text-sm"
+                        className="bg-blue-900 text-white hover:bg-blue-800 w-full sm:w-auto h-8 sm:h-10 xl:h-12 text-xs sm:text-sm xl:text-base"
                       >
                         {editingRecord ? 'Update' : 'Add'} Record
                       </Button>
@@ -503,14 +503,14 @@ const DisciplinaryPage: React.FC = () => {
             </Dialog>
           </div>
         </CardHeader>
-        <CardContent className="p-2 sm:p-4 lg:p-6">
+        <CardContent className="p-2 sm:p-4 lg:p-6 xl:p-8">
           {/* Search and Filters */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 mb-2 sm:mb-6">
-            <div className="relative w-full sm:max-w-xs">
-              <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 xl:gap-6 mb-2 sm:mb-6 xl:mb-8">
+            <div className="relative w-full sm:max-w-xs xl:max-w-md">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 xl:h-5 xl:w-5 text-muted-foreground" />
               <Input
                 placeholder="Search records..."
-                className="pl-7 bg-white h-8 sm:h-10 w-full text-xs sm:text-sm"
+                className="pl-8 xl:pl-10 bg-white h-8 sm:h-10 xl:h-12 w-full text-xs sm:text-sm xl:text-base"
                 value={searchQuery}
                 onChange={handleSearchChange}
                 aria-label="Search disciplinary records"
@@ -520,68 +520,68 @@ const DisciplinaryPage: React.FC = () => {
 
           {/* Table */}
           <div className="border rounded-lg overflow-hidden">
-            <div className="overflow-x-auto" style={{ minWidth: "280px" }}>
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted hover:bg-muted">
-                    <TableHead className="p-1.5 sm:p-3 lg:p-4 font-medium whitespace-nowrap text-xs sm:text-sm">Officer</TableHead>
-                    <TableHead className="p-1.5 sm:p-3 lg:p-4 font-medium whitespace-nowrap text-xs sm:text-sm hidden sm:table-cell">Violation</TableHead>
-                    <TableHead className="p-1.5 sm:p-3 lg:p-4 font-medium whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm">Date</TableHead>
-                    <TableHead className="p-1.5 sm:p-3 lg:p-4 font-medium whitespace-nowrap text-xs sm:text-sm">Severity</TableHead>
-                    <TableHead className="p-1.5 sm:p-3 lg:p-4 font-medium whitespace-nowrap hidden md:table-cell text-xs sm:text-sm">Action</TableHead>
-                    <TableHead className="p-1.5 sm:p-3 lg:p-4 font-medium whitespace-nowrap text-xs sm:text-sm">Status</TableHead>
-                    <TableHead className="p-1.5 sm:p-3 lg:p-4 font-medium whitespace-nowrap hidden lg:table-cell text-xs sm:text-sm">Supervisor</TableHead>
-                    <TableHead className="p-1.5 sm:p-3 lg:p-4 font-medium text-right text-xs sm:text-sm w-[60px] sm:w-auto">Actions</TableHead>
+                    <TableHead className="p-2 sm:p-4 xl:p-6 font-medium whitespace-nowrap text-xs sm:text-sm xl:text-base">Officer</TableHead>
+                    <TableHead className="p-2 sm:p-4 xl:p-6 font-medium whitespace-nowrap text-xs sm:text-sm xl:text-base hidden sm:table-cell">Violation</TableHead>
+                    <TableHead className="p-2 sm:p-4 xl:p-6 font-medium whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm xl:text-base">Date</TableHead>
+                    <TableHead className="p-2 sm:p-4 xl:p-6 font-medium whitespace-nowrap text-xs sm:text-sm xl:text-base">Severity</TableHead>
+                    <TableHead className="p-2 sm:p-4 xl:p-6 font-medium whitespace-nowrap hidden md:table-cell text-xs sm:text-sm xl:text-base">Action</TableHead>
+                    <TableHead className="p-2 sm:p-4 xl:p-6 font-medium whitespace-nowrap text-xs sm:text-sm xl:text-base">Status</TableHead>
+                    <TableHead className="p-2 sm:p-4 xl:p-6 font-medium whitespace-nowrap hidden lg:table-cell text-xs sm:text-sm xl:text-base">Supervisor</TableHead>
+                    <TableHead className="p-2 sm:p-4 xl:p-6 font-medium text-right text-xs sm:text-sm xl:text-base w-[60px] sm:w-auto">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedRecords.length > 0 ? (
                     paginatedRecords.map((record) => (
                       <TableRow key={record.id} className="hover:bg-muted/50">
-                        <TableCell className="p-1.5 sm:p-3 lg:p-4 font-medium truncate max-w-[70px] sm:max-w-[150px] text-xs sm:text-sm">
+                        <TableCell className="p-2 sm:p-4 xl:p-6 font-medium truncate max-w-[70px] sm:max-w-[150px] xl:max-w-[200px] text-xs sm:text-sm xl:text-base">
                           {record.officerName}
                         </TableCell>
-                        <TableCell className="p-1.5 sm:p-3 lg:p-4 text-xs sm:text-sm truncate max-w-[90px] sm:max-w-[150px] hidden sm:table-cell">
+                        <TableCell className="p-2 sm:p-4 xl:p-6 text-xs sm:text-sm xl:text-base truncate max-w-[90px] sm:max-w-[150px] xl:max-w-[200px] hidden sm:table-cell">
                           {record.violationType}
                         </TableCell>
-                        <TableCell className="p-1.5 sm:p-3 lg:p-4 hidden sm:table-cell text-xs sm:text-sm">
+                        <TableCell className="p-2 sm:p-4 xl:p-6 hidden sm:table-cell text-xs sm:text-sm xl:text-base">
                           {format(record.incidentDate, 'PP')}
                         </TableCell>
-                        <TableCell className="p-1.5 sm:p-3 lg:p-4">
-                          <Badge className={cn("rounded-md text-[9px] sm:text-xs font-medium py-0.5 px-1 sm:px-1.5", SEVERITY_STYLES[record.severity] || 'bg-gray-100 text-gray-800')}>
+                        <TableCell className="p-2 sm:p-4 xl:p-6">
+                          <Badge className={cn("rounded-md text-[9px] sm:text-xs xl:text-sm font-medium py-0.5 px-1 sm:px-1.5 xl:px-2.5 xl:py-1", SEVERITY_STYLES[record.severity] || 'bg-gray-100 text-gray-800')}>
                             {record.severity}
                           </Badge>
                         </TableCell>
-                        <TableCell className="p-1.5 sm:p-3 lg:p-4 hidden md:table-cell text-xs sm:text-sm">
+                        <TableCell className="p-2 sm:p-4 xl:p-6 hidden md:table-cell text-xs sm:text-sm xl:text-base">
                           {record.actionTaken}
                         </TableCell>
-                        <TableCell className="p-1.5 sm:p-3 lg:p-4">
-                          <Badge className={cn("rounded-md text-[9px] sm:text-xs font-medium py-0.5 px-1 sm:px-1.5", STATUS_STYLES[record.status] || 'bg-gray-100 text-gray-800')}>
+                        <TableCell className="p-2 sm:p-4 xl:p-6">
+                          <Badge className={cn("rounded-md text-[9px] sm:text-xs xl:text-sm font-medium py-0.5 px-1 sm:px-1.5 xl:px-2.5 xl:py-1", STATUS_STYLES[record.status] || 'bg-gray-100 text-gray-800')}>
                             {record.status}
                           </Badge>
                         </TableCell>
-                        <TableCell className="p-1.5 sm:p-3 lg:p-4 hidden lg:table-cell text-xs sm:text-sm">
+                        <TableCell className="p-2 sm:p-4 xl:p-6 hidden lg:table-cell text-xs sm:text-sm xl:text-base">
                           {record.supervisorName}
                         </TableCell>
-                        <TableCell className="p-1.5 sm:p-3 lg:p-4 text-right w-[60px] sm:w-auto">
-                          <div className="flex justify-end gap-1 sm:gap-2">
+                        <TableCell className="p-2 sm:p-4 xl:p-6 text-right w-[60px] sm:w-auto">
+                          <div className="flex justify-end gap-1 sm:gap-2 xl:gap-3">
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => handleEdit(record)}
-                              className="h-6 w-6 sm:h-8 sm:w-8 p-0 hover:bg-blue-100 hover:text-blue-600"
+                              className="h-6 w-6 sm:h-8 sm:w-8 xl:h-10 xl:w-10 p-0 hover:bg-blue-100 hover:text-blue-600"
                               aria-label="Edit record"
                             >
-                              <Pencil className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <Pencil className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => handleDelete(record.id)}
-                              className="h-6 w-6 sm:h-8 sm:w-8 p-0 hover:bg-red-100 hover:text-red-600"
+                              className="h-6 w-6 sm:h-8 sm:w-8 xl:h-10 xl:w-10 p-0 hover:bg-red-100 hover:text-red-600"
                               aria-label="Delete record"
                             >
-                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5" />
                             </Button>
                           </div>
                         </TableCell>
@@ -589,15 +589,15 @@ const DisciplinaryPage: React.FC = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-4 sm:py-8">
-                        <div className="flex flex-col items-center justify-center gap-2 sm:gap-3">
-                          <p className="text-xs sm:text-sm text-gray-500">No disciplinary records found.</p>
+                      <TableCell colSpan={8} className="text-center py-4 sm:py-8 xl:py-10">
+                        <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 xl:gap-4">
+                          <p className="text-xs sm:text-sm xl:text-base text-gray-500">No disciplinary records found.</p>
                           <Button 
                             onClick={() => setIsDialogOpen(true)}
-                            className="bg-blue-900 text-white hover:bg-blue-800 text-xs h-7 sm:h-9"
+                            className="bg-blue-900 text-white hover:bg-blue-800 text-xs sm:text-sm xl:text-base h-7 sm:h-9 xl:h-11"
                             aria-label="Add new disciplinary record"
                           >
-                            <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5" />
+                            <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5 xl:h-4 xl:w-4 mr-1 sm:mr-1.5" />
                             Add New Record
                           </Button>
                         </div>
@@ -611,18 +611,18 @@ const DisciplinaryPage: React.FC = () => {
 
           {/* Pagination */}
           {filteredRecords.length > 0 && (
-            <div className="flex flex-col sm:flex-row justify-between items-center mt-2 sm:mt-4 gap-2 sm:gap-3">
-              <div className="text-[10px] sm:text-sm text-muted-foreground order-2 sm:order-1">
+            <div className="flex flex-col sm:flex-row justify-between items-center mt-2 sm:mt-4 xl:mt-6 gap-2 sm:gap-3 xl:gap-4">
+              <div className="text-[10px] sm:text-sm xl:text-base text-muted-foreground order-2 sm:order-1">
                 Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredRecords.length)} of {filteredRecords.length} records
               </div>
               {filteredRecords.length > ITEMS_PER_PAGE && (
-                <div className="flex items-center gap-1 sm:gap-2 order-1 sm:order-2 w-full sm:w-auto">
+                <div className="flex items-center gap-1 sm:gap-2 xl:gap-3 order-1 sm:order-2 w-full sm:w-auto">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
-                    className="flex-1 sm:flex-none h-7 sm:h-9 text-xs"
+                    className="flex-1 sm:flex-none h-7 sm:h-9 xl:h-11 text-xs sm:text-sm xl:text-base px-2 sm:px-3 xl:px-4"
                     aria-label="Previous page"
                   >
                     Previous
@@ -632,7 +632,7 @@ const DisciplinaryPage: React.FC = () => {
                     size="sm"
                     onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
-                    className="flex-1 sm:flex-none h-7 sm:h-9 text-xs"
+                    className="flex-1 sm:flex-none h-7 sm:h-9 xl:h-11 text-xs sm:text-sm xl:text-base px-2 sm:px-3 xl:px-4"
                     aria-label="Next page"
                   >
                     Next

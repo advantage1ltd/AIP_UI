@@ -1,11 +1,13 @@
 import { configureStore } from '@reduxjs/toolkit'
 import usersReducer from './features/users/usersSlice'
 import contactsReducer from './features/contactsSlice'
+import quizReducer from './features/quizSlice'
 
 const store = configureStore({
   reducer: {
     users: usersReducer,
-    contacts: contactsReducer
+    contacts: contactsReducer,
+    quiz: quizReducer
   },
   preloadedState: {
     users: []

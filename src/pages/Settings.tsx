@@ -16,13 +16,14 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { usePageAccess } from '@/contexts/PageAccessContext'
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Define types for our page access configuration
 interface Page {
   id: string
   name: string
   description: string
-  category: 'dashboard' | 'reports' | 'management' | 'customer' | 'settings'
+  category: 'dashboard' | 'reports' | 'management' | 'customer' | 'settings' | 'recruitment'
   path: string
 }
 
@@ -68,7 +69,9 @@ const Settings = () => {
     setPageAccessByRole, 
     currentRole,
     isTestMode,
-    testRole
+    testRole,
+    setIsTestMode: setTestMode,
+    setTestRole
   } = usePageAccess();
   
   // State for search filter
@@ -76,6 +79,9 @@ const Settings = () => {
   
   // State to track if admin access has been modified
   const [adminAccessModified, setAdminAccessModified] = useState(false);
+
+  // State for the selected role in the mobile view
+  const [selectedRoleForMobile, setSelectedRoleForMobile] = useState<string>(userRoles[0]?.id || ''); // Default to first role
 
   // Effect to check if admin access has been modified
   useEffect(() => {
@@ -113,7 +119,8 @@ const Settings = () => {
     'management': 'Management',
     'reports': 'Operations',
     'customer': 'Customer',
-    'settings': 'Settings'
+    'settings': 'Settings',
+    'recruitment': 'Recruitment'
   };
 
   // Define subcategory display names
@@ -148,6 +155,7 @@ const Settings = () => {
     'customer-officer-support': 'Customer',
     'dashboard': 'Dashboard',
     'settings': 'Settings',
+    'take-test': 'Recruitment',
     'crm-dashboard': 'CRM',
     'crm-deals': 'CRM',
     'crm-leads': 'CRM',
@@ -160,7 +168,7 @@ const Settings = () => {
     'compliance-password-register': 'Compliance'
   };
 
-  const categoryOrder = ['dashboard', 'management', 'reports', 'customer', 'settings'];
+  const categoryOrder = ['dashboard', 'management', 'reports', 'customer', 'settings', 'recruitment'];
 
   // Group pages by subcategory for better organization
   const pagesBySubcategory = filteredPages.reduce((acc, page) => {
@@ -174,18 +182,23 @@ const Settings = () => {
 
   // Define subcategory order
   const subcategoryOrder = [
-    'Dashboard', 
+    'Dashboard',
     'Action Calendar',
     'Administration',
     'CRM',
     'Recruitment',
     'Compliance',
-    'Operations', 
-    'Employee', 
-    'Management', 
-    'Customer', 
+    'Operations',
+    'Employee',
+    'Management',
+    'Customer',
     'Settings'
   ];
+
+  // Split roles into two groups for the mobile/small tablet view
+  const rolesPerRowMobile = 3; // Show 3 roles per row on mobile
+  const mobileRoleGroup1 = userRoles.slice(0, rolesPerRowMobile);
+  const mobileRoleGroup2 = userRoles.slice(rolesPerRowMobile);
 
   // Handle toggle change
   const handleToggle = (pageId: string, roleId: string) => {
@@ -229,13 +242,16 @@ const Settings = () => {
     });
   };
 
+  // Find the full object for the selected mobile role
+  const selectedMobileRoleObject = userRoles.find(role => role.id === selectedRoleForMobile);
+
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="w-full px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6 space-y-3 sm:space-y-4">
       {/* Test Mode Banner */}
       {isTestMode && currentRole === 'administrator' && (
-        <Alert className="bg-blue-50 border-blue-200 text-blue-800">
+        <Alert className="bg-blue-50 border-blue-200 text-blue-800 mb-4">
           <Eye className="h-4 w-4" />
-          <AlertTitle className="flex items-center gap-2">
+          <AlertTitle className="flex flex-wrap items-center gap-2">
             Admin Test Mode
             <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-700 border-blue-300">
               {userRoles.find(r => r.id === testRole)?.name || testRole}
@@ -248,145 +264,234 @@ const Settings = () => {
         </Alert>
       )}
 
-      <Card className="border shadow-sm">
-        <CardHeader className="bg-card border-b pb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle className="text-xl font-semibold flex items-center gap-2">
-                <UserCog className="h-5 w-5 text-primary" />
-                Configure User Role Access
-              </CardTitle>
-              <CardDescription className="mt-1">
-                Manage which pages each user role can access in the application
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-3">
+      <div className="bg-white rounded-lg shadow-sm border border-border/40">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between p-4 border-b">
+          <div className="mb-3 md:mb-0">
+            <h1 className="text-lg md:text-xl font-semibold flex items-center gap-2">
+              <UserCog className="h-5 w-5 text-primary" />
+              Configure User Role Access
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage which pages each user role can access in the application
+            </p>
+          </div>
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
               {adminAccessModified && (
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={handleResetAdminAccess}
-                  className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                  className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10 text-xs"
                 >
-                  <AlertCircle className="h-4 w-4" />
-                  Reset Admin Access
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Reset Admin
                 </Button>
               )}
-              <Button onClick={handleSave} className="gap-2">
-                <Save className="h-4 w-4" />
+              <Button
+                size="sm"
+                onClick={handleSave}
+                className="w-full md:w-auto flex items-center justify-center gap-1.5 text-xs"
+              >
+                <Save className="h-3.5 w-3.5" />
                 Save Changes
               </Button>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6">
+        </div>
+
+        {/* Content Section */}
+        <div className="p-4">
           {adminAccessModified && (
-            <Alert variant="destructive" className="mb-6">
+            <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Warning: Administrator Access Modified</AlertTitle>
-              <AlertDescription>
+              <AlertTitle className="text-sm">Warning: Administrator Access Modified</AlertTitle>
+              <AlertDescription className="text-xs md:text-sm">
                 You have restricted administrator access to certain pages. This may affect system functionality.
                 Click "Reset Admin Access" to restore full access.
               </AlertDescription>
             </Alert>
           )}
-          
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-            <div className="relative w-full max-w-sm">
+
+          {/* Search and Filter */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+            <div className="relative w-full md:max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search pages..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-9 w-full text-sm h-9"
               />
             </div>
-            <div className="text-sm text-muted-foreground">
+            
+            {/* Mobile Role Selector Dropdown - Visible only below md */}
+            <div className="block md:hidden w-full">
+              <Select value={selectedRoleForMobile} onValueChange={setSelectedRoleForMobile}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Select a role to configure" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userRoles.map((role) => (
+                    <SelectItem key={role.id} value={role.id} className="text-sm">
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Page Count */}
+            <div className="text-xs sm:text-sm text-muted-foreground text-right md:text-left flex-shrink-0">
               {filteredPages.length} {filteredPages.length === 1 ? 'page' : 'pages'} found
             </div>
           </div>
 
-          <Card className="border overflow-hidden">
-            <ScrollArea className="h-[600px]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[300px] font-semibold">Page</TableHead>
-                    {userRoles.map(role => (
-                      <TableHead key={role.id} className="text-center">
+          {/* Table Container - Now holds BOTH table versions */} 
+          <div className="border rounded-md shadow-sm">
+            
+            {/* --- Table for Larger Screens (md and up) --- */} 
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full min-w-[900px]"> {/* Ensure min-width for larger screens */}
+                <thead className="bg-muted/50 sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left py-3 px-4 font-medium text-sm w-[35%] md:w-[30%]">Page</th>
+                    {userRoles.map((role) => (
+                      <th key={role.id} className="text-center py-3 px-2 font-medium text-xs whitespace-nowrap">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="font-semibold whitespace-nowrap px-2 py-1 rounded-full bg-secondary/50 inline-block">
+                              {/* Full name on larger screens */} 
+                              <span className="inline-block px-2 py-1 rounded-full bg-secondary/50">
                                 {role.name}
-                                {isTestMode && testRole === role.id && (
-                                  <Badge variant="outline" className="ml-2">
-                                    Testing
-                                  </Badge>
-                                )}
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>{role.description}</p>
+                              <p className="text-xs">{role.description}</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
-                      </TableHead>
+                      </th>
                     ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                  </tr>
+                </thead>
+                <tbody>
                   {subcategoryOrder.map(subcategory => {
                     const pagesInSubcategory = pagesBySubcategory[subcategory] || [];
                     if (pagesInSubcategory.length === 0) return null;
-                    
                     return (
-                      <React.Fragment key={subcategory}>
-                        {/* Category Header */}
-                        <TableRow className="bg-muted/50">
-                          <TableCell colSpan={userRoles.length + 1} className="py-3">
-                            <div className="font-bold text-sm">{subcategory}</div>
-                          </TableCell>
-                        </TableRow>
-                        
-                        {/* Pages in this category */}
+                      <React.Fragment key={subcategory + '-lg'}>
+                        <tr className="bg-muted/30 border-t">
+                          <td colSpan={userRoles.length + 1} className="py-2 px-4 font-semibold text-sm">
+                            {subcategory}
+                          </td>
+                        </tr>
                         {pagesInSubcategory.map(page => (
-                          <TableRow key={page.id} className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="border-l-2 border-l-transparent hover:border-l-primary transition-colors">
+                          <tr key={page.id + '-lg'} className="border-t hover:bg-muted/20 transition-colors">
+                            <td className="py-3 px-4 border-l-2 border-l-transparent hover:border-l-primary">
                               <div>
-                                <div className="font-medium">{page.name}</div>
-                                <div className="text-sm text-muted-foreground">{page.description}</div>
+                                <div className="font-medium text-sm">{page.name}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">{page.description}</div>
                               </div>
-                            </TableCell>
+                            </td>
                             {userRoles.map(role => (
-                              <TableCell key={role.id} className="text-center">
+                              <td key={`${page.id}-${role.id}-lg`} className="text-center py-3 px-2">
                                 <div className="flex justify-center">
                                   <Switch
                                     checked={(pageAccessByRole[role.id] || []).includes(page.id)}
                                     onCheckedChange={() => handleToggle(page.id, role.id)}
                                     disabled={role.id === 'administrator' && !adminAccessModified}
-                                    className="transition-all duration-200 hover:scale-105"
+                                    className="data-[state=checked]:bg-primary h-5 w-9"
                                   />
                                 </div>
-                              </TableCell>
+                              </td>
                             ))}
-                          </TableRow>
+                          </tr>
                         ))}
                       </React.Fragment>
                     );
                   })}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </Card>
-          
-          <div className="mt-6 flex justify-end">
-            <Button onClick={handleSave} className="gap-2">
-              <Save className="h-4 w-4" />
+                </tbody>
+              </table>
+            </div>
+
+            {/* --- Table for Small Screens (mobile/tablet) - Dropdown Controlled --- */}
+            <div className="block md:hidden">
+              {/* No overflow needed, table width adapts */}
+              <table className="w-full">
+                <thead className="bg-muted/50 sticky top-0 z-10">
+                  <tr>
+                    {/* Simpler header for mobile */}
+                    <th className="text-left py-3 px-4 font-medium text-sm w-3/5">Page</th>
+                    {/* Header shows the selected role */}
+                    <th className="text-center py-3 px-2 font-medium text-xs whitespace-nowrap w-2/5">
+                      {selectedMobileRoleObject ? (
+                         <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-block px-2 py-1 rounded-full bg-secondary/50">
+                                {selectedMobileRoleObject.name}
+                              </span>
+                             </TooltipTrigger>
+                            <TooltipContent><p className="text-xs">{selectedMobileRoleObject.description}</p></TooltipContent>
+                           </Tooltip>
+                         </TooltipProvider>
+                      ) : (
+                         'Select Role' // Placeholder if no role selected somehow
+                      )}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subcategoryOrder.map(subcategory => {
+                    const pagesInSubcategory = pagesBySubcategory[subcategory] || [];
+                    if (pagesInSubcategory.length === 0) return null;
+                    return (
+                      <React.Fragment key={subcategory + '-sm'}>
+                        <tr className="bg-muted/30 border-t">
+                          {/* Category header spans 2 columns */}
+                          <td colSpan={2} className="py-2 px-4 font-semibold text-sm">{subcategory}</td>
+                        </tr>
+                        {pagesInSubcategory.map(page => (
+                          <tr key={page.id + '-sm'} className="border-t hover:bg-muted/20 transition-colors">
+                            {/* Page details */}
+                            <td className="py-3 px-4 border-l-2 border-l-transparent hover:border-l-primary">
+                              <div>
+                                <div className="font-medium text-sm">{page.name}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">{page.description}</div>
+                              </div>
+                            </td>
+                            {/* Single switch column for the selected role */}
+                            <td className="text-center py-3 px-2">
+                              <div className="flex justify-center">
+                                <Switch
+                                  checked={(pageAccessByRole[selectedRoleForMobile] || []).includes(page.id)}
+                                  onCheckedChange={() => handleToggle(page.id, selectedRoleForMobile)}
+                                  // Disable admin switch only if not modified AND it's the selected role
+                                  disabled={selectedRoleForMobile === 'administrator' && !adminAccessModified}
+                                  className="data-[state=checked]:bg-primary h-5 w-9"
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+          {/* Bottom Save Button */} 
+          <div className="mt-4 flex justify-end">
+            <Button size="sm" onClick={handleSave} className="gap-1.5 text-xs">
+              <Save className="h-3.5 w-3.5" />
               Save Changes
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

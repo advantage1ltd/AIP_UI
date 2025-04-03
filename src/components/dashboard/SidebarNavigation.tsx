@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import {
   Settings as SettingsIcon,
   LayoutGrid,
@@ -80,44 +80,50 @@ interface NavItemProps {
 
 const NavItem = ({ to, icon, label, onClick, className }: NavItemProps) => {
   const { hasAccess } = usePageAccess();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isActive = location.pathname === to;
   
   if (!hasAccess(to)) return null;
   
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(to);
+    onClick?.();
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault()
-      onClick?.()
+      e.preventDefault();
+      navigate(to);
+      onClick?.();
     }
   }
 
   return (
-    <Link
-      to={to}
+    <a
+      href={to}
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
         "hover:bg-accent hover:text-accent-foreground",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        isActive && "bg-accent text-accent-foreground",
         className
       )}
-      onClick={onClick}
+      onClick={handleClick}
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >
       {icon}
       <span>{label}</span>
-    </Link>
+    </a>
   )
 }
 
-const handleKeyDown = (e: React.KeyboardEvent) => {
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault()
-    ;(e.target as HTMLElement).click()
-  }
-}
-
-export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => {
+export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate, onMobileClose }) => {
   const { hasAccess } = usePageAccess();
+  const navigate = useNavigate();
+  const location = useLocation();
   
   const hasSectionAccess = (paths: string[]) => {
     return paths.some(path => hasAccess(path));
@@ -172,7 +178,8 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
   
   const recruitmentPaths = [
     '/recruitment/vetting',
-    '/recruitment/cbt'
+    '/recruitment/cbt',
+    '/recruitment/take-test'
   ];
   
   const crmPaths = [
@@ -193,6 +200,22 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
   const showRecruitmentSection = hasSectionAccess(recruitmentPaths);
   const showCrmSection = hasSectionAccess(crmPaths);
 
+  const handleKeyDown = (to: string) => (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      navigate(to);
+      onNavigate?.();
+      onMobileClose?.();
+    }
+  };
+
+  const handleNavigation = (to: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(to);
+    onNavigate?.();
+    onMobileClose?.();
+  }
+
   return (
     <div className="px-3 py-2">
       <div className="space-y-4">
@@ -200,35 +223,94 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           <div className="pl-5">
             <Button
               asChild
-              className="w-[180px] bg-white hover:bg-white/90 text-black flex items-center justify-start gap-2 h-9 px-3 rounded-[20px]"
+              className={cn(
+                "w-[180px] bg-white hover:bg-white/90 text-black flex items-center justify-start gap-2 h-9 px-3 rounded-[20px]",
+                location.pathname === "/" && "bg-white/90"
+              )}
             >
-              <Link to="/" onClick={onNavigate} className="flex items-center gap-2">
+              <a 
+                href="/" 
+                onClick={handleNavigation("/")} 
+                onKeyDown={handleKeyDown("/")}
+                className="flex items-center gap-2"
+              >
                 <div className="bg-red-500/10 p-1.5 rounded-lg">
                   <LayoutGrid className="h-[18px] w-[18px] text-red-500" />
                 </div>
                 <span className="text-xs font-medium">Dashboard</span>
-              </Link>
+              </a>
             </Button>
           </div>
         )}
 
         {hasAccess('/action-calendar') && (
-          <Link
-            to="/action-calendar"
+          <a
+            href="/action-calendar"
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
               "hover:bg-accent hover:text-accent-foreground",
-              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              location.pathname === "/action-calendar" && "bg-accent text-accent-foreground"
             )}
+            onClick={handleNavigation("/action-calendar")}
+            onKeyDown={handleKeyDown("/action-calendar")}
             tabIndex={0}
-            onKeyDown={handleKeyDown}
           >
             <Calendar className="h-4 w-4" />
             <span>Action Calendar</span>
-          </Link>
+          </a>
         )}
 
         <Accordion type="multiple" className="space-y-1">
+          {showCrmSection && (
+            <AccordionItem value="crm" className="border-none">
+              <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
+                <Handshake className="h-4 w-4" />
+                <span className="flex-1 text-left">CRM</span>
+              </AccordionTrigger>
+              <AccordionContent className="pb-1 pt-0">
+                <div className="ml-4 space-y-1">
+                  <NavItem
+                    to="/crm/dashboard"
+                    icon={<LayoutDashboard className="h-4 w-4" />}
+                    label="Dashboard"
+                    onClick={onNavigate}
+                  />
+                  <NavItem
+                    to="/crm/leads"
+                    icon={<UserPlus className="h-4 w-4" />}
+                    label="Leads"
+                    onClick={onNavigate}
+                  />
+                  <NavItem
+                    to="/crm/contacts"
+                    icon={<Users className="h-4 w-4" />}
+                    label="Contacts"
+                    onClick={onNavigate}
+                  />
+                  <NavItem
+                    to="/crm/deals"
+                    icon={<DollarSign className="h-4 w-4" />}
+                    label="Deals"
+                    onClick={onNavigate}
+                  />
+                  <NavItem
+                    to="/crm/pipeline"
+                    icon={<GitBranch className="h-4 w-4" />}
+                    label="Pipeline"
+                    onClick={onNavigate}
+                  />
+                  <NavItem
+                    to="/crm/tasks"
+                    icon={<CheckSquare className="h-4 w-4" />}
+                    label="Tasks"
+                    onClick={onNavigate}
+                  />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          )}
+
           {showAdminSection && (
             <AccordionItem value="administration" className="border-none">
               <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
@@ -407,55 +489,6 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
             </AccordionItem>
           )}
 
-          {showCrmSection && (
-            <AccordionItem value="crm" className="border-none">
-              <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
-                <Handshake className="h-4 w-4" />
-                <span className="flex-1 text-left">CRM</span>
-              </AccordionTrigger>
-              <AccordionContent className="pb-1 pt-0">
-                <div className="ml-4 space-y-1">
-                  <NavItem
-                    to="/crm/dashboard"
-                    icon={<LayoutDashboard className="h-4 w-4" />}
-                    label="Dashboard"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/crm/leads"
-                    icon={<UserPlus className="h-4 w-4" />}
-                    label="Leads"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/crm/contacts"
-                    icon={<Users className="h-4 w-4" />}
-                    label="Contacts"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/crm/deals"
-                    icon={<DollarSign className="h-4 w-4" />}
-                    label="Deals"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/crm/pipeline"
-                    icon={<GitBranch className="h-4 w-4" />}
-                    label="Pipeline"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/crm/tasks"
-                    icon={<CheckSquare className="h-4 w-4" />}
-                    label="Tasks"
-                    onClick={onNavigate}
-                  />
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          )}
-
           {showComplianceSection && (
             <AccordionItem value="compliance" className="border-none">
               <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
@@ -507,6 +540,12 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                     label="CBT"
                     onClick={onNavigate}
                   />
+                  <NavItem
+                    to="/recruitment/take-test"
+                    icon={<FileQuestion className="h-4 w-4" />}
+                    label="Take Test"
+                    onClick={onNavigate}
+                  />
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -556,19 +595,23 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           )}
         </Accordion>
 
-        <Link
-          to="/settings"
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-            "hover:bg-accent hover:text-accent-foreground",
-            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          )}
-          tabIndex={0}
-          onKeyDown={handleKeyDown}
-        >
-          <Cog className="h-4 w-4" />
-          <span>Settings</span>
-        </Link>
+        {hasAccess('/settings') && (
+          <div className="px-2 pt-4">
+            <a
+              href="/settings"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium bg-blue-600 hover:bg-blue-700 text-white",
+                location.pathname === "/settings" && "bg-blue-700"
+              )}
+              onClick={handleNavigation("/settings")}
+              onKeyDown={handleKeyDown("/settings")}
+              tabIndex={0}
+            >
+              <Cog className="h-5 w-5" />
+              <span>Settings</span>
+            </a>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -363,19 +363,19 @@ const ManagerSupportPage: React.FC = () => {
 
   return (
     <TooltipProvider>
-      <div className="container mx-auto px-1 sm:px-2 md:px-6 py-2 md:py-6">
-        <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 mb-3 md:mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold">Manager Support</h1>
+      <div className="container mx-auto px-1 sm:px-2 md:px-6 lg:px-8 xl:px-10 2xl:px-12 py-2 md:py-6 lg:py-8 xl:py-10 2xl:py-12 max-w-screen-2xl">
+        <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 mb-3 md:mb-6 xl:mb-8">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-bold">Manager Support</h1>
           <Button 
             onClick={() => openDialog('create')}
-            className="bg-blue-500 hover:bg-blue-600 w-auto ml-auto text-xs sm:text-sm py-1 h-7 sm:h-8"
+            className="bg-blue-500 hover:bg-blue-600 w-auto ml-auto text-xs sm:text-sm xl:text-base py-1 h-7 sm:h-8 xl:h-10 px-3 sm:px-4 xl:px-6"
           >
             <span className="whitespace-nowrap">Add New</span>
           </Button>
         </div>
         
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-4 mb-3 md:mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-4 xl:gap-6 mb-3 md:mb-6 xl:mb-8">
           <SummaryCard 
             title="Total Updates" 
             value={totalUpdates} 
@@ -406,16 +406,16 @@ const ManagerSupportPage: React.FC = () => {
         
         {/* Main Content */}
         <Card className="overflow-hidden">
-          <CardContent className="p-2 sm:p-4 md:p-6">
-            <div className="flex items-center gap-1 sm:gap-2 mb-2 md:mb-4">
-              <InfoIcon className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
-              <h2 className="text-lg sm:text-xl font-semibold">Security Updates & Declarations</h2>
+          <CardContent className="p-2 sm:p-4 md:p-6 xl:p-8">
+            <div className="flex items-center gap-1 sm:gap-2 xl:gap-3 mb-2 md:mb-4 xl:mb-6">
+              <InfoIcon className="h-4 w-4 sm:h-5 sm:w-5 xl:h-6 xl:w-6 text-blue-500" />
+              <h2 className="text-lg sm:text-xl xl:text-2xl 2xl:text-3xl font-semibold">Security Updates & Declarations</h2>
             </div>
-            <p className="text-xs sm:text-sm text-gray-600 mb-3 md:mb-6">Track and manage security updates and officer declarations</p>
+            <p className="text-xs sm:text-sm xl:text-base text-gray-600 mb-3 md:mb-6 xl:mb-8">Track and manage security updates and officer declarations</p>
             
             {updates.length === 0 ? (
-              <div className="border rounded-md p-2 sm:p-4 bg-gray-50">
-                <p className="text-xs sm:text-sm text-gray-500">No updates available yet. Click "Add New Update" to create one.</p>
+              <div className="border rounded-md p-2 sm:p-4 xl:p-6 bg-gray-50">
+                <p className="text-xs sm:text-sm xl:text-base text-gray-500">No updates available yet. Click "Add New Update" to create one.</p>
               </div>
             ) : (
               <div className="overflow-x-auto -mx-2 sm:mx-0">
@@ -423,41 +423,49 @@ const ManagerSupportPage: React.FC = () => {
                   <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-[30%] py-2 px-1 sm:px-4">
-                          <div className="flex items-center gap-1 sm:gap-2">
-                            <FileIcon className="h-3 w-3 text-blue-500" />
-                            <span className="font-semibold text-[10px] sm:text-xs">Update Name</span>
+                        <TableHead className="w-[25%] py-2 px-1 sm:px-4 xl:px-6">
+                          <div className="flex items-center gap-1 sm:gap-2 xl:gap-3">
+                            <FileIcon className="h-3 w-3 xl:h-4 xl:w-4 text-blue-500" />
+                            <span className="font-semibold text-[10px] sm:text-xs xl:text-sm">Update Name</span>
                           </div>
                         </TableHead>
-                        <TableHead className="hidden md:table-cell md:w-[45%] py-2">
-                          <span className="font-semibold text-[10px] sm:text-xs">Description</span>
+                        <TableHead className="hidden md:table-cell w-[40%] py-2 xl:py-4">
+                          <span className="font-semibold text-[10px] sm:text-xs xl:text-sm">Description</span>
                         </TableHead>
-                        <TableHead className="w-[25%] py-2 px-1 sm:px-4">
-                          <div className="flex items-center gap-1 sm:gap-2">
-                            <CalendarIcon className="h-3 w-3 text-blue-500" />
-                            <span className="font-semibold text-[10px] sm:text-xs">Date</span>
+                        <TableHead className="w-[20%] py-2 px-1 sm:px-4 xl:px-6">
+                          <div className="flex items-center gap-1 sm:gap-2 xl:gap-3">
+                            <CalendarIcon className="h-3 w-3 xl:h-4 xl:w-4 text-blue-500" />
+                            <span className="font-semibold text-[10px] sm:text-xs xl:text-sm">Date</span>
                           </div>
                         </TableHead>
-                        <TableHead className="w-[30%] md:w-[15%] text-right py-2 px-1 sm:px-4">
-                          <span className="font-semibold text-[10px] sm:text-xs">Actions</span>
+                        <TableHead className="w-[15%] text-right py-2 px-1 sm:px-4 xl:px-6">
+                          <span className="font-semibold text-[10px] sm:text-xs xl:text-sm">Actions</span>
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {updates.map((update) => (
                         <TableRow key={update.id} className="hover:bg-gray-50">
-                          <TableCell className="py-1.5 sm:py-2 md:py-4 px-1 sm:px-4">
-                            <div className="font-medium text-blue-600 text-[10px] xs:text-xs sm:text-sm md:text-base truncate max-w-[100px] xs:max-w-none">{update.name}</div>
-                            <div className="md:hidden text-[9px] xs:text-[10px] text-gray-500 line-clamp-1 mt-0.5">{update.description}</div>
+                          <TableCell className="py-1.5 sm:py-2 md:py-4 xl:py-6 px-1 sm:px-4 xl:px-6">
+                            <div className="font-medium text-blue-600 text-[10px] xs:text-xs sm:text-sm md:text-base xl:text-lg max-w-[200px] xl:max-w-[300px] truncate">
+                              {update.name}
+                            </div>
+                            <div className="md:hidden text-[9px] xs:text-[10px] xl:text-xs text-gray-500 line-clamp-1 mt-0.5 max-w-[200px]">
+                              {update.description}
+                            </div>
                           </TableCell>
-                          <TableCell className="hidden md:table-cell py-1.5 sm:py-2 md:py-4">
-                            <div className="line-clamp-2 text-gray-600 text-xs sm:text-sm md:text-base">{update.description}</div>
+                          <TableCell className="hidden md:table-cell py-1.5 sm:py-2 md:py-4 xl:py-6">
+                            <div className="text-gray-600 text-xs sm:text-sm md:text-base xl:text-lg line-clamp-2 max-w-[300px] xl:max-w-[500px]">
+                              {update.description}
+                            </div>
                           </TableCell>
-                          <TableCell className="py-1.5 sm:py-2 md:py-4 px-1 sm:px-4">
-                            <div className="text-gray-600 text-[10px] xs:text-xs sm:text-sm md:text-base whitespace-nowrap">{format(update.effectiveDate, "MM/d/yy")}</div>
+                          <TableCell className="py-1.5 sm:py-2 md:py-4 xl:py-6 px-1 sm:px-4 xl:px-6">
+                            <div className="text-gray-600 text-[10px] xs:text-xs sm:text-sm md:text-base xl:text-lg whitespace-nowrap">
+                              {format(update.effectiveDate, "dd/MM/yyyy")}
+                            </div>
                           </TableCell>
-                          <TableCell className="py-1.5 sm:py-2 md:py-4 px-0.5 sm:px-4">
-                            <div className="flex justify-end items-center gap-0.5 sm:gap-1">
+                          <TableCell className="py-1.5 sm:py-2 md:py-4 xl:py-6 px-0.5 sm:px-4 xl:px-6">
+                            <div className="flex justify-end items-center gap-0.5 sm:gap-1 xl:gap-2">
                               {[
                                 { icon: <Eye />, color: "text-blue-600", hoverColor: "hover:bg-blue-50", action: () => openDialog('view', update) },
                                 { icon: <Download />, color: "text-green-600", hoverColor: "hover:bg-green-50", action: () => handleDownload(update) },
@@ -469,13 +477,13 @@ const ManagerSupportPage: React.FC = () => {
                                     <Button 
                                       variant="ghost"
                                       size="sm"
-                                      className={`h-5 w-5 xs:h-6 xs:w-6 sm:h-8 sm:w-8 p-0 ${btn.hoverColor}`}
+                                      className={`h-5 w-5 xs:h-6 xs:w-6 sm:h-8 sm:w-8 xl:h-10 xl:w-10 p-0 ${btn.hoverColor}`}
                                       onClick={btn.action}
                                     >
-                                      {React.cloneElement(btn.icon as React.ReactElement, { className: `h-2.5 w-2.5 xs:h-3 xs:w-3 sm:h-4 sm:w-4 ${btn.color}` })}
+                                      {React.cloneElement(btn.icon as React.ReactElement, { className: `h-2.5 w-2.5 xs:h-3 xs:w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 ${btn.color}` })}
                                     </Button>
                                   </TooltipTrigger>
-                                  <TooltipContent className="text-[9px] xs:text-xs" side="top">
+                                  <TooltipContent className="text-[9px] xs:text-xs xl:text-sm" side="top">
                                     {idx === 0 ? "View" : idx === 1 ? "Download" : idx === 2 ? "Edit" : "Delete"}
                                   </TooltipContent>
                                 </Tooltip>
@@ -494,10 +502,10 @@ const ManagerSupportPage: React.FC = () => {
 
         {/* Create Dialog */}
         <Dialog open={dialogState.create} onOpenChange={(open) => !open && closeDialog('create')}>
-          <DialogContent className="sm:max-w-[500px] max-h-[95vh] overflow-y-auto p-3 sm:p-6 w-[calc(100%-16px)]">
+          <DialogContent className="sm:max-w-[500px] xl:max-w-[800px] max-h-[95vh] overflow-y-auto p-3 sm:p-6 xl:p-8 w-[calc(100%-16px)]">
             <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">Add New Update</DialogTitle>
-              <DialogDescription className="text-xs sm:text-sm text-gray-500">
+              <DialogTitle className="text-lg sm:text-xl xl:text-2xl 2xl:text-3xl">Add New Update</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm xl:text-base text-gray-500">
                 Create a new security update for manager support
               </DialogDescription>
             </DialogHeader>
@@ -514,13 +522,13 @@ const ManagerSupportPage: React.FC = () => {
               formId="create"
             />
             
-            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
-              <Button variant="outline" onClick={() => closeDialog('create')} className="w-full sm:w-auto order-2 sm:order-1">
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 mt-4 xl:mt-6">
+              <Button variant="outline" onClick={() => closeDialog('create')} className="w-full sm:w-auto order-2 sm:order-1 h-8 sm:h-10 xl:h-12 text-xs sm:text-sm xl:text-base">
                 Cancel
               </Button>
               <Button 
                 onClick={handleCreate}
-                className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto order-1 sm:order-2"
+                className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto order-1 sm:order-2 h-8 sm:h-10 xl:h-12 text-xs sm:text-sm xl:text-base"
               >
                 Add Update
               </Button>
@@ -530,55 +538,55 @@ const ManagerSupportPage: React.FC = () => {
 
         {/* View Dialog */}
         <Dialog open={dialogState.view} onOpenChange={(open) => !open && closeDialog('view')}>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogContent className="sm:max-w-[500px] xl:max-w-[800px] max-h-[90vh] overflow-y-auto p-4 sm:p-6 xl:p-8">
             <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">View Update</DialogTitle>
+              <DialogTitle className="text-lg sm:text-xl xl:text-2xl 2xl:text-3xl">View Update</DialogTitle>
             </DialogHeader>
             
             {selectedUpdate && (
-              <div className="space-y-3 sm:space-y-4 py-2 sm:py-4">
+              <div className="space-y-3 sm:space-y-4 xl:space-y-6 py-2 sm:py-4 xl:py-6">
                 {[
                   { label: "Update Name", value: selectedUpdate.name },
                   { label: "Description", value: selectedUpdate.description },
-                  { label: "Effective Date", value: format(selectedUpdate.effectiveDate, "MMMM d, yyyy") },
-                  { label: "Created", value: format(selectedUpdate.createdAt, "MMMM d, yyyy") }
+                  { label: "Effective Date", value: format(selectedUpdate.effectiveDate, "dd/MM/yyyy") },
+                  { label: "Created", value: format(selectedUpdate.createdAt, "dd/MM/yyyy") }
                 ].map((field, idx) => (
                   <div key={idx} className="space-y-1 sm:space-y-2">
-                    <h3 className="text-xs sm:text-sm font-medium text-gray-500">{field.label}</h3>
-                    <p className="text-sm sm:text-base">{field.value}</p>
+                    <h3 className="text-xs sm:text-sm xl:text-base font-medium text-gray-500">{field.label}</h3>
+                    <p className="text-sm sm:text-base xl:text-lg">{field.value}</p>
                   </div>
                 ))}
                 
                 <div className="space-y-1 sm:space-y-2">
-                  <h3 className="text-xs sm:text-sm font-medium text-gray-500">Document</h3>
-                  <div className="flex items-center flex-wrap gap-2">
-                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 text-blue-500" />
-                    <span className="text-sm sm:text-base">{selectedUpdate.documentName}</span>
+                  <h3 className="text-xs sm:text-sm xl:text-base font-medium text-gray-500">Document</h3>
+                  <div className="flex items-center flex-wrap gap-2 xl:gap-3">
+                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 xl:h-6 xl:w-6 mr-1 sm:mr-2 text-blue-500" />
+                    <span className="text-sm sm:text-base xl:text-lg">{selectedUpdate.documentName}</span>
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="ml-auto h-7 sm:h-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1"
+                      className="ml-auto h-7 sm:h-8 xl:h-10 text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1"
                       onClick={() => handleDownload(selectedUpdate)}
                     >
-                      <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                      <span className="text-xs sm:text-sm">Download</span>
+                      <Download className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 mr-1" />
+                      <span className="text-xs sm:text-sm xl:text-base">Download</span>
                     </Button>
                   </div>
                 </div>
                 
                 <div className="space-y-1 sm:space-y-2">
-                  <h3 className="text-xs sm:text-sm font-medium text-gray-500">Declarations</h3>
-                  <Badge variant={selectedUpdate.declarations ? "default" : "outline"} className={selectedUpdate.declarations ? "bg-blue-100 text-blue-800" : ""}>
+                  <h3 className="text-xs sm:text-sm xl:text-base font-medium text-gray-500">Declarations</h3>
+                  <Badge variant={selectedUpdate.declarations ? "default" : "outline"} className={`${selectedUpdate.declarations ? 'bg-blue-100 text-blue-800' : ''} text-xs sm:text-sm xl:text-base px-2 py-1 xl:px-3 xl:py-1.5`}>
                     {selectedUpdate.declarations} Officers
                   </Badge>
                 </div>
               </div>
             )}
             
-            <DialogFooter className="mt-4">
+            <DialogFooter className="mt-4 xl:mt-6">
               <Button 
                 onClick={() => closeDialog('view')}
-                className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto"
+                className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto h-8 sm:h-10 xl:h-12 text-xs sm:text-sm xl:text-base"
               >
                 Close
               </Button>
@@ -588,10 +596,10 @@ const ManagerSupportPage: React.FC = () => {
 
         {/* Edit Dialog */}
         <Dialog open={dialogState.edit} onOpenChange={(open) => !open && closeDialog('edit')}>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogContent className="sm:max-w-[500px] xl:max-w-[800px] max-h-[90vh] overflow-y-auto p-4 sm:p-6 xl:p-8">
             <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">Edit Update</DialogTitle>
-              <DialogDescription className="text-xs sm:text-sm text-gray-500">
+              <DialogTitle className="text-lg sm:text-xl xl:text-2xl 2xl:text-3xl">Edit Update</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm xl:text-base text-gray-500">
                 Modify the security update details
               </DialogDescription>
             </DialogHeader>
@@ -609,13 +617,13 @@ const ManagerSupportPage: React.FC = () => {
               formId="edit"
             />
             
-            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
-              <Button variant="outline" onClick={() => closeDialog('edit')} className="w-full sm:w-auto order-2 sm:order-1">
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 mt-4 xl:mt-6">
+              <Button variant="outline" onClick={() => closeDialog('edit')} className="w-full sm:w-auto order-2 sm:order-1 h-8 sm:h-10 xl:h-12 text-xs sm:text-sm xl:text-base">
                 Cancel
               </Button>
               <Button 
                 onClick={handleUpdate}
-                className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto order-1 sm:order-2"
+                className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto order-1 sm:order-2 h-8 sm:h-10 xl:h-12 text-xs sm:text-sm xl:text-base"
               >
                 Save Changes
               </Button>
@@ -625,20 +633,20 @@ const ManagerSupportPage: React.FC = () => {
 
         {/* Delete Dialog */}
         <Dialog open={dialogState.delete} onOpenChange={(open) => !open && closeDialog('delete')}>
-          <DialogContent className="sm:max-w-[500px] p-4 sm:p-6">
+          <DialogContent className="sm:max-w-[500px] xl:max-w-[800px] p-4 sm:p-6 xl:p-8">
             <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">Delete Update</DialogTitle>
-              <DialogDescription className="text-xs sm:text-sm text-gray-500">
+              <DialogTitle className="text-lg sm:text-xl xl:text-2xl 2xl:text-3xl">Delete Update</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm xl:text-base text-gray-500">
                 Are you sure you want to delete this update?
               </DialogDescription>
             </DialogHeader>
             
             {selectedUpdate && (
-              <div className="py-2 sm:py-4">
+              <div className="py-2 sm:py-4 xl:py-6">
                 <Alert variant="destructive">
-                  <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <AlertTitle className="text-sm sm:text-base">Warning</AlertTitle>
-                  <AlertDescription className="text-xs sm:text-sm">
+                  <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5" />
+                  <AlertTitle className="text-sm sm:text-base xl:text-lg">Warning</AlertTitle>
+                  <AlertDescription className="text-xs sm:text-sm xl:text-base">
                     This action cannot be undone. This will permanently delete the update
                     "{selectedUpdate.name}" and remove all associated data.
                   </AlertDescription>
@@ -646,14 +654,14 @@ const ManagerSupportPage: React.FC = () => {
               </div>
             )}
             
-            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
-              <Button variant="outline" onClick={() => closeDialog('delete')} className="w-full sm:w-auto order-2 sm:order-1">
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 mt-4 xl:mt-6">
+              <Button variant="outline" onClick={() => closeDialog('delete')} className="w-full sm:w-auto order-2 sm:order-1 h-8 sm:h-10 xl:h-12 text-xs sm:text-sm xl:text-base">
                 Cancel
               </Button>
               <Button 
                 onClick={handleDelete}
                 variant="destructive"
-                className="w-full sm:w-auto order-1 sm:order-2"
+                className="w-full sm:w-auto order-1 sm:order-2 h-8 sm:h-10 xl:h-12 text-xs sm:text-sm xl:text-base"
               >
                 Delete
               </Button>

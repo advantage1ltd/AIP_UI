@@ -22,7 +22,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { format } from "date-fns"
-import { CalendarIcon, PlusCircle, Trash2, Package } from "lucide-react"
+import { CalendarIcon, PlusCircle, Trash2, Package, QrCode } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -66,6 +66,7 @@ const formSchema = z.object({
     quantity: z.number(),
     totalAmount: z.number(),
     category: z.string(),
+    productName: z.string(),
   })).optional(),
   dutyManagerName: z.string().min(1, "Duty manager name is required"),
   status: z.enum(['pending', 'resolved', 'in-progress']).default('pending'),
@@ -146,9 +147,10 @@ interface IncidentFormProps {
   initialData?: Incident | null
   onSubmit: (data: Incident) => void
   onCancel: () => void
+  onScanBarcode?: () => void
 }
 
-const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit, onCancel }) => {
+const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit, onCancel, onScanBarcode }) => {
   const [stolenItems, setStolenItems] = useState<StolenItem[]>(initialData?.stolenItems || [])
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -255,11 +257,12 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       ...stolenItems,
       {
         id: Date.now().toString(),
+        category: "",
         description: "",
+        productName: "",
         cost: 0,
         quantity: 1,
         totalAmount: 0,
-        category: "",
       },
     ])
   }
@@ -282,16 +285,16 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="min-h-screen bg-[#F8F3F1]">
-        <div className="w-full max-w-[95%] sm:max-w-[90%] lg:max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="bg-[#F8F3F1]">
+        <div className="w-full max-w-[98%] mx-auto px-4 py-4">
           {/* Header */}
-          <div className="space-y-2 mb-4 sm:mb-6 lg:mb-8">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900">New Incident Report</h1>
-            <p className="text-sm sm:text-base text-gray-500">Fill in the details of the security incident below. All fields marked with * are required.</p>
+          <div className="space-y-2 mb-4">
+            <h1 className="text-xl font-semibold text-gray-900">New Incident Report</h1>
+            <p className="text-sm text-gray-500">Fill in the details of the security incident below. All fields marked with * are required.</p>
           </div>
 
           {/* Form Content */}
-          <div className="space-y-4 sm:space-y-5 lg:space-y-6">
+          <div className="space-y-4">
             {/* Main Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
               {/* Basic Information */}
@@ -831,24 +834,39 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     <h2 className="text-base sm:text-lg lg:text-xl font-medium text-gray-900">Stolen Items</h2>
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  onClick={addStolenItem}
-                  variant="outline"
-                  size="lg"
-                  className="flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px]"
-                >
-                  <PlusCircle className="h-5 w-5" />
-                  Add Item
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+                  <Button
+                    type="button"
+                    onClick={onScanBarcode}
+                    variant="outline"
+                    size="lg"
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px]"
+                  >
+                    <QrCode className="h-5 w-5" />
+                    Scan Barcode
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={addStolenItem}
+                    variant="outline"
+                    size="lg"
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px]"
+                  >
+                    <PlusCircle className="h-5 w-5" />
+                    Add Item
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-4">
                 <div className="hidden sm:grid sm:grid-cols-12 gap-4">
-                  <div className="col-span-3">
+                  <div className="col-span-2">
                     <Label className="text-base font-medium">Category</Label>
                   </div>
-                  <div className="col-span-4">
+                  <div className="col-span-3">
+                    <Label className="text-base font-medium">Product Name</Label>
+                  </div>
+                  <div className="col-span-2">
                     <Label className="text-base font-medium">Description</Label>
                   </div>
                   <div className="col-span-2">
@@ -866,7 +884,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                   <div className="space-y-4">
                     {stolenItems.map((item, index) => (
                       <div key={index} className="flex flex-col sm:grid sm:grid-cols-12 gap-3 sm:gap-4 items-start sm:items-center border-b sm:border-0 pb-4 sm:pb-0">
-                        <div className="w-full sm:col-span-3">
+                        <div className="w-full sm:col-span-2">
                           <Label className="sm:hidden mb-1 block text-sm font-medium">Category</Label>
                           <Select
                             value={item.category}
@@ -884,7 +902,16 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="w-full sm:col-span-4">
+                        <div className="w-full sm:col-span-3">
+                          <Label className="sm:hidden mb-1 block text-sm font-medium">Product Name</Label>
+                          <Input
+                            className="h-11"
+                            value={item.productName}
+                            onChange={(e) => updateStolenItem(index, "productName", e.target.value)}
+                            placeholder="Product name"
+                          />
+                        </div>
+                        <div className="w-full sm:col-span-2">
                           <Label className="sm:hidden mb-1 block text-sm font-medium">Description</Label>
                           <Input
                             className="h-11"
@@ -967,20 +994,18 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
             </div>
 
             {/* Form Actions */}
-            <div className="flex flex-col xs:flex-row justify-end gap-3 sm:gap-4 pt-4">
+            <div className="flex justify-end items-center gap-3 pt-4">
               <Button 
                 type="button" 
                 variant="outline" 
-                size="lg"
                 onClick={onCancel}
-                className="w-full xs:w-auto min-h-[44px] sm:min-w-[120px]"
+                className="h-9 px-4 text-sm"
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
-                size="lg"
-                className="w-full xs:w-auto min-h-[44px] sm:min-w-[120px] bg-green-600 hover:bg-green-700 text-white"
+                className="h-9 px-4 text-sm bg-green-600 hover:bg-green-700 text-white"
               >
                 Save Incident
               </Button>

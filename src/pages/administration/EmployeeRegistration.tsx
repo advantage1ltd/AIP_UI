@@ -101,13 +101,13 @@ export default function EmployeeRegistration() {
 
   return (
     <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-indigo-100/80 via-purple-50/80 to-pink-100/80">
-      <div className="container mx-auto px-2 md:px-6 lg:px-8 py-4 md:py-6 lg:py-8 space-y-4 md:space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
-          <div className="space-y-1">
-            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-[#324053]">
+      <div className="container mx-auto px-2 md:px-6 lg:px-8 xl:px-10 2xl:px-12 py-4 md:py-6 lg:py-8 xl:py-10 2xl:py-12 space-y-4 md:space-y-6 xl:space-y-8 max-w-screen-2xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 xl:gap-6">
+          <div className="space-y-1 xl:space-y-2">
+            <h1 className="text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-bold text-[#324053]">
               Employee Registration
             </h1>
-            <p className="text-sm md:text-base text-gray-500">Register and manage employee information</p>
+            <p className="text-sm md:text-base xl:text-lg text-gray-500">Register and manage employee information</p>
           </div>
         </div>
 
@@ -120,7 +120,7 @@ export default function EmployeeRegistration() {
         <div className="w-full overflow-x-auto rounded-lg">
           <div className="min-w-[320px]">
             <Card className="bg-white/70 backdrop-blur-lg border border-gray-100 shadow-md">
-              <CardContent className="p-2 md:p-4 lg:p-6">
+              <CardContent className="p-2 md:p-4 lg:p-6 xl:p-8">
                 <EmployeesTable
                   employees={employees}
                   onNewEmployee={handleNewEmployee}
@@ -134,9 +134,9 @@ export default function EmployeeRegistration() {
 
         {/* Employee Form Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-[500px] p-4 sm:p-6">
+          <DialogContent className="max-w-[95vw] sm:max-w-[500px] xl:max-w-[800px] p-4 sm:p-6 xl:p-8 max-h-[95vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-lg md:text-xl">
+              <DialogTitle className="text-lg md:text-xl xl:text-2xl 2xl:text-3xl">
                 {selectedEmployee ? "Edit Employee" : "New Employee"}
               </DialogTitle>
             </DialogHeader>

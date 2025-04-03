@@ -66,8 +66,8 @@ const PatrolLogPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="container mx-auto px-2 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 max-w-[1280px]">
-        <div className="space-y-3 sm:space-y-4 md:space-y-6">
+      <div className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8 xl:px-10 2xl:px-12 py-3 sm:py-4 md:py-6 xl:py-8 2xl:py-10 max-w-screen-2xl">
+        <div className="space-y-3 sm:space-y-4 md:space-y-6 xl:space-y-8">
           {/* Header Section */}
           <PatrolLogHeader
             showEditForm={dialogState.showEditForm}
@@ -79,7 +79,7 @@ const PatrolLogPage: React.FC = () => {
 
           {/* Edit Form */}
           {dialogState.showEditForm && (
-            <div className="bg-white p-2 sm:p-4 md:p-6 rounded-lg border border-gray-200 shadow-sm">
+            <div className="bg-white p-2 sm:p-4 md:p-6 xl:p-8 rounded-lg border border-gray-200 shadow-sm">
               <PatrolLogEditForm
                 formData={editFormData}
                 onFormChange={handleEditFormChange}
@@ -93,44 +93,50 @@ const PatrolLogPage: React.FC = () => {
           )}
 
           {/* Main content grid layout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 xl:gap-8">
             {/* Download Section - spans 1 column on mobile, 2 on tablet, full width on desktop */}
             <div className="col-span-1 md:col-span-2 lg:col-span-4">
-              <PatrolLogDownload
-                startDate={startDate}
-                onStartDateChange={setStartDate}
-                endDate={endDate}
-                onEndDateChange={setEndDate}
-                csvData={handleGetCSVData()}
-              />
+              <div className="bg-white p-2 sm:p-4 md:p-6 xl:p-8 rounded-lg border border-gray-200 shadow-sm">
+                <PatrolLogDownload
+                  startDate={startDate}
+                  onStartDateChange={setStartDate}
+                  endDate={endDate}
+                  onEndDateChange={setEndDate}
+                  csvData={handleGetCSVData()}
+                />
+              </div>
             </div>
 
             {/* Filter Section - spans 1 column on mobile, 2 on tablet, full width on desktop  */}
             <div className="col-span-1 md:col-span-2 lg:col-span-4">
-              <PatrolLogFilter
-                selectedMonth={selectedMonth}
-                onMonthChange={setSelectedMonth}
-                itemType={itemType}
-                onItemTypeChange={setItemType}
-                searchTerm={searchTerm}
-                onSearchChange={handleSearchChange}
-                showCompletedRecords={showCompletedRecords}
-                onToggleCompletedRecords={handleToggleCompletedRecords}
-                onPatrolSystem={handlePatrolSystem}
-              />
+              <div className="bg-white p-2 sm:p-4 md:p-6 xl:p-8 rounded-lg border border-gray-200 shadow-sm">
+                <PatrolLogFilter
+                  selectedMonth={selectedMonth}
+                  onMonthChange={setSelectedMonth}
+                  itemType={itemType}
+                  onItemTypeChange={setItemType}
+                  searchTerm={searchTerm}
+                  onSearchChange={handleSearchChange}
+                  showCompletedRecords={showCompletedRecords}
+                  onToggleCompletedRecords={handleToggleCompletedRecords}
+                  onPatrolSystem={handlePatrolSystem}
+                />
+              </div>
             </div>
 
             {/* Table Section - spans full width across all breakpoints */}
             <div className="col-span-1 md:col-span-2 lg:col-span-4 overflow-hidden">
               <div className="bg-white rounded-xl shadow-sm border border-gray-200">
                 <div className="overflow-x-auto">
-                  <PatrolLogTable
-                    logs={paginatedLogs}
-                    selectedRow={selectedRow}
-                    onRowClick={handleRowClick}
-                  />
+                  <div className="min-w-[300px] max-w-full">
+                    <PatrolLogTable
+                      logs={paginatedLogs}
+                      selectedRow={selectedRow}
+                      onRowClick={handleRowClick}
+                    />
+                  </div>
                 </div>
-                <div className="border-t border-gray-200">
+                <div className="border-t border-gray-200 p-2 sm:p-3 md:p-4 xl:p-6">
                   <PatrolLogPagination
                     currentPage={currentPage}
                     totalPages={totalPages}
@@ -147,21 +153,21 @@ const PatrolLogPage: React.FC = () => {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={dialogState.showDeleteDialog} onOpenChange={closeDeleteDialog}>
-        <AlertDialogContent className="max-w-md mx-2 sm:mx-auto p-3 sm:p-4 md:p-6">
+        <AlertDialogContent className="max-w-md mx-2 sm:mx-auto p-3 sm:p-4 md:p-6 xl:p-8">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg">Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">
+            <AlertDialogTitle className="text-lg xl:text-xl">Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm xl:text-base">
               This action cannot be undone. This will permanently delete the selected patrol log record.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:gap-0 pt-2">
-            <AlertDialogCancel className="w-full sm:w-auto h-9 text-sm">Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:gap-0 pt-2 xl:pt-4">
+            <AlertDialogCancel className="w-full sm:w-auto h-9 xl:h-11 text-sm xl:text-base">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={() => {
                 handleDeleteRecord();
                 closeDeleteDialog();
               }}
-              className="w-full sm:w-auto h-9 text-sm bg-red-600 hover:bg-red-700 text-white"
+              className="w-full sm:w-auto h-9 xl:h-11 text-sm xl:text-base bg-red-600 hover:bg-red-700 text-white"
             >
               Delete
             </AlertDialogAction>
@@ -171,18 +177,18 @@ const PatrolLogPage: React.FC = () => {
 
       {/* Archive Confirmation Dialog */}
       <AlertDialog open={dialogState.showArchivedDialog} onOpenChange={closeArchivedDialog}>
-        <AlertDialogContent className="max-w-md mx-2 sm:mx-auto p-3 sm:p-4 md:p-6">
+        <AlertDialogContent className="max-w-md mx-2 sm:mx-auto p-3 sm:p-4 md:p-6 xl:p-8">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg">Record Archived Successfully</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">
+            <AlertDialogTitle className="text-lg xl:text-xl">Record Archived Successfully</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm xl:text-base">
               The selected record has been marked as closed and moved to the archived records.
               You can view it in the Completed Records Page.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="pt-2">
+          <AlertDialogFooter className="pt-2 xl:pt-4">
             <AlertDialogAction 
               onClick={closeArchivedDialog}
-              className="w-full sm:w-auto h-9 text-sm bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full sm:w-auto h-9 xl:h-11 text-sm xl:text-base bg-blue-600 hover:bg-blue-700 text-white"
             >
               OK
             </AlertDialogAction>

@@ -1,5 +1,6 @@
-import { useState } from "react"
-import { Plus, ChevronDown } from "lucide-react"
+import { useState, useMemo, useCallback } from "react"
+import React from 'react'
+import { Plus, ChevronDown, Users, Building, CheckCircle2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
@@ -8,7 +9,8 @@ import { LeadForm } from "@/components/leads/LeadForm"
 import { LeadFilter } from "@/components/leads/LeadFilter"
 import { Lead } from "@/types/leads"
 import { Contact } from "@/types/contacts"
-import { toast } from "@/components/ui/use-toast"
+import { toast as hotToast, ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 import { 
   Dialog, 
   DialogContent, 
@@ -27,6 +29,27 @@ import {
 import { useDispatch } from 'react-redux'
 import { addContact } from '@/store/features/contactsSlice'
 import { useNavigate } from 'react-router-dom'
+
+// Types
+type GroupByOption = "status" | "company" | null
+// Define LeadStatus type
+type LeadStatus = "New Lead" | "Qualified" | "Negotiation" | "Won" | "Lost";
+
+type Filters = { status?: LeadStatus }
+type StatCard = {
+  label: string
+  value: number
+  icon: React.ElementType
+  bgColor: string
+  hoverColor: string
+}
+
+// Update LeadFilter props type at the top of the file
+type LeadFilterProps = {
+  filters: Filters
+  onFilterChange: (filters: Filters) => void
+  className?: string // Make className optional
+}
 
 // Sample data - replace with actual data fetching
 const SAMPLE_LEADS: Lead[] = [
@@ -54,16 +77,159 @@ const SAMPLE_LEADS: Lead[] = [
   }
 ]
 
+// Components
+const StatCardComponent = React.memo(({ stat, isLast, totalStats }: { 
+  stat: StatCard
+  isLast: boolean
+  totalStats: number 
+}) => {
+  const Icon = stat.icon
+  return (
+    <Card 
+      className={`${stat.bgColor} ${stat.hoverColor} transition-all duration-200 rounded-lg shadow-sm overflow-hidden`}
+    >
+      <div className="p-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-sm text-white font-medium truncate">{stat.label}</span>
+          <Icon className="h-4 w-4 text-white/80" />
+        </div>
+        <p className="text-xl font-bold text-white">{stat.value}</p>
+      </div>
+    </Card>
+  )
+})
+
+const EmptyState = React.memo(({ searchQuery, filters, onAddLead }: { 
+  searchQuery: string
+  filters: Filters
+  onAddLead: () => void 
+}) => (
+  <div className="flex flex-col items-center justify-center p-8 sm:p-12 bg-white rounded-lg border border-border/40 shadow-lg text-center mt-4 sm:mt-6">
+    <div className="rounded-full bg-primary/10 p-4 mb-4">
+      <Plus className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+    </div>
+    <h3 className="text-lg sm:text-xl font-semibold mb-2">No leads found</h3>
+    <p className="text-sm sm:text-base text-muted-foreground mb-6 max-w-md mx-auto">
+      {searchQuery || filters.status 
+        ? "Try adjusting your search or filters to find what you're looking for." 
+        : "Get started by adding your first lead to begin tracking potential clients."}
+    </p>
+    <Button 
+      className="gap-2 bg-primary hover:bg-primary/90 text-sm sm:text-base py-2 px-4"
+      onClick={onAddLead}
+    >
+      <Plus className="h-5 w-5" />
+      Add your first lead
+    </Button>
+  </div>
+))
+
+const LeadsHeader = React.memo(({ filters, onFilterChange, onAddLead }: {
+  filters: Filters
+  onFilterChange: (filters: Filters) => void
+  onAddLead: () => void
+}) => (
+  <div className="flex flex-col space-y-2.5">
+    <div className="flex items-start">
+      <div className="bg-blue-50 rounded-lg p-1.5 mr-2">
+        <div className="text-blue-600">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-file-text"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+        </div>
+      </div>
+      <div>
+        <h1 className="text-lg font-bold tracking-tight text-primary">Lead Management</h1>
+        <p className="text-xs text-muted-foreground">
+          Manage and track your potential clients
+        </p>
+      </div>
+    </div>
+    
+    <div className="grid grid-cols-5 gap-2">
+      <div className="col-span-3">
+        <LeadFilter 
+          filters={filters}
+          onFilterChange={onFilterChange}
+          className="w-full"
+        />
+      </div>
+      <Button 
+        className="col-span-2 bg-primary text-white h-9 text-xs p-0 flex items-center justify-center gap-1"
+        onClick={onAddLead}
+      >
+        <Plus className="h-4 w-4" />
+        <span className="truncate">Add New Lead</span>
+      </Button>
+    </div>
+  </div>
+))
+
+const SearchControls = React.memo(({ 
+  searchQuery, 
+  onSearchChange, 
+  groupBy, 
+  onGroupByChange,
+  filteredLeadsCount,
+  filters,
+  searchText
+}: {
+  searchQuery: string
+  onSearchChange: (value: string) => void
+  groupBy: GroupByOption
+  onGroupByChange: (value: GroupByOption) => void
+  filteredLeadsCount: number
+  filters: Filters
+  searchText: string
+}) => (
+  <div className="space-y-3">
+    <Card className="shadow-md rounded-xl overflow-hidden">
+      <div className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <div className="relative flex-1">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2">
+            <Search className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+          </div>
+          <Input
+            placeholder="Search leads..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full h-10 sm:h-11 text-sm sm:text-base pl-10 pr-4 rounded-lg border-muted"
+          />
+        </div>
+        <Select 
+          value={groupBy || 'none'} 
+          onValueChange={(value) => onGroupByChange(value === 'none' ? null : value as GroupByOption)}
+        >
+          <SelectTrigger className="w-full sm:w-[180px] h-10 sm:h-11 text-sm sm:text-base rounded-lg border-muted">
+            <SelectValue placeholder="Group by..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No grouping</SelectItem>
+            <SelectItem value="status">Status</SelectItem>
+            <SelectItem value="company">Company</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </Card>
+    
+    <div className="text-sm sm:text-base text-muted-foreground px-1 flex items-center">
+      <div className="h-2 w-2 rounded-full bg-primary mr-2"></div>
+      Showing {filteredLeadsCount} {filteredLeadsCount === 1 ? 'lead' : 'leads'}
+      {filters.status ? ` with status "${filters.status}"` : ''}
+      {searchText ? ` matching "${searchText}"` : ''}
+    </div>
+  </div>
+))
+
 export default function Leads() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const [leads, setLeads] = useState<Lead[]>(SAMPLE_LEADS)
   const [searchQuery, setSearchQuery] = useState("")
-  const [filters, setFilters] = useState<{ status?: Lead['status'] }>({})
+  const [filters, setFilters] = useState<Filters>({})
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false)
-  const [groupBy, setGroupBy] = useState<"status" | "company" | null>(null)
+  const [groupBy, setGroupBy] = useState<GroupByOption>(null)
 
-  const handleAddLead = (event: React.FormEvent<HTMLFormElement>) => {
+  // Memoized handlers
+  const handleAddLead = useCallback((event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
     const newLead: Lead = {
@@ -73,7 +239,7 @@ export default function Leads() {
       email: formData.get("email") as string,
       phone: formData.get("phone") as string,
       title: formData.get("title") as string,
-      status: formData.get("status") as Lead['status'],
+      status: formData.get("status") as LeadStatus,
       notes: formData.get("notes") as string,
       lastInteraction: new Date().toLocaleDateString('en-US', {
         year: 'numeric',
@@ -82,16 +248,21 @@ export default function Leads() {
       })
     }
 
-    setLeads([newLead, ...leads])
+    setLeads(prev => [newLead, ...prev])
     setIsAddLeadOpen(false)
-    toast({
-      title: "Lead Added",
-      description: "New lead has been successfully added.",
+    hotToast("Lead Added", {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: "light",
     })
-  }
+  }, [])
 
-  const handleMoveToContact = (lead: Lead) => {
-    // Convert lead to contact
+  const handleMoveToContact = useCallback((lead: Lead) => {
     const newContact: Contact = {
       id: lead.id,
       name: lead.name,
@@ -104,186 +275,204 @@ export default function Leads() {
       region: "",
     }
 
-    // Add to contacts store
     dispatch(addContact(newContact))
-
-    // Remove from leads
-    setLeads(leads.filter(l => l.id !== lead.id))
-
-    // Show success message
-    toast({
-      title: "Lead Moved to Contacts",
-      description: `${lead.name} has been successfully moved to contacts.`
+    setLeads(prev => prev.filter(l => l.id !== lead.id))
+    
+    hotToast("Lead Moved to Contacts", {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: "light",
     })
 
-    // Navigate to contacts page
     navigate('/crm/contacts')
-  }
+  }, [dispatch, navigate])
 
-  const handleFilterChange = (newFilters: { status?: Lead['status'] }) => {
+  const handleFilterChange = useCallback((newFilters: Filters) => {
     setFilters(newFilters)
-  }
+  }, [])
 
-  // Apply filters and search
-  let filteredLeads = leads
-  
-  // Apply status filter
-  if (filters.status) {
-    filteredLeads = filteredLeads.filter(lead => lead.status === filters.status)
-  }
+  // Memoized computations
+  const filteredLeads = useMemo(() => {
+    let result = leads
 
-  // Apply search
-  if (searchQuery) {
-    const query = searchQuery.toLowerCase()
-    filteredLeads = filteredLeads.filter(lead =>
-      lead.name.toLowerCase().includes(query) ||
-      lead.company.toLowerCase().includes(query) ||
-      lead.email.toLowerCase().includes(query) ||
-      lead.title.toLowerCase().includes(query)
-    )
-  }
+    if (filters.status) {
+      result = result.filter(lead => lead.status === filters.status)
+    }
 
-  // Group leads if grouping is selected
-  const groupedLeads = groupBy ? 
-    filteredLeads.reduce((groups, lead) => {
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      result = result.filter(lead =>
+        lead.name.toLowerCase().includes(query) ||
+        lead.company.toLowerCase().includes(query) ||
+        lead.email.toLowerCase().includes(query) ||
+        lead.title.toLowerCase().includes(query)
+      )
+    }
+
+    return result
+  }, [leads, filters.status, searchQuery])
+
+  const groupedLeads = useMemo(() => {
+    if (!groupBy) return null
+    
+    return filteredLeads.reduce((groups, lead) => {
       const key = lead[groupBy]
       if (!groups[key]) {
         groups[key] = []
       }
       groups[key].push(lead)
       return groups
-    }, {} as Record<string, Lead[]>) 
-    : null
+    }, {} as Record<string, Lead[]>)
+  }, [filteredLeads, groupBy])
 
+  const stats = useMemo(() => [
+    { 
+      label: "Total Leads", 
+      value: leads.length,
+      icon: Users,
+      bgColor: "bg-indigo-900",
+      hoverColor: "hover:bg-indigo-800"
+    },
+    { 
+      label: "New Leads", 
+      value: leads.filter(lead => lead.status === "New Lead").length,
+      icon: Plus,
+      bgColor: "bg-blue-900",
+      hoverColor: "hover:bg-blue-800"
+    },
+    { 
+      label: "Qualified", 
+      value: leads.filter(lead => lead.status === "Qualified").length,
+      icon: CheckCircle2,
+      bgColor: "bg-purple-900",
+      hoverColor: "hover:bg-purple-800"
+    },
+    { 
+      label: "Companies", 
+      value: new Set(leads.map(lead => lead.company)).size,
+      icon: Building,
+      bgColor: "bg-slate-900",
+      hoverColor: "hover:bg-slate-800"
+    }
+  ], [leads])
+
+  // Main component return with optimized layout for mobile
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
-        {/* Header with action buttons */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-border/40">
-          <div className="space-y-1 w-full sm:w-auto">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">Lead Management</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Manage and track your potential clients
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-2 sm:mt-0">
-            <LeadFilter 
-              filters={filters}
-              onFilterChange={handleFilterChange}
-            />
-            <Button 
-              className="gap-2 bg-primary hover:bg-primary/90 w-full sm:w-auto"
-              onClick={() => setIsAddLeadOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Add Lead
-            </Button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-slate-50">
+      <div className="container mx-auto px-3 py-3 sm:py-4 max-w-full">
+        <div className="space-y-3 sm:space-y-4">
+          <LeadsHeader 
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onAddLead={() => setIsAddLeadOpen(true)}
+          />
 
-        {/* Search and Group Controls */}
-        <Card className="border border-border/40 shadow-sm">
-          <div className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div className="relative w-full sm:max-w-sm">
-              <Input
-                placeholder="Search leads..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full"
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {stats.map((stat, index) => (
+              <StatCardComponent 
+                key={stat.label} 
+                stat={stat} 
+                isLast={index === stats.length - 1}
+                totalStats={stats.length}
               />
-            </div>
-            <Select 
-              value={groupBy || 'none'} 
-              onValueChange={(value) => setGroupBy(value === 'none' ? null : value as "status" | "company")}
-            >
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Group by..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No grouping</SelectItem>
-                <SelectItem value="status">Status</SelectItem>
-                <SelectItem value="company">Company</SelectItem>
-              </SelectContent>
-            </Select>
+            ))}
           </div>
-        </Card>
 
-        {/* Lead Count Summary */}
-        <div className="text-sm text-muted-foreground">
-          Showing {filteredLeads.length} {filteredLeads.length === 1 ? 'lead' : 'leads'}
-          {filters.status ? ` with status "${filters.status}"` : ''}
-          {searchQuery ? ` matching "${searchQuery}"` : ''}
-        </div>
-
-        {/* Leads Table */}
-        <div className="bg-white rounded-lg border border-border/40 shadow-sm overflow-hidden">
-          {groupedLeads ? (
-            Object.entries(groupedLeads).map(([group, leads]) => (
-              <div key={group} className="space-y-2 p-4 sm:p-6">
-                <h2 className="text-lg font-semibold text-primary">{group}</h2>
-                <LeadTable 
-                  leads={leads}
-                  onMoveToContact={handleMoveToContact}
+          <div className="mt-3 sm:mt-4">
+            <div className="mb-2 sm:mb-3">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search leads..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-9 pl-8 border-slate-200 rounded-md text-sm"
                 />
               </div>
-            ))
-          ) : (
-            <LeadTable 
-              leads={filteredLeads}
-              onMoveToContact={handleMoveToContact}
-            />
-          )}
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-2.5 border-b border-slate-100 flex justify-between items-center">
+                <div className="text-xs text-muted-foreground">
+                  Showing {filteredLeads.length} {filteredLeads.length === 1 ? 'lead' : 'leads'}
+                </div>
+                <Select 
+                  value={groupBy || 'none'} 
+                  onValueChange={(value) => setGroupBy(value === 'none' ? null : value as GroupByOption)}
+                >
+                  <SelectTrigger className="w-[130px] h-7 text-xs rounded border-slate-200">
+                    <SelectValue placeholder="No grouping" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No grouping</SelectItem>
+                    <SelectItem value="status">Status</SelectItem>
+                    <SelectItem value="company">Company</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="overflow-x-auto">
+                <div className="min-w-full">
+                  {groupedLeads ? (
+                    <>
+                      {Object.entries(groupedLeads).map(([group, leads]) => (
+                        <div key={group}>
+                          <div className="p-2 bg-slate-50 font-medium text-xs text-primary border-t border-b border-slate-200">
+                            {group}
+                          </div>
+                          <LeadTable 
+                            leads={leads} 
+                            onMoveToContact={handleMoveToContact}
+                          />
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <LeadTable 
+                      leads={filteredLeads} 
+                      onMoveToContact={handleMoveToContact}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Add Lead Button (Bottom) */}
-        {filteredLeads.length > 0 && (
+        {/* Floating Action Button for Mobile */}
+        <div className="fixed right-3 bottom-3 z-10">
           <Button
-            variant="outline"
-            className="w-full py-4 sm:py-6 border-dashed"
+            size="icon"
+            className="h-11 w-11 rounded-full shadow-lg bg-primary text-white"
             onClick={() => setIsAddLeadOpen(true)}
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Add lead
+            <Plus className="h-5 w-5" />
           </Button>
-        )}
+        </div>
 
-        {/* Empty State */}
-        {filteredLeads.length === 0 && (
-          <div className="flex flex-col items-center justify-center p-8 sm:p-12 bg-white rounded-lg border border-border/40 shadow-sm text-center">
-            <div className="rounded-full bg-primary/10 p-3 mb-4">
-              <Plus className="h-6 w-6 text-primary" />
+        {/* Dialog */}
+        <Dialog open={isAddLeadOpen} onOpenChange={setIsAddLeadOpen}>
+          <DialogContent className="sm:max-w-[425px] p-0 mx-2 sm:mx-auto rounded-lg overflow-hidden">
+            <DialogHeader className="p-3 sm:p-4 bg-white border-b">
+              <DialogTitle className="text-base sm:text-lg font-semibold text-primary">Add New Lead</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm mt-1">
+                Add details of your new lead to start tracking.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="p-3 sm:p-4">
+              <LeadForm onSubmit={handleAddLead} />
             </div>
-            <h3 className="text-lg font-medium mb-2">No leads found</h3>
-            <p className="text-muted-foreground mb-6 max-w-md">
-              {searchQuery || filters.status 
-                ? "Try adjusting your search or filters to find what you're looking for." 
-                : "Get started by adding your first lead to begin tracking potential clients."}
-            </p>
-            <Button 
-              className="gap-2 bg-primary hover:bg-primary/90"
-              onClick={() => setIsAddLeadOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Add your first lead
-            </Button>
-          </div>
-        )}
-      </div>
+          </DialogContent>
+        </Dialog>
 
-      {/* Add Lead Dialog */}
-      <Dialog open={isAddLeadOpen} onOpenChange={setIsAddLeadOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle className="text-xl sm:text-2xl font-bold text-primary">
-              Add New Lead
-            </DialogTitle>
-            <DialogDescription>
-              Fill in the details below to add a new lead to your pipeline.
-            </DialogDescription>
-          </DialogHeader>
-          <LeadForm onSubmit={handleAddLead} />
-        </DialogContent>
-      </Dialog>
+        {/* Contact added toast */}
+        <ToastContainer position="bottom-right" hideProgressBar={false} closeOnClick pauseOnHover theme="light" />
+      </div>
     </div>
   )
 }
