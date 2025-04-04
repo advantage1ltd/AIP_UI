@@ -47,6 +47,7 @@ const ActionCalendar = withMotion(lazy(() => import('./pages/ActionCalendar')))
 const Profile = withMotion(lazy(() => import('./pages/Profile')))
 const Settings = withMotion(lazy(() => import('./pages/Settings')))
 const ConfigureViews = withMotion(lazy(() => import('./pages/ConfigureViews')))
+const ReportsDashboard = withMotion(lazy(() => import('./pages/ReportsDashboard')))
 
 // Administration
 const UserSetup = withMotion(lazy(() => import('./pages/administration/UserSetup')))
@@ -107,6 +108,7 @@ const AppRoutes = () => {
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/configure-views" element={<ConfigureViews />} />
+            <Route path="/reports-dashboard" element={<ReportsDashboard />} />
 
             {/* Administration Routes */}
             <Route path="/administration/user-setup" element={<UserSetup />} />

@@ -11,7 +11,7 @@ import {
   Quiz,
   Question,
   QuestionType,
-  QuizResult
+  QuizResult as BaseQuizResult,
 } from "@/store/features/quizSlice"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -59,6 +59,15 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Progress } from "@/components/ui/progress"
 
+// Extended QuizResult interface to include additional properties used in the UI
+interface QuizResult extends BaseQuizResult {
+  officerRank?: string;
+  officerDepartment?: string;
+  correctAnswers?: number;
+  totalQuestions?: number;
+  feedback?: string;
+}
+
 const CBT = () => {
   // Redux
   const dispatch = useDispatch()
@@ -73,6 +82,8 @@ const CBT = () => {
   const [editMode, setEditMode] = useState(false)
   const [questionDialogOpen, setQuestionDialogOpen] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
+  const [resultDetailsOpen, setResultDetailsOpen] = useState(false)
+  const [currentResult, setCurrentResult] = useState<QuizResult | null>(null)
   
   // Filtered quizzes based on search and filter
   const filteredQuizzes = quizzes.filter(quiz => {
@@ -611,12 +622,25 @@ const CBT = () => {
 
   // Results Tab content
   const ResultsTab = () => {
+    const [selectedQuizId, setSelectedQuizId] = useState<string>('all')
+    
+    // Filtered results based on selected quiz
+    const filteredResults = selectedQuizId === 'all' 
+      ? results 
+      : results.filter(result => result.quizId === selectedQuizId)
+      
+    // Handler for viewing result details
+    const handleViewResultDetails = (result: QuizResult) => {
+      setCurrentResult(result)
+      setResultDetailsOpen(true)
+    }
+    
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-semibold">Test Results</h2>
           <div>
-            <Select defaultValue="all">
+            <Select value={selectedQuizId} onValueChange={setSelectedQuizId}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by test" />
               </SelectTrigger>
@@ -644,40 +668,52 @@ const CBT = () => {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {results.map(result => (
-                  <tr key={result.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">{result.officerName}</td>
-                    <td className="px-4 py-3">{result.quizTitle}</td>
-                    <td className="px-4 py-3">{formatDate(result.endTime)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span>{result.score}/{result.totalPoints}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({result.percentageScore.toFixed(1)}%)
-                        </span>
-                      </div>
-                      <Progress 
-                        value={result.percentageScore} 
-                        className="h-1.5 w-24" 
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge className={
-                        result.status === 'passed' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }>
-                        {result.status === 'passed' ? 'Passed' : 'Failed'}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
+                {filteredResults.length > 0 ? (
+                  filteredResults.map(result => (
+                    <tr key={result.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">{result.officerName}</td>
+                      <td className="px-4 py-3">{result.quizTitle}</td>
+                      <td className="px-4 py-3">{formatDate(result.endTime)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span>{result.score}/{result.totalPoints}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({result.percentageScore.toFixed(1)}%)
+                          </span>
+                        </div>
+                        <Progress 
+                          value={result.percentageScore} 
+                          className="h-1.5 w-24" 
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge className={
+                          result.status === 'passed' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }>
+                          {result.status === 'passed' ? 'Passed' : 'Failed'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleViewResultDetails(result)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View Details
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                      No results found
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -988,6 +1024,267 @@ const CBT = () => {
           </DialogHeader>
           
           <QuestionForm />
+        </DialogContent>
+      </Dialog>
+      
+      {/* Result Details Dialog */}
+      <Dialog open={resultDetailsOpen} onOpenChange={setResultDetailsOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Test Result Details</DialogTitle>
+            <DialogDescription>
+              Detailed view of the officer's test performance
+            </DialogDescription>
+          </DialogHeader>
+          
+          {currentResult && (
+            <div className="space-y-6">
+              {/* Officer & Test Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Officer Information</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="space-y-2 text-sm">
+                      <div>
+                        <dt className="text-muted-foreground">Name:</dt>
+                        <dd className="font-medium">{currentResult.officerName}</dd>
+                      </div>
+                      {currentResult.officerRank && (
+                        <div>
+                          <dt className="text-muted-foreground">Rank:</dt>
+                          <dd>{currentResult.officerRank}</dd>
+                        </div>
+                      )}
+                      {currentResult.officerDepartment && (
+                        <div>
+                          <dt className="text-muted-foreground">Department:</dt>
+                          <dd>{currentResult.officerDepartment}</dd>
+                        </div>
+                      )}
+                    </dl>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Test Information</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="space-y-2 text-sm">
+                      <div>
+                        <dt className="text-muted-foreground">Test Name:</dt>
+                        <dd className="font-medium">{currentResult.quizTitle}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Date Taken:</dt>
+                        <dd>{formatDate(currentResult.endTime)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Duration:</dt>
+                        <dd>{Math.round((currentResult.endTime.getTime() - currentResult.startTime.getTime()) / 60000)} minutes</dd>
+                      </div>
+                    </dl>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Test Stats */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Test Performance</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="border rounded-lg p-4 flex flex-col items-center justify-center">
+                      <div className="text-3xl font-bold">{currentResult.score}</div>
+                      <div className="text-sm text-muted-foreground">Points Scored</div>
+                      <div className="text-xs">Out of {currentResult.totalPoints}</div>
+                    </div>
+                    <div className="border rounded-lg p-4 flex flex-col items-center justify-center">
+                      <div className="text-3xl font-bold">{currentResult.percentageScore.toFixed(1)}%</div>
+                      <div className="text-sm text-muted-foreground">Percentage</div>
+                      <div className="text-xs">
+                        <Badge className={
+                          currentResult.status === 'passed' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }>
+                          {currentResult.status === 'passed' ? 'PASSED' : 'FAILED'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="border rounded-lg p-4 flex flex-col items-center justify-center">
+                      <div className="text-3xl font-bold">{currentResult.correctAnswers || 
+                        currentResult.answers?.filter(a => a.correct).length || 0}</div>
+                      <div className="text-sm text-muted-foreground">Correct Answers</div>
+                      <div className="text-xs">Out of {currentResult.totalQuestions || 
+                        currentResult.answers?.length || 0} questions</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Answer Details */}
+              {currentResult.answers && currentResult.answers.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Answer Details</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {currentResult.answers.map((answer, index) => {
+                        // Find corresponding question if available
+                        const question = quizzes.find(q => q.id === currentResult.quizId)?.questions.find(q => q.id === answer.questionId);
+                        const isCorrect = answer.correct === true;
+                        
+                        return (
+                          <div key={answer.questionId} className={cn(
+                            "border rounded-lg p-4",
+                            isCorrect ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"
+                          )}>
+                            <div className="flex justify-between items-start">
+                              <div className="flex gap-2 items-start">
+                                <div className={cn(
+                                  "rounded-full h-6 w-6 flex items-center justify-center text-xs font-medium",
+                                  isCorrect ? "bg-emerald-200 text-emerald-800" : "bg-red-200 text-red-800"
+                                )}>
+                                  {index + 1}
+                                </div>
+                                <div>
+                                  <h4 className="font-medium text-sm">{question?.text || `Question ${index + 1}`}</h4>
+                                  
+                                  {question?.type === 'multiple-choice' && (
+                                    <div className="mt-2 pl-1 space-y-1">
+                                      {question.options.map((option, optIndex) => (
+                                        <div key={optIndex} className={cn(
+                                          "text-sm flex items-start gap-2",
+                                          answer.answer === optIndex.toString() && "font-medium",
+                                          question.correctAnswer === optIndex.toString() && "text-emerald-700",
+                                          answer.answer === optIndex.toString() && answer.answer !== question.correctAnswer && "text-red-700"
+                                        )}>
+                                          <div className={cn(
+                                            "h-4 w-4 mt-0.5 rounded-full flex items-center justify-center",
+                                            answer.answer === optIndex.toString() && (
+                                              answer.answer === question.correctAnswer 
+                                                ? "bg-emerald-500 text-white"
+                                                : "bg-red-500 text-white"
+                                            ),
+                                            question.correctAnswer === optIndex.toString() && answer.answer !== optIndex.toString() && "border-2 border-emerald-500"
+                                          )}>
+                                            {answer.answer === optIndex.toString() && (
+                                              <CheckSquare className="h-3 w-3" />
+                                            )}
+                                          </div>
+                                          <span>{option}</span>
+                                          {question.correctAnswer === optIndex.toString() && answer.answer !== optIndex.toString() && (
+                                            <span className="text-xs text-emerald-600 ml-1">(Correct Answer)</span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  {question?.type === 'true-false' && (
+                                    <div className="mt-2 pl-1 space-y-1">
+                                      <div className={cn(
+                                        "text-sm flex items-center gap-2",
+                                        answer.answer === 'true' && "font-medium",
+                                        question.correctAnswer === 'true' && "text-emerald-700",
+                                        answer.answer === 'true' && question.correctAnswer !== 'true' && "text-red-700"
+                                      )}>
+                                        <div className={cn(
+                                          "h-4 w-4 rounded-full flex items-center justify-center",
+                                          answer.answer === 'true' && (
+                                            question.correctAnswer === 'true' 
+                                              ? "bg-emerald-500 text-white" 
+                                              : "bg-red-500 text-white"
+                                          ),
+                                          question.correctAnswer === 'true' && answer.answer !== 'true' && "border-2 border-emerald-500"
+                                        )}>
+                                          {answer.answer === 'true' && <CheckSquare className="h-3 w-3" />}
+                                        </div>
+                                        <span>True</span>
+                                      </div>
+                                      <div className={cn(
+                                        "text-sm flex items-center gap-2",
+                                        answer.answer === 'false' && "font-medium",
+                                        question.correctAnswer === 'false' && "text-emerald-700",
+                                        answer.answer === 'false' && question.correctAnswer !== 'false' && "text-red-700"
+                                      )}>
+                                        <div className={cn(
+                                          "h-4 w-4 rounded-full flex items-center justify-center",
+                                          answer.answer === 'false' && (
+                                            question.correctAnswer === 'false' 
+                                              ? "bg-emerald-500 text-white" 
+                                              : "bg-red-500 text-white"
+                                          ),
+                                          question.correctAnswer === 'false' && answer.answer !== 'false' && "border-2 border-emerald-500"
+                                        )}>
+                                          {answer.answer === 'false' && <CheckSquare className="h-3 w-3" />}
+                                        </div>
+                                        <span>False</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {(question?.type === 'text' || question?.type === 'essay') && (
+                                    <div className="mt-2 pl-1">
+                                      <div className="text-sm">
+                                        <div className="font-medium">Officer's Answer:</div>
+                                        <div className="mt-1 p-2 border bg-white rounded">{answer.answer}</div>
+                                      </div>
+                                      {question.correctAnswer && (
+                                        <div className="text-sm mt-2">
+                                          <div className="font-medium text-emerald-700">Correct Answer:</div>
+                                          <div className="mt-1 p-2 border border-emerald-200 bg-emerald-50 rounded">{question.correctAnswer}</div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <Badge className={isCorrect ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}>
+                                {isCorrect ? "Correct" : "Incorrect"}
+                              </Badge>
+                            </div>
+                            
+                            {question && (
+                              <div className="text-xs text-muted-foreground mt-3 flex items-center justify-end">
+                                <div>Points: {isCorrect ? question.points : 0}/{question.points}</div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {/* Comments & Feedback */}
+              {currentResult.feedback && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Feedback & Comments</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="p-3 bg-slate-50 rounded border text-sm">
+                      {currentResult.feedback}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setResultDetailsOpen(false)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
