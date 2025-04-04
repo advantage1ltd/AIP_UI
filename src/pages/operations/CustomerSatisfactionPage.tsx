@@ -4,10 +4,17 @@ import { SurveyForm } from '@/pages/operations/components/SurveyForm';
 import { SurveyDetails } from '@/pages/operations/components/SurveyDetails';
 import { CustomerSurvey, SurveyFilters, PaginationState } from '@/pages/operations/components/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ClipboardList, FileSpreadsheet, BarChart3, Users, Building, MapPin, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { 
+  ClipboardList, FileSpreadsheet, BarChart3, Users, Building, MapPin, 
+  Eye, Pencil, Trash2, ChevronLeft, ChevronRight, Search, Download, Calendar as CalendarIcon 
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from 'date-fns';
+import { cn } from "@/lib/utils";
 
 // Generate mock data with more variety
 const generateMockSurveys = (count = 25): CustomerSurvey[] => {
@@ -255,16 +262,66 @@ const MobileSurveyCard = ({
   );
 };
 
+// Helper function to generate CSV data
+const generateCsvData = (data: CustomerSurvey[]): string => {
+  if (!data || data.length === 0) {
+    return '';
+  }
+
+  // Define headers, flattening the ratings
+  const headers = [
+    'ID', 'Officer Name', 'Date', 'Customer', 'Region', 'Location',
+    'Rating: Uniform & Appearance', 'Rating: Professionalism', 'Rating: Customer Service',
+    'Rating: Improved Security Feeling', 'Rating: Relations w/ Colleagues', 'Rating: Punctuality & Breaks',
+    'Rating: Proactivity', 'Store Manager Name', 'Area Manager Name',
+    'Follow Up Actions', 'Dates To Be Completed'
+  ];
+
+  // Convert survey data to CSV rows
+  const rows = data.map(survey => {
+    const ratings: Partial<CustomerSurvey['ratings']> = survey.ratings || {};
+    const row = [
+      survey.id,
+      survey.officerName,
+      survey.date,
+      survey.customer,
+      survey.region,
+      survey.location,
+      ratings.uniformAndAppearance ?? '',
+      ratings.professionalism ?? '',
+      ratings.customerServiceApproach ?? '',
+      ratings.improvedFeelingSecurity ?? '',
+      ratings.relationsWithStoreColleagues ?? '',
+      ratings.punctualityBreaks ?? '',
+      ratings.proactivity ?? '',
+      survey.storeManagerName,
+      survey.areaManagerName,
+      (survey.followUpActions || []).join('; '), // Join arrays with semicolon
+      (survey.datesToBeCompleted || []).join('; ')
+    ];
+    // Escape commas and wrap in quotes if necessary
+    return row.map(value => {
+      const strValue = String(value ?? '');
+      if (strValue.includes(',')) {
+        return `"${strValue.replace(/"/g, '""')}"`; // Escape double quotes
+      }
+      return strValue;
+    }).join(',');
+  });
+
+  return [headers.join(','), ...rows].join('\n');
+};
+
 const CustomerSatisfactionPage: React.FC = () => {
   // State management
   const [showForm, setShowForm] = useState(false);
   const [editingSurvey, setEditingSurvey] = useState<CustomerSurvey | null>(null);
   const [viewingSurvey, setViewingSurvey] = useState<CustomerSurvey | null>(null);
-  const [surveys, setSurveys] = useState<CustomerSurvey[]>(() => generateMockSurveys(25));
+  const [surveys, setSurveys] = useState<CustomerSurvey[]>(() => generateMockSurveys(50));
   const [pagination, setPagination] = useState<PaginationState>({
     currentPage: 1,
     pageSize: 10,
-    total: 25
+    total: 50
   });
   const [filters, setFilters] = useState<SurveyFilters>({
     search: '',
@@ -273,6 +330,8 @@ const CustomerSatisfactionPage: React.FC = () => {
     location: '',
     dateRange: undefined
   });
+  const [downloadStartDate, setDownloadStartDate] = useState<Date | undefined>();
+  const [downloadEndDate, setDownloadEndDate] = useState<Date | undefined>();
 
   // Event handlers with useCallback to prevent unnecessary rerenders
   const handleNewSurvey = useCallback(() => {
@@ -338,6 +397,61 @@ const CustomerSatisfactionPage: React.FC = () => {
   const handleCloseDetails = useCallback(() => {
     setViewingSurvey(null);
   }, []);
+
+  const handleDownloadCsv = useCallback(() => {
+    if (!downloadStartDate || !downloadEndDate) {
+      alert('Please select both a start and end date for the download.');
+      return;
+    }
+
+    if (downloadStartDate > downloadEndDate) {
+        alert('Start date cannot be after end date.');
+        return;
+    }
+
+    // Filter surveys based on the download date range
+    const filteredForDownload = surveys.filter(survey => {
+      const surveyDate = new Date(survey.date);
+      // Set hours to 0 to compare dates only
+      surveyDate.setHours(0, 0, 0, 0);
+      const startDate = new Date(downloadStartDate);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(downloadEndDate);
+      endDate.setHours(0, 0, 0, 0);
+
+      return surveyDate >= startDate && surveyDate <= endDate;
+    });
+
+    if (filteredForDownload.length === 0) {
+      alert('No survey data found for the selected date range.');
+      return;
+    }
+
+    // Generate CSV content
+    const csvData = generateCsvData(filteredForDownload);
+    if (!csvData) {
+      alert('Failed to generate CSV data.');
+      return;
+    }
+
+    // Create a Blob and trigger download
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) { // Check for download attribute support
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      const formattedStartDate = format(downloadStartDate, 'yyyy-MM-dd');
+      const formattedEndDate = format(downloadEndDate, 'yyyy-MM-dd');
+      link.setAttribute('download', `customer_satisfaction_${formattedStartDate}_to_${formattedEndDate}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url); // Clean up the object URL
+    } else {
+      alert('CSV download is not supported in your browser.');
+    }
+  }, [surveys, downloadStartDate, downloadEndDate]);
 
   // Memoized filter logic
   const filteredSurveys = useMemo(() => {
@@ -433,64 +547,192 @@ const CustomerSatisfactionPage: React.FC = () => {
                         <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
                       </div>
 
-                      {/* Mobile card list with pagination */}
-                      {paginatedSurveys.length > 0 ? (
-                        <>
-                          {paginatedSurveys.map(survey => (
-                            <MobileSurveyCard 
-                              key={survey.id}
-                              survey={survey}
-                              onEdit={handleEditSurvey}
-                              onView={handleViewSurvey}
-                              onDelete={handleDeleteSurvey}
-                            />
-                          ))}
-                          
-                          {/* Mobile pagination */}
-                          <div className="flex justify-between items-center mt-4 pt-2 border-t text-xs text-gray-500">
-                            <span>Page {pagination.currentPage} of {Math.ceil(filteredSurveys.length / pagination.pageSize)}</span>
-                            <div className="flex gap-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-8 w-8 p-0" 
-                                onClick={() => handlePageChange(pagination.currentPage - 1)}
-                                disabled={pagination.currentPage === 1}
-                              >
-                                <ChevronLeft className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-8 w-8 p-0" 
-                                onClick={() => handlePageChange(pagination.currentPage + 1)}
-                                disabled={pagination.currentPage >= Math.ceil(filteredSurveys.length / pagination.pageSize)}
-                              >
-                                <ChevronRight className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="text-center py-8 text-sm text-gray-500">
-                          No surveys found matching your search.
+                      {/* Download controls for Mobile */}
+                      <div className="mt-4 p-3 border rounded-md bg-gray-50">
+                        <p className="text-xs font-medium text-gray-600 mb-2">Download Report (CSV)</p>
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                           <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant={"outline"}
+                                  size="sm"
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal h-8 text-xs",
+                                    !downloadStartDate && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                                  {downloadStartDate ? format(downloadStartDate, "PPP") : <span>Start date</span>}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                  mode="single"
+                                  selected={downloadStartDate}
+                                  onSelect={setDownloadStartDate}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant={"outline"}
+                                  size="sm"
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal h-8 text-xs",
+                                    !downloadEndDate && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                                  {downloadEndDate ? format(downloadEndDate, "PPP") : <span>End date</span>}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                  mode="single"
+                                  selected={downloadEndDate}
+                                  onSelect={setDownloadEndDate}
+                                   disabled={(date) =>
+                                      downloadStartDate ? date < downloadStartDate : false
+                                    }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
                         </div>
-                      )}
+                        <Button 
+                          size="sm" 
+                          className="w-full h-8 text-xs" 
+                          onClick={handleDownloadCsv}
+                          disabled={!downloadStartDate || !downloadEndDate}
+                        >
+                           <Download className="mr-1 h-3.5 w-3.5" /> Download CSV
+                        </Button>
+                      </div>
+                      
+                      {/* Mobile card list with pagination */}
+                      <div className="mt-4"> 
+                        {paginatedSurveys.length > 0 ? (
+                          <>
+                            {paginatedSurveys.map(survey => (
+                              <MobileSurveyCard 
+                                key={survey.id}
+                                survey={survey}
+                                onEdit={handleEditSurvey}
+                                onView={handleViewSurvey}
+                                onDelete={handleDeleteSurvey}
+                              />
+                            ))}
+                            
+                            {/* Mobile pagination */}
+                            <div className="flex justify-between items-center mt-4 pt-2 border-t text-xs text-gray-500">
+                              <span>Page {pagination.currentPage} of {Math.ceil(filteredSurveys.length / pagination.pageSize)}</span>
+                              <div className="flex gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0" 
+                                  onClick={() => handlePageChange(pagination.currentPage - 1)}
+                                  disabled={pagination.currentPage === 1}
+                                >
+                                  <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0" 
+                                  onClick={() => handlePageChange(pagination.currentPage + 1)}
+                                  disabled={pagination.currentPage >= Math.ceil(filteredSurveys.length / pagination.pageSize)}
+                                >
+                                  <ChevronRight className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center py-8 text-sm text-gray-500">
+                            No surveys found matching your search.
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Desktop view - table layout (hidden on mobile) */}
                     <div className="hidden sm:block min-w-[320px] overflow-auto">
-                <SurveyTable 
-                  surveys={paginatedSurveys}
-                  pagination={pagination}
-                  filters={filters}
-                  onNewSurvey={handleNewSurvey}
-                  onEditSurvey={handleEditSurvey}
-                  onViewSurvey={handleViewSurvey}
-                  onDeleteSurvey={handleDeleteSurvey}
-                  onPageChange={handlePageChange}
-                  onFiltersChange={handleFiltersChange}
-                />
+                      {/* Download Controls for Desktop */}
+                       <div className="flex items-center gap-2 p-4 border-b">
+                         <span className="text-sm font-medium text-gray-700 mr-2">Download Report:</span>
+                         <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"outline"}
+                                size="sm"
+                                className={cn(
+                                  "w-[180px] justify-start text-left font-normal h-9",
+                                  !downloadStartDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {downloadStartDate ? format(downloadStartDate, "PPP") : <span>Start date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={downloadStartDate}
+                                onSelect={setDownloadStartDate}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                           <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant={"outline"}
+                                  size="sm"
+                                  className={cn(
+                                    "w-[180px] justify-start text-left font-normal h-9",
+                                    !downloadEndDate && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {downloadEndDate ? format(downloadEndDate, "PPP") : <span>End date</span>}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                  mode="single"
+                                  selected={downloadEndDate}
+                                  onSelect={setDownloadEndDate}
+                                  disabled={(date) =>
+                                      downloadStartDate ? date < downloadStartDate : false
+                                    }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          <Button 
+                            size="sm" 
+                            className="h-9" 
+                            onClick={handleDownloadCsv}
+                            disabled={!downloadStartDate || !downloadEndDate}
+                          >
+                            <Download className="mr-2 h-4 w-4" /> Download CSV
+                          </Button>
+                      </div>
+                      
+                      <SurveyTable 
+                        surveys={paginatedSurveys}
+                        pagination={pagination}
+                        filters={filters}
+                        onNewSurvey={handleNewSurvey}
+                        onEditSurvey={handleEditSurvey}
+                        onViewSurvey={handleViewSurvey}
+                        onDeleteSurvey={handleDeleteSurvey}
+                        onPageChange={handlePageChange}
+                        onFiltersChange={handleFiltersChange}
+                      />
                     </div>
                   </div>
                 </div>

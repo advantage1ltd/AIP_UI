@@ -58,6 +58,7 @@ const Index = lazy(() => import("./pages/Index"))
 const ActionCalendar = lazy(() => import("./pages/ActionCalendar"))
 const Settings = lazy(() => import("./pages/Settings"))
 const ConfigureViews = lazy(() => import("./pages/ConfigureViews"))
+const ReportsDashboard = lazy(() => import('./pages/ReportsDashboard'))
 const UserSetup = lazy(() => import("./pages/administration/UserSetup"))
 const EmployeeRegistration = lazy(() => import("./pages/administration/EmployeeRegistration"))
 const CustomerSetup = lazy(() => import("./pages/administration/CustomerSetup"))
@@ -113,6 +114,7 @@ const App: React.FC = () => {
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/configure-views" element={<ConfigureViews />} />
+                  <Route path="/reports-dashboard" element={<ReportsDashboard />} />
 
                   {/* Administration Routes */}
                   <Route path="/administration">
