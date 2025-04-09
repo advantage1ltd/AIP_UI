@@ -66,14 +66,14 @@ const SafeComponent: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   if (hasError) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
-        <h2 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-4">Something went wrong</h2>
-        <p className="text-slate-600 dark:text-slate-400 mb-6 text-center max-w-md">
+      <div className="flex flex-col items-center justify-center min-h-[300px] md:min-h-[400px] p-2 md:p-4 lg:p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+        <h2 className="text-lg md:text-xl font-semibold text-red-600 dark:text-red-400 mb-2 md:mb-4">Something went wrong</h2>
+        <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mb-4 md:mb-6 text-center max-w-md">
           We encountered an error while rendering this component. Please try refreshing the page.
         </p>
         <button 
           onClick={() => window.location.reload()}
-          className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm"
+          className="mt-2 md:mt-4 px-3 md:px-4 py-1.5 md:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm text-xs md:text-sm"
         >
           Refresh Page
         </button>
@@ -278,12 +278,12 @@ const BeSafeBeSecureGraph: React.FC = () => {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg">
-          <p className="font-medium text-sm">{label}</p>
+        <div className="bg-white dark:bg-slate-800 p-2 md:p-3 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg">
+          <p className="font-medium text-xs md:text-sm">{label}</p>
           {payload.map((entry: any, index: number) => (
-            <div key={`item-${index}`} className="flex items-center gap-2 mt-1">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.fill }}></div>
-              <p className="text-sm">
+            <div key={`item-${index}`} className="flex items-center gap-1 md:gap-2 mt-1">
+              <div className="w-2 h-2 md:w-3 md:h-3 rounded-full" style={{ backgroundColor: entry.fill }}></div>
+              <p className="text-xs md:text-sm">
                 <span className="text-slate-600 dark:text-slate-400">{entry.name}: </span>
                 <span className="font-medium">{entry.value}</span>
               </p>
@@ -299,13 +299,13 @@ const BeSafeBeSecureGraph: React.FC = () => {
   const CustomPieTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg">
-          <p className="font-medium text-sm">{payload[0].name}</p>
-          <p className="text-sm mt-1">
+        <div className="bg-white dark:bg-slate-800 p-2 md:p-3 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg">
+          <p className="font-medium text-xs md:text-sm">{payload[0].name}</p>
+          <p className="text-xs md:text-sm mt-1">
             <span className="text-slate-600 dark:text-slate-400">Value: </span>
             <span className="font-medium">{payload[0].value}</span>
           </p>
-          <p className="text-sm mt-1">
+          <p className="text-xs md:text-sm mt-1">
             <span className="text-slate-600 dark:text-slate-400">Percentage: </span>
             <span className="font-medium">{`${(payload[0].percent * 100).toFixed(1)}%`}</span>
           </p>
@@ -323,9 +323,9 @@ const BeSafeBeSecureGraph: React.FC = () => {
     try {
       if (isLoading) {
         return (
-          <div className="flex flex-col items-center justify-center h-[300px] md:h-[400px] p-4 md:p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
-            <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-sm text-slate-600 dark:text-slate-400">Loading chart data...</p>
+          <div className="flex flex-col items-center justify-center h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px] p-2 md:p-4 lg:p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+            <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 border-b-2 border-blue-600 mb-2 md:mb-4"></div>
+            <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Loading chart data...</p>
           </div>
         );
       }
@@ -333,9 +333,9 @@ const BeSafeBeSecureGraph: React.FC = () => {
       if (!displayData || displayData.length === 0) {
         console.warn('[BeSafeBeSecureGraph] No data available for chart');
         return (
-          <div className="flex flex-col items-center justify-center h-[300px] md:h-[400px] p-4 md:p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
-            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No data available</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 text-center max-w-md mb-6">
+          <div className="flex flex-col items-center justify-center h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px] p-2 md:p-4 lg:p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+            <h3 className="text-base md:text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No data available</h3>
+            <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 text-center max-w-md mb-4 md:mb-6">
               There is no data to display for the selected filters.
             </p>
           </div>
@@ -345,9 +345,9 @@ const BeSafeBeSecureGraph: React.FC = () => {
       if (selectedFilter === 'Breakdown of Insecure Areas') {
         return (
           <div className="w-full overflow-x-auto">
-            <div className="min-w-[600px] h-[300px] md:h-[400px]">
+            <div className="min-w-[320px] sm:min-w-[450px] md:min-w-[600px] h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={displayData} margin={{ top: 20, right: 30, left: 5, bottom: 60 }}>
+                <BarChart data={displayData} margin={{ top: 20, right: 20, left: 5, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                   <XAxis 
                     dataKey="area" 
@@ -355,22 +355,22 @@ const BeSafeBeSecureGraph: React.FC = () => {
                     angle={-45} 
                     textAnchor="end" 
                     height={60} 
-                    tick={{ fontSize: 10, fontWeight: 500 }}
+                    tick={{ fontSize: 9, fontWeight: 500 }}
                     tickLine={false}
                   />
-                  <YAxis tickLine={false} axisLine={false} width={40} />
+                  <YAxis tickLine={false} axisLine={false} width={30} tick={{ fontSize: 9 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar 
                     dataKey="value" 
                     fill={COLORS.secondary[0]}
                     radius={[4, 4, 0, 0]}
-                    barSize={30}
+                    barSize={20}
                   >
                     <LabelList 
                       dataKey="value" 
                       position="top" 
                       fill="#666" 
-                      fontSize={10}
+                      fontSize={9}
                       fontWeight={500} 
                     />
                   </Bar>
@@ -383,28 +383,28 @@ const BeSafeBeSecureGraph: React.FC = () => {
 
       if (selectedFilter === 'Breakdown of Checks By Type') {
         return (
-          <div className="h-[300px] md:h-[400px]">
+          <div className="h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={displayData} margin={{ top: 20, right: 30, left: 5, bottom: 20 }}>
+              <BarChart data={displayData} margin={{ top: 20, right: 20, left: 5, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                 <XAxis 
                   dataKey="type" 
                   tickLine={false}
-                  tick={{ fontSize: 12, fontWeight: 500 }}
+                  tick={{ fontSize: 10, fontWeight: 500 }}
                 />
-                <YAxis tickLine={false} axisLine={false} width={40} />
+                <YAxis tickLine={false} axisLine={false} width={30} tick={{ fontSize: 9 }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar 
                   dataKey="value" 
                   fill={COLORS.primary[0]}
                   radius={[4, 4, 0, 0]}
-                  barSize={60}
+                  barSize={30}
                 >
                   <LabelList 
                     dataKey="value" 
                     position="top" 
                     fill="#666" 
-                    fontSize={11}
+                    fontSize={9}
                     fontWeight={500} 
                   />
                 </Bar>
@@ -417,9 +417,9 @@ const BeSafeBeSecureGraph: React.FC = () => {
       if (selectedFilter === 'Breakdown of Systems Checks') {
         return (
           <div className="w-full overflow-x-auto">
-            <div className="min-w-[600px] h-[300px] md:h-[400px]">
+            <div className="min-w-[320px] sm:min-w-[450px] md:min-w-[600px] h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={displayData} margin={{ top: 20, right: 30, left: 5, bottom: 60 }}>
+                <BarChart data={displayData} margin={{ top: 20, right: 20, left: 5, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                   <XAxis 
                     dataKey="area" 
@@ -427,22 +427,22 @@ const BeSafeBeSecureGraph: React.FC = () => {
                     angle={-45} 
                     textAnchor="end" 
                     height={60} 
-                    tick={{ fontSize: 10, fontWeight: 500 }}
+                    tick={{ fontSize: 9, fontWeight: 500 }}
                     tickLine={false}
                   />
-                  <YAxis tickLine={false} axisLine={false} width={40} />
+                  <YAxis tickLine={false} axisLine={false} width={30} tick={{ fontSize: 9 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar 
                     dataKey="value" 
                     fill={COLORS.tertiary[0]}
                     radius={[4, 4, 0, 0]}
-                    barSize={30}
+                    barSize={20}
                   >
                     <LabelList 
                       dataKey="value" 
                       position="top" 
                       fill="#666" 
-                      fontSize={10}
+                      fontSize={9}
                       fontWeight={500} 
                     />
                   </Bar>
@@ -455,7 +455,7 @@ const BeSafeBeSecureGraph: React.FC = () => {
 
       if (selectedFilter === 'Breakdown Of Compliance Checks') {
         return (
-          <div className="relative h-[350px] md:h-[400px] lg:h-[450px]">
+          <div className="relative h-[250px] sm:h-[300px] md:h-[350px] lg:h-[450px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -464,8 +464,8 @@ const BeSafeBeSecureGraph: React.FC = () => {
                   cy="50%"
                   startAngle={90}
                   endAngle={-270}
-                  innerRadius={window.innerWidth < 768 ? 60 : 80}
-                  outerRadius={window.innerWidth < 768 ? 110 : 140}
+                  innerRadius={window.innerWidth < 640 ? 40 : window.innerWidth < 768 ? 60 : 80}
+                  outerRadius={window.innerWidth < 640 ? 80 : window.innerWidth < 768 ? 110 : 140}
                   paddingAngle={2}
                   dataKey="value"
                   labelLine={window.innerWidth >= 640}
@@ -505,21 +505,21 @@ const BeSafeBeSecureGraph: React.FC = () => {
       // Default chart for Breakdown Of Checks By Site
       return (
         <div className="w-full overflow-x-auto">
-          <div className="min-w-[600px] h-[300px] md:h-[400px]">
+          <div className="min-w-[320px] sm:min-w-[450px] md:min-w-[600px] h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={displayData} margin={{ top: 20, right: 30, left: 5, bottom: 20 }}>
+              <BarChart data={displayData} margin={{ top: 20, right: 20, left: 5, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                 <XAxis 
                   dataKey="site" 
                   tickLine={false}
-                  tick={{ fontSize: 11, fontWeight: 500 }}
+                  tick={{ fontSize: 9, fontWeight: 500 }}
                 />
-                <YAxis tickLine={false} axisLine={false} width={40} />
+                <YAxis tickLine={false} axisLine={false} width={30} tick={{ fontSize: 9 }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
                   iconType="circle" 
                   iconSize={8}
-                  wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                  wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }}
                   formatter={(value) => <span className="text-xs sm:text-sm">{value}</span>}
                 />
                 <Bar 
@@ -527,13 +527,13 @@ const BeSafeBeSecureGraph: React.FC = () => {
                   name="Insecure Areas" 
                   fill={COLORS.primary[0]} 
                   radius={[4, 4, 0, 0]}
-                  barSize={20}
+                  barSize={window.innerWidth < 768 ? 15 : 20}
                 >
                   <LabelList 
                     dataKey="insecureAreas" 
                     position="top" 
                     fill="#666" 
-                    fontSize={10}
+                    fontSize={9}
                     fontWeight={500} 
                   />
                 </Bar>
@@ -542,13 +542,13 @@ const BeSafeBeSecureGraph: React.FC = () => {
                   name="Compliance" 
                   fill={COLORS.primary[2]} 
                   radius={[4, 4, 0, 0]}
-                  barSize={20}
+                  barSize={window.innerWidth < 768 ? 15 : 20}
                 >
                   <LabelList 
                     dataKey="compliance" 
                     position="top" 
                     fill="#666" 
-                    fontSize={10}
+                    fontSize={9}
                     fontWeight={500} 
                   />
                 </Bar>
@@ -557,13 +557,13 @@ const BeSafeBeSecureGraph: React.FC = () => {
                   name="Systems" 
                   fill={COLORS.primary[4]} 
                   radius={[4, 4, 0, 0]}
-                  barSize={20}
+                  barSize={window.innerWidth < 768 ? 15 : 20}
                 >
                   <LabelList 
                     dataKey="systems" 
                     position="top" 
                     fill="#666" 
-                    fontSize={10}
+                    fontSize={9}
                     fontWeight={500} 
                   />
                 </Bar>
@@ -580,9 +580,9 @@ const BeSafeBeSecureGraph: React.FC = () => {
         error: error instanceof Error ? error.message : 'Unknown error'
       });
       return (
-        <div className="flex flex-col items-center justify-center h-[300px] md:h-[400px] p-4 md:p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
-          <h3 className="text-base md:text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">Chart could not be displayed</h3>
-          <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 text-center max-w-md mb-4 md:mb-6">
+        <div className="flex flex-col items-center justify-center h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px] p-2 md:p-4 lg:p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+          <h3 className="text-sm md:text-base lg:text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">Chart could not be displayed</h3>
+          <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 text-center max-w-md mb-2 md:mb-4">
             There was an error rendering this chart. Please check the console for more details.
           </p>
         </div>
@@ -625,165 +625,169 @@ const BeSafeBeSecureGraph: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-4 md:p-6">
-      <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
-          Be Safe Be Secure Graphs
-        </h1>
-        <p className="text-sm md:text-base text-slate-600 dark:text-slate-400">
-          Visualize security compliance data across sites and categories
-        </p>
-      </div>
+    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <div className="w-full px-2 sm:px-4 md:px-6 lg:px-8 py-2 md:py-4 lg:py-6 mx-auto max-w-full md:max-w-[98%] lg:max-w-[96%] xl:max-w-[94%] 2xl:max-w-full">
+        <div className="mb-4 md:mb-6 lg:mb-8">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+            Be Safe Be Secure Graphs
+          </h1>
+          <p className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400">
+            Visualize security compliance data across sites and categories
+          </p>
+        </div>
 
-      <Card className="mb-4 md:mb-6 border-slate-200 dark:border-slate-700 shadow-sm">
-        <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-b border-slate-200 dark:border-slate-700 pb-3 md:pb-4">
-          <CardTitle className="text-base md:text-lg font-semibold">Filter Options</CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 md:p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-            <div className="space-y-2">
-              <label className="text-xs md:text-sm font-medium flex items-center gap-1">
-                <Calendar className="h-3 w-3 md:h-4 md:w-4 text-slate-500" />
-                Date Range
-              </label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <div className="flex-1">
-                  <DatePicker 
-                    date={startDate} 
-                    setDate={(date) => {
-                      console.log('[BeSafeBeSecureGraph] Start date changed:', date);
-                      setStartDate(date);
-                    }}
-                    placeholder="Start Date"
-                  />
-                </div>
-                <div className="flex-1">
-          <DatePicker
-                    date={endDate} 
-                    setDate={(date) => {
-                      console.log('[BeSafeBeSecureGraph] End date changed:', date);
-                      setEndDate(date);
-                    }}
-                    placeholder="End Date"
-                  />
+        <Card className="mb-3 md:mb-4 lg:mb-6 border-slate-200 dark:border-slate-700 shadow-sm">
+          <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-b border-slate-200 dark:border-slate-700 py-2 md:py-3 lg:py-4 px-3 md:px-4 lg:px-6">
+            <CardTitle className="text-sm md:text-base lg:text-lg font-semibold">Filter Options</CardTitle>
+          </CardHeader>
+          <CardContent className="p-2 md:p-4 lg:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
+              <div className="space-y-1 md:space-y-2">
+                <label className="text-xs md:text-sm font-medium flex items-center gap-1">
+                  <Calendar className="h-3 w-3 md:h-4 md:w-4 text-slate-500" />
+                  Date Range
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex-1">
+                    <DatePicker 
+                      date={startDate} 
+                      setDate={(date) => {
+                        console.log('[BeSafeBeSecureGraph] Start date changed:', date);
+                        setStartDate(date);
+                      }}
+                      placeholder="Start Date"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <DatePicker
+                      date={endDate} 
+                      setDate={(date) => {
+                        console.log('[BeSafeBeSecureGraph] End date changed:', date);
+                        setEndDate(date);
+                      }}
+                      placeholder="End Date"
+                    />
+                  </div>
                 </div>
               </div>
+              
+              <div className="space-y-1 md:space-y-2">
+                <label className="text-xs md:text-sm font-medium flex items-center gap-1">
+                  <Search className="h-3 w-3 md:h-4 md:w-4 text-slate-500" />
+                  Site
+                </label>
+                <Select 
+                  value={selectedSite} 
+                  onValueChange={handleSiteChange}
+                >
+                  <SelectTrigger className="bg-white dark:bg-slate-900 h-8 md:h-9 lg:h-10 text-xs md:text-sm">
+                    <SelectValue placeholder="All Sites" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sites</SelectItem>
+                    {mockData['Breakdown Of Checks By Site'].map((siteData) => (
+                      <SelectItem 
+                        key={siteData.site} 
+                        value={siteData.site}
+                      >
+                        {siteData.site}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-end sm:col-span-2 lg:col-span-1">
+                <Button 
+                  onClick={handleSearch} 
+                  className="w-full h-8 md:h-9 lg:h-10 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs md:text-sm"
+                >
+                  Apply Filters
+                </Button>
+              </div>
             </div>
-            
-            <div className="space-y-2">
-              <label className="text-xs md:text-sm font-medium flex items-center gap-1">
-                <Search className="h-3 w-3 md:h-4 md:w-4 text-slate-500" />
-                Site
-              </label>
-              <Select 
-                value={selectedSite} 
-                onValueChange={handleSiteChange}
-              >
-                <SelectTrigger className="bg-white dark:bg-slate-900 h-9 md:h-10">
-                  <SelectValue placeholder="All Sites" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sites</SelectItem>
-                  {mockData['Breakdown Of Checks By Site'].map((siteData) => (
-                    <SelectItem 
-                      key={siteData.site} 
-                      value={siteData.site}
-                    >
-                      {siteData.site}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex items-end sm:col-span-2 lg:col-span-1">
-              <Button 
-                onClick={handleSearch} 
-                className="w-full h-9 md:h-10 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm"
-              >
-                Apply Filters
-              </Button>
-            </div>
+          </CardContent>
+        </Card>
+
+        <div className="overflow-x-auto mb-3 md:mb-4 lg:mb-6">
+          <div className="min-w-[320px] sm:min-w-[450px] md:min-w-[600px]">
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
+              <TabsList className="grid grid-cols-5 mb-2 md:mb-3 lg:mb-4">
+                <TabsTrigger value="sites" className="text-[10px] sm:text-xs md:text-sm py-1 md:py-1.5 lg:py-2">
+                  Checks By Site
+                </TabsTrigger>
+                <TabsTrigger value="types" className="text-[10px] sm:text-xs md:text-sm py-1 md:py-1.5 lg:py-2">
+                  Checks By Type
+                </TabsTrigger>
+                <TabsTrigger value="insecure" className="text-[10px] sm:text-xs md:text-sm py-1 md:py-1.5 lg:py-2">
+                  Insecure Areas
+                </TabsTrigger>
+                <TabsTrigger value="systems" className="text-[10px] sm:text-xs md:text-sm py-1 md:py-1.5 lg:py-2">
+                  Systems Checks
+                </TabsTrigger>
+                <TabsTrigger value="compliance" className="text-[10px] sm:text-xs md:text-sm py-1 md:py-1.5 lg:py-2">
+                  Compliance Checks
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
-        </CardContent>
-      </Card>
 
-      <div className="overflow-x-auto mb-4 md:mb-6">
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="min-w-[600px]">
-          <TabsList className="grid grid-cols-5 mb-3 md:mb-4">
-            <TabsTrigger value="sites" className="text-xs md:text-sm py-1.5 md:py-2">
-              Checks By Site
-            </TabsTrigger>
-            <TabsTrigger value="types" className="text-xs md:text-sm py-1.5 md:py-2">
-              Checks By Type
-            </TabsTrigger>
-            <TabsTrigger value="insecure" className="text-xs md:text-sm py-1.5 md:py-2">
-              Insecure Areas
-            </TabsTrigger>
-            <TabsTrigger value="systems" className="text-xs md:text-sm py-1.5 md:py-2">
-              Systems Checks
-            </TabsTrigger>
-            <TabsTrigger value="compliance" className="text-xs md:text-sm py-1.5 md:py-2">
-              Compliance Checks
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      <Card className="border-slate-200 dark:border-slate-700 shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-b border-slate-200 dark:border-slate-700 py-3 md:py-4">
-          <CardTitle className="text-lg md:text-xl font-semibold flex flex-wrap items-center gap-2">
-            <span className="mr-1">{selectedFilter}</span>
-            {(startDate || endDate) && (
-              <span className="text-xs font-normal px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">
-                Date Filtered
-              </span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 md:p-6">
-          <div className="space-y-4">
-            <SafeComponent>
-              {renderChart()}
-            </SafeComponent>
-          </div>
-          <div className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mt-4 md:mt-6 pt-3 md:pt-4 border-t border-slate-200 dark:border-slate-700">
-            <p>
-              Data shown for period: 
-              {startDate ? startDate.toLocaleDateString('en-GB', { 
-                day: 'numeric', 
-                month: 'short', 
-                year: 'numeric' 
-              }) : 'All time'} - 
-              {endDate ? endDate.toLocaleDateString('en-GB', { 
-                day: 'numeric', 
-                month: 'short', 
-                year: 'numeric' 
-              }) : 'Present'}
-            </p>
-            <p className="font-medium mt-1">{customerRegion}</p>
-            {startDate && endDate && startDate > endDate && (
-              <p className="text-red-500 mt-1">
-                Warning: Start date is after end date. Date filtering has been disabled.
+        <Card className="border-slate-200 dark:border-slate-700 shadow-sm">
+          <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-b border-slate-200 dark:border-slate-700 py-2 md:py-3 lg:py-4 px-3 md:px-4 lg:px-6">
+            <CardTitle className="text-base md:text-lg lg:text-xl font-semibold flex flex-wrap items-center gap-2">
+              <span className="mr-1">{selectedFilter}</span>
+              {(startDate || endDate) && (
+                <span className="text-[10px] md:text-xs font-normal px-1.5 md:px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">
+                  Date Filtered
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-2 md:p-4 lg:p-6">
+            <div className="space-y-2 md:space-y-4">
+              <SafeComponent>
+                {renderChart()}
+              </SafeComponent>
+            </div>
+            <div className="text-[10px] sm:text-xs md:text-sm text-slate-600 dark:text-slate-400 mt-2 md:mt-4 lg:mt-6 pt-2 md:pt-3 lg:pt-4 border-t border-slate-200 dark:border-slate-700">
+              <p>
+                Data shown for period: 
+                {startDate ? startDate.toLocaleDateString('en-GB', { 
+                  day: 'numeric', 
+                  month: 'short', 
+                  year: 'numeric' 
+                }) : 'All time'} - 
+                {endDate ? endDate.toLocaleDateString('en-GB', { 
+                  day: 'numeric', 
+                  month: 'short', 
+                  year: 'numeric' 
+                }) : 'Present'}
               </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <p className="font-medium mt-1">{customerRegion}</p>
+              {startDate && endDate && startDate > endDate && (
+                <p className="text-red-500 mt-1">
+                  Warning: Start date is after end date. Date filtering has been disabled.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
 
 // Create a fallback component for chart errors
 const ChartFallback = () => (
-  <div className="flex flex-col items-center justify-center h-[300px] md:h-[400px] p-4 md:p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
-    <h3 className="text-base md:text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">Chart could not be displayed</h3>
-    <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 text-center max-w-md mb-4 md:mb-6">
+  <div className="flex flex-col items-center justify-center h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px] p-2 md:p-4 lg:p-6 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+    <h3 className="text-sm md:text-base lg:text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">Chart could not be displayed</h3>
+    <p className="text-[10px] sm:text-xs md:text-sm text-slate-600 dark:text-slate-400 text-center max-w-md mb-2 md:mb-4 lg:mb-6">
       There was an error rendering this chart. Please try refreshing the page or contact support if the issue persists.
     </p>
     <Button 
       onClick={() => window.location.reload()}
-      className="bg-blue-600 hover:bg-blue-700 text-white text-sm h-8 md:h-10"
+      className="bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm h-7 md:h-8 lg:h-10"
     >
       Refresh Page
     </Button>

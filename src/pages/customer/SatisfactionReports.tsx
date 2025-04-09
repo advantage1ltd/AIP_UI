@@ -121,7 +121,7 @@ const SatisfactionReports = () => {
         <div className="flex items-center justify-between mb-1">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
             <div key={rating} className="flex flex-col items-center">
-              <div className={`h-5 w-5 sm:h-6 sm:w-10 rounded-full border ${value === rating ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-300'}`}></div>
+              <div className={`h-5 w-5 sm:h-6 sm:w-6 rounded-full border ${value === rating ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-300'}`}></div>
               <span className="text-[10px] sm:text-xs mt-1">{rating}</span>
             </div>
           ))}
@@ -137,232 +137,298 @@ const SatisfactionReports = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 bg-gray-50 min-h-screen">
-      <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="bg-blue-100 p-2 rounded-lg">
-            <FileText className="h-5 w-5 text-blue-600" />
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Customer Satisfaction Surveys</h1>
-        </div>
-        <p className="text-sm text-gray-500 ml-10">View and manage customer satisfaction surveys across all locations.</p>
-      </div>
-
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700">Total Surveys:</span>
-              <span className="text-sm font-bold">{surveys.length}</span>
+    <div className="bg-gray-50 min-h-screen overflow-x-hidden">
+      <div className="mx-auto px-2 sm:px-4 md:px-6 lg:px-8 max-w-full md:max-w-[98%] lg:max-w-[96%] xl:max-w-full 2xl:px-10 py-2 md:py-4 lg:py-6">
+        <div className="bg-white rounded-lg shadow-sm p-2 md:p-4 mb-2 md:mb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 md:gap-3">
+            <div className="bg-blue-100 p-2 rounded-lg">
+              <FileText className="h-4 md:h-5 w-4 md:h-5 text-blue-600" />
             </div>
-            
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                <Input 
-                  placeholder="Search surveys..." 
-                  className="pl-9 h-9 w-full"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+            <div>
+              <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-800">Customer Satisfaction Surveys</h1>
+              <p className="text-xs md:text-sm text-gray-500">View and manage customer satisfaction surveys across all locations.</p>
+            </div>
+          </div>
+        </div>
+
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-2 md:p-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 md:mb-4 gap-2 md:gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs md:text-sm font-medium text-gray-700">Total Surveys:</span>
+                <span className="text-xs md:text-sm font-bold">{surveys.length}</span>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-2 md:gap-3 w-full sm:w-auto">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input 
+                    placeholder="Search surveys..." 
+                    className="pl-9 h-8 md:h-9 w-full text-xs md:text-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead className="font-medium">Officer Name</TableHead>
-                  <TableHead className="font-medium">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4 text-gray-500" />
-                      <span>Date</span>
-                    </div>
-                  </TableHead>
-                  <TableHead className="font-medium">Customer</TableHead>
-                  <TableHead className="font-medium">
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4 text-gray-500" />
-                      <span>Location</span>
-                    </div>
-                  </TableHead>
-                  <TableHead className="font-medium">Region</TableHead>
-                  <TableHead className="font-medium">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSurveys.map((survey) => (
-                  <TableRow key={survey.id} className="border-b">
-                    <TableCell className="font-medium">{survey.officerName}</TableCell>
-                    <TableCell>{survey.date}</TableCell>
-                    <TableCell>{survey.customer}</TableCell>
-                    <TableCell>{survey.location}</TableCell>
-                    <TableCell>{survey.region}</TableCell>
-                    <TableCell>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="p-0 text-blue-600 hover:bg-transparent hover:text-blue-700 font-medium"
-                        onClick={() => handleViewSurvey(survey.id)}
-                      >
-                        View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="flex justify-between items-center mt-4 text-sm text-gray-500">
-            <div>Showing 1 to 10 of {surveys.length} results</div>
-            <div className="flex gap-1">
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0 font-medium bg-blue-600 text-white border-blue-600">
-                1
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0 font-medium">
-                2
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0 font-medium">
-                3
-              </Button>
+            {/* Table for tablet and desktop */}
+            <div className="hidden md:block overflow-x-auto">
+              <div className="w-full inline-block align-middle">
+                <Table className="w-full divide-y divide-gray-200">
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-medium px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">Officer Name</TableHead>
+                      <TableHead className="font-medium px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 md:h-4 w-3 md:w-4 text-gray-500" />
+                          <span>Date</span>
+                        </div>
+                      </TableHead>
+                      <TableHead className="font-medium px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">Customer</TableHead>
+                      <TableHead className="font-medium px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3 md:h-4 w-3 md:w-4 text-gray-500" />
+                          <span>Location</span>
+                        </div>
+                      </TableHead>
+                      <TableHead className="font-medium px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">Region</TableHead>
+                      <TableHead className="font-medium px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSurveys.map((survey) => (
+                      <TableRow key={survey.id} className="border-b">
+                        <TableCell className="font-medium px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">{survey.officerName}</TableCell>
+                        <TableCell className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">{survey.date}</TableCell>
+                        <TableCell className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">{survey.customer}</TableCell>
+                        <TableCell className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">{survey.location}</TableCell>
+                        <TableCell className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">{survey.region}</TableCell>
+                        <TableCell className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="p-0 text-blue-600 hover:bg-transparent hover:text-blue-700 font-medium"
+                            onClick={() => handleViewSurvey(survey.id)}
+                          >
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* View Survey Dialog */}
-      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-3xl md:max-w-4xl lg:max-w-5xl p-3 sm:p-6 max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="mb-2 sm:mb-4">
-            <DialogTitle className="text-base sm:text-xl font-bold flex items-center gap-2">
-              <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-              Customer Satisfaction Survey
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="overflow-y-auto pr-1 sm:pr-2 mt-2 sm:mt-4 flex-1">
-            {selectedSurvey && (
-              <>
-                {/* Basic Information */}
-                <div className="bg-gray-50 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8">
-                  <h2 className="text-base sm:text-lg font-semibold mb-4 sm:mb-5">Basic Information</h2>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                    <div className="space-y-2">
-                      <Label className="text-xs sm:text-sm text-gray-600 mb-1 block">Regular Officer Name</Label>
-                      <Input value={selectedSurvey.officerName} readOnly className="bg-white h-9 sm:h-10 text-xs sm:text-sm" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs sm:text-sm text-gray-600 mb-1 block">Date</Label>
-                      <div className="relative">
-                        <Input value={selectedSurvey.date} readOnly className="bg-white h-9 sm:h-10 text-xs sm:text-sm" />
-                        <CalendarIcon className="absolute right-3 top-2.5 h-4 w-4 text-gray-500" />
+            {/* Card view for mobile */}
+            <div className="md:hidden space-y-2">
+              {filteredSurveys.length === 0 ? (
+                <div className="text-center text-gray-500 p-4 text-sm">
+                  No surveys found
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredSurveys.map((survey) => (
+                    <div 
+                      key={survey.id}
+                      className="bg-white border border-gray-200 rounded-lg p-2 shadow-sm"
+                    >
+                      <div className="mb-2">
+                        <div className="font-medium text-sm">{survey.officerName}</div>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Calendar className="h-3 w-3 text-gray-500" />
+                          <span className="text-xs text-gray-500">{survey.date}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                        <div>
+                          <div className="text-gray-500">Customer:</div>
+                          <div>{survey.customer}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Region:</div>
+                          <div>{survey.region}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="mb-2">
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-gray-500" />
+                          <span className="text-xs text-gray-500">Location:</span>
+                        </div>
+                        <div className="text-xs">{survey.location}</div>
+                      </div>
+                      
+                      <div className="border-t border-gray-100 pt-2 flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewSurvey(survey.id)}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs h-7 px-2"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs sm:text-sm text-gray-600 mb-1 block">Customer</Label>
-                      <Select defaultValue={selectedSurvey.customer} disabled>
-                        <SelectTrigger className="bg-white h-9 sm:h-10 text-xs sm:text-sm">
-                          <SelectValue placeholder="Select customer" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={selectedSurvey.customer}>{selectedSurvey.customer}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs sm:text-sm text-gray-600 mb-1 block">Region</Label>
-                      <Select defaultValue={selectedSurvey.region} disabled>
-                        <SelectTrigger className="bg-white h-9 sm:h-10 text-xs sm:text-sm">
-                          <SelectValue placeholder="Select region" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={selectedSurvey.region}>{selectedSurvey.region}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                      <Label className="text-xs sm:text-sm text-gray-600 mb-1 block">Location</Label>
-                      <Select defaultValue={selectedSurvey.location} disabled>
-                        <SelectTrigger className="bg-white h-9 sm:h-10 text-xs sm:text-sm">
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={selectedSurvey.location}>{selectedSurvey.location}</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-between items-center mt-2 md:mt-4 gap-2">
+              <div className="text-xs md:text-sm text-gray-500 w-full sm:w-auto text-center sm:text-left">
+                Showing 1 to 10 of {surveys.length} results
+              </div>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" className="h-7 md:h-8 w-7 md:w-8 p-0 font-medium bg-blue-600 text-white border-blue-600 text-xs">
+                  1
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 md:h-8 w-7 md:w-8 p-0 font-medium text-xs">
+                  2
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 md:h-8 w-7 md:w-8 p-0 font-medium text-xs">
+                  3
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* View Survey Dialog */}
+        <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+          <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-[85vw] lg:max-w-5xl xl:max-w-6xl max-h-[90vh] overflow-hidden flex flex-col p-2 md:p-4">
+            <DialogHeader className="mb-2 md:mb-4">
+              <DialogTitle className="text-base md:text-lg lg:text-xl font-bold flex items-center gap-2">
+                <FileText className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+                Customer Satisfaction Survey
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="overflow-y-auto pr-1 md:pr-2 mt-2 md:mt-4 flex-1">
+              {selectedSurvey && (
+                <>
+                  {/* Basic Information */}
+                  <div className="bg-gray-50 rounded-lg p-2 md:p-4 mb-3 md:mb-5">
+                    <h2 className="text-sm md:text-base lg:text-lg font-semibold mb-2 md:mb-4">Basic Information</h2>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
+                      <div className="space-y-1 md:space-y-2">
+                        <Label className="text-xs text-gray-600 block">Regular Officer Name</Label>
+                        <Input value={selectedSurvey.officerName} readOnly className="bg-white h-8 md:h-9 text-xs md:text-sm" />
+                      </div>
+                      <div className="space-y-1 md:space-y-2">
+                        <Label className="text-xs text-gray-600 block">Date</Label>
+                        <div className="relative">
+                          <Input value={selectedSurvey.date} readOnly className="bg-white h-8 md:h-9 text-xs md:text-sm" />
+                          <CalendarIcon className="absolute right-3 top-2 h-4 w-4 text-gray-500" />
+                        </div>
+                      </div>
+                      <div className="space-y-1 md:space-y-2">
+                        <Label className="text-xs text-gray-600 block">Customer</Label>
+                        <Select defaultValue={selectedSurvey.customer} disabled>
+                          <SelectTrigger className="bg-white h-8 md:h-9 text-xs md:text-sm">
+                            <SelectValue placeholder="Select customer" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={selectedSurvey.customer}>{selectedSurvey.customer}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1 md:space-y-2">
+                        <Label className="text-xs text-gray-600 block">Region</Label>
+                        <Select defaultValue={selectedSurvey.region} disabled>
+                          <SelectTrigger className="bg-white h-8 md:h-9 text-xs md:text-sm">
+                            <SelectValue placeholder="Select region" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={selectedSurvey.region}>{selectedSurvey.region}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="md:col-span-2 space-y-1 md:space-y-2">
+                        <Label className="text-xs text-gray-600 block">Location</Label>
+                        <Select defaultValue={selectedSurvey.location} disabled>
+                          <SelectTrigger className="bg-white h-8 md:h-9 text-xs md:text-sm">
+                            <SelectValue placeholder="Select location" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={selectedSurvey.location}>{selectedSurvey.location}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Performance Rating */}
-                <div className="mb-6 sm:mb-8 p-4 sm:p-6 border border-gray-100 rounded-lg">
-                  <h2 className="text-base sm:text-lg font-semibold mb-4 sm:mb-5">Performance Rating</h2>
-                  
-                  <div className="space-y-5 sm:space-y-7">
-                    <RatingScale value={selectedSurvey.performanceRating.uniformAndAppearance} title="Uniform and Appearance" />
-                    <RatingScale value={selectedSurvey.performanceRating.professionalism} title="Professionalism" />
-                    <RatingScale value={selectedSurvey.performanceRating.customerServiceApproach} title="Customer Service Approach" />
-                    <RatingScale value={selectedSurvey.performanceRating.improvedFeelingSecurity} title="Improved Feeling of Security when Officer on Site" />
-                    <RatingScale value={selectedSurvey.performanceRating.relationsWithStoreColleagues} title="Relations With Store Colleagues" />
-                    <RatingScale value={selectedSurvey.performanceRating.punctualityAndBreaks} title="Punctuality / Breaks" />
-                    <RatingScale value={selectedSurvey.performanceRating.proactivity} title="Proactivity" />
-                  </div>
-                </div>
-
-                {/* Management Information */}
-                <div className="bg-gray-50 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8">
-                  <h2 className="text-base sm:text-lg font-semibold mb-4 sm:mb-5">Management Information</h2>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                    <div className="space-y-2">
-                      <Label className="text-xs sm:text-sm text-gray-600 mb-1 block">Store Manager Name</Label>
-                      <Input value={selectedSurvey.storeManagerName} readOnly className="bg-white h-9 sm:h-10 text-xs sm:text-sm" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs sm:text-sm text-gray-600 mb-1 block">Area Manager Name</Label>
-                      <Input value={selectedSurvey.areaManagerName} readOnly className="bg-white h-9 sm:h-10 text-xs sm:text-sm" />
+                  {/* Performance Rating */}
+                  <div className="mb-3 md:mb-5 p-2 md:p-4 border border-gray-100 rounded-lg">
+                    <h2 className="text-sm md:text-base lg:text-lg font-semibold mb-2 md:mb-4">Performance Rating</h2>
+                    
+                    <div className="space-y-4 md:space-y-6">
+                      <RatingScale value={selectedSurvey.performanceRating.uniformAndAppearance} title="Uniform and Appearance" />
+                      <RatingScale value={selectedSurvey.performanceRating.professionalism} title="Professionalism" />
+                      <RatingScale value={selectedSurvey.performanceRating.customerServiceApproach} title="Customer Service Approach" />
+                      <RatingScale value={selectedSurvey.performanceRating.improvedFeelingSecurity} title="Improved Feeling of Security when Officer on Site" />
+                      <RatingScale value={selectedSurvey.performanceRating.relationsWithStoreColleagues} title="Relations With Store Colleagues" />
+                      <RatingScale value={selectedSurvey.performanceRating.punctualityAndBreaks} title="Punctuality / Breaks" />
+                      <RatingScale value={selectedSurvey.performanceRating.proactivity} title="Proactivity" />
                     </div>
                   </div>
-                </div>
 
-                {/* Follow Up Actions */}
-                <div className="mb-6 sm:mb-8 p-4 sm:p-6 border border-gray-100 rounded-lg">
-                  <h2 className="text-base sm:text-lg font-semibold mb-4 sm:mb-5">Follow Up Actions</h2>
-                  
-                  <div className="space-y-4 sm:space-y-6">
-                    {selectedSurvey.followUpActions.map((action, index) => (
-                      <div key={action.id} className="mb-3 sm:mb-5 pb-3 sm:pb-5 border-b border-gray-100 last:border-0 last:mb-0 last:pb-0">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                          <div className="space-y-2">
-                            <Label className="text-xs sm:text-sm text-gray-600 mb-1 block">Action {index + 1}</Label>
-                            <Input value={action.action} readOnly className="bg-white h-9 sm:h-10 text-xs sm:text-sm" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs sm:text-sm text-gray-600 mb-1 block">Date to be Completed</Label>
-                            <div className="relative">
-                              <Input value={action.dateToBeCompleted} readOnly className="bg-white h-9 sm:h-10 text-xs sm:text-sm" />
-                              <CalendarIcon className="absolute right-3 top-2.5 h-4 w-4 text-gray-500" />
+                  {/* Management Information */}
+                  <div className="bg-gray-50 rounded-lg p-2 md:p-4 mb-3 md:mb-5">
+                    <h2 className="text-sm md:text-base lg:text-lg font-semibold mb-2 md:mb-4">Management Information</h2>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
+                      <div className="space-y-1 md:space-y-2">
+                        <Label className="text-xs text-gray-600 block">Store Manager Name</Label>
+                        <Input value={selectedSurvey.storeManagerName} readOnly className="bg-white h-8 md:h-9 text-xs md:text-sm" />
+                      </div>
+                      <div className="space-y-1 md:space-y-2">
+                        <Label className="text-xs text-gray-600 block">Area Manager Name</Label>
+                        <Input value={selectedSurvey.areaManagerName} readOnly className="bg-white h-8 md:h-9 text-xs md:text-sm" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Follow Up Actions */}
+                  <div className="mb-3 md:mb-5 p-2 md:p-4 border border-gray-100 rounded-lg">
+                    <h2 className="text-sm md:text-base lg:text-lg font-semibold mb-2 md:mb-4">Follow Up Actions</h2>
+                    
+                    <div className="space-y-3 md:space-y-4">
+                      {selectedSurvey.followUpActions.map((action, index) => (
+                        <div key={action.id} className="mb-2 md:mb-3 pb-2 md:pb-3 border-b border-gray-100 last:border-0 last:mb-0 last:pb-0">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
+                            <div className="space-y-1 md:space-y-2">
+                              <Label className="text-xs text-gray-600 block">Action {index + 1}</Label>
+                              <Input value={action.action} readOnly className="bg-white h-8 md:h-9 text-xs md:text-sm" />
+                            </div>
+                            <div className="space-y-1 md:space-y-2">
+                              <Label className="text-xs text-gray-600 block">Date to be Completed</Label>
+                              <div className="relative">
+                                <Input value={action.dateToBeCompleted} readOnly className="bg-white h-8 md:h-9 text-xs md:text-sm" />
+                                <CalendarIcon className="absolute right-3 top-2 h-4 w-4 text-gray-500" />
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex justify-end gap-3 sm:gap-4 mt-6 sm:mt-8">
-                  <Button variant="outline" onClick={() => setViewDialogOpen(false)} className="h-9 sm:h-10 text-xs sm:text-sm px-4 sm:px-5">
-                    Close
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+                  <div className="flex justify-end gap-2 md:gap-3 mt-3 md:mt-4">
+                    <Button variant="outline" onClick={() => setViewDialogOpen(false)} className="h-8 md:h-9 text-xs md:text-sm px-3 md:px-4">
+                      Close
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   )
 }

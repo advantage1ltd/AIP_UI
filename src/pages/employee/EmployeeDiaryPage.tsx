@@ -1,15 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
-import { Plus, Search, Pencil, Trash2, Eye, CalendarIcon, Clock, MapPin, Shield, AlertTriangle, FileText, Briefcase, GraduationCap, Target, Award } from 'lucide-react';
+import { Plus, Search, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -18,15 +10,6 @@ import {
   DialogTrigger,
   DialogDescription,
 } from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  FormDescription,
-} from '@/components/ui/form';
 import {
   Select,
   SelectContent,
@@ -37,24 +20,15 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
-import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
-import { format } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
 import {
   Tabs,
@@ -62,18 +36,16 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar as CalendarIconIcon } from 'lucide-react';
 
 // Use imported components with renamed imports
-import { ActivityTimeline as ActivityTimelineImported } from '@/components/employee/ActivityTimeline';
-import { ActivityForm as ActivityFormImported } from '@/components/employee/ActivityForm';
+import { ActivityTimeline } from '@/components/employee/ActivityTimeline';
+import { ActivityForm } from '@/components/employee/ActivityForm';
 import { SyncStatus } from '@/components/employee/SyncStatus';
 import { employeeActivityService } from '@/services/employeeActivityService';
 import { ACTIVITY_CATEGORIES, ACTIVITY_SOURCES, AUTO_SYNC_INTERVAL, ITEMS_PER_PAGE } from '@/config/activityConfig';
 import type { ActivityCategory, ActivitySource, ActivityStatus, ActivitySyncStatus, EmployeeActivity, Employee } from '@/types/employee';
 
-// Constants and Types
+// Constants and Types - In a real implementation, these would be moved to separate files
 const CATEGORY_COLORS: Record<ActivityCategory, string> = {
   employment: 'bg-blue-100 text-blue-800',
   training: 'bg-green-100 text-green-800',
@@ -84,74 +56,6 @@ const CATEGORY_COLORS: Record<ActivityCategory, string> = {
   equipment: 'bg-indigo-100 text-indigo-800',
   certifications: 'bg-pink-100 text-pink-800',
 };
-
-// Activity types by category
-const ACTIVITY_TYPES: Record<ActivityCategory, string[]> = {
-  employment: [
-    'New Hire',
-    'Contract Update',
-    'Role Change',
-    'Salary Review',
-    'Termination',
-    'Disciplinary Action',
-  ],
-  training: [
-    'Initial Training',
-    'Refresher Course',
-    'Certification Training',
-    'Skills Development',
-    'Health & Safety Training',
-    'Compliance Training',
-  ],
-  leave: [
-    'Annual Leave Request',
-    'Sick Leave',
-    'Compassionate Leave',
-    'Unpaid Leave',
-    'Training Leave',
-    'Other Leave',
-  ],
-  incidents: [
-    'Security Incident',
-    'Workplace Accident',
-    'Customer Complaint',
-    'Policy Violation',
-    'Equipment Damage',
-    'Near Miss',
-  ],
-  documents: [
-    'Contract Signing',
-    'Policy Acknowledgment',
-    'NDA',
-    'Performance Review',
-    'Warning Letter',
-    'Certificate',
-  ],
-  performance: [
-    'Annual Review',
-    'Quarterly Assessment',
-    'KPI Update',
-    'Commendation',
-    'Warning',
-    'Improvement Plan',
-  ],
-  equipment: [
-    'Uniform Issue',
-    'Equipment Assignment',
-    'Return of Equipment',
-    'Damage Report',
-    'Replacement Request',
-    'Maintenance Record',
-  ],
-  certifications: [
-    'SIA License',
-    'First Aid',
-    'Fire Safety',
-    'Health & Safety',
-    'Specialized Training',
-    'License Renewal',
-  ],
-} as const;
 
 // Form schema
 const formSchema = z.object({
@@ -175,219 +79,6 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-// Define local types for this component
-type EmployeeActivityWithoutOptional = {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  activityDate: Date;
-  activityCategory: string;
-  activityType: string;
-  description: string;
-  status: string;
-  source: ActivitySource;
-  recordedBy: string;
-  actionRequired: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  attachments?: string[];
-  notes?: string;
-  relatedDocuments?: string[];
-  nextReviewDate?: Date;
-  actionDeadline?: Date;
-};
-
-// Mock data
-const employees = [
-  { id: 'EMP001', name: 'John Doe', role: 'Security Officer' },
-  { id: 'EMP002', name: 'Jane Smith', role: 'Security Supervisor' },
-  { id: 'EMP003', name: 'Mike Johnson', role: 'Security Officer' },
-  { id: 'EMP004', name: 'Sarah Williams', role: 'Security Officer' },
-  { id: 'EMP005', name: 'David Rodriguez', role: 'Security Manager' },
-  { id: 'EMP006', name: 'Lisa Chen', role: 'Training Coordinator' },
-  { id: 'EMP007', name: 'James Wilson', role: 'Senior Security Officer' },
-  { id: 'EMP008', name: 'Amanda Taylor', role: 'HR Specialist' },
-] as unknown as Employee[];
-
-const mockActivities: EmployeeActivity[] = [
-  {
-    id: '1',
-    employeeId: 'EMP001',
-    employeeName: 'John Doe',
-    activityDate: new Date(),
-    activityCategory: 'employment',
-    activityType: 'New Hire',
-    description: 'Initial employment contract signed',
-    status: 'completed',
-    source: 'manual',
-    attachments: ['contract.pdf'],
-    relatedDocuments: [],
-    recordedBy: 'HR Manager',
-    actionRequired: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  },
-  {
-    id: '2',
-    employeeId: 'EMP001',
-    employeeName: 'John Doe',
-    activityDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    activityCategory: 'training',
-    activityType: 'Initial Training',
-    description: 'Completed initial security training program',
-    status: 'completed',
-    source: 'training_system',
-    attachments: [],
-    relatedDocuments: [],
-    nextReviewDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-    recordedBy: 'Training Manager',
-    actionRequired: false,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
-  },
-  {
-    id: '3',
-    employeeId: 'EMP002',
-    employeeName: 'Jane Smith',
-    activityDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    activityCategory: 'performance',
-    activityType: 'Quarterly Assessment',
-    description: 'Excellent performance in team leadership and coordination',
-    status: 'completed',
-    source: 'performance_system',
-    attachments: ['assessment_q2.pdf'],
-    relatedDocuments: ['performance_matrix.xlsx'],
-    recordedBy: 'David Rodriguez',
-    actionRequired: false,
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  },
-  {
-    id: '4',
-    employeeId: 'EMP003',
-    employeeName: 'Mike Johnson',
-    activityDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    activityCategory: 'certifications',
-    activityType: 'SIA License',
-    description: 'License renewal submitted',
-    status: 'in_progress',
-    source: 'certification_system',
-    attachments: ['license_renewal.pdf'],
-    relatedDocuments: [],
-    recordedBy: 'Amanda Taylor',
-    actionRequired: true,
-    actionDeadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
-  },
-  {
-    id: '5',
-    employeeId: 'EMP004',
-    employeeName: 'Sarah Williams',
-    activityDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-    activityCategory: 'leave',
-    activityType: 'Annual Leave Request',
-    description: 'Two weeks annual leave approved',
-    status: 'completed',
-    source: 'leave_system',
-    attachments: [],
-    relatedDocuments: ['leave_calendar.xlsx'],
-    recordedBy: 'System',
-    actionRequired: false,
-    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
-  },
-  {
-    id: '6',
-    employeeId: 'EMP001',
-    employeeName: 'John Doe',
-    activityDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-    activityCategory: 'equipment',
-    activityType: 'Uniform Issue',
-    description: 'Complete uniform kit issued',
-    status: 'completed',
-    source: 'equipment_system',
-    attachments: ['equipment_receipt.pdf'],
-    relatedDocuments: [],
-    recordedBy: 'Store Manager',
-    actionRequired: false,
-    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
-  },
-  {
-    id: '7',
-    employeeId: 'EMP005',
-    employeeName: 'David Rodriguez',
-    activityDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    activityCategory: 'training',
-    activityType: 'Leadership Workshop',
-    description: 'Completed advanced leadership training',
-    status: 'completed',
-    source: 'training_system',
-    attachments: ['certificate.pdf'],
-    relatedDocuments: ['leadership_manual.pdf'],
-    recordedBy: 'Lisa Chen',
-    actionRequired: true,
-    actionDeadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    nextReviewDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
-  },
-  {
-    id: '8',
-    employeeId: 'EMP006',
-    employeeName: 'Lisa Chen',
-    activityDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    activityCategory: 'documents',
-    activityType: 'Policy Acknowledgment',
-    description: 'Annual policy updates acknowledgment',
-    status: 'pending',
-    source: 'document_system',
-    attachments: [],
-    relatedDocuments: ['policy_updates_2023.pdf'],
-    recordedBy: 'System',
-    actionRequired: true,
-    actionDeadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
-  },
-  {
-    id: '9',
-    employeeId: 'EMP007',
-    employeeName: 'James Wilson',
-    activityDate: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
-    activityCategory: 'incidents',
-    activityType: 'Security Incident',
-    description: 'Successfully handled unauthorized access attempt',
-    status: 'completed',
-    source: 'manual',
-    attachments: ['incident_report.pdf'],
-    relatedDocuments: ['security_log.xlsx'],
-    recordedBy: 'David Rodriguez',
-    actionRequired: false,
-    createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
-  },
-  {
-    id: '10',
-    employeeId: 'EMP002',
-    employeeName: 'Jane Smith',
-    activityDate: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
-    activityCategory: 'employment',
-    activityType: 'Role Change',
-    description: 'Promotion to Security Supervisor',
-    status: 'completed',
-    source: 'hr_system',
-    attachments: ['promotion_letter.pdf'],
-    relatedDocuments: ['job_description.pdf'],
-    recordedBy: 'Amanda Taylor',
-    actionRequired: true,
-    actionDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000)
-  },
-];
-
 // State interface
 interface State {
   isDialogOpen: boolean;
@@ -400,6 +91,9 @@ interface State {
   syncStatus: Record<ActivitySource, ActivitySyncStatus>;
   isSyncing: boolean;
   errorLog: Array<{ message: string; timestamp: Date; data?: any }>;
+  isLoading: boolean;
+  employees: Employee[];
+  isLoadingEmployees: boolean;
 }
 
 // Action types
@@ -417,15 +111,10 @@ type Action =
   | { type: 'SET_SYNC_STATUS'; payload: Record<ActivitySource, ActivitySyncStatus> }
   | { type: 'UPDATE_SYNC_STATUS'; payload: { source: ActivitySource; status: ActivitySyncStatus } }
   | { type: 'SET_SYNCING'; payload: boolean }
-  | { type: 'LOG_ERROR'; payload: { message: string; data?: any } };
-
-// Mock data for testing
-const mockEmployees = [
-  { id: '1', name: 'John Doe', role: 'Software Engineer' },
-  { id: '2', name: 'Jane Smith', role: 'Product Manager' },
-  { id: '3', name: 'Mike Johnson', role: 'Designer' },
-  { id: '4', name: 'Sarah Williams', role: 'Marketing Manager' },
-] as unknown as Employee[];
+  | { type: 'LOG_ERROR'; payload: { message: string; data?: any } }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_EMPLOYEES'; payload: Employee[] }
+  | { type: 'SET_LOADING_EMPLOYEES'; payload: boolean };
 
 const initialSyncStatus: Record<ActivitySource, ActivitySyncStatus> = {
   manual: { source: 'manual', status: 'inactive', lastSynced: null },
@@ -445,10 +134,13 @@ const initialState: State = {
   editingEntry: null,
   activeTab: 'all',
   selectedEmployee: null,
-  activities: mockActivities,
+  activities: [],
   syncStatus: initialSyncStatus,
   isSyncing: false,
   errorLog: [],
+  isLoading: false,
+  employees: [],
+  isLoadingEmployees: false,
 };
 
 // Reducer function defined outside component
@@ -502,46 +194,61 @@ function reducer(state: State, action: Action): State {
           { message: action.payload.message, timestamp: new Date(), data: action.payload.data },
         ],
       };
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.payload };
+    case 'SET_EMPLOYEES':
+      return { ...state, employees: action.payload };
+    case 'SET_LOADING_EMPLOYEES':
+      return { ...state, isLoadingEmployees: action.payload };
     default:
       return state;
   }
 }
 
 const EmployeeDiaryPage: React.FC = () => {
-  console.log("Initial state with activities:", initialState.activities.length);
-  
-  // Direct activities state separate from reducer
-  const [activities, setActivities] = useState<EmployeeActivity[]>(mockActivities);
-  
-  useEffect(() => {
-    console.log("Component mounted, direct activities:", activities.length);
-    
-    // Directly set activities to ensure we have data
-    if (activities.length === 0) {
-      console.log("Forcing activities to mock data");
-      setActivities(mockActivities);
-    }
-  }, [activities.length]);
-  
   // State management
   const [state, dispatch] = useReducer(reducer, initialState);
   
+  // Fetch employees data
+  const fetchEmployees = useCallback(async () => {
+    try {
+      dispatch({ type: 'SET_LOADING_EMPLOYEES', payload: true });
+      
+      // Replace with your actual API endpoint
+      const response = await fetch('/api/employees');
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch employees: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      dispatch({ type: 'SET_EMPLOYEES', payload: data });
+    } catch (error) {
+      dispatch({
+        type: 'LOG_ERROR',
+        payload: { message: 'Error fetching employees', data: error },
+      });
+      toast({
+        title: "Error",
+        description: "Failed to load employee data.",
+        variant: "destructive",
+      });
+    } finally {
+      dispatch({ type: 'SET_LOADING_EMPLOYEES', payload: false });
+    }
+  }, []);
+
+  // Initialize data on component mount
   useEffect(() => {
-    console.log("Component mounted, state activities:", state.activities.length);
-    console.log("Active tab:", state.activeTab);
-    
-    // Force set activities explicitly to make sure we have data
-    dispatch({ type: 'SET_ACTIVITIES', payload: mockActivities });
-    
-    // Also reset to "all" tab
+    fetchEmployees();
+    checkSyncStatus();
+    fetchActivities();
     dispatch({ type: 'SET_ACTIVE_TAB', payload: 'all' });
   }, []);
   
-  // Modify the filtered activities logic to be more permissive for debugging
+  // Filter activities based on search, employee selection, and active tab
   const filteredActivities = useMemo(() => {
     const searchLower = state.searchQuery.toLowerCase();
-    
-    console.log("Filtering with tab:", state.activeTab);
     
     return state.activities.filter((activity) => {
       // Handle search filtering
@@ -560,11 +267,6 @@ const EmployeeDiaryPage: React.FC = () => {
         return matchesSearch;
       }
       
-      // Important: Compare category ID with current tab
-      // Log this comparison to debug tab filtering issues
-      console.log(`Tab filter: Activity ${activity.id} with category "${activity.activityCategory}" vs active tab "${state.activeTab}"`);
-      
-      // Categories need exact string matching
       return matchesSearch && activity.activityCategory === state.activeTab;
     });
   }, [state.activities, state.searchQuery, state.selectedEmployee, state.activeTab]);
@@ -593,6 +295,7 @@ const EmployeeDiaryPage: React.FC = () => {
   // Data fetching
   const fetchActivities = useCallback(async () => {
     try {
+      dispatch({ type: 'SET_LOADING', payload: true });
       const activities = await employeeActivityService.fetchEmployeeActivities(
         state.selectedEmployee || undefined
       );
@@ -607,6 +310,8 @@ const EmployeeDiaryPage: React.FC = () => {
         description: "Failed to fetch activities.",
         variant: "destructive",
       });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   }, [state.selectedEmployee]);
 
@@ -775,7 +480,7 @@ const EmployeeDiaryPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [state.syncStatus, handleSync, state.isSyncing]);
 
-  // Filtered and paginated data - memoized for performance
+  // Sort and paginate activities
   const sortedActivities = useMemo(() => 
     [...filteredActivities].sort((a, b) => 
       b.activityDate.getTime() - a.activityDate.getTime()
@@ -791,18 +496,6 @@ const EmployeeDiaryPage: React.FC = () => {
     )
   , [sortedActivities, state.currentPage]);
 
-  // Debug current state - moved here after all data is defined
-  useEffect(() => {
-    console.log("Current state:", {
-      activities: state.activities.length,
-      filteredActivities: filteredActivities.length,
-      paginatedActivities: paginatedActivities.length,
-      currentPage: state.currentPage,
-      activeTab: state.activeTab,
-      searchQuery: state.searchQuery
-    });
-  }, [state, filteredActivities, paginatedActivities]);
-
   const handleTabChange = useCallback((value: string) => {
     dispatch({ 
       type: 'SET_ACTIVE_TAB', 
@@ -812,7 +505,8 @@ const EmployeeDiaryPage: React.FC = () => {
 
   const handleEmployeeChange = useCallback((value: string) => {
     dispatch({ type: 'SET_SELECTED_EMPLOYEE', payload: value || null });
-  }, []);
+    fetchActivities();
+  }, [fetchActivities]);
 
   const handleDialogChange = useCallback((open: boolean) => {
     dispatch({ type: 'SET_DIALOG_OPEN', payload: open });
@@ -835,62 +529,86 @@ const EmployeeDiaryPage: React.FC = () => {
     </div>
   ), []);
 
-  // Add this right before the return statement to test
-  console.log("Before render:", {
-    mockDataLength: mockActivities.length,
-    activitiesLength: activities.length,
-    stateActivitiesLength: state.activities.length,
-    paginatedLength: paginatedActivities.length
-  });
+  // Loading state component
+  const renderLoadingState = useCallback(() => (
+    <div className="flex items-center justify-center py-16">
+      <div className="flex flex-col items-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Loading activities...</p>
+      </div>
+    </div>
+  ), []);
 
-  // Add a guaranteed hardcoded activity for rendering
-  const FALLBACK_ACTIVITY: EmployeeActivity = {
-    id: 'fallback-1',
-    employeeId: 'EMP001',
-    employeeName: 'John Doe',
-    activityDate: new Date(),
-    activityCategory: 'employment',
-    activityType: 'New Hire',
-    description: 'Initial employment contract signed',
-    status: 'completed',
-    source: 'manual',
-    attachments: ['contract.pdf'],
-    relatedDocuments: [],
-    recordedBy: 'HR Manager',
-    actionRequired: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
+  // Error state for employee loading
+  const renderEmployeeLoadingError = useCallback(() => (
+    <Card className="shadow-sm border-red-200">
+      <CardHeader className="text-center border-b text-red-600">
+        <CardTitle>Failed to Load Employees</CardTitle>
+        <CardDescription className="text-red-500">
+          We couldn't load the employee data. Please try refreshing the page.
+        </CardDescription>
+      </CardHeader>
+      <CardFooter className="flex justify-center pt-4">
+        <Button 
+          variant="outline"
+          onClick={fetchEmployees}
+          className="border-red-300 text-red-600 hover:bg-red-50"
+        >
+          Retry Loading Employees
+        </Button>
+      </CardFooter>
+    </Card>
+  ), [fetchEmployees]);
 
   return (
-    <div className="space-y-4 md:space-y-6 p-2 md:p-4 max-w-full overflow-hidden">
-      <Card className="overflow-hidden">
-        <CardHeader className="p-3 md:p-6">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <div>
-              <CardTitle className="text-xl md:text-2xl font-bold">Employee Activity Diary</CardTitle>
-              <CardDescription className="text-sm mt-1">
-                Comprehensive record of all employee-related activities and interactions
-              </CardDescription>
-            </div>
-            <div className="flex flex-col gap-3 md:gap-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-                <Select
-                  value={state.selectedEmployee || undefined}
-                  onValueChange={handleEmployeeChange}
-                >
-                  <SelectTrigger className="w-full sm:w-[200px]">
-                    <SelectValue placeholder="Select Employee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Employees</SelectItem>
-                    {employees.map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id}>
-                        {employee.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+    <div className="container mx-auto px-4 py-6 max-w-[1400px]">
+      {/* Page Header */}
+      <div className="flex flex-col gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-[#324053]">Employee Activity Diary</h1>
+          <p className="text-muted-foreground mt-1">
+            Comprehensive record of all employee-related activities and interactions
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        {/* Controls Card */}
+        <Card className="shadow-sm border-gray-200">
+          <CardHeader className="p-4 lg:p-6 border-b">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full md:w-auto">
+                {state.isLoadingEmployees ? (
+                  <div className="w-full sm:w-[240px] h-10 flex items-center justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <span className="text-sm text-muted-foreground">Loading...</span>
+                  </div>
+                ) : state.employees.length === 0 ? (
+                  <Button
+                    variant="outline"
+                    onClick={fetchEmployees}
+                    className="w-full sm:w-[240px]"
+                  >
+                    Retry Loading Employees
+                  </Button>
+                ) : (
+                  <Select
+                    value={state.selectedEmployee || undefined}
+                    onValueChange={handleEmployeeChange}
+                  >
+                    <SelectTrigger className="w-full sm:w-[240px]">
+                      <SelectValue placeholder="Select Employee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Employees</SelectItem>
+                      {state.employees.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <Dialog 
                   open={state.isDialogOpen} 
                   onOpenChange={handleDialogChange}
@@ -912,31 +630,18 @@ const EmployeeDiaryPage: React.FC = () => {
                           : 'Record a new employee activity or interaction.'}
                       </DialogDescription>
                     </DialogHeader>
-                    <ActivityFormImported
+                    <ActivityForm
                       form={form}
                       onSubmit={handleSubmit}
                       onCancel={() => handleDialogChange(false)}
                       isEditing={!!state.editingEntry}
-                      employees={employees}
+                      employees={state.employees}
                     />
                   </DialogContent>
                 </Dialog>
               </div>
-              <div className="w-full overflow-x-auto">
-                <SyncStatus
-                  sources={state.syncStatus}
-                  onSync={handleSync}
-                  onToggleStatus={handleToggleSourceStatus}
-                  isSyncing={state.isSyncing}
-                />
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-3 md:p-6">
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-              <div className="relative w-full sm:w-[300px]">
+              
+              <div className="relative w-full md:w-[300px]">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search activities..."
@@ -946,90 +651,76 @@ const EmployeeDiaryPage: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <Tabs 
-                defaultValue="all"
-                value={state.activeTab}
-                onValueChange={handleTabChange}
-              >
-                <div className="flex justify-between items-center mb-6 overflow-x-auto pb-2">
-                  <TabsList className="h-auto p-1 bg-muted/50 overflow-x-auto flex-nowrap min-w-[320px]">
-                    <TabsTrigger 
-                      value="all" 
-                      className={`flex items-center gap-2 px-3 py-2 flex-shrink-0 ${state.activeTab === 'all' ? 'bg-blue-100 text-blue-800' : ''}`}
-                    >
-                      <FileText className="h-4 w-4" />
-                      <span>All</span>
-                    </TabsTrigger>
+          </CardHeader>
+
+          <CardContent className="pt-4 px-4 lg:px-6 pb-0 overflow-hidden">
+            <div className="w-full overflow-x-auto pb-2">
+              <SyncStatus
+                sources={state.syncStatus}
+                onSync={handleSync}
+                onToggleStatus={handleToggleSourceStatus}
+                isSyncing={state.isSyncing}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Content Card */}
+        <Card className="shadow-sm border-gray-200">
+          <CardContent className="p-4 lg:p-6">
+            <Tabs 
+              defaultValue="all"
+              value={state.activeTab}
+              onValueChange={handleTabChange}
+              className="w-full"
+            >
+              <div className="flex justify-between items-center mb-6 overflow-x-auto pb-2">
+                <TabsList className="h-auto p-1 bg-muted/50 overflow-x-auto flex-nowrap min-w-[320px]">
+                  <TabsTrigger 
+                    value="all" 
+                    className={`flex items-center gap-2 px-3 py-2 flex-shrink-0 ${state.activeTab === 'all' ? 'bg-blue-100 text-blue-800' : ''}`}
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span>All</span>
+                  </TabsTrigger>
+                  
+                  {ACTIVITY_CATEGORIES.map((category) => {
+                    const Icon = category.icon;
+                    const isActive = state.activeTab === category.id;
+                    const categories = state.activities
+                      .filter(a => a.activityCategory === category.id)
+                      .length;
                     
-                    {ACTIVITY_CATEGORIES.map((category) => {
-                      const Icon = category.icon;
-                      const isActive = state.activeTab === category.id;
-                      const categories = state.activities
-                        .filter(a => a.activityCategory === category.id)
-                        .length;
-                      
-                      return (
-                        <TabsTrigger
-                          key={category.id}
-                          value={category.id}
-                          className={`flex items-center gap-2 px-3 py-2 flex-shrink-0 ${isActive ? CATEGORY_COLORS[category.id] : ''}`}
-                        >
-                          <Icon className="h-4 w-4" />
-                          <span className="hidden sm:inline">{category.label}</span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white' : 'bg-gray-200'}`}>
-                            {categories}
-                          </span>
-                        </TabsTrigger>
-                      );
-                    })}
-                  </TabsList>
-                </div>
+                    return (
+                      <TabsTrigger
+                        key={category.id}
+                        value={category.id}
+                        className={`flex items-center gap-2 px-3 py-2 flex-shrink-0 ${isActive ? CATEGORY_COLORS[category.id] : ''}`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span className="hidden sm:inline">{category.label}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white' : 'bg-gray-200'}`}>
+                          {categories}
+                        </span>
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+              </div>
 
-                {state.activeTab === 'all' && (
-                  <TabsContent value="all" className="mt-4 md:mt-6 space-y-4 md:space-y-6">
-                    {filteredActivities.length === 0 ? (
-                      renderEmptyState()
-                    ) : (
-                      filteredActivities.map((activity) => (
-                        <ActivityTimelineImported
-                          key={activity.id}
-                          activity={activity}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                        />
-                      ))
-                    )}
-                  </TabsContent>
-                )}
+              {/* Show loading state */}
+              {state.isLoading && renderLoadingState()}
 
-                {ACTIVITY_CATEGORIES.map((category) => (
-                  state.activeTab === category.id && (
-                    <TabsContent key={category.id} value={category.id} className="mt-4 md:mt-6 space-y-4 md:space-y-6">
+              {/* Show content when not loading */}
+              {!state.isLoading && (
+                <>
+                  {state.activeTab === 'all' && (
+                    <TabsContent value="all" className="mt-4 md:mt-6 space-y-4 md:space-y-6">
                       {filteredActivities.length === 0 ? (
-                        <div className="text-center py-6 md:py-8">
-                          <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-muted mb-3 md:mb-4">
-                            {React.createElement(category.icon, { className: "h-5 w-5 md:h-6 md:w-6 text-muted-foreground" })}
-                          </div>
-                          <h3 className="text-base md:text-lg font-medium">No {category.label} Activities</h3>
-                          <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-                            No activities found in this category. Try another category or add a new activity.
-                          </p>
-                          <Button 
-                            className="mt-4 bg-blue-900 text-white hover:bg-blue-800"
-                            onClick={() => {
-                              // Pre-select the current category when adding a new activity
-                              form.setValue('activityCategory', category.id as ActivityCategory);
-                              dispatch({ type: 'SET_DIALOG_OPEN', payload: true });
-                            }}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add {category.label} Activity
-                          </Button>
-                        </div>
+                        renderEmptyState()
                       ) : (
-                        filteredActivities.map((activity) => (
-                          <ActivityTimelineImported
+                        paginatedActivities.map((activity) => (
+                          <ActivityTimeline
                             key={activity.id}
                             activity={activity}
                             onEdit={handleEdit}
@@ -1038,41 +729,80 @@ const EmployeeDiaryPage: React.FC = () => {
                         ))
                       )}
                     </TabsContent>
-                  )
-                ))}
-              </Tabs>
-            </div>
-          </div>
+                  )}
 
-          {filteredActivities.length > 0 && (
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 md:mt-8">
-              <div className="text-xs sm:text-sm text-muted-foreground order-2 sm:order-1">
-                Showing {((state.currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(state.currentPage * ITEMS_PER_PAGE, sortedActivities.length)} of {sortedActivities.length} activities
+                  {ACTIVITY_CATEGORIES.map((category) => (
+                    state.activeTab === category.id && (
+                      <TabsContent key={category.id} value={category.id} className="mt-4 md:mt-6 space-y-4 md:space-y-6">
+                        {filteredActivities.length === 0 ? (
+                          <div className="text-center py-6 md:py-8">
+                            <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-muted mb-3 md:mb-4">
+                              {React.createElement(category.icon, { className: "h-5 w-5 md:h-6 md:w-6 text-muted-foreground" })}
+                            </div>
+                            <h3 className="text-base md:text-lg font-medium">No {category.label} Activities</h3>
+                            <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+                              No activities found in this category. Try another category or add a new activity.
+                            </p>
+                            <Button 
+                              className="mt-4 bg-blue-900 text-white hover:bg-blue-800"
+                              onClick={() => {
+                                // Pre-select the current category when adding a new activity
+                                form.setValue('activityCategory', category.id as ActivityCategory);
+                                dispatch({ type: 'SET_DIALOG_OPEN', payload: true });
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add {category.label} Activity
+                            </Button>
+                          </div>
+                        ) : (
+                          paginatedActivities.map((activity) => (
+                            <ActivityTimeline
+                              key={activity.id}
+                              activity={activity}
+                              onEdit={handleEdit}
+                              onDelete={handleDelete}
+                            />
+                          ))
+                        )}
+                      </TabsContent>
+                    )
+                  ))}
+                </>
+              )}
+            </Tabs>
+
+            {/* Pagination - only show when not loading and we have activities */}
+            {!state.isLoading && filteredActivities.length > 0 && (
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 border-t pt-4">
+                <div className="text-xs sm:text-sm text-muted-foreground order-2 sm:order-1">
+                  Showing {((state.currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(state.currentPage * ITEMS_PER_PAGE, sortedActivities.length)} of {sortedActivities.length} activities
+                </div>
+                <div className="flex space-x-2 order-1 sm:order-2 w-full sm:w-auto justify-center sm:justify-start">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(Math.max(1, state.currentPage - 1))}
+                    disabled={state.currentPage === 1}
+                    className="h-8 px-3"
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(Math.min(totalPages, state.currentPage + 1))}
+                    disabled={state.currentPage === totalPages}
+                    className="h-8 px-3"
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
-              <div className="flex space-x-2 order-1 sm:order-2 w-full sm:w-auto justify-center sm:justify-start">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(Math.max(1, state.currentPage - 1))}
-                  disabled={state.currentPage === 1}
-                  className="h-8 px-3"
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(Math.min(totalPages, state.currentPage + 1))}
-                  disabled={state.currentPage === totalPages}
-                  className="h-8 px-3"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
