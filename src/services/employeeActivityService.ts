@@ -2,140 +2,222 @@ import type { ActivitySource, ActivitySyncStatus, EmployeeActivity } from '@/typ
 import { ACTIVITY_SOURCES } from '@/config/activityConfig';
 
 class EmployeeActivityService {
-  private activities: EmployeeActivity[] = [];
-  private baseUrl: string = 'https://your-api-base-url.com';
-  private syncStatus: Record<ActivitySource, ActivitySyncStatus> = Object.fromEntries(
-    Object.keys(ACTIVITY_SOURCES).map(source => [
-      source as ActivitySource,
-      { source: source as ActivitySource, status: 'inactive', lastSynced: null }
-    ])
-  ) as Record<ActivitySource, ActivitySyncStatus>;
-
+  private baseUrl: string = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  
+  // Get all activities or filter by employee ID
   async fetchEmployeeActivities(employeeId?: string): Promise<EmployeeActivity[]> {
-    // In a real implementation, this would fetch from an API
-    return employeeId
-      ? this.activities.filter(activity => activity.employeeId === employeeId)
-      : this.activities;
-  }
-
-  async fetchActivitySources(): Promise<Record<ActivitySource, ActivitySyncStatus>> {
-    // In a real implementation, this would fetch from an API
-    return this.syncStatus;
-  }
-
-  async createActivity(data: Omit<EmployeeActivity, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmployeeActivity> {
-    const newActivity: EmployeeActivity = {
-      ...data,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    this.activities.unshift(newActivity);
-    return newActivity;
-  }
-
-  async updateActivity(id: string, data: Partial<EmployeeActivity>): Promise<EmployeeActivity> {
-    const index = this.activities.findIndex(activity => activity.id === id);
-    if (index === -1) {
-      throw new Error('Activity not found');
-    }
-
-    const updatedActivity: EmployeeActivity = {
-      ...this.activities[index],
-      ...data,
-      updatedAt: new Date(),
-    };
-    this.activities[index] = updatedActivity;
-    return updatedActivity;
-  }
-
-  async deleteActivity(id: string): Promise<void> {
-    const index = this.activities.findIndex(activity => activity.id === id);
-    if (index === -1) {
-      throw new Error('Activity not found');
-    }
-    this.activities.splice(index, 1);
-  }
-
-  async syncActivitiesFromSource(source: ActivitySource): Promise<void> {
-    // In a real implementation, this would sync with external systems
     try {
-      this.syncStatus[source] = {
-        ...this.syncStatus[source],
-        status: 'active',
-        lastSynced: new Date(),
-      };
+      const url = employeeId 
+        ? `${this.baseUrl}/activities?employeeId=${employeeId}`
+        : `${this.baseUrl}/activities`;
+        
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Transform dates from strings to Date objects
+      return data.map((activity: any) => ({
+        ...activity,
+        activityDate: new Date(activity.activityDate),
+        nextReviewDate: activity.nextReviewDate ? new Date(activity.nextReviewDate) : undefined,
+        actionDeadline: activity.actionDeadline ? new Date(activity.actionDeadline) : undefined,
+        createdAt: new Date(activity.createdAt),
+        updatedAt: new Date(activity.updatedAt)
+      }));
     } catch (error) {
-      this.syncStatus[source] = {
-        ...this.syncStatus[source],
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-      };
+      console.error('Error fetching activities:', error);
       throw error;
     }
   }
 
-  // Automated data extraction
-  async extractActivitiesFromHR(startDate: Date, endDate: Date): Promise<EmployeeActivity[]> {
-    const response = await fetch(`${this.baseUrl}/api/extract-hr-activities`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ startDate, endDate }),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to extract activities from HR system');
+  // Get sync status for all activity sources
+  async fetchActivitySources(): Promise<Record<ActivitySource, ActivitySyncStatus>> {
+    try {
+      const response = await fetch(`${this.baseUrl}/sync-status`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Transform lastSynced dates from strings to Date objects
+      return Object.fromEntries(
+        Object.entries(data).map(([source, status]: [string, any]) => [
+          source,
+          {
+            ...status,
+            lastSynced: status.lastSynced ? new Date(status.lastSynced) : null
+          }
+        ])
+      ) as Record<ActivitySource, ActivitySyncStatus>;
+    } catch (error) {
+      console.error('Error fetching sync status:', error);
+      // Fallback to default sync status if API fails
+      return Object.fromEntries(
+        Object.keys(ACTIVITY_SOURCES).map(source => [
+          source as ActivitySource,
+          { source: source as ActivitySource, status: 'inactive', lastSynced: null }
+        ])
+      ) as Record<ActivitySource, ActivitySyncStatus>;
     }
-    return response.json();
   }
 
-  async extractActivitiesFromTraining(): Promise<EmployeeActivity[]> {
-    const response = await fetch(`${this.baseUrl}/api/extract-training-activities`);
-    if (!response.ok) {
-      throw new Error('Failed to extract activities from training system');
+  // Create a new activity
+  async createActivity(data: Omit<EmployeeActivity, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmployeeActivity> {
+    try {
+      const response = await fetch(`${this.baseUrl}/activities`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const activity = await response.json();
+      
+      // Transform dates from strings to Date objects
+      return {
+        ...activity,
+        activityDate: new Date(activity.activityDate),
+        nextReviewDate: activity.nextReviewDate ? new Date(activity.nextReviewDate) : undefined,
+        actionDeadline: activity.actionDeadline ? new Date(activity.actionDeadline) : undefined,
+        createdAt: new Date(activity.createdAt),
+        updatedAt: new Date(activity.updatedAt)
+      };
+    } catch (error) {
+      console.error('Error creating activity:', error);
+      throw error;
     }
-    return response.json();
   }
 
-  async extractActivitiesFromLeave(): Promise<EmployeeActivity[]> {
-    const response = await fetch(`${this.baseUrl}/api/extract-leave-activities`);
-    if (!response.ok) {
-      throw new Error('Failed to extract activities from leave system');
+  // Update an existing activity
+  async updateActivity(id: string, data: Partial<EmployeeActivity>): Promise<EmployeeActivity> {
+    try {
+      const response = await fetch(`${this.baseUrl}/activities/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const activity = await response.json();
+      
+      // Transform dates from strings to Date objects
+      return {
+        ...activity,
+        activityDate: new Date(activity.activityDate),
+        nextReviewDate: activity.nextReviewDate ? new Date(activity.nextReviewDate) : undefined,
+        actionDeadline: activity.actionDeadline ? new Date(activity.actionDeadline) : undefined,
+        createdAt: new Date(activity.createdAt),
+        updatedAt: new Date(activity.updatedAt)
+      };
+    } catch (error) {
+      console.error('Error updating activity:', error);
+      throw error;
     }
-    return response.json();
   }
 
-  // Utility methods
-  async uploadAttachment(activityId: string, file: File): Promise<string> {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await fetch(`${this.baseUrl}/api/activities/${activityId}/attachments`, {
-      method: 'POST',
-      body: formData,
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to upload attachment');
+  // Delete an activity
+  async deleteActivity(id: string): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/activities/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      throw error;
     }
-    
-    const { url } = await response.json();
-    return url;
   }
 
+  // Sync with external data source
+  async syncActivitiesFromSource(source: ActivitySource): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ source })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+    } catch (error) {
+      console.error(`Error syncing activities from ${source}:`, error);
+      throw error;
+    }
+  }
+
+  // Generate activity report
   async generateActivityReport(employeeId: string, startDate: Date, endDate: Date): Promise<Blob> {
-    const response = await fetch(`${this.baseUrl}/api/activities/report`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ employeeId, startDate, endDate }),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to generate activity report');
+    try {
+      const response = await fetch(`${this.baseUrl}/activities/report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          employeeId, 
+          startDate: startDate.toISOString(), 
+          endDate: endDate.toISOString() 
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      return await response.blob();
+    } catch (error) {
+      console.error('Error generating activity report:', error);
+      throw error;
     }
-    
-    return response.blob();
+  }
+  
+  // Utility method to transform activity data
+  private transformActivityDates(activity: any): EmployeeActivity {
+    return {
+      ...activity,
+      activityDate: new Date(activity.activityDate),
+      nextReviewDate: activity.nextReviewDate ? new Date(activity.nextReviewDate) : undefined,
+      actionDeadline: activity.actionDeadline ? new Date(activity.actionDeadline) : undefined,
+      createdAt: new Date(activity.createdAt),
+      updatedAt: new Date(activity.updatedAt)
+    };
   }
 }
 
+// Create and export a singleton instance
 export const employeeActivityService = new EmployeeActivityService(); 

@@ -1,0 +1,227 @@
+{
+  "employees": [
+    {
+      "id": "EMP001",
+      "name": "John Doe",
+      "role": "Security Officer",
+      "department": "Operations",
+      "startDate": "2021-03-15T00:00:00.000Z",
+      "status": "active",
+      "employmentType": "full-time",
+      "email": "john.doe@example.com",
+      "contactNumber": "555-123-4567"
+    },
+    {
+      "id": "EMP002",
+      "name": "Jane Smith",
+      "role": "Security Supervisor",
+      "department": "Operations",
+      "startDate": "2019-06-10T00:00:00.000Z",
+      "status": "active",
+      "employmentType": "full-time",
+      "supervisor": "EMP005",
+      "email": "jane.smith@example.com",
+      "contactNumber": "555-234-5678"
+    },
+    {
+      "id": "EMP003",
+      "name": "Mike Johnson",
+      "role": "Security Officer",
+      "department": "Operations",
+      "startDate": "2022-01-20T00:00:00.000Z",
+      "status": "active",
+      "employmentType": "part-time",
+      "supervisor": "EMP002",
+      "email": "mike.johnson@example.com"
+    },
+    {
+      "id": "EMP004",
+      "name": "Sarah Williams",
+      "role": "Security Officer",
+      "department": "Operations",
+      "startDate": "2021-09-05T00:00:00.000Z",
+      "status": "active",
+      "employmentType": "full-time",
+      "supervisor": "EMP002",
+      "email": "sarah.williams@example.com",
+      "contactNumber": "555-345-6789"
+    },
+    {
+      "id": "EMP005",
+      "name": "David Rodriguez",
+      "role": "Security Manager",
+      "department": "Operations",
+      "startDate": "2018-04-12T00:00:00.000Z",
+      "status": "active",
+      "employmentType": "full-time",
+      "email": "david.rodriguez@example.com",
+      "contactNumber": "555-456-7890"
+    },
+    {
+      "id": "EMP006",
+      "name": "Lisa Chen",
+      "role": "Training Coordinator",
+      "department": "Training",
+      "startDate": "2020-07-15T00:00:00.000Z",
+      "status": "active",
+      "employmentType": "full-time",
+      "supervisor": "EMP005",
+      "email": "lisa.chen@example.com",
+      "contactNumber": "555-567-8901"
+    },
+    {
+      "id": "EMP007",
+      "name": "James Wilson",
+      "role": "Senior Security Officer",
+      "department": "Operations",
+      "startDate": "2019-11-30T00:00:00.000Z",
+      "status": "active",
+      "employmentType": "full-time",
+      "supervisor": "EMP002",
+      "email": "james.wilson@example.com"
+    },
+    {
+      "id": "EMP008",
+      "name": "Amanda Taylor",
+      "role": "HR Specialist",
+      "department": "Human Resources",
+      "startDate": "2020-02-18T00:00:00.000Z",
+      "status": "active",
+      "employmentType": "full-time",
+      "email": "amanda.taylor@example.com",
+      "contactNumber": "555-678-9012"
+    }
+  ],
+  "activities": [
+    {
+      "id": "1",
+      "employeeId": "EMP001",
+      "employeeName": "John Doe",
+      "activityDate": "2023-06-15T14:30:00.000Z",
+      "activityCategory": "employment",
+      "activityType": "New Hire",
+      "description": "Initial employment contract signed",
+      "status": "completed",
+      "source": "manual",
+      "attachments": ["contract.pdf"],
+      "relatedDocuments": [],
+      "recordedBy": "HR Manager",
+      "actionRequired": false,
+      "createdAt": "2023-06-15T14:30:00.000Z",
+      "updatedAt": "2023-06-15T14:30:00.000Z"
+    },
+    {
+      "id": "2",
+      "employeeId": "EMP001",
+      "employeeName": "John Doe",
+      "activityDate": "2023-06-18T09:00:00.000Z",
+      "activityCategory": "training",
+      "activityType": "Initial Training",
+      "description": "Completed initial security training program",
+      "status": "completed",
+      "source": "training_system",
+      "attachments": [],
+      "relatedDocuments": [],
+      "nextReviewDate": "2023-12-15T00:00:00.000Z",
+      "recordedBy": "Training Manager",
+      "actionRequired": false,
+      "createdAt": "2023-06-18T09:00:00.000Z",
+      "updatedAt": "2023-06-18T09:00:00.000Z"
+    },
+    {
+      "id": "3",
+      "employeeId": "EMP002",
+      "employeeName": "Jane Smith",
+      "activityDate": "2023-06-10T13:00:00.000Z",
+      "activityCategory": "performance",
+      "activityType": "Quarterly Assessment",
+      "description": "Excellent performance in team leadership and coordination",
+      "status": "completed",
+      "source": "performance_system",
+      "attachments": ["assessment_q2.pdf"],
+      "relatedDocuments": ["performance_matrix.xlsx"],
+      "recordedBy": "David Rodriguez",
+      "actionRequired": false,
+      "createdAt": "2023-06-10T13:00:00.000Z",
+      "updatedAt": "2023-06-10T13:00:00.000Z"
+    },
+    {
+      "id": "4",
+      "employeeId": "EMP003",
+      "employeeName": "Mike Johnson",
+      "activityDate": "2023-06-12T11:30:00.000Z",
+      "activityCategory": "certifications",
+      "activityType": "SIA License",
+      "description": "License renewal submitted",
+      "status": "in_progress",
+      "source": "certification_system",
+      "attachments": ["license_renewal.pdf"],
+      "relatedDocuments": [],
+      "recordedBy": "Amanda Taylor",
+      "actionRequired": true,
+      "actionDeadline": "2023-07-01T00:00:00.000Z",
+      "createdAt": "2023-06-12T11:30:00.000Z",
+      "updatedAt": "2023-06-12T11:30:00.000Z"
+    },
+    {
+      "id": "5",
+      "employeeId": "EMP004",
+      "employeeName": "Sarah Williams",
+      "activityDate": "2023-06-07T10:15:00.000Z",
+      "activityCategory": "leave",
+      "activityType": "Annual Leave Request",
+      "description": "Two weeks annual leave approved",
+      "status": "completed",
+      "source": "leave_system",
+      "attachments": [],
+      "relatedDocuments": ["leave_calendar.xlsx"],
+      "recordedBy": "System",
+      "actionRequired": false,
+      "createdAt": "2023-06-07T10:15:00.000Z",
+      "updatedAt": "2023-06-07T10:15:00.000Z"
+    }
+  ],
+  "sync-status": {
+    "manual": {
+      "source": "manual",
+      "status": "inactive",
+      "lastSynced": null
+    },
+    "hr_system": {
+      "source": "hr_system",
+      "status": "active",
+      "lastSynced": "2023-06-17T14:00:00.000Z"
+    },
+    "training_system": {
+      "source": "training_system",
+      "status": "active",
+      "lastSynced": "2023-06-17T15:30:00.000Z"
+    },
+    "leave_system": {
+      "source": "leave_system",
+      "status": "inactive",
+      "lastSynced": "2023-06-16T14:00:00.000Z"
+    },
+    "performance_system": {
+      "source": "performance_system",
+      "status": "active",
+      "lastSynced": "2023-06-17T10:00:00.000Z"
+    },
+    "document_system": {
+      "source": "document_system",
+      "status": "inactive",
+      "lastSynced": null
+    },
+    "equipment_system": {
+      "source": "equipment_system",
+      "status": "error",
+      "lastSynced": "2023-06-17T04:00:00.000Z",
+      "error": "Connection timeout"
+    },
+    "certification_system": {
+      "source": "certification_system",
+      "status": "active",
+      "lastSynced": "2023-06-17T12:00:00.000Z"
+    }
+  }
+}
