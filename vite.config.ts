@@ -68,43 +68,35 @@ export default defineConfig(({ mode }) => ({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: true,
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
     rollupOptions: {
-      external: [
-        'react-csv',
-        '@radix-ui/react-separator',
-        '@radix-ui/react-popover',
-        '@radix-ui/react-dialog',
-        '@radix-ui/react-alert-dialog',
-        '@radix-ui/react-toast',
-        '@radix-ui/react-label',
-        '@radix-ui/react-switch',
-        '@radix-ui/react-tabs',
-        '@radix-ui/react-tooltip',
-        '@radix-ui/react-avatar',
-        '@radix-ui/react-select',
-        '@radix-ui/react-progress',
-        '@radix-ui/react-checkbox',
-        '@radix-ui/react-radio-group',
-        '@radix-ui/react-scroll-area',
-        '@radix-ui/react-dropdown-menu',
-        '@radix-ui/react-accordion',
-        '@tanstack/react-table'
-      ],
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom', 'react-redux'],
-          'utils-vendor': [
-            'date-fns',
-            'class-variance-authority',
-            'uuid',
-            'framer-motion',
-            'recharts',
-            'sonner',
-            'react-toastify',
-            'react-day-picker',
-            'tailwind-merge',
-            '@zxing/library'
-          ]
+        manualChunks: (id) => {
+          // Create a chunk for Radix UI components
+          if (id.includes('@radix-ui')) {
+            return 'radix-ui-vendor';
+          }
+          
+          // React and related libraries
+          if (id.includes('react') || id.includes('redux')) {
+            return 'react-vendor';
+          }
+          
+          // Utilities and other libraries
+          if (id.includes('date-fns') || 
+              id.includes('class-variance-authority') || 
+              id.includes('uuid') || 
+              id.includes('framer-motion') || 
+              id.includes('recharts') || 
+              id.includes('sonner') || 
+              id.includes('react-toastify') || 
+              id.includes('react-day-picker') || 
+              id.includes('tailwind-merge') || 
+              id.includes('@zxing/library')) {
+            return 'utils-vendor';
+          }
         }
       }
     }
