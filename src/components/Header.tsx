@@ -145,14 +145,14 @@ const RoleSelectorContent = ({
             value={role.id} 
             checked={role.id === activeRole}
             onClick={() => handleRoleChange(role.id)}
-            className="text-white focus:bg-blue-800 focus:text-white text-[15px]"
+            className="text-white hover:bg-transparent focus:bg-blue-800 focus:text-white text-[15px]"
           >
             {role.name}
           </DropdownMenuRadioItem>
         ))}
       </DropdownMenuRadioGroup>
       <DropdownMenuSeparator className="bg-blue-800" />
-      <DropdownMenuItem onClick={toggleTestMode} className="text-white focus:bg-blue-800 focus:text-white text-[15px]">
+      <DropdownMenuItem onClick={toggleTestMode} className="text-white hover:bg-transparent focus:bg-blue-800 focus:text-white text-[15px]">
         {isTestMode ? 'Exit Test Mode' : 'Enter Test Mode'}
         {isTestMode && (
           <Badge variant="outline" className="ml-auto border-blue-700 bg-blue-950/50">Active</Badge>

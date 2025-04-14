@@ -6,12 +6,19 @@ interface AccordionContextType {
   value: string[];
   setValue: (itemValue: string) => void;
   type: "single" | "multiple";
+  itemValue?: string;
 }
 
 const AccordionContext = React.createContext<AccordionContextType>({
   value: [],
   setValue: () => {},
-  type: "single"
+  type: "single",
+  itemValue: undefined
+});
+
+// Create a new context for AccordionItem
+const AccordionItemContext = React.createContext<{ value: string }>({
+  value: ''
 });
 
 export function Accordion({ 
@@ -58,9 +65,11 @@ export function AccordionItem({
   value: string;
 }) {
   return (
-    <div className={cn("border-b", className)} {...props}>
-      {children}
-    </div>
+    <AccordionItemContext.Provider value={{ value }}>
+      <div className={cn("border-b", className)} {...props}>
+        {children}
+      </div>
+    </AccordionItemContext.Provider>
   );
 }
 
@@ -69,8 +78,8 @@ export function AccordionTrigger({
   className,
   ...props
 }: React.HTMLAttributes<HTMLButtonElement>) {
-  const { value, setValue, type } = React.useContext(AccordionContext);
-  const itemValue = (props as any).value;
+  const { value, setValue } = React.useContext(AccordionContext);
+  const { value: itemValue } = React.useContext(AccordionItemContext);
   const isExpanded = value.includes(itemValue);
 
   return (
@@ -96,7 +105,7 @@ export function AccordionContent({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   const { value } = React.useContext(AccordionContext);
-  const itemValue = (props as any).value;
+  const { value: itemValue } = React.useContext(AccordionItemContext);
   const isExpanded = value.includes(itemValue);
 
   if (!isExpanded) return null;
