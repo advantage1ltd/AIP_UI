@@ -1,69 +1,82 @@
-# Welcome to your Lovable project
+# Employee Diary Application
 
-## Project info
+A React application for managing employee activities and records.
 
-**URL**: https://lovable.dev/projects/c7d8b4a3-3d58-4228-9a4a-df03d0e4c95a
+## Features
 
-## How can I edit this code?
+- View employee activities and records
+- Filter activities by employee, category, or search terms
+- Add new activity records
+- Edit and delete existing records
+- Sync with external systems (simulated)
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- React with TypeScript
+- Vite for frontend build and development
+- Tailwind CSS for styling
+- React Hook Form with Zod for form validation
+- JSON Server for mock API
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/c7d8b4a3-3d58-4228-9a4a-df03d0e4c95a) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js 18 or later
+- npm or yarn
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. Clone this repository
+2. Install dependencies:
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+npm install
+# or
+yarn install
 ```
 
-**Edit a file directly in GitHub**
+### Running the Development Server
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+This project uses JSON Server to simulate a backend API with the data from `db.json`.
 
-**Use GitHub Codespaces**
+1. Start the mock API server:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+npm run mock-api
+# or
+yarn mock-api
+```
 
-## What technologies are used for this project?
+This will start a server on http://localhost:3001
 
-This project is built with .
+2. In a separate terminal, start the development server:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+npm run dev
+# or
+yarn dev
+```
 
-## How can I deploy this project?
+This will start the Vite development server.
 
-Simply open [Lovable](https://lovable.dev/projects/c7d8b4a3-3d58-4228-9a4a-df03d0e4c95a) and click on Share -> Publish.
+## API Endpoints
 
-## I want to use a custom domain - is that possible?
+The mock API provides the following endpoints:
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+- `GET /employees` - List all employees
+- `GET /activities` - List all activities
+- `GET /activities?employeeId={id}` - List activities for a specific employee
+- `POST /activities` - Create a new activity
+- `PUT /activities/{id}` - Update an activity
+- `DELETE /activities/{id}` - Delete an activity
+- `GET /sync-status` - Get sync status for all sources
+
+## Project Structure
+
+- `src/components/` - Reusable React components
+- `src/pages/` - Main pages of the application
+- `src/services/` - Service layers for API interactions
+- `src/types/` - TypeScript type definitions
+- `src/config/` - Application configuration
+- `db.json` - Mock database used by JSON Server
