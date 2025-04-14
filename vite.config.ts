@@ -12,8 +12,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [
-    // Add our custom plugin before the React plugin
-    radixResolver(),
+    // React plugin only - we'll handle Radix components normally
     react(),
   ],
   resolve: {
@@ -23,13 +22,6 @@ export default defineConfig(({ mode }) => ({
     dedupe: ['react', 'react-dom']
   },
   optimizeDeps: {
-    // Exclude problematic packages
-    exclude: [
-      '@radix-ui/react-accordion', 
-      '@radix-ui/react-dropdown-menu', 
-      '@radix-ui/react-scroll-area', 
-      '@radix-ui/react-card'
-    ],
     include: [
       // React core
       'react', 
@@ -37,7 +29,11 @@ export default defineConfig(({ mode }) => ({
       'react-redux',
       'react-router-dom',
       
-      // Safe Radix UI components
+      // All Radix UI components
+      '@radix-ui/react-accordion',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-scroll-area',
+      '@radix-ui/react-card',
       '@radix-ui/react-separator',
       '@radix-ui/react-slot',
       '@radix-ui/react-popover',
@@ -82,16 +78,30 @@ export default defineConfig(({ mode }) => ({
       extensions: ['.js', '.cjs', '.mjs'],
     },
     rollupOptions: {
-      // Explicitly treat these modules as external
-      external: [
-        '@radix-ui/react-accordion',
-        '@radix-ui/react-dropdown-menu',
-        '@radix-ui/react-scroll-area',
-        '@radix-ui/react-card'
-      ],
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom', 'react-redux'],
+          'radix-vendor': [
+            '@radix-ui/react-accordion',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-scroll-area',
+            '@radix-ui/react-card',
+            '@radix-ui/react-separator',
+            '@radix-ui/react-slot',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-alert-dialog',
+            '@radix-ui/react-toast',
+            '@radix-ui/react-label',
+            '@radix-ui/react-switch',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-avatar',
+            '@radix-ui/react-select',
+            '@radix-ui/react-progress',
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-radio-group'
+          ],
           'utils-vendor': [
             'date-fns',
             'class-variance-authority',
