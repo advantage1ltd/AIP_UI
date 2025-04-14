@@ -43,7 +43,6 @@ import {
   Shirt,
   FileTextIcon,
   BarChart3,
-  Handshake,
   ShieldCheck,
   Boxes,
   GraduationCap,
@@ -440,7 +439,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
         {
           title: "Manager Support",
           href: "/management/manager-support",
-          icon: <Handshake className="h-4 w-4" />,
+          icon: <Building2 className="h-4 w-4" />,
           roles: ['administrator', 'advantage-ho'],
         },
         {

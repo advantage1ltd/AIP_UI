@@ -1,4 +1,4 @@
-import { Building2, Mail, Phone, UserRound, Calendar, PenLine, Trash2 } from "lucide-react"
+import { Building2, Mail, Phone, User, Calendar, PenLine, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Lead } from "@/types/leads"
@@ -30,7 +30,7 @@ export function LeadTable({ leads, onMoveToContact }: LeadTableProps) {
     return (
       <div className="flex flex-col items-center justify-center py-5 bg-white text-center">
         <div className="rounded-full bg-slate-100 p-2.5 mb-2.5">
-          <UserRound className="h-5 w-5 text-slate-400" />
+          <User className="h-5 w-5 text-slate-400" />
         </div>
         <h3 className="text-xs font-medium mb-1">No leads found</h3>
         <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">
@@ -59,7 +59,7 @@ export function LeadTable({ leads, onMoveToContact }: LeadTableProps) {
             
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-2">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <UserRound className="h-3 w-3 text-slate-400 flex-shrink-0" />
+                <User className="h-3 w-3 text-slate-400 flex-shrink-0" />
                 <span className="truncate">{lead.title}</span>
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
