@@ -28,8 +28,7 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-accordion', 
       '@radix-ui/react-dropdown-menu', 
       '@radix-ui/react-scroll-area', 
-      '@radix-ui/react-card', 
-      '@tanstack/react-table'
+      '@radix-ui/react-card'
     ],
     include: [
       // React core
@@ -63,6 +62,7 @@ export default defineConfig(({ mode }) => ({
       'react-toastify',
       'react-day-picker',
       'react-csv',
+      '@tanstack/react-table',
       
       // Utilities
       'date-fns',
@@ -87,8 +87,7 @@ export default defineConfig(({ mode }) => ({
         '@radix-ui/react-accordion',
         '@radix-ui/react-dropdown-menu',
         '@radix-ui/react-scroll-area',
-        '@radix-ui/react-card',
-        '@tanstack/react-table'
+        '@radix-ui/react-card'
       ],
       output: {
         manualChunks: {
@@ -103,7 +102,8 @@ export default defineConfig(({ mode }) => ({
             'react-toastify',
             'react-day-picker',
             'tailwind-merge',
-            '@zxing/library'
+            '@zxing/library',
+            '@tanstack/react-table'
           ]
         }
       }

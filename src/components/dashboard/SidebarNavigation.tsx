@@ -260,7 +260,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           </a>
         )}
 
-        <Accordion type="multiple" className="space-y-1">
+        <Accordion type="single" defaultValue={["crm"]} className="space-y-1">
           {showCrmSection && (
             <AccordionItem value="crm" className="border-none">
               <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
