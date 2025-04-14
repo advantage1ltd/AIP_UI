@@ -1,82 +1,123 @@
-# Employee Diary Application
+# Advantage One Interactive Portal (AIP)
 
-A React application for managing employee activities and records.
+Advantage One Interactive Portal (AIP) is an advanced, full-featured crime and incident management software designed to streamline and automate various aspects of incident reporting, management, and follow-up. Built as an API-centric solution, AIP leverages a modern technology stack including React, Vite, .NET (with Entity Framework), and MSSQL for robust, scalable, and high-performance functionality across various modules.
 
-## Features
+## Key Features
 
-- View employee activities and records
-- Filter activities by employee, category, or search terms
-- Add new activity records
-- Edit and delete existing records
-- Sync with external systems (simulated)
+### Crime & Incident Management
+- Capture, track, and resolve incidents efficiently
+- Enhanced user workflows
+- Comprehensive incident tracking system
 
-## Tech Stack
+### CRM (Customer Relationship Management)
+- Manage client interactions
+- Track communication
+- Ensure smooth information flow
 
+### CBT (Computer-Based Training)
+- Implement training programs for personnel
+- Ensure staff are properly equipped to handle incidents
+
+### Additional Features
+- Incident Reporting
+- Satisfaction Surveys
+- Advanced Reporting
+- Stock Management
+- Recruitment Management
+- Holiday Management
+
+## Technologies Used
+
+### Frontend
 - React with TypeScript
-- Vite for frontend build and development
-- Tailwind CSS for styling
-- React Hook Form with Zod for form validation
-- JSON Server for mock API
+- Vite for fast, modern development
+- TailwindCSS for styling
+- React Hook Form with Zod for validation
+
+### Backend
+- .NET – Robust and scalable API
+- Entity Framework for ORM
+- MSSQL Database
+- CORS enabled for secure cross-origin requests
 
 ## Getting Started
 
 ### Prerequisites
-
 - Node.js 18 or later
+- .NET SDK
+- MSSQL Server
 - npm or yarn
 
 ### Installation
 
-1. Clone this repository
-2. Install dependencies:
-
+1. Clone the repository:
 ```bash
+git clone https://github.com/dibanga2800/aip.git
+```
+
+2. Install Frontend Dependencies:
+```bash
+cd frontend
 npm install
-# or
-yarn install
 ```
 
-### Running the Development Server
-
-This project uses JSON Server to simulate a backend API with the data from `db.json`.
-
-1. Start the mock API server:
-
+3. Install Backend Dependencies:
 ```bash
-npm run mock-api
-# or
-yarn mock-api
+cd backend
+dotnet restore
 ```
 
-This will start a server on http://localhost:3001
+### Configuration
 
-2. In a separate terminal, start the development server:
+1. Database Setup:
+- Configure your MSSQL connection string in `appsettings.json`
+- Update any necessary database migrations using Entity Framework
 
+2. CORS Configuration:
+- CORS is enabled to allow cross-origin requests
+- Update CORS policy in backend if needed
+
+### Running the Application
+
+1. Start the Backend:
 ```bash
+cd backend
+dotnet run
+```
+
+2. Start the Frontend:
+```bash
+cd frontend
 npm run dev
-# or
-yarn dev
 ```
-
-This will start the Vite development server.
-
-## API Endpoints
-
-The mock API provides the following endpoints:
-
-- `GET /employees` - List all employees
-- `GET /activities` - List all activities
-- `GET /activities?employeeId={id}` - List activities for a specific employee
-- `POST /activities` - Create a new activity
-- `PUT /activities/{id}` - Update an activity
-- `DELETE /activities/{id}` - Delete an activity
-- `GET /sync-status` - Get sync status for all sources
 
 ## Project Structure
 
-- `src/components/` - Reusable React components
-- `src/pages/` - Main pages of the application
-- `src/services/` - Service layers for API interactions
-- `src/types/` - TypeScript type definitions
-- `src/config/` - Application configuration
-- `db.json` - Mock database used by JSON Server
+- `frontend/` - React application with Vite
+  - `src/components/` - Reusable React components
+  - `src/pages/` - Main application pages
+  - `src/services/` - API service layers
+  - `src/types/` - TypeScript type definitions
+
+- `backend/` - .NET API
+  - `Controllers/` - API endpoints
+  - `Models/` - Entity Framework models
+  - `Services/` - Business logic
+  - `Data/` - Database context and migrations
+
+## Contributing
+
+We welcome contributions to improve AIP. Please feel free to:
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
+
+## Contact
+
+For questions or support:
+- Open an issue on GitHub
+- Email: dibanga2800@gmail.com
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE.md file for details.
