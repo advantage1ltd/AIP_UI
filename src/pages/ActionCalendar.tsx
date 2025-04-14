@@ -192,22 +192,27 @@ const ActionCalendar = () => {
                       mode="single"
                       selected={date}
                       onSelect={(date) => date && setDate(date)}
-                      className="rounded-lg border shadow-sm bg-white mx-auto"
+                      className="w-full rounded-md border-0 shadow-sm"
                       classNames={{
-                        day_selected: "bg-blue-600 text-white hover:bg-blue-700",
-                        day_today: "bg-blue-100 text-blue-700 font-semibold",
-                        day_outside: "text-gray-400 opacity-50",
-                        day: "h-10 w-10 sm:h-12 sm:w-12 text-sm sm:text-md rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors",
+                        months: "space-y-4",
+                        month: "space-y-2",
+                        caption: "flex justify-between items-center px-2 py-2",
+                        caption_label: "text-base font-semibold text-gray-900 ml-3",
+                        nav: "flex items-center space-x-1",
+                        nav_button: "inline-flex items-center justify-center rounded-full h-8 w-8 p-0 border border-gray-200 bg-white hover:bg-gray-50 text-gray-500",
+                        nav_button_previous: "",
+                        nav_button_next: "",
                         table: "w-full border-collapse",
-                        head_row: "flex justify-between w-full",
-                        head_cell: "text-gray-600 font-medium text-sm sm:text-md w-10 sm:w-12",
-                        row: "flex justify-between w-full mt-1",
-                        cell: "text-center p-0",
-                        nav_button: "border border-gray-300 bg-white hover:bg-gray-100 p-2 rounded-full",
-                        nav_button_previous: "absolute left-1 top-1",
-                        nav_button_next: "absolute right-1 top-1",
-                        caption: "flex items-center justify-center py-3 sm:py-4 px-5 relative",
-                        caption_label: "text-md sm:text-lg font-semibold text-gray-800",
+                        head_row: "grid grid-cols-7",
+                        head_cell: "text-gray-500 font-medium text-center text-xs uppercase tracking-wider py-2",
+                        row: "grid grid-cols-7 mt-1",
+                        cell: "text-center text-sm relative py-1 focus-within:relative focus-within:z-20",
+                        day: "h-9 w-9 font-normal flex items-center justify-center mx-auto rounded-full hover:bg-gray-100 transition-colors",
+                        day_selected: "bg-blue-600 text-white hover:bg-blue-600 hover:text-white font-medium",
+                        day_today: "border border-blue-500 text-blue-600 font-medium",
+                        day_outside: "text-gray-400",
+                        day_disabled: "text-gray-300",
+                        day_hidden: "invisible",
                       }}
                     />
                   </div>

@@ -1,6 +1,8 @@
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import path from "path"
+// Import our custom Radix UI resolver plugin
+import radixResolver from "./src/vite-plugins/radix-resolver.ts"
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -10,14 +12,25 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [
+    // Add our custom plugin before the React plugin
+    radixResolver(),
     react(),
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    dedupe: ['react', 'react-dom']
   },
   optimizeDeps: {
+    // Exclude problematic packages
+    exclude: [
+      '@radix-ui/react-accordion', 
+      '@radix-ui/react-dropdown-menu', 
+      '@radix-ui/react-scroll-area', 
+      '@radix-ui/react-card', 
+      '@tanstack/react-table'
+    ],
     include: [
       // React core
       'react', 
@@ -25,7 +38,7 @@ export default defineConfig(({ mode }) => ({
       'react-redux',
       'react-router-dom',
       
-      // Radix UI components
+      // Safe Radix UI components
       '@radix-ui/react-separator',
       '@radix-ui/react-slot',
       '@radix-ui/react-popover',
@@ -41,9 +54,6 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-progress',
       '@radix-ui/react-checkbox',
       '@radix-ui/react-radio-group',
-      '@radix-ui/react-scroll-area',
-      '@radix-ui/react-dropdown-menu',
-      '@radix-ui/react-accordion',
       
       // Other UI libraries
       'lucide-react',
@@ -53,7 +63,6 @@ export default defineConfig(({ mode }) => ({
       'react-toastify',
       'react-day-picker',
       'react-csv',
-      '@tanstack/react-table',
       
       // Utilities
       'date-fns',
@@ -61,8 +70,7 @@ export default defineConfig(({ mode }) => ({
       'uuid',
       'tailwind-merge',
       '@zxing/library'
-    ],
-    exclude: ['@radix-ui/react-card']
+    ]
   },
   build: {
     outDir: 'dist',
@@ -70,33 +78,33 @@ export default defineConfig(({ mode }) => ({
     sourcemap: true,
     commonjsOptions: {
       transformMixedEsModules: true,
+      include: [/node_modules/],
+      extensions: ['.js', '.cjs', '.mjs'],
     },
     rollupOptions: {
+      // Explicitly treat these modules as external
+      external: [
+        '@radix-ui/react-accordion',
+        '@radix-ui/react-dropdown-menu',
+        '@radix-ui/react-scroll-area',
+        '@radix-ui/react-card',
+        '@tanstack/react-table'
+      ],
       output: {
-        manualChunks: (id) => {
-          // Create a chunk for Radix UI components
-          if (id.includes('@radix-ui')) {
-            return 'radix-ui-vendor';
-          }
-          
-          // React and related libraries
-          if (id.includes('react') || id.includes('redux')) {
-            return 'react-vendor';
-          }
-          
-          // Utilities and other libraries
-          if (id.includes('date-fns') || 
-              id.includes('class-variance-authority') || 
-              id.includes('uuid') || 
-              id.includes('framer-motion') || 
-              id.includes('recharts') || 
-              id.includes('sonner') || 
-              id.includes('react-toastify') || 
-              id.includes('react-day-picker') || 
-              id.includes('tailwind-merge') || 
-              id.includes('@zxing/library')) {
-            return 'utils-vendor';
-          }
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom', 'react-redux'],
+          'utils-vendor': [
+            'date-fns',
+            'class-variance-authority',
+            'uuid',
+            'framer-motion',
+            'recharts',
+            'sonner',
+            'react-toastify',
+            'react-day-picker',
+            'tailwind-merge',
+            '@zxing/library'
+          ]
         }
       }
     }
