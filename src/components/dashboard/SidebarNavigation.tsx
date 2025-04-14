@@ -15,7 +15,6 @@ import {
   CalendarRange,
   Shirt,
   BookOpen,
-  Handshake,
   UserCog,
   Boxes,
   ScrollText,
@@ -265,7 +264,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           {showCrmSection && (
             <AccordionItem value="crm" className="border-none">
               <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
-                <Handshake className="h-4 w-4" />
+                <Building2 className="h-4 w-4" />
                 <span className="flex-1 text-left">CRM</span>
               </AccordionTrigger>
               <AccordionContent className="pb-1 pt-0">
@@ -468,7 +467,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                   />
                   <NavItem
                     to="/management/manager-support"
-                    icon={<Handshake className="h-4 w-4" />}
+                    icon={<Building2 className="h-4 w-4" />}
                     label="Manager Support"
                     onClick={onNavigate}
                   />
