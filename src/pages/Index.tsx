@@ -42,6 +42,9 @@ import { IncidentTable } from '@/components/dashboard/IncidentTable'
 import { OfficerPerformance } from '@/components/dashboard/OfficerPerformance'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { cn } from '@/lib/utils'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Customer-specific data
 const customerData = {
@@ -417,6 +420,57 @@ const officerStats = [
     status: 'non-reporter'
   }
 ] as const;
+
+const TestComponents = () => {
+  return (
+    <div className="space-y-6 p-4 border border-gray-200 rounded-md my-4">
+      <h2 className="text-xl font-bold">Test Components</h2>
+      
+      <div>
+        <h3 className="font-medium mb-2">Accordion Test</h3>
+        <Accordion type="single" collapsible>
+          <AccordionItem value="item-1">
+            <AccordionTrigger>Is this working?</AccordionTrigger>
+            <AccordionContent>
+              Yes. This is our custom accordion component.
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </div>
+      
+      <div>
+        <h3 className="font-medium mb-2">Dropdown Test</h3>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="border rounded-md px-4 py-2">
+            Click me
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem>
+              Item 1
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              Item 2
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      
+      <div>
+        <h3 className="font-medium mb-2">ScrollArea Test</h3>
+        <ScrollArea className="h-32 w-full border rounded-md">
+          <div className="p-4">
+            <h4>Scrollable Content</h4>
+            <p>This is a test of the ScrollArea component.</p>
+            <p>Scroll down to see more content.</p>
+            <div className="h-64 bg-gray-100 mt-2 p-4">
+              Tall content to enable scrolling
+            </div>
+          </div>
+        </ScrollArea>
+      </div>
+    </div>
+  )
+}
 
 const Index = () => {
   const location = useLocation();

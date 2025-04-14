@@ -83,7 +83,7 @@ interface HeaderProps {
 
 // Reusable components
 const UserProfileDropdown = () => (
-  <DropdownMenuContent className="w-56" align="end" forceMount>
+  <DropdownMenuContent className="w-56 bg-white text-gray-800 border-gray-200" align="end">
     <DropdownMenuLabel className="font-normal">
       <div className="flex flex-col space-y-1">
         <p className="text-sm font-medium leading-none">David Ibanga</p>
@@ -93,20 +93,20 @@ const UserProfileDropdown = () => (
       </div>
     </DropdownMenuLabel>
     <DropdownMenuSeparator />
-    <DropdownMenuItem asChild>
+    <DropdownMenuItem asChild className="cursor-pointer focus:bg-gray-100">
       <Link to="/profile" className="flex w-full cursor-pointer items-center">
         <User className="mr-2 h-4 w-4" />
         <span>Profile</span>
       </Link>
     </DropdownMenuItem>
-    <DropdownMenuItem asChild>
+    <DropdownMenuItem asChild className="cursor-pointer focus:bg-gray-100">
       <Link to="/settings" className="flex w-full cursor-pointer items-center">
         <Settings className="mr-2 h-4 w-4" />
         <span>Settings</span>
       </Link>
     </DropdownMenuItem>
     <DropdownMenuSeparator />
-    <DropdownMenuItem>
+    <DropdownMenuItem className="cursor-pointer focus:bg-gray-100">
       <LogOut className="mr-2 h-4 w-4" />
       <span>Log out</span>
     </DropdownMenuItem>
@@ -128,29 +128,39 @@ const RoleSelectorContent = ({
   handleRoleChange: (roleId: string) => void;
   toggleTestMode: () => void;
   userRoles: Array<{ id: string; name: string; }>;
-}) => (
-  <DropdownMenuContent align="start" className="w-[calc(340px-48px)] sm:w-[calc(400px-48px)] bg-blue-900 text-white border-blue-800">
-    <DropdownMenuLabel className="text-blue-200 text-[15px]">Switch Role</DropdownMenuLabel>
-    <DropdownMenuSeparator className="bg-blue-800" />
-    <DropdownMenuRadioGroup 
-      value={isTestMode && testRole ? testRole : currentRole || ''} 
-      onValueChange={handleRoleChange}
-    >
-      {userRoles.map(role => (
-        <DropdownMenuRadioItem key={role.id} value={role.id} className="text-white focus:bg-blue-800 focus:text-white text-[15px]">
-          {role.name}
-        </DropdownMenuRadioItem>
-      ))}
-    </DropdownMenuRadioGroup>
-    <DropdownMenuSeparator className="bg-blue-800" />
-    <DropdownMenuItem onClick={toggleTestMode} className="text-white focus:bg-blue-800 focus:text-white text-[15px]">
-      {isTestMode ? 'Exit Test Mode' : 'Enter Test Mode'}
-      {isTestMode && (
-        <Badge variant="outline" className="ml-auto border-blue-700 bg-blue-950/50">Active</Badge>
-      )}
-    </DropdownMenuItem>
-  </DropdownMenuContent>
-);
+}) => {
+  const activeRole = isTestMode && testRole ? testRole : currentRole || '';
+  
+  return (
+    <DropdownMenuContent align="start" className="w-[calc(340px-48px)] sm:w-[calc(400px-48px)] bg-blue-900 text-white border-blue-800">
+      <DropdownMenuLabel className="text-blue-200 text-[15px]">Switch Role</DropdownMenuLabel>
+      <DropdownMenuSeparator className="bg-blue-800" />
+      <DropdownMenuRadioGroup 
+        value={activeRole} 
+        onValueChange={handleRoleChange}
+      >
+        {userRoles.map(role => (
+          <DropdownMenuRadioItem 
+            key={role.id} 
+            value={role.id} 
+            checked={role.id === activeRole}
+            onClick={() => handleRoleChange(role.id)}
+            className="text-white focus:bg-blue-800 focus:text-white text-[15px]"
+          >
+            {role.name}
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
+      <DropdownMenuSeparator className="bg-blue-800" />
+      <DropdownMenuItem onClick={toggleTestMode} className="text-white focus:bg-blue-800 focus:text-white text-[15px]">
+        {isTestMode ? 'Exit Test Mode' : 'Enter Test Mode'}
+        {isTestMode && (
+          <Badge variant="outline" className="ml-auto border-blue-700 bg-blue-950/50">Active</Badge>
+        )}
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  );
+};
 
 // Navigation menu component
 const NavigationMenu = ({ 
