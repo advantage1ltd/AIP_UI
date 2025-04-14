@@ -60,8 +60,8 @@ export function OfficerPerformance({ data }: OfficerPerformanceProps) {
       // Sort by value saved (descending) for top performers
       return b.valueSaved - a.valueSaved
     } else {
-      // Sort by response rate (ascending) for non-reporters
-      return a.responseRate - b.responseRate
+      // Sort by incidents (ascending) for non-reporters
+      return a.incidents - b.incidents
     }
   })
 
@@ -87,39 +87,37 @@ export function OfficerPerformance({ data }: OfficerPerformanceProps) {
       </div>
 
       <div className="rounded-md border">
-        <table className="w-full">
+        <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50">
-              <th className="h-12 px-4 text-left align-middle font-medium">Officer</th>
-              <th className="h-12 px-4 text-left align-middle font-medium">Incidents</th>
-              <th className="h-12 px-4 text-left align-middle font-medium">Value Saved</th>
-              <th className="h-12 px-4 text-left align-middle font-medium">Response Rate</th>
-              <th className="h-12 px-4 text-left align-middle font-medium">Status</th>
+              <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground md:h-12 md:px-4">
+                Officer
+              </th>
+              <th className="h-10 px-2 text-center align-middle font-medium text-muted-foreground md:h-12 md:px-4">
+                Incidents
+              </th>
+              <th className="h-10 px-2 text-right align-middle font-medium text-muted-foreground md:h-12 md:px-4">
+                Value Saved
+              </th>
+              <th className="h-10 px-2 text-center align-middle font-medium text-muted-foreground md:h-12 md:px-4">
+                Status
+              </th>
             </tr>
           </thead>
           <tbody>
             {filteredData.map((officer) => (
               <tr key={officer.id} className="border-b transition-colors hover:bg-muted/50">
-                <td className="p-4 align-middle font-medium">{officer.name}</td>
-                <td className="p-4 align-middle">{officer.incidents}</td>
-                <td className="p-4 align-middle">£{officer.valueSaved.toLocaleString()}</td>
-                <td className="p-4 align-middle">
-                  <div className="flex items-center gap-2">
-                    <Progress 
-                      value={officer.responseRate} 
-                      className={cn(
-                        "w-[60px]",
-                        officer.responseRate >= 90 ? '[&>div]:bg-green-500' :
-                        officer.responseRate >= 70 ? '[&>div]:bg-yellow-500' : '[&>div]:bg-red-500'
-                      )}
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      {officer.responseRate}%
-                    </span>
-                  </div>
+                <td className="p-2 align-middle font-medium md:p-4">
+                  {officer.name}
                 </td>
-                <td className="p-4 align-middle">
-                  <Badge className={getStatusColor(officer.status)}>
+                <td className="p-2 align-middle text-center tabular-nums md:p-4">
+                  {officer.incidents}
+                </td>
+                <td className="p-2 align-middle text-right font-medium tabular-nums text-green-600 dark:text-green-400 md:p-4">
+                  £{officer.valueSaved.toLocaleString()}
+                </td>
+                <td className="p-2 align-middle text-center md:p-4">
+                  <Badge className={cn("inline-flex justify-center min-w-[100px]", getStatusColor(officer.status))}>
                     {getStatusText(officer.status)}
                   </Badge>
                 </td>
@@ -127,7 +125,7 @@ export function OfficerPerformance({ data }: OfficerPerformanceProps) {
             ))}
             {filteredData.length === 0 && (
               <tr>
-                <td colSpan={5} className="h-24 text-center text-muted-foreground">
+                <td colSpan={4} className="h-24 text-center text-muted-foreground">
                   No officers found in this category.
                 </td>
               </tr>
@@ -136,11 +134,11 @@ export function OfficerPerformance({ data }: OfficerPerformanceProps) {
         </table>
       </div>
 
-      <div className="text-sm text-muted-foreground">
+      <div className="text-xs text-muted-foreground md:text-sm p-2 md:p-4">
         {viewMode === 'top-performers' ? (
           <p>Showing top performing officers sorted by value saved</p>
         ) : (
-          <p>Showing officers that need attention sorted by response rate</p>
+          <p>Showing officers that need attention sorted by incidents</p>
         )}
       </div>
     </div>

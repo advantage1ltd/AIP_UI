@@ -31,41 +31,43 @@ export function UserDialog({ open, onOpenChange, user, onSubmit }: UserDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[500px] p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>{user ? 'Edit User' : 'Create New User'}</DialogTitle>
+          <DialogTitle className="text-lg md:text-xl">{user ? 'Edit User' : 'Create New User'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 py-2 sm:py-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1 sm:space-y-2">
+              <Label htmlFor="username" className="text-sm">Username</Label>
               <Input
                 id="username"
                 value={formData.username}
                 onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
                 required
+                className="h-9"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+            <div className="space-y-1 sm:space-y-2">
+              <Label htmlFor="email" className="text-sm">Email</Label>
               <Input
                 id="email"
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 required
+                className="h-9"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1 sm:space-y-2">
+              <Label htmlFor="role" className="text-sm">Role</Label>
               <Select
                 value={formData.role}
                 onValueChange={(value: any) => setFormData(prev => ({ ...prev, role: value }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -76,24 +78,25 @@ export function UserDialog({ open, onOpenChange, user, onSubmit }: UserDialogPro
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
+            <div className="space-y-1 sm:space-y-2">
+              <Label htmlFor="department" className="text-sm">Department</Label>
               <Input
                 id="department"
                 value={formData.department}
                 onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
                 required
+                className="h-9"
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
+          <div className="space-y-1 sm:space-y-2">
+            <Label htmlFor="status" className="text-sm">Status</Label>
             <Select
               value={formData.status}
               onValueChange={(value: any) => setFormData(prev => ({ ...prev, status: value }))}
             >
-              <SelectTrigger>
+              <SelectTrigger className="h-9">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
@@ -103,11 +106,11 @@ export function UserDialog({ open, onOpenChange, user, onSubmit }: UserDialogPro
             </Select>
           </div>
 
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex justify-end gap-2 sm:gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-8 sm:h-9 text-xs sm:text-sm">
               Cancel
             </Button>
-            <Button type="submit" style={{ backgroundColor: '#324053' }}>
+            <Button type="submit" style={{ backgroundColor: '#324053' }} className="h-8 sm:h-9 text-xs sm:text-sm">
               {user ? 'Update' : 'Create'}
             </Button>
           </div>

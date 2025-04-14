@@ -1,15 +1,7 @@
-import React from 'react';
-import { Plus, Search, Pencil, Trash2, Eye, CalendarIcon, Clock, MapPin, Shield, AlertTriangle, FileText, Briefcase, GraduationCap, Target, Award } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import { Plus, Search, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -18,15 +10,6 @@ import {
   DialogTrigger,
   DialogDescription,
 } from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  FormDescription,
-} from '@/components/ui/form';
 import {
   Select,
   SelectContent,
@@ -37,24 +20,15 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
-import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
-import { format } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
 import {
   Tabs,
@@ -62,329 +36,253 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar as CalendarIconIcon } from 'lucide-react';
 
-// Define activity categories
-const activityCategories = [
-  { id: 'employment', label: 'Employment', icon: <Briefcase className="h-4 w-4" /> },
-  { id: 'training', label: 'Training', icon: <GraduationCap className="h-4 w-4" /> },
-  { id: 'leave', label: 'Leave', icon: <CalendarIconIcon className="h-4 w-4" /> },
-  { id: 'incidents', label: 'Incidents', icon: <AlertTriangle className="h-4 w-4" /> },
-  { id: 'documents', label: 'Documents', icon: <FileText className="h-4 w-4" /> },
-  { id: 'performance', label: 'Performance', icon: <Target className="h-4 w-4" /> },
-  { id: 'equipment', label: 'Equipment', icon: <Shield className="h-4 w-4" /> },
-  { id: 'certifications', label: 'Certifications', icon: <Award className="h-4 w-4" /> },
-] as const;
+// Use imported components with renamed imports
+import { ActivityTimeline } from '@/components/employee/ActivityTimeline';
+import { ActivityForm } from '@/components/employee/ActivityForm';
+import { SyncStatus } from '@/components/employee/SyncStatus';
+import { employeeActivityService } from '@/services/employeeActivityService';
+import { ACTIVITY_CATEGORIES, ACTIVITY_SOURCES, AUTO_SYNC_INTERVAL, ITEMS_PER_PAGE } from '@/config/activityConfig';
+import type { ActivityCategory, ActivitySource, ActivityStatus, ActivitySyncStatus, EmployeeActivity, Employee } from '@/types/employee';
 
-// Define the form schema
+// Constants and Types - In a real implementation, these would be moved to separate files
+const CATEGORY_COLORS: Record<ActivityCategory, string> = {
+  employment: 'bg-blue-100 text-blue-800',
+  training: 'bg-green-100 text-green-800',
+  leave: 'bg-purple-100 text-purple-800',
+  incidents: 'bg-red-100 text-red-800',
+  documents: 'bg-yellow-100 text-yellow-800',
+  performance: 'bg-orange-100 text-orange-800',
+  equipment: 'bg-indigo-100 text-indigo-800',
+  certifications: 'bg-pink-100 text-pink-800',
+};
+
+// Form schema
 const formSchema = z.object({
-  employeeId: z.string().min(1, 'Employee ID is required'),
+  employeeId: z.string().min(1, 'Employee is required'),
   employeeName: z.string().min(1, 'Employee name is required'),
-  activityDate: z.date({
-    required_error: 'Activity date is required',
-  }),
-  activityCategory: z.string().min(1, 'Activity category is required'),
-  activityType: z.string().min(1, 'Activity type is required'),
-  description: z.string().min(10, 'Description must be at least 10 characters'),
-  status: z.string().min(1, 'Status is required'),
-  attachments: z.array(z.string()).optional(),
+  activityDate: z.date(),
+  activityCategory: z.enum(['employment', 'training', 'leave', 'incidents', 'documents', 'performance', 'equipment', 'certifications'] as const),
+  activityType: z.string().min(1, 'Type is required'),
+  description: z.string().min(1, 'Description is required'),
+  status: z.enum(['pending', 'in_progress', 'completed', 'cancelled', 'on_hold'] as const),
+  source: z.enum(['manual', 'hr_system', 'training_system', 'leave_system', 'performance_system', 'document_system', 'equipment_system', 'certification_system'] as const),
+  sourceReference: z.string().optional(),
+  attachments: z.array(z.string()).default([]),
   notes: z.string().optional(),
-  relatedDocuments: z.array(z.string()).optional(),
+  relatedDocuments: z.array(z.string()).default([]),
   nextReviewDate: z.date().optional(),
   actionRequired: z.boolean().default(false),
   actionDeadline: z.date().optional(),
-  recordedBy: z.string().min(1, 'Recorder name is required'),
+  recordedBy: z.string().min(1, 'Recorder is required'),
 });
 
-// Activity types by category
-const activityTypesByCategory = {
-  employment: [
-    'New Hire',
-    'Contract Update',
-    'Role Change',
-    'Salary Review',
-    'Termination',
-    'Disciplinary Action',
-  ],
-  training: [
-    'Initial Training',
-    'Refresher Course',
-    'Certification Training',
-    'Skills Development',
-    'Health & Safety Training',
-    'Compliance Training',
-  ],
-  leave: [
-    'Annual Leave Request',
-    'Sick Leave',
-    'Compassionate Leave',
-    'Unpaid Leave',
-    'Training Leave',
-    'Other Leave',
-  ],
-  incidents: [
-    'Security Incident',
-    'Workplace Accident',
-    'Customer Complaint',
-    'Policy Violation',
-    'Equipment Damage',
-    'Near Miss',
-  ],
-  documents: [
-    'Contract Signing',
-    'Policy Acknowledgment',
-    'NDA',
-    'Performance Review',
-    'Warning Letter',
-    'Certificate',
-  ],
-  performance: [
-    'Annual Review',
-    'Quarterly Assessment',
-    'KPI Update',
-    'Commendation',
-    'Warning',
-    'Improvement Plan',
-  ],
-  equipment: [
-    'Uniform Issue',
-    'Equipment Assignment',
-    'Return of Equipment',
-    'Damage Report',
-    'Replacement Request',
-    'Maintenance Record',
-  ],
-  certifications: [
-    'SIA License',
-    'First Aid',
-    'Fire Safety',
-    'Health & Safety',
-    'Specialized Training',
-    'License Renewal',
-  ],
+type FormData = z.infer<typeof formSchema>;
+
+// State interface
+interface State {
+  isDialogOpen: boolean;
+  searchQuery: string;
+  currentPage: number;
+  editingEntry: EmployeeActivity | null;
+  activeTab: ActivityCategory | 'all';
+  selectedEmployee: string | null;
+  activities: EmployeeActivity[];
+  syncStatus: Record<ActivitySource, ActivitySyncStatus>;
+  isSyncing: boolean;
+  errorLog: Array<{ message: string; timestamp: Date; data?: any }>;
+  isLoading: boolean;
+  employees: Employee[];
+  isLoadingEmployees: boolean;
+}
+
+// Action types
+type Action =
+  | { type: 'SET_DIALOG_OPEN'; payload: boolean }
+  | { type: 'SET_SEARCH_QUERY'; payload: string }
+  | { type: 'SET_CURRENT_PAGE'; payload: number }
+  | { type: 'SET_EDITING_ENTRY'; payload: EmployeeActivity | null }
+  | { type: 'SET_ACTIVE_TAB'; payload: ActivityCategory | 'all' }
+  | { type: 'SET_SELECTED_EMPLOYEE'; payload: string | null }
+  | { type: 'SET_ACTIVITIES'; payload: EmployeeActivity[] }
+  | { type: 'ADD_ACTIVITY'; payload: EmployeeActivity }
+  | { type: 'UPDATE_ACTIVITY'; payload: EmployeeActivity }
+  | { type: 'DELETE_ACTIVITY'; payload: string }
+  | { type: 'SET_SYNC_STATUS'; payload: Record<ActivitySource, ActivitySyncStatus> }
+  | { type: 'UPDATE_SYNC_STATUS'; payload: { source: ActivitySource; status: ActivitySyncStatus } }
+  | { type: 'SET_SYNCING'; payload: boolean }
+  | { type: 'LOG_ERROR'; payload: { message: string; data?: any } }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_EMPLOYEES'; payload: Employee[] }
+  | { type: 'SET_LOADING_EMPLOYEES'; payload: boolean };
+
+const initialSyncStatus: Record<ActivitySource, ActivitySyncStatus> = {
+  manual: { source: 'manual', status: 'inactive', lastSynced: null },
+  hr_system: { source: 'hr_system', status: 'inactive', lastSynced: null },
+  training_system: { source: 'training_system', status: 'inactive', lastSynced: null },
+  leave_system: { source: 'leave_system', status: 'inactive', lastSynced: null },
+  performance_system: { source: 'performance_system', status: 'inactive', lastSynced: null },
+  document_system: { source: 'document_system', status: 'inactive', lastSynced: null },
+  equipment_system: { source: 'equipment_system', status: 'inactive', lastSynced: null },
+  certification_system: { source: 'certification_system', status: 'inactive', lastSynced: null },
 };
 
-// Mock data interface
-interface EmployeeActivity {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  activityDate: Date;
-  activityCategory: string;
-  activityType: string;
-  description: string;
-  status: string;
-  attachments?: string[];
-  notes?: string;
-  relatedDocuments?: string[];
-  nextReviewDate?: Date;
-  actionRequired: boolean;
-  actionDeadline?: Date;
-  recordedBy: string;
+const initialState: State = {
+  isDialogOpen: false,
+  searchQuery: '',
+  currentPage: 1,
+  editingEntry: null,
+  activeTab: 'all',
+  selectedEmployee: null,
+  activities: [],
+  syncStatus: initialSyncStatus,
+  isSyncing: false,
+  errorLog: [],
+  isLoading: false,
+  employees: [],
+  isLoadingEmployees: false,
+};
+
+// Reducer function defined outside component
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case 'SET_DIALOG_OPEN':
+      return { ...state, isDialogOpen: action.payload };
+    case 'SET_SEARCH_QUERY':
+      return { ...state, searchQuery: action.payload, currentPage: 1 };
+    case 'SET_CURRENT_PAGE':
+      return { ...state, currentPage: action.payload };
+    case 'SET_EDITING_ENTRY':
+      return { ...state, editingEntry: action.payload };
+    case 'SET_ACTIVE_TAB':
+      return { ...state, activeTab: action.payload, currentPage: 1 };
+    case 'SET_SELECTED_EMPLOYEE':
+      return { ...state, selectedEmployee: action.payload, currentPage: 1 };
+    case 'SET_ACTIVITIES':
+      return { ...state, activities: action.payload };
+    case 'ADD_ACTIVITY':
+      return { ...state, activities: [action.payload, ...state.activities] };
+    case 'UPDATE_ACTIVITY':
+      return {
+        ...state,
+        activities: state.activities.map(activity =>
+          activity.id === action.payload.id ? action.payload : activity
+        ),
+      };
+    case 'DELETE_ACTIVITY':
+      return {
+        ...state,
+        activities: state.activities.filter(activity => activity.id !== action.payload),
+      };
+    case 'SET_SYNC_STATUS':
+      return { ...state, syncStatus: action.payload };
+    case 'UPDATE_SYNC_STATUS':
+      return {
+        ...state,
+        syncStatus: {
+          ...state.syncStatus,
+          [action.payload.source]: action.payload.status,
+        },
+      };
+    case 'SET_SYNCING':
+      return { ...state, isSyncing: action.payload };
+    case 'LOG_ERROR':
+      return {
+        ...state,
+        errorLog: [
+          ...state.errorLog,
+          { message: action.payload.message, timestamp: new Date(), data: action.payload.data },
+        ],
+      };
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.payload };
+    case 'SET_EMPLOYEES':
+      return { ...state, employees: action.payload };
+    case 'SET_LOADING_EMPLOYEES':
+      return { ...state, isLoadingEmployees: action.payload };
+    default:
+      return state;
+  }
 }
 
 const EmployeeDiaryPage: React.FC = () => {
-  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [currentPage, setCurrentPage] = React.useState(1);
-  const [editingEntry, setEditingEntry] = React.useState<EmployeeActivity | null>(null);
-  const [activeTab, setActiveTab] = React.useState('all');
-  const [selectedEmployee, setSelectedEmployee] = React.useState<string | null>(null);
-  const itemsPerPage = 10;
-  const [errorLog, setErrorLog] = React.useState<Array<{ message: string; timestamp: Date; data?: any }>>([]);
-
-  // Mock employees data
-  const employees = [
-    { id: 'EMP001', name: 'John Doe', role: 'Security Officer' },
-    { id: 'EMP002', name: 'Jane Smith', role: 'Security Supervisor' },
-    { id: 'EMP003', name: 'Mike Johnson', role: 'Security Officer' },
-    { id: 'EMP004', name: 'Sarah Williams', role: 'Security Officer' },
-  ];
-
-  // Mock activities data
-  const [activities, setActivities] = React.useState<EmployeeActivity[]>([
-    {
-      id: '1',
-      employeeId: 'EMP001',
-      employeeName: 'John Doe',
-      activityDate: new Date(),
-      activityCategory: 'employment',
-      activityType: 'New Hire',
-      description: 'Initial employment contract signed',
-      status: 'Completed',
-      attachments: ['contract.pdf'],
-      recordedBy: 'HR Manager',
-      actionRequired: false,
-    },
-    {
-      id: '2',
-      employeeId: 'EMP001',
-      employeeName: 'John Doe',
-      activityDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      activityCategory: 'training',
-      activityType: 'Initial Training',
-      description: 'Completed initial security training program',
-      status: 'Completed',
-      nextReviewDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-      recordedBy: 'Training Manager',
-      actionRequired: false,
-    },
-    {
-      id: '3',
-      employeeId: 'EMP002',
-      employeeName: 'Jane Smith',
-      activityDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      activityCategory: 'incidents',
-      activityType: 'Security Incident',
-      description: 'Responded to unauthorized access attempt at main entrance',
-      status: 'Completed',
-      attachments: ['incident_report.pdf'],
-      recordedBy: 'Security Supervisor',
-      actionRequired: true,
-      actionDeadline: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-    },
-    {
-      id: '4',
-      employeeId: 'EMP003',
-      employeeName: 'Mike Johnson',
-      activityDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      activityCategory: 'leave',
-      activityType: 'Annual Leave',
-      description: 'Annual leave request for summer vacation',
-      status: 'Approved',
-      recordedBy: 'HR Manager',
-      actionRequired: false,
-    },
-    {
-      id: '5',
-      employeeId: 'EMP002',
-      employeeName: 'Jane Smith',
-      activityDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      activityCategory: 'performance',
-      activityType: 'Quarterly Review',
-      description: 'Excellent performance in Q2 2024. Exceeded expectations in emergency response.',
-      status: 'Completed',
-      attachments: ['performance_review.pdf'],
-      recordedBy: 'Operations Manager',
-      actionRequired: false,
-    },
-    {
-      id: '6',
-      employeeId: 'EMP004',
-      employeeName: 'Sarah Williams',
-      activityDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-      activityCategory: 'equipment',
-      activityType: 'Equipment Issue',
-      description: 'Issued new radio and body camera',
-      status: 'Completed',
-      attachments: ['equipment_form.pdf'],
-      recordedBy: 'Equipment Manager',
-      actionRequired: false,
-    },
-    {
-      id: '7',
-      employeeId: 'EMP002',
-      employeeName: 'Jane Smith',
-      activityDate: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000),
-      activityCategory: 'certifications',
-      activityType: 'SIA License',
-      description: 'SIA License renewal completed',
-      status: 'Completed',
-      attachments: ['sia_license.pdf'],
-      recordedBy: 'Training Manager',
-      actionRequired: false,
-    },
-    {
-      id: '8',
-      employeeId: 'EMP003',
-      employeeName: 'Mike Johnson',
-      activityDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-      activityCategory: 'training',
-      activityType: 'Health & Safety Training',
-      description: 'Completed annual health and safety refresher course',
-      status: 'Completed',
-      attachments: ['training_certificate.pdf'],
-      recordedBy: 'Health & Safety Officer',
-      actionRequired: true,
-      actionDeadline: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-    },
-    {
-      id: '9',
-      employeeId: 'EMP001',
-      employeeName: 'John Doe',
-      activityDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-      activityCategory: 'documents',
-      activityType: 'Policy Acknowledgment',
-      description: 'Signed updated security procedures manual',
-      status: 'Completed',
-      attachments: ['policy_acknowledgment.pdf'],
-      recordedBy: 'HR Manager',
-      actionRequired: false,
-    },
-    {
-      id: '10',
-      employeeId: 'EMP004',
-      employeeName: 'Sarah Williams',
-      activityDate: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000),
-      activityCategory: 'performance',
-      activityType: 'Commendation',
-      description: 'Received commendation for exceptional handling of emergency situation',
-      status: 'Completed',
-      attachments: ['commendation_letter.pdf'],
-      recordedBy: 'Operations Manager',
-      actionRequired: false,
+  // State management
+  const [state, dispatch] = useReducer(reducer, initialState);
+  
+  // Fetch employees data
+  const fetchEmployees = useCallback(async () => {
+    try {
+      dispatch({ type: 'SET_LOADING_EMPLOYEES', payload: true });
+      
+      // Replace with your actual API endpoint
+      const response = await fetch('/api/employees');
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch employees: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      dispatch({ type: 'SET_EMPLOYEES', payload: data });
+    } catch (error) {
+      dispatch({
+        type: 'LOG_ERROR',
+        payload: { message: 'Error fetching employees', data: error },
+      });
+      toast({
+        title: "Error",
+        description: "Failed to load employee data.",
+        variant: "destructive",
+      });
+    } finally {
+      dispatch({ type: 'SET_LOADING_EMPLOYEES', payload: false });
     }
-  ]);
+  }, []);
 
-  // Get category badge color
-  const getCategoryBadge = (category: string) => {
-    const variants: Record<string, string> = {
-      'employment': 'bg-blue-100 text-blue-800',
-      'training': 'bg-green-100 text-green-800',
-      'leave': 'bg-purple-100 text-purple-800',
-      'incidents': 'bg-red-100 text-red-800',
-      'documents': 'bg-yellow-100 text-yellow-800',
-      'performance': 'bg-orange-100 text-orange-800',
-      'equipment': 'bg-indigo-100 text-indigo-800',
-      'certifications': 'bg-pink-100 text-pink-800',
-    };
-    return variants[category] || 'bg-gray-100 text-gray-800';
-  };
+  // Initialize data on component mount
+  useEffect(() => {
+    fetchEmployees();
+    checkSyncStatus();
+    fetchActivities();
+    dispatch({ type: 'SET_ACTIVE_TAB', payload: 'all' });
+  }, []);
+  
+  // Filter activities based on search, employee selection, and active tab
+  const filteredActivities = useMemo(() => {
+    const searchLower = state.searchQuery.toLowerCase();
+    
+    return state.activities.filter((activity) => {
+      // Handle search filtering
+      const matchesSearch = 
+        activity.employeeName.toLowerCase().includes(searchLower) ||
+        activity.activityType.toLowerCase().includes(searchLower) ||
+        activity.description.toLowerCase().includes(searchLower);
 
-  // Filter activities based on search query and active tab
-  const filteredActivities = activities.filter((activity) => {
-    const matchesSearch = 
-      activity.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      activity.activityType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      activity.description.toLowerCase().includes(searchQuery.toLowerCase());
+      // Handle employee filtering
+      if (state.selectedEmployee && state.selectedEmployee !== 'all') {
+        if (activity.employeeId !== state.selectedEmployee) return false;
+      }
+      
+      // Handle tab filtering
+      if (state.activeTab === 'all') {
+        return matchesSearch;
+      }
+      
+      return matchesSearch && activity.activityCategory === state.activeTab;
+    });
+  }, [state.activities, state.searchQuery, state.selectedEmployee, state.activeTab]);
 
-    if (selectedEmployee && selectedEmployee !== 'all') return matchesSearch && activity.employeeId === selectedEmployee;
-    if (activeTab === 'all') return matchesSearch;
-    return matchesSearch && activity.activityCategory === activeTab;
-  });
-
-  // Sort activities by date (most recent first)
-  const sortedActivities = [...filteredActivities].sort((a, b) => 
-    b.activityDate.getTime() - a.activityDate.getTime()
-  );
-
-  // Pagination
-  const totalPages = Math.ceil(sortedActivities.length / itemsPerPage);
-  const paginatedActivities = sortedActivities.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const form = useForm<z.infer<typeof formSchema>>({
+  // Form handling
+  const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       employeeId: '',
       employeeName: '',
-      activityCategory: '',
+      activityCategory: 'employment',
       activityType: '',
       description: '',
-      status: 'Pending',
+      status: 'pending',
+      source: 'manual',
+      sourceReference: '',
       attachments: [],
       notes: '',
       relatedDocuments: [],
@@ -394,728 +292,517 @@ const EmployeeDiaryPage: React.FC = () => {
     },
   });
 
-  // Function to log errors
-  const logError = (message: string, data?: any) => {
-    console.error(`[EmployeeDiaryPage Error] ${message}`, data);
-    setErrorLog(prev => [...prev, { message, timestamp: new Date(), data }]);
-  };
-
-  // Wrap state updates in try-catch
-  const safeStateUpdate = <T extends unknown>(
-    updateFn: (value: T) => void,
-    newValue: T,
-    actionName: string
-  ) => {
+  // Data fetching
+  const fetchActivities = useCallback(async () => {
     try {
-      updateFn(newValue);
+      dispatch({ type: 'SET_LOADING', payload: true });
+      const activities = await employeeActivityService.fetchEmployeeActivities(
+        state.selectedEmployee || undefined
+      );
+      dispatch({ type: 'SET_ACTIVITIES', payload: activities });
     } catch (error) {
-      logError(`Error updating state in ${actionName}:`, error);
+      dispatch({
+        type: 'LOG_ERROR',
+        payload: { message: 'Error fetching activities', data: error },
+      });
       toast({
         title: "Error",
-        description: `Failed to update ${actionName}. Please try again.`,
+        description: "Failed to fetch activities.",
         variant: "destructive",
       });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
-  };
+  }, [state.selectedEmployee]);
 
-  // Modified handleSubmit with better error tracking
-  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+  const checkSyncStatus = useCallback(async () => {
     try {
-      console.log('[EmployeeDiaryPage] Starting form submission');
-      console.log('[EmployeeDiaryPage] Form values:', values);
+      const sources = await employeeActivityService.fetchActivitySources();
+      dispatch({ type: 'SET_SYNC_STATUS', payload: sources });
+    } catch (error) {
+      dispatch({
+        type: 'LOG_ERROR',
+        payload: { message: 'Error checking sync status', data: error },
+      });
+    }
+  }, []);
 
-      // Validate required fields
-      if (!values.employeeId) {
-        console.error('[EmployeeDiaryPage] Missing employeeId');
-        throw new Error('Employee ID is required');
-      }
-      if (!values.employeeName) {
-        console.error('[EmployeeDiaryPage] Missing employeeName');
-        throw new Error('Employee Name is required');
-      }
-      if (!values.activityCategory) {
-        console.error('[EmployeeDiaryPage] Missing activityCategory');
-        throw new Error('Activity Category is required');
-      }
-      if (!values.activityType) {
-        console.error('[EmployeeDiaryPage] Missing activityType');
-        throw new Error('Activity Type is required');
-      }
-      if (!values.description) {
-        console.error('[EmployeeDiaryPage] Missing description');
-        throw new Error('Description is required');
-      }
-      if (!values.status) {
-        console.error('[EmployeeDiaryPage] Missing status');
-        throw new Error('Status is required');
-      }
-      if (!values.recordedBy) {
-        console.error('[EmployeeDiaryPage] Missing recordedBy');
-        throw new Error('Recorder name is required');
-      }
+  // Event handlers
+  const handleSync = useCallback(async (source: ActivitySource) => {
+    if (state.isSyncing) return;
+    
+    try {
+      dispatch({ type: 'SET_SYNCING', payload: true });
+      await employeeActivityService.syncActivitiesFromSource(source);
+      await fetchActivities();
+      toast({
+        title: "Sync Complete",
+        description: `Successfully synced activities from ${ACTIVITY_SOURCES[source].label}`,
+      });
+    } catch (error) {
+      dispatch({
+        type: 'LOG_ERROR',
+        payload: { message: `Error syncing from ${source}`, data: error },
+      });
+      toast({
+        title: "Sync Error",
+        description: `Failed to sync activities from ${ACTIVITY_SOURCES[source].label}`,
+        variant: "destructive",
+      });
+    } finally {
+      dispatch({ type: 'SET_SYNCING', payload: false });
+    }
+  }, [fetchActivities, state.isSyncing]);
 
-      if (editingEntry) {
-        console.log('[EmployeeDiaryPage] Updating existing entry:', editingEntry.id);
-        setActivities(current =>
-          current.map(activity =>
-            activity.id === editingEntry.id
-              ? { ...values, id: activity.id } as EmployeeActivity
-              : activity
-          )
+  const handleSubmit = useCallback(async (values: FormData) => {
+    try {
+      const commonData = {
+        employeeId: values.employeeId,
+        employeeName: values.employeeName,
+        activityDate: values.activityDate,
+        activityCategory: values.activityCategory as ActivityCategory,
+        activityType: values.activityType,
+        description: values.description,
+        status: values.status as ActivityStatus,
+        source: values.source as ActivitySource,
+        attachments: values.attachments || [],
+        notes: values.notes,
+        relatedDocuments: values.relatedDocuments || [],
+        nextReviewDate: values.nextReviewDate,
+        actionRequired: values.actionRequired,
+        actionDeadline: values.actionDeadline,
+        recordedBy: values.recordedBy,
+      };
+
+      if (state.editingEntry) {
+        const updated = await employeeActivityService.updateActivity(
+          state.editingEntry.id,
+          commonData
         );
+        dispatch({ type: 'UPDATE_ACTIVITY', payload: updated });
         toast({
           title: "Activity Updated",
           description: "Employee activity record has been updated.",
         });
       } else {
-        console.log('[EmployeeDiaryPage] Creating new entry');
-        const newActivity: EmployeeActivity = {
-          id: Date.now().toString(),
-          employeeId: values.employeeId,
-          employeeName: values.employeeName,
-          activityDate: values.activityDate || new Date(),
-          activityCategory: values.activityCategory,
-          activityType: values.activityType,
-          description: values.description,
-          status: values.status,
-          attachments: values.attachments || [],
-          notes: values.notes || '',
-          relatedDocuments: values.relatedDocuments || [],
-          nextReviewDate: values.nextReviewDate,
-          actionRequired: values.actionRequired || false,
-          actionDeadline: values.actionDeadline,
-          recordedBy: values.recordedBy
-        };
-
-        console.log('[EmployeeDiaryPage] New activity object:', newActivity);
-
-        setActivities(current => {
-          console.log('[EmployeeDiaryPage] Current activities length:', current.length);
-          const updated = [newActivity, ...current];
-          console.log('[EmployeeDiaryPage] Updated activities length:', updated.length);
-          return updated;
-        });
-
+        const created = await employeeActivityService.createActivity(commonData);
+        dispatch({ type: 'ADD_ACTIVITY', payload: created });
         toast({
           title: "Activity Added",
           description: "New employee activity has been recorded.",
         });
       }
 
-      // Reset form and close dialog
-      console.log('[EmployeeDiaryPage] Resetting form and closing dialog');
-      safeStateUpdate(setIsDialogOpen, false, 'dialog state');
-      safeStateUpdate(setEditingEntry, null, 'editing state');
+      dispatch({ type: 'SET_DIALOG_OPEN', payload: false });
+      dispatch({ type: 'SET_EDITING_ENTRY', payload: null });
       form.reset();
-
     } catch (error) {
-      logError('Error in handleSubmit:', error);
-      console.error('[EmployeeDiaryPage] Error in handleSubmit:', error);
-      
-      // Show more specific error message
+      dispatch({
+        type: 'LOG_ERROR',
+        payload: { message: 'Error in handleSubmit', data: error },
+      });
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save the activity. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to save the activity.",
         variant: "destructive",
       });
     }
-  };
+  }, [state.editingEntry, form]);
 
-  // Modified handleEdit with error tracking
-  const handleEdit = (activity: EmployeeActivity) => {
-    try {
-      console.log('[EmployeeDiaryPage] Editing activity:', activity.id);
-      safeStateUpdate(setEditingEntry, activity, 'editing entry');
-      form.reset(activity);
-      safeStateUpdate(setIsDialogOpen, true, 'dialog state');
-    } catch (error) {
-      logError('Error in handleEdit:', error);
-      toast({
-        title: "Error",
-        description: "Failed to edit the activity. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
+  const handleEdit = useCallback((activity: EmployeeActivity) => {
+    dispatch({ type: 'SET_EDITING_ENTRY', payload: activity });
+    form.reset({
+      ...activity,
+      activityCategory: activity.activityCategory as ActivityCategory,
+      status: activity.status as ActivityStatus,
+    });
+    dispatch({ type: 'SET_DIALOG_OPEN', payload: true });
+  }, [form]);
 
-  // Modified handleDelete with error tracking
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     try {
-      console.log('[EmployeeDiaryPage] Deleting activity:', id);
       if (window.confirm('Are you sure you want to delete this activity record?')) {
-        setActivities(current => {
-          const filtered = current.filter(activity => activity.id !== id);
-          console.log('[EmployeeDiaryPage] Activities after deletion:', filtered.length);
-          return filtered;
-        });
+        await employeeActivityService.deleteActivity(id);
+        dispatch({ type: 'DELETE_ACTIVITY', payload: id });
         toast({
           title: "Activity Deleted",
           description: "The activity record has been permanently deleted.",
-          variant: "destructive",
         });
       }
     } catch (error) {
-      logError('Error in handleDelete:', error);
+      dispatch({
+        type: 'LOG_ERROR',
+        payload: { message: 'Error in handleDelete', data: error },
+      });
       toast({
         title: "Error",
-        description: "Failed to delete the activity. Please try again.",
+        description: "Failed to delete the activity.",
         variant: "destructive",
       });
     }
-  };
-
-  // Add error boundary effect
-  React.useEffect(() => {
-    const handleError = (event: ErrorEvent) => {
-      logError('Unhandled error:', event.error);
-      console.error('[EmployeeDiaryPage] Unhandled error:', event);
-      toast({
-        title: "Unexpected Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      });
-    };
-
-    window.addEventListener('error', handleError);
-    return () => window.removeEventListener('error', handleError);
   }, []);
 
-  // Debug logging for form state
-  React.useEffect(() => {
-    const subscription = form.watch((value) => {
-      console.log('[EmployeeDiaryPage] Form values changed:', value);
+  const handleToggleSourceStatus = useCallback((source: ActivitySource) => {
+    const currentStatus = state.syncStatus[source];
+    const newStatus: ActivitySyncStatus = {
+      ...currentStatus,
+      status: currentStatus.status === 'active' ? 'inactive' : 'active',
+      lastSynced: currentStatus.status === 'inactive' ? currentStatus.lastSynced : new Date()
+    };
+    
+    dispatch({ 
+      type: 'UPDATE_SYNC_STATUS', 
+      payload: { 
+        source, 
+        status: newStatus 
+      } 
     });
-    return () => subscription.unsubscribe();
-  }, [form]);
+    
+    toast({
+      title: `${ACTIVITY_SOURCES[source].label} Sync ${newStatus.status === 'active' ? 'Activated' : 'Deactivated'}`,
+      description: `Synchronization for ${ACTIVITY_SOURCES[source].label} is now ${newStatus.status}.`,
+    });
+  }, [state.syncStatus]);
 
-  // Add error log viewer (only visible in development)
-  const ErrorLogViewer = process.env.NODE_ENV === 'development' ? (
-    <div className="fixed bottom-4 right-4 z-50">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => {
-          console.log('[EmployeeDiaryPage] Error Log:', errorLog);
-          toast({
-            title: "Error Log",
-            description: (
-              <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
-                <code className="text-white">
-                  {JSON.stringify(errorLog, null, 2)}
-                </code>
-              </pre>
-            ),
-          });
-        }}
-      >
-        View Error Log ({errorLog.length})
-      </Button>
+  // Auto-sync effect
+  useEffect(() => {
+    const syncSources = async () => {
+      if (state.isSyncing) return;
+      
+      for (const [source, config] of Object.entries(ACTIVITY_SOURCES)) {
+        if (config.syncInterval > 0 && state.syncStatus[source as ActivitySource]?.status === 'active') {
+          await handleSync(source as ActivitySource);
+        }
+      }
+    };
+
+    const interval = setInterval(syncSources, AUTO_SYNC_INTERVAL);
+    return () => clearInterval(interval);
+  }, [state.syncStatus, handleSync, state.isSyncing]);
+
+  // Sort and paginate activities
+  const sortedActivities = useMemo(() => 
+    [...filteredActivities].sort((a, b) => 
+      b.activityDate.getTime() - a.activityDate.getTime()
+    )
+  , [filteredActivities]);
+
+  const totalPages = Math.ceil(sortedActivities.length / ITEMS_PER_PAGE);
+  
+  const paginatedActivities = useMemo(() => 
+    sortedActivities.slice(
+      (state.currentPage - 1) * ITEMS_PER_PAGE,
+      state.currentPage * ITEMS_PER_PAGE
+    )
+  , [sortedActivities, state.currentPage]);
+
+  const handleTabChange = useCallback((value: string) => {
+    dispatch({ 
+      type: 'SET_ACTIVE_TAB', 
+      payload: value === 'all' ? 'all' : value as ActivityCategory
+    });
+  }, []);
+
+  const handleEmployeeChange = useCallback((value: string) => {
+    dispatch({ type: 'SET_SELECTED_EMPLOYEE', payload: value || null });
+    fetchActivities();
+  }, [fetchActivities]);
+
+  const handleDialogChange = useCallback((open: boolean) => {
+    dispatch({ type: 'SET_DIALOG_OPEN', payload: open });
+  }, []);
+
+  const handlePageChange = useCallback((page: number) => {
+    dispatch({ type: 'SET_CURRENT_PAGE', payload: page });
+  }, []);
+
+  // Render empty state component
+  const renderEmptyState = useCallback(() => (
+    <div className="text-center py-12">
+      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-4">
+        <FileText className="h-6 w-6 text-muted-foreground" />
+      </div>
+      <h3 className="text-lg font-medium">No activities found</h3>
+      <p className="text-muted-foreground mt-2">
+        Start by adding a new activity record or sync from available sources.
+      </p>
     </div>
-  ) : null;
+  ), []);
+
+  // Loading state component
+  const renderLoadingState = useCallback(() => (
+    <div className="flex items-center justify-center py-16">
+      <div className="flex flex-col items-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Loading activities...</p>
+      </div>
+    </div>
+  ), []);
+
+  // Error state for employee loading
+  const renderEmployeeLoadingError = useCallback(() => (
+    <Card className="shadow-sm border-red-200">
+      <CardHeader className="text-center border-b text-red-600">
+        <CardTitle>Failed to Load Employees</CardTitle>
+        <CardDescription className="text-red-500">
+          We couldn't load the employee data. Please try refreshing the page.
+        </CardDescription>
+      </CardHeader>
+      <CardFooter className="flex justify-center pt-4">
+        <Button 
+          variant="outline"
+          onClick={fetchEmployees}
+          className="border-red-300 text-red-600 hover:bg-red-50"
+        >
+          Retry Loading Employees
+        </Button>
+      </CardFooter>
+    </Card>
+  ), [fetchEmployees]);
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="text-2xl font-bold">Employee Activity Diary</CardTitle>
-              <CardDescription>Comprehensive record of all employee-related activities and interactions</CardDescription>
-            </div>
-            <div className="flex gap-4">
-              <Select
-                value={selectedEmployee || undefined}
-                onValueChange={(value) => setSelectedEmployee(value || null)}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select Employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Employees</SelectItem>
-                  {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button 
-                    className="bg-blue-900 text-white hover:bg-blue-800"
+    <div className="container mx-auto px-4 py-6 max-w-[1400px]">
+      {/* Page Header */}
+      <div className="flex flex-col gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-[#324053]">Employee Activity Diary</h1>
+          <p className="text-muted-foreground mt-1">
+            Comprehensive record of all employee-related activities and interactions
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        {/* Controls Card */}
+        <Card className="shadow-sm border-gray-200">
+          <CardHeader className="p-4 lg:p-6 border-b">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full md:w-auto">
+                {state.isLoadingEmployees ? (
+                  <div className="w-full sm:w-[240px] h-10 flex items-center justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <span className="text-sm text-muted-foreground">Loading...</span>
+                  </div>
+                ) : state.employees.length === 0 ? (
+                  <Button
+                    variant="outline"
+                    onClick={fetchEmployees}
+                    className="w-full sm:w-[240px]"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Activity
+                    Retry Loading Employees
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px]">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {editingEntry ? 'Edit Activity Record' : 'Add New Activity Record'}
-                    </DialogTitle>
-                    <DialogDescription>
-                      {editingEntry 
-                        ? 'Update the activity record details below.' 
-                        : 'Record a new employee activity or interaction.'}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="employeeId"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Employee</FormLabel>
-                              <Select 
-                                onValueChange={(value) => {
-                                  field.onChange(value);
-                                  const employee = employees.find(e => e.id === value);
-                                  if (employee) {
-                                    form.setValue('employeeName', employee.name);
-                                  }
-                                }}
-                                defaultValue={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger className="bg-white">
-                                    <SelectValue placeholder="Select employee" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {employees.map((employee) => (
-                                    <SelectItem key={employee.id} value={employee.id}>
-                                      {employee.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="activityDate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Activity Date</FormLabel>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <FormControl>
-                                    <Button
-                                      variant="outline"
-                                      className={cn(
-                                        "w-full bg-white pl-3 text-left font-normal",
-                                        !field.value && "text-muted-foreground"
-                                      )}
-                                    >
-                                      {field.value ? (
-                                        format(field.value, "PPP")
-                                      ) : (
-                                        <span>Pick a date</span>
-                                      )}
-                                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                    </Button>
-                                  </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={field.onChange}
-                                    initialFocus
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="activityCategory"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Category</FormLabel>
-                              <Select 
-                                onValueChange={(value) => {
-                                  field.onChange(value);
-                                  form.setValue('activityType', '');
-                                }}
-                                defaultValue={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger className="bg-white">
-                                    <SelectValue placeholder="Select category" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {activityCategories.map((category) => (
-                                    <SelectItem key={category.id} value={category.id}>
-                                      {category.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="activityType"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Activity Type</FormLabel>
-                              <Select
-                                onValueChange={field.onChange}
-                                defaultValue={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger className="bg-white">
-                                    <SelectValue placeholder="Select type" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {form.watch('activityCategory') &&
-                                    activityTypesByCategory[form.watch('activityCategory') as keyof typeof activityTypesByCategory]?.map((type) => (
-                                      <SelectItem key={type} value={type}>
-                                        {type}
-                                      </SelectItem>
-                                    ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="description"
-                          render={({ field }) => (
-                            <FormItem className="col-span-2">
-                              <FormLabel>Description</FormLabel>
-                              <FormControl>
-                                <Textarea
-                                  placeholder="Provide a detailed description of the activity"
-                                  className="bg-white resize-none"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="status"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Status</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger className="bg-white">
-                                    <SelectValue placeholder="Select status" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="Pending">Pending</SelectItem>
-                                  <SelectItem value="In Progress">In Progress</SelectItem>
-                                  <SelectItem value="Completed">Completed</SelectItem>
-                                  <SelectItem value="Cancelled">Cancelled</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="actionRequired"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <div className="space-y-1 leading-none">
-                                <FormLabel>
-                                  Follow-up Required
-                                </FormLabel>
-                                <FormDescription>
-                                  Check if this activity requires follow-up action
-                                </FormDescription>
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      <Separator />
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setIsDialogOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="submit"
-                          className="bg-blue-900 text-white hover:bg-blue-800"
-                        >
-                          {editingEntry ? 'Update' : 'Add'} Record
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                </DialogContent>
-              </Dialog>
+                ) : (
+                  <Select
+                    value={state.selectedEmployee || undefined}
+                    onValueChange={handleEmployeeChange}
+                  >
+                    <SelectTrigger className="w-full sm:w-[240px]">
+                      <SelectValue placeholder="Select Employee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Employees</SelectItem>
+                      {state.employees.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Dialog 
+                  open={state.isDialogOpen} 
+                  onOpenChange={handleDialogChange}
+                >
+                  <DialogTrigger asChild>
+                    <Button className="bg-blue-900 text-white hover:bg-blue-800 w-full sm:w-auto">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Activity
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[600px] w-[95vw] max-w-full">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {state.editingEntry ? 'Edit Activity Record' : 'Add New Activity Record'}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {state.editingEntry 
+                          ? 'Update the activity record details below.' 
+                          : 'Record a new employee activity or interaction.'}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <ActivityForm
+                      form={form}
+                      onSubmit={handleSubmit}
+                      onCancel={() => handleDialogChange(false)}
+                      isEditing={!!state.editingEntry}
+                      employees={state.employees}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
+              
+              <div className="relative w-full md:w-[300px]">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search activities..."
+                  className="pl-8 w-full"
+                  value={state.searchQuery}
+                  onChange={(e) => dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value })}
+                />
+              </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Tabs defaultValue="all" className="w-full" onValueChange={setActiveTab}>
-              <div className="flex justify-between items-center mb-6">
-                <TabsList className="h-auto p-1 bg-muted/50">
+          </CardHeader>
+
+          <CardContent className="pt-4 px-4 lg:px-6 pb-0 overflow-hidden">
+            <div className="w-full overflow-x-auto pb-2">
+              <SyncStatus
+                sources={state.syncStatus}
+                onSync={handleSync}
+                onToggleStatus={handleToggleSourceStatus}
+                isSyncing={state.isSyncing}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Content Card */}
+        <Card className="shadow-sm border-gray-200">
+          <CardContent className="p-4 lg:p-6">
+            <Tabs 
+              defaultValue="all"
+              value={state.activeTab}
+              onValueChange={handleTabChange}
+              className="w-full"
+            >
+              <div className="flex justify-between items-center mb-6 overflow-x-auto pb-2">
+                <TabsList className="h-auto p-1 bg-muted/50 overflow-x-auto flex-nowrap min-w-[320px]">
                   <TabsTrigger 
                     value="all" 
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded-md transition-colors",
-                      activeTab === "all" ? "bg-white shadow-sm" : "hover:bg-muted"
-                    )}
+                    className={`flex items-center gap-2 px-3 py-2 flex-shrink-0 ${state.activeTab === 'all' ? 'bg-blue-100 text-blue-800' : ''}`}
                   >
-                    <Shield className="h-4 w-4" />
+                    <FileText className="h-4 w-4" />
                     <span>All</span>
                   </TabsTrigger>
-                  {activityCategories.map((category) => (
-                    <TabsTrigger
-                      key={category.id}
-                      value={category.id}
-                      className={cn(
-                        "flex items-center gap-2 px-3 py-2 rounded-md transition-colors",
-                        activeTab === category.id ? "bg-white shadow-sm" : "hover:bg-muted"
-                      )}
-                    >
-                      {category.icon}
-                      <span className="hidden md:inline">{category.label}</span>
-                    </TabsTrigger>
-                  ))}
+                  
+                  {ACTIVITY_CATEGORIES.map((category) => {
+                    const Icon = category.icon;
+                    const isActive = state.activeTab === category.id;
+                    const categories = state.activities
+                      .filter(a => a.activityCategory === category.id)
+                      .length;
+                    
+                    return (
+                      <TabsTrigger
+                        key={category.id}
+                        value={category.id}
+                        className={`flex items-center gap-2 px-3 py-2 flex-shrink-0 ${isActive ? CATEGORY_COLORS[category.id] : ''}`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span className="hidden sm:inline">{category.label}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white' : 'bg-gray-200'}`}>
+                          {categories}
+                        </span>
+                      </TabsTrigger>
+                    );
+                  })}
                 </TabsList>
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search activities..."
-                    className="pl-8 bg-white"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
               </div>
 
-              <TabsContent value="all" className="mt-6 space-y-6">
-                {paginatedActivities.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-4">
-                      <FileText className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-medium">No activities found</h3>
-                    <p className="text-muted-foreground mt-2">
-                      Start by adding a new activity record.
-                    </p>
-                  </div>
-                ) : (
-                  paginatedActivities.map((activity, index) => (
-                    <div
-                      key={activity.id}
-                      className={cn(
-                        "relative pb-8",
-                        index === paginatedActivities.length - 1 ? "pb-0" : "border-l border-gray-200 dark:border-gray-800"
+              {/* Show loading state */}
+              {state.isLoading && renderLoadingState()}
+
+              {/* Show content when not loading */}
+              {!state.isLoading && (
+                <>
+                  {state.activeTab === 'all' && (
+                    <TabsContent value="all" className="mt-4 md:mt-6 space-y-4 md:space-y-6">
+                      {filteredActivities.length === 0 ? (
+                        renderEmptyState()
+                      ) : (
+                        paginatedActivities.map((activity) => (
+                          <ActivityTimeline
+                            key={activity.id}
+                            activity={activity}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                          />
+                        ))
                       )}
-                    >
-                      <div className="relative flex items-start group">
-                        <div className="h-9 flex items-center">
-                          <div className={cn(
-                            "relative z-10 w-8 h-8 flex items-center justify-center rounded-full -ml-4",
-                            getCategoryBadge(activity.activityCategory)
-                          )}>
-                            {activityCategories.find(cat => cat.id === activity.activityCategory)?.icon}
-                          </div>
-                        </div>
-                        <div className="flex-1 ml-4">
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                              {activity.employeeName}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {format(activity.activityDate, 'PPP')}
-                            </div>
-                          </div>
-                          <div className="mt-2 flex items-center gap-2">
-                            <Badge className={cn("rounded-md font-medium", getCategoryBadge(activity.activityCategory))}>
-                              {activity.activityType}
-                            </Badge>
-                            {activity.actionRequired && (
-                              <Badge variant="outline" className="border-yellow-500 text-yellow-700">
-                                Action Required
-                                {activity.actionDeadline && (
-                                  <span className="ml-2">
-                                    Due: {format(activity.actionDeadline, 'PP')}
-                                  </span>
-                                )}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                            {activity.description}
-                          </div>
-                          {activity.attachments && activity.attachments.length > 0 && (
-                            <div className="mt-2 flex items-center gap-2">
-                              <FileText className="h-4 w-4 text-gray-500" />
-                              <span className="text-sm text-gray-500">
-                                {activity.attachments.length} attachment(s)
-                              </span>
-                            </div>
-                          )}
-                          <div className="mt-2 flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(activity)}
-                              className="h-8 px-2 hover:bg-blue-100 hover:text-blue-600"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(activity.id)}
-                              className="h-8 px-2 hover:bg-red-100 hover:text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </TabsContent>
+                    </TabsContent>
+                  )}
 
-              {activityCategories.map((category) => (
-                <TabsContent key={category.id} value={category.id} className="mt-6 space-y-6">
-                  {paginatedActivities
-                    .filter(activity => activity.activityCategory === category.id)
-                    .map((activity, index, filteredArray) => (
-                      <div
-                        key={activity.id}
-                        className={cn(
-                          "relative pb-8",
-                          index === filteredArray.length - 1 ? "pb-0" : "border-l border-gray-200 dark:border-gray-800"
+                  {ACTIVITY_CATEGORIES.map((category) => (
+                    state.activeTab === category.id && (
+                      <TabsContent key={category.id} value={category.id} className="mt-4 md:mt-6 space-y-4 md:space-y-6">
+                        {filteredActivities.length === 0 ? (
+                          <div className="text-center py-6 md:py-8">
+                            <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-muted mb-3 md:mb-4">
+                              {React.createElement(category.icon, { className: "h-5 w-5 md:h-6 md:w-6 text-muted-foreground" })}
+                            </div>
+                            <h3 className="text-base md:text-lg font-medium">No {category.label} Activities</h3>
+                            <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+                              No activities found in this category. Try another category or add a new activity.
+                            </p>
+                            <Button 
+                              className="mt-4 bg-blue-900 text-white hover:bg-blue-800"
+                              onClick={() => {
+                                // Pre-select the current category when adding a new activity
+                                form.setValue('activityCategory', category.id as ActivityCategory);
+                                dispatch({ type: 'SET_DIALOG_OPEN', payload: true });
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add {category.label} Activity
+                            </Button>
+                          </div>
+                        ) : (
+                          paginatedActivities.map((activity) => (
+                            <ActivityTimeline
+                              key={activity.id}
+                              activity={activity}
+                              onEdit={handleEdit}
+                              onDelete={handleDelete}
+                            />
+                          ))
                         )}
-                      >
-                        <div className="relative flex items-start group">
-                          <div className="h-9 flex items-center">
-                            <div className={cn(
-                              "relative z-10 w-8 h-8 flex items-center justify-center rounded-full -ml-4",
-                              getCategoryBadge(activity.activityCategory)
-                            )}>
-                              {category.icon}
-                            </div>
-                          </div>
-                          <div className="flex-1 ml-4">
-                            <div className="flex items-center justify-between">
-                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                {activity.employeeName}
-                              </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {format(activity.activityDate, 'PPP')}
-                              </div>
-                            </div>
-                            <div className="mt-2 flex items-center gap-2">
-                              <Badge className={cn("rounded-md font-medium", getCategoryBadge(activity.activityCategory))}>
-                                {activity.activityType}
-                              </Badge>
-                              {activity.actionRequired && (
-                                <Badge variant="outline" className="border-yellow-500 text-yellow-700">
-                                  Action Required
-                                  {activity.actionDeadline && (
-                                    <span className="ml-2">
-                                      Due: {format(activity.actionDeadline, 'PP')}
-                                    </span>
-                                  )}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                              {activity.description}
-                            </div>
-                            {activity.attachments && activity.attachments.length > 0 && (
-                              <div className="mt-2 flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-gray-500" />
-                                <span className="text-sm text-gray-500">
-                                  {activity.attachments.length} attachment(s)
-                                </span>
-                              </div>
-                            )}
-                            <div className="mt-2 flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEdit(activity)}
-                                className="h-8 px-2 hover:bg-blue-100 hover:text-blue-600"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(activity.id)}
-                                className="h-8 px-2 hover:bg-red-100 hover:text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </TabsContent>
-              ))}
+                      </TabsContent>
+                    )
+                  ))}
+                </>
+              )}
             </Tabs>
-          </div>
 
-          {/* Pagination */}
-          <div className="flex justify-between items-center mt-8">
-            <div className="text-sm text-muted-foreground">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, sortedActivities.length)} of {sortedActivities.length} activities
-            </div>
-            <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </Button>
-            </div>
+            {/* Pagination - only show when not loading and we have activities */}
+            {!state.isLoading && filteredActivities.length > 0 && (
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 border-t pt-4">
+                <div className="text-xs sm:text-sm text-muted-foreground order-2 sm:order-1">
+                  Showing {((state.currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(state.currentPage * ITEMS_PER_PAGE, sortedActivities.length)} of {sortedActivities.length} activities
+                </div>
+                <div className="flex space-x-2 order-1 sm:order-2 w-full sm:w-auto justify-center sm:justify-start">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(Math.max(1, state.currentPage - 1))}
+                    disabled={state.currentPage === 1}
+                    className="h-8 px-3"
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(Math.min(totalPages, state.currentPage + 1))}
+                    disabled={state.currentPage === totalPages}
+                    className="h-8 px-3"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-        </CardContent>
-      </Card>
-      {ErrorLogViewer}
     </div>
   );
 };

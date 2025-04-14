@@ -231,7 +231,7 @@ const CustomerDAR = () => {
       control={form.control}
       name={name as any}
       render={({ field }) => (
-        <FormItem className="space-y-3 bg-white/50 dark:bg-slate-800/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+        <FormItem className="bg-white/50 dark:bg-slate-800/50 p-3 md:p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
           <FormLabel className="text-sm font-medium flex items-center gap-2">
             {label}
           </FormLabel>
@@ -245,13 +245,13 @@ const CustomerDAR = () => {
                 }
               }}
               defaultValue={field.value}
-              className="flex space-x-4"
+              className="flex flex-col md:flex-row gap-2 md:gap-4"
             >
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <RadioGroupItem value="Yes" id={`${name}-yes`} />
                 <Label htmlFor={`${name}-yes`}>Yes</Label>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <RadioGroupItem value="No" id={`${name}-no`} />
                 <Label htmlFor={`${name}-no`}>No</Label>
               </div>
@@ -283,32 +283,38 @@ const CustomerDAR = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto p-6 space-y-8">
-        <div className="flex justify-between items-center">
+      <div className="container mx-auto p-2 md:p-4 space-y-6 md:space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               Daily Activity Report
             </h1>
             <p className="text-slate-600 dark:text-slate-400 mt-2">
               Track and manage daily security activities and compliance checks
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+             setIsDialogOpen(open);
+             if (!open) {
+               form.reset(); // Ensure form resets on close
+               setEditingRecord(null);
+             }
+           }}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg">
+              <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shrink-0 w-full md:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 New Report
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-md md:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                <DialogTitle className="text-xl md:text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                   {editingRecord ? 'Edit Daily Activity Report' : 'New Daily Activity Report'}
                 </DialogTitle>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                     {/* Basic Information */}
                     <Card className="border-slate-200 dark:border-slate-700 shadow-lg">
                       <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-t-lg border-b border-slate-200 dark:border-slate-700">
@@ -317,7 +323,7 @@ const CustomerDAR = () => {
                           Please fill in the basic details about the report
                         </p>
                       </CardHeader>
-                      <CardContent className="space-y-4 pt-6">
+                      <CardContent className="space-y-4 p-4 md:p-6 pt-6">
                         <FormField
                           control={form.control}
                           name="site"
@@ -380,7 +386,7 @@ const CustomerDAR = () => {
                           Select Yes/No for each compliance check. If Yes is selected, please provide a brief description.
                         </p>
                       </CardHeader>
-                      <CardContent className="space-y-4 pt-6">
+                      <CardContent className="space-y-4 p-4 md:p-6 pt-6">
                         {renderYesNoRadio('tillCashOver150', 'Till contained over £150 of cash')}
                         {renderYesNoRadio('cashOfficeDoorOpen', 'Cash Office Door Open')}
                         {renderYesNoRadio('visibleCashOnDisplay', 'Visible Cash On Display')}
@@ -399,7 +405,7 @@ const CustomerDAR = () => {
                           Check each area for security concerns. Select Yes if area is secure, No if issues found and provide details.
                         </p>
                       </CardHeader>
-                      <CardContent className="space-y-4 pt-6">
+                      <CardContent className="space-y-4 p-4 md:p-6 pt-6">
                         {renderYesNoRadio('kioskSecure', 'Kiosk Secure')}
                         {renderYesNoRadio('highValueRoom', 'High Value Room')}
                         {renderYesNoRadio('managersOffice', 'Managers Office')}
@@ -419,7 +425,7 @@ const CustomerDAR = () => {
                           Report any non-functioning systems. Select Yes if system is not working and provide additional information.
                         </p>
                       </CardHeader>
-                      <CardContent className="space-y-4 pt-6">
+                      <CardContent className="space-y-4 p-4 md:p-6 pt-6">
                         {renderYesNoRadio('watchMeNow', 'Watch Me Now')}
                         {renderYesNoRadio('cctv', 'CCTV')}
                         {renderYesNoRadio('intruderAlarm', 'Intruder Alarm')}
@@ -432,14 +438,14 @@ const CustomerDAR = () => {
                   </div>
 
                   {/* Notes and Searches */}
-                  <Card className="border-slate-200 dark:border-slate-700 shadow-lg">
+                  <Card className="border-slate-200 dark:border-slate-700 shadow-lg md:col-span-2">
                     <CardHeader className="bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 rounded-t-lg border-b border-slate-200 dark:border-slate-700">
                       <CardTitle className="text-lg font-semibold text-purple-700 dark:text-purple-300">Notes and Searches</CardTitle>
                       <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                         Document any additional notes, record searches conducted, and provide relevant staff details.
                       </p>
                     </CardHeader>
-                    <CardContent className="space-y-4 pt-6">
+                    <CardContent className="space-y-4 p-4 md:p-6 pt-6">
                       <FormField
                         control={form.control}
                         name="shiftCompletionNotes"
@@ -526,68 +532,120 @@ const CustomerDAR = () => {
 
         {/* Search and Table */}
         <Card className="border-slate-200 dark:border-slate-700 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-b border-slate-200 dark:border-slate-700">
-            <div className="flex items-center space-x-2">
-              <Search className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+          <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-b border-slate-200 dark:border-slate-700 p-2 md:p-4">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-slate-500 dark:text-slate-400 shrink-0" />
               <Input
                 placeholder="Search reports..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="max-w-sm bg-white dark:bg-slate-900"
+                className="w-full md:max-w-sm bg-white dark:bg-slate-900"
               />
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <CardContent className="p-0 md:p-4">
+            {/* Desktop Table View (md and up) */}
+            <div className="hidden md:block border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
               <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50 dark:bg-slate-800">
-                    <TableHead>Site</TableHead>
-                    <TableHead>Officer Name</TableHead>
-                    <TableHead>Report Date</TableHead>
-                    <TableHead>Created At</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                <TableHeader className="bg-slate-50 dark:bg-slate-800">
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap px-4 py-3">Site</TableHead>
+                    <TableHead className="whitespace-nowrap px-4 py-3">Officer Name</TableHead>
+                    <TableHead className="whitespace-nowrap px-4 py-3">Report Date</TableHead>
+                    <TableHead className="whitespace-nowrap px-4 py-3">Created At</TableHead>
+                    <TableHead className="text-right whitespace-nowrap px-4 py-3">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedRecords.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                      <TableCell>{record.site}</TableCell>
-                      <TableCell>{record.officerName}</TableCell>
-                      <TableCell>{format(record.reportDate, 'PPP')}</TableCell>
-                      <TableCell>{format(record.createdAt, 'PPP')}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(record)}
-                            className="hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 h-10 w-12"
-                          >
-                            <Pencil className="h-5 w-5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(record.id)}
-                            className="hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 h-10 w-12"
-                          >
-                            <Trash2 className="h-5 w-5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {paginatedRecords.length === 0 ? (
+                     <TableRow className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                       <TableCell colSpan={5} className="h-24 text-center text-slate-500 dark:text-slate-400">
+                         No records found.
+                       </TableCell>
+                     </TableRow>
+                  ) : (
+                    paginatedRecords.map((record) => (
+                      <TableRow key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 border-b last:border-b-0 border-slate-200 dark:border-slate-700">
+                        <TableCell className="px-4 py-3">{record.site}</TableCell>
+                        <TableCell className="px-4 py-3">{record.officerName}</TableCell>
+                        <TableCell className="px-4 py-3 whitespace-nowrap">{format(record.reportDate, 'PPP')}</TableCell>
+                        <TableCell className="px-4 py-3 whitespace-nowrap">{format(record.createdAt, 'PPP')}</TableCell>
+                        <TableCell className="text-right px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              onClick={() => handleEdit(record)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded-md cursor-pointer"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              onClick={() => handleDelete(record.id)}
+                              className="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded-md cursor-pointer"
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )))}
                 </TableBody>
               </Table>
             </div>
 
+            {/* Mobile Card View (below md) */}
+            <div className="md:hidden space-y-3 p-2">
+              {paginatedRecords.length === 0 ? (
+                <div className="text-center text-slate-500 dark:text-slate-400 py-10">
+                  No records found.
+                </div>
+              ) : (
+                paginatedRecords.map((record) => (
+                  <div key={record.id} className="border rounded-lg p-3 shadow-sm bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="text-sm">
+                          <span className="font-semibold text-slate-600 dark:text-slate-400">Site: </span>
+                          <span className="text-slate-800 dark:text-slate-200">{record.site}</span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-semibold text-slate-600 dark:text-slate-400">Officer: </span>
+                          <span className="text-slate-800 dark:text-slate-200">{record.officerName}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-semibold text-slate-600 dark:text-slate-400">Report Date: </span>
+                      <span className="text-slate-800 dark:text-slate-200">{format(record.reportDate, 'PPP')}</span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-semibold text-slate-600 dark:text-slate-400">Created At: </span>
+                      <span className="text-slate-800 dark:text-slate-200">{format(record.createdAt, 'PPP')}</span>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                       <Button
+                         onClick={() => handleEdit(record)}
+                         className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded-md cursor-pointer"
+                       >
+                         Edit
+                       </Button>
+                       <Button
+                         onClick={() => handleDelete(record.id)}
+                         className="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded-md cursor-pointer"
+                       >
+                         Delete
+                       </Button>
+                     </div>
+                  </div>
+                ))
+              )}
+            </div>
+
             {/* Pagination */}
-            <div className="flex items-center justify-between space-x-2 py-4">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-2 md:gap-4 py-4 px-2 md:px-0">
               <div className="text-sm text-slate-600 dark:text-slate-400">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredRecords.length)} of {filteredRecords.length} records
+                Showing {paginatedRecords.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0} to {Math.min(currentPage * itemsPerPage, filteredRecords.length)} of {filteredRecords.length} records
               </div>
-              <div className="flex space-x-2">
+              <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"

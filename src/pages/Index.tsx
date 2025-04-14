@@ -1,9 +1,9 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Button } from '../components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar'
-import { Badge } from '../components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { 
   Activity, 
   AlertCircle, 
@@ -23,7 +23,12 @@ import {
   User,
   Plus,
   Currency,
-  Star
+  Star,
+  CheckCircle,
+  FileText,
+  Briefcase,
+  MapPin,
+  MessageSquare
 } from 'lucide-react'
 import {
   Select,
@@ -31,12 +36,12 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../components/ui/select"
-import { TaskCard } from '../components/dashboard/TaskCard'
-import { IncidentTable } from '../components/dashboard/IncidentTable'
-import { OfficerPerformance } from '../components/dashboard/OfficerPerformance'
+} from "@/components/ui/select"
+import { TaskCard } from '@/components/dashboard/TaskCard'
+import { IncidentTable } from '@/components/dashboard/IncidentTable'
+import { OfficerPerformance } from '@/components/dashboard/OfficerPerformance'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
-import { cn } from '../lib/utils'
+import { cn } from '@/lib/utils'
 
 // Customer-specific data
 const customerData = {
@@ -47,19 +52,41 @@ const customerData = {
       { title: 'Incidents Today', value: '8', change: '-3%', trend: 'down', icon: AlertCircle, color: 'red' },
       { title: 'Active Guards', value: '342', change: '+12%', trend: 'up', icon: Users, color: 'blue' }
     ],
+    dailyIncidents: [
+      { date: 'Mon', uniformOfficers: 12, storeDetectives: 8 },
+      { date: 'Tue', uniformOfficers: 19, storeDetectives: 14 },
+      { date: 'Wed', uniformOfficers: 15, storeDetectives: 11 },
+      { date: 'Thu', uniformOfficers: 20, storeDetectives: 17 },
+      { date: 'Fri', uniformOfficers: 25, storeDetectives: 20 },
+      { date: 'Sat', uniformOfficers: 22, storeDetectives: 19 },
+      { date: 'Sun', uniformOfficers: 18, storeDetectives: 15 }
+    ],
+    weeklyIncidents: [
+      { week: 'Week 1', uniformOfficers: 42, storeDetectives: 35 },
+      { week: 'Week 2', uniformOfficers: 38, storeDetectives: 30 },
+      { week: 'Week 3', uniformOfficers: 45, storeDetectives: 36 },
+      { week: 'Week 4', uniformOfficers: 40, storeDetectives: 32 }
+    ],
     monthlyIncidents: [
-      { month: 'Jan', incidents: 40 },
-      { month: 'Feb', incidents: 30 },
-      { month: 'Mar', incidents: 45 },
-      { month: 'Apr', incidents: 25 },
-      { month: 'May', incidents: 35 },
-      { month: 'Jun', incidents: 20 },
-      { month: 'Jul', incidents: 28 },
-      { month: 'Aug', incidents: 32 },
-      { month: 'Sep', incidents: 38 },
-      { month: 'Oct', incidents: 42 },
-      { month: 'Nov', incidents: 36 },
-      { month: 'Dec', incidents: 30 }
+      { month: 'Jan', uniformOfficers: 40, storeDetectives: 32 },
+      { month: 'Feb', uniformOfficers: 30, storeDetectives: 24 },
+      { month: 'Mar', uniformOfficers: 45, storeDetectives: 36 },
+      { month: 'Apr', uniformOfficers: 25, storeDetectives: 20 },
+      { month: 'May', uniformOfficers: 35, storeDetectives: 28 },
+      { month: 'Jun', uniformOfficers: 20, storeDetectives: 16 },
+      { month: 'Jul', uniformOfficers: 28, storeDetectives: 22 },
+      { month: 'Aug', uniformOfficers: 32, storeDetectives: 26 },
+      { month: 'Sep', uniformOfficers: 38, storeDetectives: 30 },
+      { month: 'Oct', uniformOfficers: 42, storeDetectives: 34 },
+      { month: 'Nov', uniformOfficers: 36, storeDetectives: 29 },
+      { month: 'Dec', uniformOfficers: 30, storeDetectives: 24 }
+    ],
+    yearlyIncidents: [
+      { year: '2020', uniformOfficers: 280, storeDetectives: 224 },
+      { year: '2021', uniformOfficers: 320, storeDetectives: 256 },
+      { year: '2022', uniformOfficers: 350, storeDetectives: 280 },
+      { year: '2023', uniformOfficers: 375, storeDetectives: 300 },
+      { year: '2024', uniformOfficers: 401, storeDetectives: 321 }
     ],
     incidentReports: [
       {
@@ -95,19 +122,41 @@ const customerData = {
       { title: 'Incidents Today', value: '5', change: '-10%', trend: 'down', icon: AlertCircle, color: 'red' },
       { title: 'Active Guards', value: '420', change: '+15%', trend: 'up', icon: Users, color: 'blue' }
     ],
+    dailyIncidents: [
+      { date: 'Mon', uniformOfficers: 10, storeDetectives: 8 },
+      { date: 'Tue', uniformOfficers: 15, storeDetectives: 12 },
+      { date: 'Wed', uniformOfficers: 13, storeDetectives: 10 },
+      { date: 'Thu', uniformOfficers: 18, storeDetectives: 14 },
+      { date: 'Fri', uniformOfficers: 22, storeDetectives: 18 },
+      { date: 'Sat', uniformOfficers: 20, storeDetectives: 16 },
+      { date: 'Sun', uniformOfficers: 16, storeDetectives: 13 }
+    ],
+    weeklyIncidents: [
+      { week: 'Week 1', uniformOfficers: 38, storeDetectives: 30 },
+      { week: 'Week 2', uniformOfficers: 35, storeDetectives: 28 },
+      { week: 'Week 3', uniformOfficers: 40, storeDetectives: 32 },
+      { week: 'Week 4', uniformOfficers: 37, storeDetectives: 30 }
+    ],
     monthlyIncidents: [
-      { month: 'Jan', incidents: 35 },
-      { month: 'Feb', incidents: 28 },
-      { month: 'Mar', incidents: 40 },
-      { month: 'Apr', incidents: 22 },
-      { month: 'May', incidents: 30 },
-      { month: 'Jun', incidents: 18 },
-      { month: 'Jul', incidents: 25 },
-      { month: 'Aug', incidents: 30 },
-      { month: 'Sep', incidents: 35 },
-      { month: 'Oct', incidents: 38 },
-      { month: 'Nov', incidents: 32 },
-      { month: 'Dec', incidents: 28 }
+      { month: 'Jan', uniformOfficers: 35, storeDetectives: 28 },
+      { month: 'Feb', uniformOfficers: 28, storeDetectives: 22 },
+      { month: 'Mar', uniformOfficers: 40, storeDetectives: 32 },
+      { month: 'Apr', uniformOfficers: 22, storeDetectives: 18 },
+      { month: 'May', uniformOfficers: 30, storeDetectives: 24 },
+      { month: 'Jun', uniformOfficers: 18, storeDetectives: 14 },
+      { month: 'Jul', uniformOfficers: 25, storeDetectives: 20 },
+      { month: 'Aug', uniformOfficers: 30, storeDetectives: 24 },
+      { month: 'Sep', uniformOfficers: 35, storeDetectives: 28 },
+      { month: 'Oct', uniformOfficers: 38, storeDetectives: 30 },
+      { month: 'Nov', uniformOfficers: 32, storeDetectives: 26 },
+      { month: 'Dec', uniformOfficers: 28, storeDetectives: 22 }
+    ],
+    yearlyIncidents: [
+      { year: '2020', uniformOfficers: 260, storeDetectives: 208 },
+      { year: '2021', uniformOfficers: 290, storeDetectives: 232 },
+      { year: '2022', uniformOfficers: 320, storeDetectives: 256 },
+      { year: '2023', uniformOfficers: 345, storeDetectives: 276 },
+      { year: '2024', uniformOfficers: 361, storeDetectives: 289 }
     ],
     incidentReports: [
       {
@@ -143,19 +192,41 @@ const customerData = {
       { title: 'Incidents Today', value: '3', change: '-15%', trend: 'down', icon: AlertCircle, color: 'red' },
       { title: 'Active Guards', value: '280', change: '+8%', trend: 'up', icon: Users, color: 'blue' }
     ],
+    dailyIncidents: [
+      { date: 'Mon', uniformOfficers: 8, storeDetectives: 6 },
+      { date: 'Tue', uniformOfficers: 12, storeDetectives: 10 },
+      { date: 'Wed', uniformOfficers: 10, storeDetectives: 8 },
+      { date: 'Thu', uniformOfficers: 14, storeDetectives: 11 },
+      { date: 'Fri', uniformOfficers: 18, storeDetectives: 14 },
+      { date: 'Sat', uniformOfficers: 16, storeDetectives: 13 },
+      { date: 'Sun', uniformOfficers: 13, storeDetectives: 10 }
+    ],
+    weeklyIncidents: [
+      { week: 'Week 1', uniformOfficers: 32, storeDetectives: 26 },
+      { week: 'Week 2', uniformOfficers: 30, storeDetectives: 24 },
+      { week: 'Week 3', uniformOfficers: 35, storeDetectives: 28 },
+      { week: 'Week 4', uniformOfficers: 33, storeDetectives: 26 }
+    ],
     monthlyIncidents: [
-      { month: 'Jan', incidents: 30 },
-      { month: 'Feb', incidents: 25 },
-      { month: 'Mar', incidents: 35 },
-      { month: 'Apr', incidents: 20 },
-      { month: 'May', incidents: 28 },
-      { month: 'Jun', incidents: 15 },
-      { month: 'Jul', incidents: 22 },
-      { month: 'Aug', incidents: 26 },
-      { month: 'Sep', incidents: 32 },
-      { month: 'Oct', incidents: 36 },
-      { month: 'Nov', incidents: 30 },
-      { month: 'Dec', incidents: 25 }
+      { month: 'Jan', uniformOfficers: 30, storeDetectives: 24 },
+      { month: 'Feb', uniformOfficers: 25, storeDetectives: 20 },
+      { month: 'Mar', uniformOfficers: 35, storeDetectives: 28 },
+      { month: 'Apr', uniformOfficers: 20, storeDetectives: 16 },
+      { month: 'May', uniformOfficers: 28, storeDetectives: 22 },
+      { month: 'Jun', uniformOfficers: 15, storeDetectives: 12 },
+      { month: 'Jul', uniformOfficers: 22, storeDetectives: 18 },
+      { month: 'Aug', uniformOfficers: 26, storeDetectives: 21 },
+      { month: 'Sep', uniformOfficers: 32, storeDetectives: 26 },
+      { month: 'Oct', uniformOfficers: 36, storeDetectives: 29 },
+      { month: 'Nov', uniformOfficers: 30, storeDetectives: 24 },
+      { month: 'Dec', uniformOfficers: 25, storeDetectives: 20 }
+    ],
+    yearlyIncidents: [
+      { year: '2020', uniformOfficers: 220, storeDetectives: 176 },
+      { year: '2021', uniformOfficers: 250, storeDetectives: 200 },
+      { year: '2022', uniformOfficers: 280, storeDetectives: 224 },
+      { year: '2023', uniformOfficers: 300, storeDetectives: 240 },
+      { year: '2024', uniformOfficers: 324, storeDetectives: 259 }
     ],
     incidentReports: [
       {
@@ -181,6 +252,30 @@ const customerData = {
         officerName: 'Chris Taylor',
         date: '2025-01-28',
         amount: 2300.00
+      },
+      {
+        id: '4',
+        customerName: 'Midcounties COOP',
+        store: 'Store #9015',
+        officerName: 'Rachel Parker',
+        date: '2025-01-27',
+        amount: 1850.00
+      },
+      {
+        id: '5',
+        customerName: 'Midcounties COOP',
+        store: 'Store #9016',
+        officerName: 'Mark Thompson',
+        date: '2025-01-26',
+        amount: 2100.00
+      },
+      {
+        id: '6',
+        customerName: 'Midcounties COOP',
+        store: 'Store #9017',
+        officerName: 'Sophie Anderson',
+        date: '2025-01-25',
+        amount: 1950.00
       }
     ]
   }
@@ -326,322 +421,532 @@ const officerStats = [
 const Index = () => {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
-  const [selectedCustomer, setSelectedCustomer] = React.useState<string>(customers[0].id);
+  const [selectedCustomer, setSelectedCustomer] = React.useState<string>(customers[2].id);
+  const customer = customerData[selectedCustomer as keyof typeof customerData];
+  const [activePeriod, setActivePeriod] = React.useState<'Daily' | 'Weekly' | 'Monthly' | 'Yearly'>('Monthly');
 
-  // Get current month to determine which 6-month window to show
-  const currentMonth = new Date().getMonth(); // 0-11
-  const isSecondHalf = currentMonth >= 6;
+  // Log customer selection and data
+  React.useEffect(() => {
+    console.log('Selected customer:', selectedCustomer);
+    console.log('Customer data:', customer);
+    console.log('Incident reports:', customer.incidentReports);
+  }, [selectedCustomer, customer]);
 
-  // Get the current customer's data or use default data if no customer is selected
-  const currentCustomerData = selectedCustomer ? customerData[selectedCustomer as keyof typeof customerData] : customerData.customer1;
+  // Get the appropriate data based on selected time period
+  const getChartData = () => {
+    switch (activePeriod) {
+      case 'Daily':
+        return customer.dailyIncidents;
+      case 'Weekly':
+        return customer.weeklyIncidents;
+      case 'Monthly':
+        return customer.monthlyIncidents;
+      case 'Yearly':
+        return customer.yearlyIncidents;
+      default:
+        return customer.monthlyIncidents;
+    }
+  };
 
-  // Use the current customer's data
-  const metrics = currentCustomerData.metrics;
-  const allMonthlyIncidents = currentCustomerData.monthlyIncidents;
-  const monthlyIncidents = isSecondHalf 
-    ? allMonthlyIncidents.slice(6, 12)  // Jul-Dec
-    : allMonthlyIncidents.slice(0, 6);   // Jan-Jun
+  // Get x-axis key based on active period
+  const getDataKey = () => {
+    switch (activePeriod) {
+      case 'Daily': return 'date';
+      case 'Weekly': return 'week';
+      case 'Monthly': return 'month';
+      case 'Yearly': return 'year';
+      default: return 'month';
+    }
+  };
 
-  const incidentReports = currentCustomerData.incidentReports;
+  // Get current chart data
+  const chartData = getChartData();
+  const dataKey = getDataKey();
 
-  const getMetricColor = (color: string) => {
-    const colors = {
-      blue: 'bg-blue-50 text-blue-700 ring-blue-600/10 dark:bg-blue-900/20 dark:text-blue-300',
-      red: 'bg-red-50 text-red-700 ring-red-600/10 dark:bg-red-900/20 dark:text-red-300',
-      green: 'bg-green-50 text-green-700 ring-green-600/10 dark:bg-green-900/20 dark:text-green-300',
-      yellow: 'bg-yellow-50 text-yellow-700 ring-yellow-600/10 dark:bg-yellow-900/20 dark:text-yellow-300'
+  // Derive data for component
+  const { metrics, incidentReports } = customer;
+  
+  // In a real app, we would fetch user-specific tasks from an API or context
+  // This simulates loading user-specific tasks, which could be empty
+  const [userTasks, setUserTasks] = React.useState<typeof tasks | []>([]);
+  
+  // Simulate loading tasks (in a real app, this would be an API call)
+  React.useEffect(() => {
+    // Simulate API call to get tasks
+    const loadTasks = () => {
+      // For demo purposes: randomly decide if the user has tasks
+      const hasAssignedTasks = Math.random() > 0.3; // 70% chance to have tasks
+      
+      if (hasAssignedTasks) {
+        setUserTasks(tasks);
+      } else {
+        setUserTasks([]);
+      }
     };
-    return colors[color as keyof typeof colors] || colors.blue;
+    
+    loadTasks();
+    
+    // In a real app, we would include dependencies like user ID
+  }, []);
+  
+  // Officer stats for the table
+  const officerStats = [
+    {
+      id: '1',
+      name: 'John Smith',
+      incidents: 45,
+      valueSaved: 25600,
+      responseRate: 92,
+      status: 'excellent'
+    },
+    {
+      id: '2',
+      name: 'Jane Doe',
+      incidents: 38,
+      valueSaved: 19200,
+      responseRate: 85,
+      status: 'good'
+    },
+    {
+      id: '3',
+      name: 'David Johnson',
+      incidents: 12,
+      valueSaved: 5300,
+      responseRate: 45,
+      status: 'needs-improvement'
+    },
+    {
+      id: '4',
+      name: 'Sarah Wilson',
+      incidents: 5,
+      valueSaved: 2100,
+      responseRate: 20,
+      status: 'non-reporter'
+    }
+  ] as const;
+
+  // Define background colors for each stat card based on type
+  const getStatCardColor = (color: string) => {
+    switch(color) {
+      case 'green': return 'bg-emerald-800';
+      case 'yellow': return 'bg-amber-800';
+      case 'red': return 'bg-rose-800';
+      case 'blue': return 'bg-blue-800';
+      default: return 'bg-slate-800';
+    }
   };
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto">
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back to your dashboard</p>
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden">
+      <div className="container mx-auto px-2 md:px-4 space-y-4 max-w-full md:max-w-7xl">
+        {/* Customer Selection */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
+          <h1 className="text-base font-semibold md:text-lg lg:text-xl">Dashboard</h1>
+          <div className="w-full md:w-auto">
+            <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+              <SelectTrigger className="w-full text-sm md:w-[200px]">
+                <SelectValue placeholder="Select customer" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map((c) => (
+                  <SelectItem key={c.id} value={c.id} className="text-sm">
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <Select value={selectedCustomer} onValueChange={(value: string) => setSelectedCustomer(value)}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select customer" />
-          </SelectTrigger>
-          <SelectContent>
-            {customers.map((customer) => (
-              <SelectItem key={customer.id} value={customer.id}>
-                {customer.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
 
-      {/* Metrics Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {metrics.map((metric, index) => {
-          const Icon = metric.icon
-          const gradients = {
-            'Total Saved YTD': "from-slate-800 via-slate-700 to-slate-800",
-            'Customer Satisfaction': "from-slate-800 via-indigo-900 to-slate-800",
-            'Incidents Today': "from-slate-800 via-rose-900 to-slate-800",
-            'Active Guards': "from-slate-800 via-blue-900 to-slate-800"
-          }
-          return (
-            <Card key={metric.title} className={cn(
-              `bg-gradient-to-br ${gradients[metric.title as keyof typeof gradients]} dark:from-slate-900 dark:to-slate-800 border-slate-600/50`,
-              "transition-all hover:shadow-lg hover:-translate-y-0.5"
-            )}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-white">
-                  {metric.title}
-                </CardTitle>
-                <Icon className="h-4 w-4 text-white" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">
-                  {metric.value}
+        {/* Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          {metrics.map((metric, index) => {
+            // Define gradient backgrounds based on color
+            const getGradientClass = (color: string) => {
+              switch(color) {
+                case 'green': return 'bg-gradient-to-br from-emerald-500 to-emerald-700';
+                case 'yellow': return 'bg-gradient-to-br from-amber-500 to-amber-700';
+                case 'red': return 'bg-gradient-to-br from-rose-400 to-rose-600';
+                case 'blue': return 'bg-gradient-to-br from-blue-400 to-blue-600';
+                default: return 'bg-gradient-to-br from-slate-600 to-slate-800';
+              }
+            };
+            
+            // Define visualization element based on metric type
+            const renderVisualization = (color: string) => {
+              switch(color) {
+                case 'green': 
+                  return (
+                    <div className="absolute bottom-3 right-3 opacity-30">
+                      <svg width="48" height="24" viewBox="0 0 48 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M0 24L8 12L16 18L32 6L40 12L48 0" stroke="white" strokeWidth="2" />
+                      </svg>
+                    </div>
+                  );
+                case 'yellow': 
+                  return (
+                    <div className="absolute bottom-3 right-3 opacity-30">
+                      <svg width="48" height="24" viewBox="0 0 48 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M0 18L8 12L16 16L24 4L32 8L40 2L48 12" stroke="white" strokeWidth="2" />
+                      </svg>
+                    </div>
+                  );
+                case 'red': 
+                  return (
+                    <div className="absolute bottom-3 right-3 opacity-30">
+                      <svg width="48" height="24" viewBox="0 0 48 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="0" y="6" width="6" height="18" rx="1" fill="white" opacity="0.3" />
+                        <rect x="10" y="12" width="6" height="12" rx="1" fill="white" opacity="0.4" />
+                        <rect x="20" y="0" width="6" height="24" rx="1" fill="white" opacity="0.6" />
+                        <rect x="30" y="8" width="6" height="16" rx="1" fill="white" opacity="0.3" />
+                        <rect x="40" y="4" width="6" height="20" rx="1" fill="white" opacity="0.4" />
+                      </svg>
+                    </div>
+                  );
+                case 'blue': 
+                  return (
+                    <div className="absolute bottom-3 right-3 opacity-30">
+                      <svg width="48" height="24" viewBox="0 0 48 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 13C8.66667 7.66667 13 8.33333 16 9C19 9.66667 20.6667 12.3333 24 13C27.3333 13.6667 31.6667 13 38 5" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                  );
+                default:
+                  return null;
+              }
+            };
+            
+            return (
+              <Card 
+                key={index} 
+                className={`min-w-[140px] ${getGradientClass(metric.color)} text-white border-0 shadow-md overflow-hidden relative`}
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-2 md:pb-3">
+                  <CardTitle className="text-xs font-medium md:text-sm text-white">
+                    {metric.title}
+                  </CardTitle>
+                  <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
+                  <metric.icon className="h-4 w-4 text-white" />
+                  </div>
+                </CardHeader>
+                <CardContent className="p-3 md:p-4 pt-1 md:pt-2 z-10 relative">
+                  <div className="text-xl font-bold md:text-2xl lg:text-3xl text-white">{metric.value}</div>
+                  <div className="flex items-center mt-1">
+                    <span className={`text-xs flex items-center px-2 py-0.5 rounded-full ${
+                      metric.trend === 'up' 
+                        ? 'bg-white/20 text-white' 
+                        : 'bg-white/20 text-white'
+                    }`}>
+                      {metric.trend === 'up' ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
+                    {metric.change}
+                    </span>
+                    <span className="ml-2 text-xs text-white/70">{metric.trend === 'up' ? 'increase' : 'decrease'}</span>
+                  </div>
+                  <div className="text-xs text-white/60 mt-1">Jan 01 - Jan 10</div>
+                  {renderVisualization(metric.color)}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
+          {/* Tasks and Incidents Section */}
+          <div className="lg:col-span-5 space-y-4">
+            {/* Monthly Incidents Chart - Improved to Incident Reports with time toggles */}
+            <Card>
+              <CardHeader className="p-2 md:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
+                <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Incident Reports</CardTitle>
+                <div className="flex items-center space-x-1">
+                  <div className="bg-gray-100 rounded-lg p-0.5 flex text-xs md:text-sm">
+                    {["Daily", "Weekly", "Monthly", "Yearly"].map((period, index) => (
+                      <button
+                        key={period}
+                        className={`px-3 py-1 rounded-md transition-colors ${
+                          period === activePeriod 
+                            ? "bg-white shadow-sm text-emerald-500 font-medium" 
+                            : "text-gray-500 hover:text-gray-700"
+                        }`}
+                        onClick={() => setActivePeriod(period as 'Daily' | 'Weekly' | 'Monthly' | 'Yearly')}
+                      >
+                        {period}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <p className={cn(
-                  "text-xs",
-                  metric.trend === 'up' ? 'text-emerald-300' : 'text-red-300'
-                )}>
-                  {metric.change}
-                </p>
+              </CardHeader>
+              <CardContent className="h-[200px] md:h-[280px] lg:h-[320px] p-2 md:p-4">
+                <div className="flex items-center justify-end mb-2 space-x-4">
+                  <div className="flex items-center">
+                    <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block mr-1"></span>
+                    <span className="text-xs text-gray-500">Uniform Officers</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="w-3 h-3 rounded-full bg-amber-400 inline-block mr-1"></span>
+                    <span className="text-xs text-gray-500">Store Detectives</span>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart 
+                    data={chartData} 
+                    margin={{ top: 5, right: 5, left: -15, bottom: 5 }}
+                  >
+                    <defs>
+                      <linearGradient id="colorUniformOfficers" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorStoreDetectives" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey={dataKey} 
+                      tick={{ fontSize: 10, fill: '#6B7280' }} 
+                      axisLine={{ stroke: '#E5E7EB' }}
+                      tickLine={false}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 10, fill: '#6B7280' }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(value) => `${value}`}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'white', 
+                        borderRadius: '0.5rem', 
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', 
+                        border: 'none', 
+                        fontSize: '0.75rem' 
+                      }}
+                      itemStyle={{ padding: '2px 0' }}
+                      formatter={(value) => [`${value}`, '']}
+                      labelFormatter={(label) => `${label}`}
+                    />
+                    <Area
+                      type="monotone"
+                      name="Uniform Officers"
+                      dataKey="uniformOfficers"
+                      stroke="#10b981"
+                      fillOpacity={1}
+                      fill="url(#colorUniformOfficers)"
+                      activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2, fill: 'white' }}
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      name="Store Detectives"
+                      dataKey="storeDetectives"
+                      stroke="#F59E0B"
+                      fillOpacity={1}
+                      fill="url(#colorStoreDetectives)"
+                      activeDot={{ r: 6, stroke: '#F59E0B', strokeWidth: 2, fill: 'white' }}
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
-          )
-        })}
-      </div>
 
-      {/* Tasks and Trends Section */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Tasks Section */}
-        <Card className={cn(
-          "bg-white dark:bg-slate-800",
-          "transition-all hover:shadow-lg"
-        )}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-lg font-medium">Recent Tasks</CardTitle>
-            <Button variant="ghost" size="sm">
-              View All
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {tasks.map((task) => (
-                <TaskCard key={task.id} task={task} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+            {/* Recent Incidents */}
+            <Card>
+              <CardHeader className="p-2 md:p-4">
+                <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Recent Incidents</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {/* Debug data info */}
+                <div className="p-2 text-xs text-muted-foreground">
+                  Data count: {incidentReports.length} incidents
+                </div>
+                <div className="px-2 pb-4 md:px-4 overflow-visible">
+                  <IncidentTable data={incidentReports.slice()} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Incidents Chart */}
-        <Card className={cn(
-          "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700",
-          "transition-all hover:shadow-lg"
-        )}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <div>
-              <CardTitle className="text-lg font-medium dark:text-white">Incident Trends</CardTitle>
-              <p className="text-sm text-muted-foreground dark:text-slate-400">
-                Monthly incident reports
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyIncidents} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="incidentGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid 
-                    strokeDasharray="3 3" 
-                    vertical={false}
-                    stroke="#334155" 
-                    opacity={0.2} 
-                  />
-                  <XAxis 
-                    dataKey="month" 
-                    stroke="#94a3b8"
-                    fontSize={12}
-                    tickLine={true}
-                    axisLine={true}
-                    padding={{ left: 10, right: 10 }}
-                  />
-                  <YAxis 
-                    stroke="#94a3b8"
-                    fontSize={12}
-                    tickLine={true}
-                    axisLine={true}
-                    tickCount={5}
-                    domain={[0, 60]}
-                    padding={{ top: 20, bottom: 20 }}
-                  />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="rounded-lg bg-slate-800 p-2 shadow-sm border border-slate-700">
-                            <p className="text-sm text-white">{`${payload[0].value} Incidents`}</p>
+          {/* Sidebar Content */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Recent Tasks - Replaces Tasks */}
+            <Card>
+              <CardHeader className="p-2 md:p-4 flex flex-row items-center justify-between">
+                <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Recent Tasks</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  asChild 
+                  className="text-xs h-8 px-2"
+                >
+                  <Link to="/action-calendar">
+                    <Calendar className="h-3.5 w-3.5 mr-1" />
+                    View All
+                  </Link>
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {/* Activity 1 */}
+                  <div className="flex items-start gap-3 p-3 hover:bg-slate-50">
+                    <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-rose-500 text-white">
+                      <CheckCircle className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <p className="text-sm font-medium text-slate-900">Task Completed</p>
+                        <span className="text-xs text-slate-500">40 mins ago</span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">John Smith completed security audit task</p>
+                    </div>
+                  </div>
+
+                  {/* Activity 2 */}
+                  <div className="flex items-start gap-3 p-3 hover:bg-slate-50">
+                    <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 text-white">
+                      <Briefcase className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <p className="text-sm font-medium text-slate-900">New Contract</p>
+                        <span className="text-xs text-slate-500">1 day ago</span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">Emma White added Tesco Express contract</p>
+                    </div>
+                  </div>
+
+                  {/* Activity 3 */}
+                  <div className="flex items-start gap-3 p-3 hover:bg-slate-50">
+                    <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-cyan-500 text-white">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <p className="text-sm font-medium text-slate-900">Report Published</p>
+                        <span className="text-xs text-slate-500">40 mins ago</span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">Lisa Chen published monthly security report</p>
+                    </div>
+                  </div>
+
+                  {/* Activity 4 */}
+                  <div className="flex items-start gap-3 p-3 hover:bg-slate-50">
+                    <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-amber-500 text-white">
+                      <MapPin className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <p className="text-sm font-medium text-slate-900">Site Visit Scheduled</p>
+                        <span className="text-xs text-slate-500">1 day ago</span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">Michael Brown scheduled visit to Store #4526</p>
+                    </div>
+                  </div>
+
+                  {/* Activity 5 */}
+                  <div className="flex items-start gap-3 p-3 hover:bg-slate-50">
+                    <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white">
+                      <MessageSquare className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <p className="text-sm font-medium text-slate-900">Comment Added</p>
+                        <span className="text-xs text-slate-500">1 day ago</span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">David Lee added comment on incident report #2345</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Equipment Distribution - Modernized */}
+            <Card className="overflow-hidden">
+              <CardHeader className="p-2 md:p-4 flex flex-row items-center justify-between bg-gradient-to-r from-slate-50 to-white border-b">
+                <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Equipment Distribution</CardTitle>
+                <Select defaultValue="all">
+                  <SelectTrigger className="w-[100px] h-7 text-xs border-slate-200">
+                    <SelectValue placeholder="Filter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">All Devices</SelectItem>
+                    <SelectItem value="active" className="text-xs">Active Only</SelectItem>
+                    <SelectItem value="inactive" className="text-xs">Inactive Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </CardHeader>
+              <CardContent className="pt-5 px-2 pb-2 md:pt-6 md:px-4 md:pb-4">
+                <div className="flex flex-col md:flex-row items-center gap-4">
+                  <div className="w-full md:w-1/2 h-[180px] sm:h-[200px] md:h-[230px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={equipmentData}
+                      cx="50%"
+                          cy="50%"
+                          innerRadius={45}
+                          outerRadius={70}
+                      paddingAngle={4}
+                      dataKey="value"
+                          cornerRadius={4}
+                          stroke="transparent"
+                    >
+                      {equipmentData.map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={entry.color} 
+                              className="drop-shadow-sm hover:opacity-90 transition-opacity"
+                            />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value, name) => [`${value} units`, name]} 
+                          contentStyle={{ 
+                            backgroundColor: 'white', 
+                            borderRadius: '0.5rem', 
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', 
+                            border: 'none', 
+                            fontSize: '0.75rem',
+                            padding: '8px'
+                          }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                  </div>
+                  <div className="w-full md:w-1/2">
+                    <div className="divide-y">
+                      {equipmentData.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between py-2">
+                          <div className="flex items-center">
+                            <div 
+                              className="w-3 h-3 rounded mr-2" 
+                              style={{ backgroundColor: item.color }} 
+                            />
+                            <span className="text-sm text-slate-700">{item.name}</span>
                           </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="incidents"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    fill="url(#incidentGradient)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Reports and Equipment Section */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Incident Reports Table */}
-        <Card className={cn(
-          "bg-white dark:bg-slate-800",
-          "transition-all hover:shadow-lg"
-        )}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-lg font-medium">Recent Incident Reports</CardTitle>
-            <Button variant="ghost" size="sm">
-              View All Reports
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <IncidentTable data={incidentReports} />
-          </CardContent>
-        </Card>
-
-        {/* Equipment Status Chart */}
-        <Card className={cn(
-          "bg-white dark:bg-slate-800",
-          "transition-all hover:shadow-lg"
-        )}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <div>
-              <CardTitle className="text-lg font-medium">Equipment Status</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Total Equipment: {equipmentData.reduce((acc, curr) => acc + curr.value, 0)} units
-              </p>
-            </div>
-            <Button variant="ghost" size="sm">
-              View Details
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={equipmentData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={90}
-                    paddingAngle={4}
-                    dataKey="value"
-                    label={({ name, value }) => `${name} (${value})`}
-                    labelLine={false}
-                  >
-                    {equipmentData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={entry.color}
-                        className="stroke-background hover:opacity-80 transition-opacity"
-                        strokeWidth={2}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        const total = equipmentData.reduce((acc, curr) => acc + curr.value, 0);
-                        const percentage = ((data.value / total) * 100).toFixed(1);
-                        return (
-                          <div className="rounded-lg border bg-background p-2 shadow-sm">
-                            <div className="grid grid-cols-1 gap-2">
-                              <div className="flex flex-col">
-                                <span className="text-[0.70rem] uppercase text-muted-foreground">
-                                  Equipment
-                                </span>
-                                <span className="font-bold text-muted-foreground">
-                                  {data.name}
-                                </span>
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-[0.70rem] uppercase text-muted-foreground">
-                                  Count
-                                </span>
-                                <span className="font-bold" style={{ color: data.color }}>
-                                  {data.value} units ({percentage}%)
-                                </span>
-                              </div>
-                            </div>
+                          <div className="flex items-center">
+                            <span className="text-sm font-medium text-slate-900">{item.value}</span>
+                            <span className="text-xs text-slate-500 ml-1">units</span>
                           </div>
-                        )
-                      }
-                      return null
-                    }}
-                  />
-                  <Legend 
-                    verticalAlign="middle" 
-                    align="right"
-                    layout="vertical"
-                    formatter={(value, entry: any) => (
-                      <span className="text-sm">
-                        <span style={{ color: entry.color }} className="font-medium">{value}</span>
-                        <span className="text-muted-foreground ml-2">
-                          ({entry.payload.value} units)
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-700">Total Devices</span>
+                        <span className="text-base font-semibold text-slate-900">
+                          {equipmentData.reduce((sum, item) => sum + item.value, 0)}
                         </span>
-                      </span>
-                    )}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Officer Performance Table */}
-      <div className="mt-6">
-        <Card className={cn(
-          "bg-white dark:bg-slate-800",
-          "transition-all hover:shadow-lg"
-        )}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <div>
-              <CardTitle className="text-lg font-medium">Officer Performance</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Top performing officers and reporting status
-              </p>
-            </div>
-            <Button variant="ghost" size="sm">
-              View All Officers
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <OfficerPerformance data={officerStats} />
-          </CardContent>
-        </Card>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   )

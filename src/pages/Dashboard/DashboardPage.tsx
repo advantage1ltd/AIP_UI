@@ -1,48 +1,48 @@
-import { DashboardMetrics } from '@/components/Dashboard/DashboardMetrics'
-import { RecentActivity } from '@/components/Dashboard/RecentActivity'
-import { TaskScheduler } from '@/components/Dashboard/TaskScheduler'
-import { PerformanceGraph } from '@/components/Dashboard/PerformanceGraph'
+import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics'
+import { RecentActivity } from '@/components/dashboard/RecentActivity'
+import { TaskScheduler } from '@/components/dashboard/TaskScheduler'
+import { PerformanceGraph } from '@/components/dashboard/PerformanceGraph'
 
 const DashboardPage = () => {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex flex-col gap-1 mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Welcome back! Here's what's happening today.
-          </p>
-        </div>
+    <>
+      {/* Header */}
+      <header className="flex flex-col gap-1 mb-4 sm:mb-6 lg:mb-8">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          Welcome back! Here's what's happening today.
+        </p>
+      </header>
 
-        {/* Metrics */}
-        <div className="mb-8">
+      {/* Metrics */}
+      <section className="mb-4 sm:mb-6 lg:mb-8">
+        <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <DashboardMetrics />
         </div>
+      </section>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
-          {/* Left Column - Task Scheduler */}
-          <div className="xl:col-span-2 space-y-8">
-            <TaskScheduler />
-          </div>
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8 mb-4 sm:mb-6 lg:mb-8">
+        {/* Left Column - Task Scheduler */}
+        <section className="lg:col-span-8 space-y-4 sm:space-y-6">
+          <TaskScheduler />
+        </section>
 
-          {/* Right Column - Recent Activity */}
-          <div className="space-y-8">
-            <RecentActivity />
-          </div>
-        </div>
-
-        {/* Performance Graph */}
-        <div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
-            <div className="p-6">
-              <PerformanceGraph />
-            </div>
-          </div>
-        </div>
+        {/* Right Column - Recent Activity */}
+        <aside className="lg:col-span-4 space-y-4 sm:space-y-6">
+          <RecentActivity />
+        </aside>
       </div>
-    </div>
+
+      {/* Performance Graph */}
+      <section className="mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
+          <div className="p-3 sm:p-4 md:p-6">
+            <PerformanceGraph />
+          </div>
+        </div>
+      </section>
+    </>
   )
 }
 

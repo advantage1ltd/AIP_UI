@@ -34,11 +34,11 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
   const getPriorityIcon = (priority: Task['priority']) => {
     switch (priority) {
       case 'high':
-        return <ArrowUpCircle className="h-4 w-4" />
+        return <ArrowUpCircle className="h-4 w-4 sm:h-5 sm:w-5" />
       case 'medium':
-        return <MinusCircle className="h-4 w-4" />
+        return <MinusCircle className="h-4 w-4 sm:h-5 sm:w-5" />
       case 'low':
-        return <ArrowDownCircle className="h-4 w-4" />
+        return <ArrowDownCircle className="h-4 w-4 sm:h-5 sm:w-5" />
       default:
         return null
     }
@@ -47,39 +47,39 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
   const getPriorityColor = (priority: Task['priority']) => {
     switch (priority) {
       case 'high':
-        return 'bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-200'
+        return 'bg-red-100 text-red-700 hover:bg-red-200 border-red-300'
       case 'medium':
-        return 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-200'
+        return 'bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-300'
       case 'low':
-        return 'bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-200'
+        return 'bg-green-100 text-green-700 hover:bg-green-200 border-green-300'
       default:
-        return 'bg-gray-500/10 text-gray-500 hover:bg-gray-500/20 border-gray-200'
+        return 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300'
     }
   }
 
   const getStatusIcon = (status: Task['status']) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle2 className="h-4 w-4" />
+        return <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
       case 'in-progress':
-        return <Clock className="h-4 w-4" />
+        return <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
       case 'blocked':
-        return <AlertCircle className="h-4 w-4" />
+        return <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
       default:
-        return <PauseCircle className="h-4 w-4" />
+        return <PauseCircle className="h-4 w-4 sm:h-5 sm:w-5" />
     }
   }
 
   const getStatusColor = (status: Task['status']) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20'
+        return 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200'
       case 'in-progress':
-        return 'bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20'
+        return 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200'
       case 'blocked':
-        return 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20'
+        return 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200'
       default:
-        return 'bg-gray-500/10 text-gray-500 border-gray-500/20 hover:bg-gray-500/20'
+        return 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
     }
   }
 
@@ -136,38 +136,38 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
 
   if (tasks.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center">
-        <div className="rounded-full bg-purple-100 p-3 dark:bg-purple-900">
-          <Calendar className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+      <div className="flex flex-col items-center justify-center p-4 sm:p-8 text-center">
+        <div className="rounded-full bg-purple-100 p-2 sm:p-3 dark:bg-purple-900">
+          <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-purple-600 dark:text-purple-400" />
         </div>
-        <h3 className="mt-4 text-lg font-semibold text-purple-700 dark:text-purple-400">No Tasks Scheduled</h3>
-        <p className="text-muted-foreground">No tasks are scheduled for this period.</p>
+        <h3 className="mt-2 sm:mt-4 text-base sm:text-lg font-semibold text-purple-700 dark:text-purple-400">No Tasks Scheduled</h3>
+        <p className="text-xs sm:text-sm text-muted-foreground">No tasks are scheduled for this period.</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {tasks.map((task) => (
         <Card key={task.id} className="transition-all hover:shadow-md border-l-4 dark:bg-gray-900/50" style={{
           borderLeftColor: task.priority === 'high' ? 'rgb(239 68 68)' : 
                           task.priority === 'medium' ? 'rgb(245 158 11)' : 
                           'rgb(34 197 94)'
         }}>
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-3 flex-1">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+              <div className="space-y-2 sm:space-y-3 flex-1">
                 <div className="space-y-1">
-                  <h4 className="font-semibold text-lg">{task.title}</h4>
-                  <p className="text-sm text-muted-foreground">{task.description}</p>
+                  <h4 className="font-semibold text-base sm:text-lg">{task.title}</h4>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{task.description}</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
-                    <User className="h-4 w-4" />
+                    <User className="h-3 w-3 sm:h-4 sm:w-4" />
                     {task.assignee}
                   </div>
                   <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
+                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span className={cn(
                       isToday(task.date) ? "text-red-500" : ""
                     )}>
@@ -176,48 +176,52 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
                   </div>
                 </div>
                 {task.statusNotes && (
-                  <div className="text-sm italic text-muted-foreground bg-muted/50 p-3 rounded-md border border-muted">
+                  <div className="text-xs sm:text-sm italic text-muted-foreground bg-muted/50 p-2 sm:p-3 rounded-md border border-muted">
                     {task.statusNotes}
                   </div>
                 )}
               </div>
-              <div className="flex flex-col gap-3 items-end">
-                <div className="flex gap-2">
+              <div className="flex sm:flex-col gap-2 sm:gap-3 items-start sm:items-end mt-2 sm:mt-0">
+                <div className="flex gap-1 sm:gap-2 order-last sm:order-first">
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={() => handleEditTask(task)}
-                    className="h-8 w-8"
+                    className="h-10 w-10 sm:h-12 sm:w-12 bg-blue-50 border-blue-200 hover:bg-blue-100 hover:text-blue-700"
                   >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600" />
+                    <span className="sr-only">Edit task</span>
                   </Button>
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={() => handleDeleteTask(task.id)}
-                    className="h-8 w-8 text-red-500 hover:text-red-600"
+                    className="h-10 w-10 sm:h-12 sm:w-12 bg-red-50 border-red-200 hover:bg-red-100 hover:text-red-700"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-6 w-6 sm:h-7 sm:w-7 text-red-600" />
+                    <span className="sr-only">Delete task</span>
                   </Button>
                 </div>
-                <Badge className={cn(
-                  "transition-colors flex items-center gap-1.5",
-                  getPriorityColor(task.priority)
-                )}>
-                  {getPriorityIcon(task.priority)}
-                  {task.priority}
-                </Badge>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "min-w-[130px] gap-2 transition-colors",
-                    getStatusColor(task.status)
-                  )}
-                  onClick={() => openUpdateDialog(task)}
-                >
-                  {getStatusIcon(task.status)}
-                  {task.status}
-                </Button>
+                <div className="flex sm:flex-col gap-2 items-center sm:items-end">
+                  <Badge className={cn(
+                    "transition-colors flex items-center gap-1 text-xs sm:text-sm px-2 py-1",
+                    getPriorityColor(task.priority)
+                  )}>
+                    {getPriorityIcon(task.priority)}
+                    {task.priority}
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "h-9 sm:h-10 px-3 sm:px-4 min-w-[100px] sm:min-w-[120px] text-xs sm:text-sm gap-1 sm:gap-2 transition-colors font-medium border",
+                      getStatusColor(task.status)
+                    )}
+                    onClick={() => openUpdateDialog(task)}
+                  >
+                    {getStatusIcon(task.status)}
+                    {task.status}
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -225,11 +229,11 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
       ))}
 
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="w-[95vw] max-w-[425px] p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Update Task Status</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2 sm:py-4">
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select value={newStatus} onValueChange={(value: Task['status']) => setNewStatus(value)}>
@@ -248,79 +252,70 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
               <Label htmlFor="notes">Status Notes</Label>
               <Textarea
                 id="notes"
-                placeholder="Add notes about the status update..."
+                placeholder="Add notes about the status change"
                 value={statusNotes}
                 onChange={(e) => setStatusNotes(e.target.value)}
-                className="min-h-[100px] resize-none"
+                className="min-h-[100px]"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleStatusUpdate} className="bg-purple-600 hover:bg-purple-700">
-              Update Status
-            </Button>
+            <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleStatusUpdate}>Update Status</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="w-[95vw] max-w-[500px] p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Edit Task</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2 sm:py-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="edit-title">Title</Label>
               <Input
-                id="title"
-                value={editedTask.title || ''}
+                id="edit-title"
+                value={editedTask.title || ""}
                 onChange={(e) => setEditedTask({ ...editedTask, title: e.target.value })}
+                className="w-full"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="edit-description">Description</Label>
               <Textarea
-                id="description"
-                value={editedTask.description || ''}
+                id="edit-description"
+                value={editedTask.description || ""}
                 onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
+                className="min-h-[100px]"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="priority">Priority</Label>
-              <Select
-                value={editedTask.priority}
-                onValueChange={(value: Task['priority']) => setEditedTask({ ...editedTask, priority: value })}
-              >
-                <SelectTrigger id="priority">
-                  <SelectValue placeholder="Select Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="assignee">Assignee</Label>
-              <Select
-                value={editedTask.assignee}
-                onValueChange={(value: string) => setEditedTask({ ...editedTask, assignee: value })}
-              >
-                <SelectTrigger id="assignee">
-                  <SelectValue placeholder="Select Assignee" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="John Doe">John Doe</SelectItem>
-                  <SelectItem value="Jane Smith">Jane Smith</SelectItem>
-                  <SelectItem value="David Johnson">David Johnson</SelectItem>
-                  <SelectItem value="Sarah Wilson">Sarah Wilson</SelectItem>
-                  <SelectItem value="Michael Brown">Michael Brown</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-priority">Priority</Label>
+                <Select 
+                  value={editedTask.priority} 
+                  onValueChange={(value: Task['priority']) => setEditedTask({ ...editedTask, priority: value })}
+                >
+                  <SelectTrigger id="edit-priority">
+                    <SelectValue placeholder="Select Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-assignee">Assignee</Label>
+                <Input
+                  id="edit-assignee"
+                  value={editedTask.assignee || ""}
+                  onChange={(e) => setEditedTask({ ...editedTask, assignee: e.target.value })}
+                  className="w-full"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Due Date</Label>
@@ -348,13 +343,9 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
               </Popover>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveEdit} className="bg-purple-600 hover:bg-purple-700">
-              Save Changes
-            </Button>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveEdit}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -12,23 +12,48 @@ const data = [
 
 export const IncidentTrendChart = () => {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-foreground">Incident Trends</CardTitle>
+    <Card className="shadow-sm">
+      <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-3 md:p-4">
+        <CardTitle className="text-sm sm:text-base md:text-lg text-foreground">Incident Trends</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="h-[300px]">
+      <CardContent className="p-1 sm:p-2 md:p-4">
+        <div className="h-[150px] xs:h-[180px] sm:h-[220px]">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="name" className="text-muted-foreground" />
-              <YAxis className="text-muted-foreground" />
+            <AreaChart data={data}
+              margin={{ 
+                top: 5,
+                right: 0,
+                left: -10,
+                bottom: 0
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="stroke-border" />
+              <XAxis 
+                dataKey="name" 
+                className="text-muted-foreground" 
+                tick={{ fontSize: 8 }}
+                axisLine={false}
+                tickLine={false}
+                tickMargin={3}
+              />
+              <YAxis 
+                className="text-muted-foreground" 
+                tick={{ fontSize: 8 }}
+                width={20}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value) => value.toString()}
+              />
               <Tooltip 
                 contentStyle={{ 
                   backgroundColor: 'hsl(var(--background))',
                   border: '1px solid hsl(var(--border))',
-                  borderRadius: '0.375rem'
+                  borderRadius: '0.375rem',
+                  fontSize: '10px',
+                  padding: '4px 6px'
                 }}
+                labelStyle={{ fontSize: '10px', marginBottom: '2px' }}
+                itemStyle={{ fontSize: '10px' }}
               />
               <Area
                 type="monotone"
@@ -36,6 +61,7 @@ export const IncidentTrendChart = () => {
                 stroke="hsl(var(--primary))"
                 fill="hsl(var(--primary))"
                 fillOpacity={0.2}
+                strokeWidth={1.5}
               />
             </AreaChart>
           </ResponsiveContainer>
