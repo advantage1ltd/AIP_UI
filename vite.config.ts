@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ['react', 'react-dom', '@radix-ui/react-use-callback-ref', '@radix-ui/primitive']
+    dedupe: ['react', 'react-dom', '@radix-ui/react-use-callback-ref', '@radix-ui/primitive', '@radix-ui/react-filter-props', '@radix-ui/react-use-escape-keydown']
   },
   optimizeDeps: {
     exclude: [],
@@ -42,7 +42,9 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-visually-hidden',
       '@radix-ui/react-presence',
       '@radix-ui/react-portal',
-      '@radix-ui/primitive',
+      '@radix-ui/react-primitive',
+      '@radix-ui/react-use-escape-keydown',
+      '@radix-ui/react-filter-props',
       
       // Radix UI components
       '@radix-ui/react-accordion',
