@@ -1,6 +1,40 @@
-import { defineConfig } from "vite"
+import { defineConfig, UserConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import path from "path"
+
+// Fix for Framer Motion and React in production
+const fixFramerMotionPlugin = () => {
+  return {
+    name: 'fix-framer-motion',
+    // Force prebundling of problematic dependencies
+    config(config: UserConfig) {
+      return {
+        optimizeDeps: {
+          ...config.optimizeDeps,
+          include: [
+            ...(config.optimizeDeps?.include || []),
+            'framer-motion',
+            'framer-motion/dom',
+            'react/jsx-runtime'
+          ],
+          // Force Vite to process these deps even if they're not found in the source code
+          force: true
+        }
+      }
+    },
+    // Add a resolver to handle JSX runtime imports
+    resolveId(id: string) {
+      // Redirect JSX runtime to React
+      if (id === 'react/jsx-runtime') {
+        return {
+          id: 'react/jsx-runtime',
+          external: false
+        };
+      }
+      return null;
+    }
+  }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -11,8 +45,10 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react({
-      jsxRuntime: 'automatic'
+      jsxRuntime: 'automatic',
+      jsxImportSource: 'react'
     }),
+    fixFramerMotionPlugin()
   ],
   resolve: {
     alias: {
@@ -111,13 +147,7 @@ export default defineConfig(({ mode }) => ({
       }
     },
     rollupOptions: {
-      external: ['react', 'react-dom', 'react/jsx-runtime'],
       output: {
-        globals: {
-          'react': 'React',
-          'react-dom': 'ReactDOM',
-          'react/jsx-runtime': 'jsxRuntime'
-        },
         manualChunks: (id) => {
           // Create a chunk for each Radix UI component
           if (id.includes('@radix-ui/react-')) {
