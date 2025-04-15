@@ -18,7 +18,16 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ['react', 'react-dom', '@radix-ui/react-use-callback-ref', '@radix-ui/primitive', '@radix-ui/react-filter-props', '@radix-ui/react-use-escape-keydown', 'framer-motion']
+    dedupe: [
+      'react', 
+      'react-dom', 
+      'react/jsx-runtime',
+      '@radix-ui/react-use-callback-ref', 
+      '@radix-ui/primitive', 
+      '@radix-ui/react-filter-props', 
+      '@radix-ui/react-use-escape-keydown', 
+      'framer-motion'
+    ]
   },
   optimizeDeps: {
     exclude: [],
@@ -102,7 +111,13 @@ export default defineConfig(({ mode }) => ({
       }
     },
     rollupOptions: {
+      external: ['react', 'react-dom', 'react/jsx-runtime'],
       output: {
+        globals: {
+          'react': 'React',
+          'react-dom': 'ReactDOM',
+          'react/jsx-runtime': 'jsxRuntime'
+        },
         manualChunks: (id) => {
           // Create a chunk for each Radix UI component
           if (id.includes('@radix-ui/react-')) {
