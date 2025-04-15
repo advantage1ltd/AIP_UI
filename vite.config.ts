@@ -10,13 +10,24 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [
-    react(),
+    react({
+      jsxRuntime: 'automatic'
+    }),
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ['react', 'react-dom', '@radix-ui/react-use-callback-ref', '@radix-ui/primitive']
+    dedupe: [
+      'react', 
+      'react-dom', 
+      'react/jsx-runtime',
+      '@radix-ui/react-use-callback-ref', 
+      '@radix-ui/primitive', 
+      '@radix-ui/react-filter-props', 
+      '@radix-ui/react-use-escape-keydown', 
+      'framer-motion'
+    ]
   },
   optimizeDeps: {
     exclude: [],
@@ -42,7 +53,9 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-visually-hidden',
       '@radix-ui/react-presence',
       '@radix-ui/react-portal',
-      '@radix-ui/primitive',
+      '@radix-ui/react-primitive',
+      '@radix-ui/react-use-escape-keydown',
+      '@radix-ui/react-filter-props',
       
       // Radix UI components
       '@radix-ui/react-accordion',
@@ -90,8 +103,21 @@ export default defineConfig(({ mode }) => ({
       include: [/node_modules/],
       extensions: ['.js', '.cjs', '.mjs'],
     },
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    },
     rollupOptions: {
+      external: ['react', 'react-dom', 'react/jsx-runtime'],
       output: {
+        globals: {
+          'react': 'React',
+          'react-dom': 'ReactDOM',
+          'react/jsx-runtime': 'jsxRuntime'
+        },
         manualChunks: (id) => {
           // Create a chunk for each Radix UI component
           if (id.includes('@radix-ui/react-')) {
@@ -103,11 +129,15 @@ export default defineConfig(({ mode }) => ({
             return 'react-vendor';
           }
           
+          // Framer Motion - separate chunk
+          if (id.includes('framer-motion')) {
+            return 'framer-motion';
+          }
+          
           // Utility libraries
           if (id.includes('date-fns') || 
               id.includes('class-variance-authority') || 
               id.includes('uuid') || 
-              id.includes('framer-motion') || 
               id.includes('recharts') || 
               id.includes('sonner') || 
               id.includes('react-toastify') || 
