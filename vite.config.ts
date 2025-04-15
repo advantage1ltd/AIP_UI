@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [
-    // React plugin only
+    // React plugin only - we'll handle Radix components normally
     react(),
   ],
   resolve: {
