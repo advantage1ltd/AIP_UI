@@ -8,8 +8,7 @@
   ],
   "buildCommand": "npm run build",
   "outputDirectory": "dist"
-<<<<<<< HEAD
 } 
-=======
+
 } 
->>>>>>> d8e8b7605077b4fcfcb296fa688b960be1b99bc0
+
