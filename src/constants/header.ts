@@ -21,8 +21,8 @@ export const BUTTON_STYLES = {
 
 // Common class names
 export const COMMON_CLASSES = {
-  mobileHeader: "md:hidden flex h-18 items-center justify-between px-5 bg-blue-50",
-  desktopHeader: "hidden md:flex h-20 items-center px-4 bg-blue-50",
+  mobileHeader: "md:hidden flex h-18 items-center justify-between px-5 bg-[#334155]",
+  desktopHeader: "hidden md:flex h-20 items-center px-4 bg-[#334155] lg:bg-white",
   sheetContent: "w-[340px] sm:w-[400px] p-0 flex flex-col h-full bg-blue-950 text-white border-r-blue-900",
   searchInput: "w-full pl-9 h-9 rounded-full bg-gray-50 border-gray-200 focus-visible:ring-0 focus-visible:ring-offset-0"
 } as const;
