@@ -132,32 +132,40 @@ const RoleSelectorContent = ({
   const activeRole = isTestMode && testRole ? testRole : currentRole || '';
   
   return (
-    <DropdownMenuContent align="start" className="w-[calc(340px-48px)] sm:w-[calc(400px-48px)] bg-blue-900 text-white border-blue-800">
-      <DropdownMenuLabel className="text-blue-200 text-[15px]">Switch Role</DropdownMenuLabel>
-      <DropdownMenuSeparator className="bg-blue-800" />
-      <DropdownMenuRadioGroup 
-        value={activeRole} 
-        onValueChange={handleRoleChange}
-      >
-        {userRoles.map(role => (
-          <DropdownMenuRadioItem 
-            key={role.id} 
-            value={role.id} 
-            checked={role.id === activeRole}
-            onClick={() => handleRoleChange(role.id)}
-            className="text-white hover:bg-transparent focus:bg-blue-800 focus:text-white text-[15px]"
+    <DropdownMenuContent 
+      align="start"
+      sideOffset={5}
+      className="w-[calc(340px-48px)] sm:w-[calc(400px-48px)] bg-blue-900 text-white border-blue-800 !z-[9999] mt-1 max-h-[calc(100vh-100px)] overflow-y-auto translate-y-1"
+    >
+      <div className="relative">
+        <DropdownMenuLabel className="text-blue-200 text-[15px] sticky top-0 bg-blue-900 z-10">Switch Role</DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-blue-800" />
+        <div className="pt-1">
+          <DropdownMenuRadioGroup 
+            value={activeRole} 
+            onValueChange={handleRoleChange}
           >
-            {role.name}
-          </DropdownMenuRadioItem>
-        ))}
-      </DropdownMenuRadioGroup>
-      <DropdownMenuSeparator className="bg-blue-800" />
-      <DropdownMenuItem onClick={toggleTestMode} className="text-white hover:bg-transparent focus:bg-blue-800 focus:text-white text-[15px]">
-        {isTestMode ? 'Exit Test Mode' : 'Enter Test Mode'}
-        {isTestMode && (
-          <Badge variant="outline" className="ml-auto border-blue-700 bg-blue-950/50">Active</Badge>
-        )}
-      </DropdownMenuItem>
+            {userRoles.map(role => (
+              <DropdownMenuRadioItem 
+                key={role.id} 
+                value={role.id} 
+                checked={role.id === activeRole}
+                onClick={() => handleRoleChange(role.id)}
+                className="text-white hover:bg-blue-800/50 hover:text-blue-200 focus:bg-blue-800/50 focus:text-blue-200 text-[15px] data-[state=checked]:bg-blue-400/30"
+              >
+                {role.name}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </div>
+        <DropdownMenuSeparator className="bg-blue-800" />
+        <DropdownMenuItem onClick={toggleTestMode} className="text-white hover:bg-blue-800/50 hover:text-blue-200 focus:bg-blue-800/50 focus:text-blue-200 text-[15px]">
+          {isTestMode ? 'Exit Test Mode' : 'Enter Test Mode'}
+          {isTestMode && (
+            <Badge variant="outline" className="ml-auto border-blue-700 bg-blue-950/50">Active</Badge>
+          )}
+        </DropdownMenuItem>
+      </div>
     </DropdownMenuContent>
   );
 };
@@ -585,7 +593,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full md:bg-[#334155] lg:bg-white border-b md:border-slate-700 lg:border-gray-200">
+    <header className="sticky top-0 z-[50] w-full bg-blue-150 border-b border-gray-200">
       {/* Mobile Header */}
       <div className={COMMON_CLASSES.mobileHeader}>
         {/* Left: Hamburger Menu */}
