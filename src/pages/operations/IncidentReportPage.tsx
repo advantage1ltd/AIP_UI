@@ -559,9 +559,9 @@ export default function IncidentReportPage() {
                     <div className="space-y-4">
                       <div>
                         <label className="text-sm font-medium text-gray-500">Was Police Involved?</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.policeInvolvement ? "Yes" : "No"}</p>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.policeInvolved ? "Yes" : "No"}</p>
                     </div>
-                    {viewingIncident.policeInvolvement && (
+                    {viewingIncident.policeInvolved && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {viewingIncident.urnNumber && (
                           <div>
@@ -665,15 +665,15 @@ export default function IncidentReportPage() {
                                 <td className="py-2 text-sm text-gray-900">{item.category}</td>
                                 <td className="py-2 text-sm text-gray-900">{item.productName}</td>
                                 <td className="py-2 text-sm text-gray-900">{item.description}</td>
-                                <td className="py-2 text-sm text-gray-900 text-right">£{item.cost.toFixed(2)}</td>
+                                <td className="py-2 text-sm text-gray-900 text-right">£{(item.cost || 0).toFixed(2)}</td>
                                 <td className="py-2 text-sm text-gray-900 text-right">{item.quantity}</td>
-                                <td className="py-2 text-sm text-gray-900 text-right">£{item.totalAmount.toFixed(2)}</td>
+                                <td className="py-2 text-sm text-gray-900 text-right">£{(item.totalAmount || 0).toFixed(2)}</td>
                               </tr>
                             ))}
                             <tr className="bg-gray-50">
                               <td colSpan={5} className="py-2 text-sm font-medium text-gray-900">Total Value</td>
                               <td className="py-2 text-sm font-medium text-gray-900 text-right">
-                                £{viewingIncident.stolenItems.reduce((sum, item) => sum + item.totalAmount, 0).toFixed(2)}
+                                £{viewingIncident.stolenItems.reduce((sum, item) => sum + (item.totalAmount || 0), 0).toFixed(2)}
                               </td>
                             </tr>
                           </tbody>
