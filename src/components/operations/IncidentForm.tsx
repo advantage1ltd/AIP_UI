@@ -276,12 +276,12 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       ...item,
       [field]: value
     }
-
+    
     // Update totalAmount if cost or quantity changes
     if (field === 'cost' || field === 'quantity') {
       updatedItem.totalAmount = updatedItem.cost * updatedItem.quantity
     }
-
+    
     updatedItems[index] = updatedItem
     setStolenItems(updatedItems)
   }

@@ -601,7 +601,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
             <Button 
               variant="ghost" 
               size="icon" 
-              className={BUTTON_STYLES.ghost.mobile}
+              className={BUTTON_STYLES.ghost}
               aria-label="Menu"
               onClick={onMobileMenuClick}
             >

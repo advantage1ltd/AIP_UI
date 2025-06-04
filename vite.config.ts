@@ -1,12 +1,16 @@
 import { defineConfig, UserConfig } from "vite"
 import react from "@vitejs/plugin-react"
-import path from "path"
+import { fileURLToPath } from 'url'
+import { dirname, resolve } from 'path'
+import { visualizer } from 'rollup-plugin-visualizer'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 // Fix for Framer Motion and React in production
 const fixFramerMotionPlugin = () => {
   return {
     name: 'fix-framer-motion',
-    // Force prebundling of problematic dependencies
     config(config: UserConfig) {
       return {
         optimizeDeps: {
@@ -17,14 +21,11 @@ const fixFramerMotionPlugin = () => {
             'framer-motion/dom',
             'react/jsx-runtime'
           ],
-          // Force Vite to process these deps even if they're not found in the source code
           force: true
         }
       }
     },
-    // Add a resolver to handle JSX runtime imports
     resolveId(id: string) {
-      // Redirect JSX runtime to React
       if (id === 'react/jsx-runtime') {
         return {
           id: 'react/jsx-runtime',
@@ -48,20 +49,17 @@ export default defineConfig(({ mode }) => ({
       jsxRuntime: 'automatic',
       jsxImportSource: 'react'
     }),
-    fixFramerMotionPlugin()
+    fixFramerMotionPlugin(),
+    ...(mode === 'production' ? [visualizer({ open: true, gzipSize: true, brotliSize: true })] : [])
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      '@': resolve(__dirname, 'src'),
     },
     dedupe: [
       'react', 
       'react-dom', 
       'react/jsx-runtime',
-      '@radix-ui/react-use-callback-ref', 
-      '@radix-ui/primitive', 
-      '@radix-ui/react-filter-props', 
-      '@radix-ui/react-use-escape-keydown', 
       'framer-motion'
     ]
   },
@@ -91,7 +89,6 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-portal',
       '@radix-ui/react-primitive',
       '@radix-ui/react-use-escape-keydown',
-      '@radix-ui/react-filter-props',
       
       // Radix UI components
       '@radix-ui/react-accordion',
@@ -133,7 +130,7 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    sourcemap: true,
+    sourcemap: false,
     commonjsOptions: {
       transformMixedEsModules: true,
       include: [/node_modules/],
@@ -149,22 +146,15 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Create a chunk for each Radix UI component
           if (id.includes('@radix-ui/react-')) {
             return 'radix';
           }
-          
-          // React and related libraries
           if (id.includes('react') || id.includes('redux')) {
             return 'react-vendor';
           }
-          
-          // Framer Motion - separate chunk
           if (id.includes('framer-motion')) {
             return 'framer-motion';
           }
-          
-          // Utility libraries
           if (id.includes('date-fns') || 
               id.includes('class-variance-authority') || 
               id.includes('uuid') || 

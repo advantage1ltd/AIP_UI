@@ -1,22 +1,17 @@
 // User data
 export const USER_DATA = {
   name: "David Ibanga",
-  role: "IT manager",
-  email: "David.Ibanga@advantage1.co.uk",
-  avatar: "https://avatars.githubusercontent.com/u/47346863?s=400&u=f3910523f6f994655d3d57ef1cbcbbef491f3bea&v=4",
-  initials: "DI"
+  email: "david.ibanga@example.com",
+  role: "Administrator",
+  avatar: "/A1logo1.png"
 } as const;
 
 // Common button styles
 export const BUTTON_STYLES = {
-  ghost: {
-    mobile: "p-0 text-white hover:bg-slate-700",
-    desktop: "p-0 rounded-full"
-  },
-  outline: {
-    mobile: "w-full h-10 gap-1 bg-blue-900 text-white border-blue-800 justify-between hover:bg-blue-800 hover:text-white",
-    desktop: "h-9 gap-1 md:bg-blue-900 md:text-white md:border-blue-800 lg:bg-white lg:text-black lg:border-gray-200"
-  }
+  primary: "bg-primary text-primary-foreground hover:bg-primary/90",
+  secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+  ghost: "hover:bg-accent hover:text-accent-foreground",
+  link: "text-primary underline-offset-4 hover:underline"
 } as const;
 
 // Common class names
@@ -33,4 +28,115 @@ export const LOGO_SIZES = {
   mobile: "h-20",
   sheet: "h-24",
   ipad: "h-17"
-} as const; 
+} as const;
+
+export const NAVIGATION_ITEMS = [
+  {
+    title: "Dashboard",
+    href: "/",
+    icon: "Home"
+  },
+  {
+    title: "Administration",
+    href: "/administration",
+    icon: "Settings",
+    children: [
+      {
+        title: "User Setup",
+        href: "/administration/user-setup",
+        description: "Manage user accounts and permissions"
+      },
+      {
+        title: "Employee Registration",
+        href: "/administration/employee-registration",
+        description: "Register and manage employees"
+      },
+      {
+        title: "Customer Setup",
+        href: "/administration/customer-setup",
+        description: "Manage customer accounts"
+      },
+      {
+        title: "Stock Control",
+        href: "/administration/stock-control",
+        description: "Manage inventory and stock"
+      }
+    ]
+  },
+  {
+    title: "CRM",
+    href: "/crm",
+    icon: "Users",
+    children: [
+      {
+        title: "Contacts",
+        href: "/crm/contacts",
+        description: "Manage contacts and leads"
+      },
+      {
+        title: "Deals",
+        href: "/crm/deals",
+        description: "Track deals and opportunities"
+      },
+      {
+        title: "Pipeline",
+        href: "/crm/pipeline",
+        description: "View sales pipeline"
+      },
+      {
+        title: "Tasks",
+        href: "/crm/tasks",
+        description: "Manage tasks and follow-ups"
+      }
+    ]
+  },
+  {
+    title: "Recruitment",
+    href: "/recruitment",
+    icon: "UserPlus",
+    children: [
+      {
+        title: "Vetting",
+        href: "/recruitment/vetting",
+        description: "Candidate vetting process"
+      },
+      {
+        title: "CBT",
+        href: "/recruitment/cbt",
+        description: "Computer-based testing"
+      },
+      {
+        title: "Take Test",
+        href: "/recruitment/take-test",
+        description: "Take assessment tests"
+      },
+      {
+        title: "Test Session",
+        href: "/recruitment/test-session",
+        description: "Manage test sessions"
+      }
+    ]
+  },
+  {
+    title: "Operations",
+    href: "/operations",
+    icon: "Activity",
+    children: [
+      {
+        title: "Incident Report",
+        href: "/operations/incident-report",
+        description: "Report and track incidents"
+      },
+      {
+        title: "Mystery Shopper",
+        href: "/operations/mystery-shopper",
+        description: "Mystery shopper program"
+      },
+      {
+        title: "Site Visit",
+        href: "/operations/site-visit",
+        description: "Site inspection reports"
+      }
+    ]
+  }
+] 
