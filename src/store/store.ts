@@ -2,6 +2,38 @@ import { configureStore } from '@reduxjs/toolkit'
 import usersReducer from './features/users/usersSlice'
 import contactsReducer from './features/contactsSlice'
 import quizReducer from './features/quizSlice'
+import type { Quiz, QuizResult } from './features/quizSlice'
+
+// Define initial state types
+interface ContactsState {
+  contacts: any[];
+  loading: boolean;
+  error: null | string;
+}
+
+interface QuizState {
+  quizzes: Quiz[];
+  results: QuizResult[];
+}
+
+interface PreloadedState {
+  users: any[];
+  contacts: ContactsState;
+  quiz: QuizState;
+}
+
+const preloadedState: PreloadedState = {
+  users: [],
+  contacts: {
+    contacts: [],
+    loading: false,
+    error: null
+  },
+  quiz: {
+    quizzes: [],
+    results: []
+  }
+}
 
 const store = configureStore({
   reducer: {
@@ -9,9 +41,12 @@ const store = configureStore({
     contacts: contactsReducer,
     quiz: quizReducer
   },
-  preloadedState: {
-    users: []
-  }
+  preloadedState,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: false,
+      immutableCheck: false,
+    })
 })
 
 export { store }
