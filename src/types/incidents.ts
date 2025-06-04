@@ -33,45 +33,55 @@ export interface OffenderAddress {
 }
 
 export interface StolenItem {
+  id: string;
   category: string;
-  name: string;
+  description: string;
   productName: string;
-  value: number;
+  cost: number;
   quantity: number;
-  total: number;
+  totalAmount: number;
 }
 
 export interface Incident {
   id: string;
-  dateInputted: string;
-  incidentDate: string;
-  incidentTime: string;
-  siteName: string;
   customerName: string;
+  siteName: string;
+  officerName: string;
+  officerRole: string;
+  dateOfIncident: string;
+  timeOfIncident: string;
   incidentType: string;
-  involvedType?: string;
   description: string;
-  status: 'Open' | 'Closed';
-  stolenItems?: any[];
-  totalValue: number;
+  incidentDetails?: string;
+  storeComments?: string;
+  incidentInvolved: string[];
+  policeInvolvement: boolean;
+  dutyManagerName: string;
+  status: 'pending' | 'resolved' | 'in-progress';
+  priority: 'low' | 'medium' | 'high';
+  evidenceAttached: boolean;
+  offenderAddress?: {
+    houseName?: string;
+    numberAndStreet?: string;
+    villageOrSuburb?: string;
+    town?: string;
+    county?: string;
+    postCode?: string;
+  };
+  offenderSex?: 'Male' | 'Female' | 'N/A or N/K';
+  offenderDOB?: Date;
+  offenderPlaceOfBirth?: string;
+  policeID?: string;
+  crimeRefNumber?: string;
+  urnNumber?: string;
   totalValueRecovered: number;
-  reportedBy: string;
-  witnesses?: string;
-  locationInStore?: string;
-  timeOfDay?: string;
-  dayOfWeek?: string;
-  securityResponseTime?: number;
-  cameraFootage?: boolean;
-  securityStaffPresent?: boolean;
-  policeInvolved?: boolean;
-  
-  // Fields that might be used elsewhere in the application
-  officerName?: string;
-  officerRole?: string;
-  dateOfIncident?: string;
-  timeOfIncident?: string;
-  officerReport?: string;
-  categoryId?: number;
-  officeLocation?: string;
-  assignedTo?: string;
+  stolenItems: StolenItem[];
+  actionTaken?: string;
+  witnessStatements?: string[];
+  involvedParties?: string[];
+  reportNumber?: string;
+  offenderName?: string;
+  dateInputted: string;
+  timeOfDay: string;
+  dayOfWeek: string;
 }
