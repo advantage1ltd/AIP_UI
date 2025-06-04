@@ -105,14 +105,14 @@ const incidentTypes: IncidentType[] = [
 ]
 
 const incidentInvolved: IncidentInvolved[] = [
-  'J - Self Scan Tills?',
-  'L - Threats And Intimidation?',
-  'N - Ban From Store?',
-  'M - Scan And Go?',
-  'K - Abusive behaviour?',
-  'M - Spitting?',
-  'O - Violent Behavior (Physical)?',
-  'Q - Police Failed to Attend?'
+  IncidentInvolved.SELF_SCAN_TILLS,
+  IncidentInvolved.THREATS_AND_INTIMIDATION,
+  IncidentInvolved.BAN_FROM_STORE,
+  IncidentInvolved.SCAN_AND_GO,
+  IncidentInvolved.ABUSIVE_BEHAVIOUR,
+  IncidentInvolved.SPITTING,
+  IncidentInvolved.VIOLENT_BEHAVIOR,
+  IncidentInvolved.POLICE_FAILED_TO_ATTEND
 ]
 
 // Update the retail categories
@@ -209,9 +209,6 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   }, [descriptionValue, form])
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-    // Calculate total value from stolen items
-    const totalFromStolenItems = stolenItems.reduce((sum, item) => sum + item.totalAmount, 0);
-    
     const formattedData: Incident = {
       id: initialData?.id || uuidv4(),
       customerName: values.customerName,
@@ -222,32 +219,36 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       timeOfIncident: values.timeOfIncident,
       incidentType: values.incidentType,
       description: values.description,
-      incidentDetails: values.description,
-      storeComments: values.storeComments,
       incidentInvolved: values.incidentInvolved,
       policeInvolvement: values.policeInvolvement,
-      urnNumber: values.urnNumber,
-      stolenItems,
-      totalValueRecovered: values.totalValueRecovered 
-        ? parseFloat(values.totalValueRecovered) 
-        : totalFromStolenItems,
       dutyManagerName: values.dutyManagerName,
       status: values.status,
       priority: values.priority,
-      actionTaken: values.actionTaken,
       evidenceAttached: values.evidenceAttached,
+      offenderAddress: values.offenderAddress,
+      offenderSex: values.offenderSex,
+      stolenItems: stolenItems.map(item => ({
+        ...item,
+        totalAmount: item.cost * item.quantity
+      })),
+      // Optional fields
+      incidentDetails: values.incidentDetails,
+      storeComments: values.storeComments,
+      urnNumber: values.urnNumber,
+      totalValueRecovered: parseFloat(values.totalValueRecovered || '0'),
+      actionTaken: values.actionTaken,
       witnessStatements: values.witnessStatements,
       involvedParties: values.involvedParties,
       reportNumber: values.reportNumber,
-      dateInputted: initialData?.dateInputted || new Date().toISOString(),
-      userThatInput: initialData?.userThatInput || "Current User",
       offenderName: values.offenderName,
-      offenderAddress: values.offenderAddress,
-      offenderSex: values.offenderSex,
-      offenderDOB: values.offenderDOB?.toISOString(),
+      offenderDOB: values.offenderDOB,
       offenderPlaceOfBirth: values.offenderPlaceOfBirth,
       policeID: values.policeID,
       crimeRefNumber: values.crimeRefNumber,
+      // Additional fields
+      dateInputted: new Date().toISOString(),
+      timeOfDay: format(new Date(values.timeOfIncident), 'HH:mm'),
+      dayOfWeek: format(values.dateOfIncident, 'EEEE'),
     }
     onSubmit(formattedData)
   }
@@ -269,13 +270,19 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
 
   const updateStolenItem = (index: number, field: keyof StolenItem, value: any) => {
     const updatedItems = [...stolenItems]
-    updatedItems[index] = {
-      ...updatedItems[index],
-      [field]: value,
-      totalAmount: field === 'cost' ? value * updatedItems[index].quantity :
-                  field === 'quantity' ? updatedItems[index].cost * value :
-                  updatedItems[index].totalAmount,
+    const item = updatedItems[index]
+    
+    const updatedItem = {
+      ...item,
+      [field]: value
     }
+
+    // Update totalAmount if cost or quantity changes
+    if (field === 'cost' || field === 'quantity') {
+      updatedItem.totalAmount = updatedItem.cost * updatedItem.quantity
+    }
+
+    updatedItems[index] = updatedItem
     setStolenItems(updatedItems)
   }
 

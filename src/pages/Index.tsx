@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -45,6 +45,11 @@ import { cn } from '@/lib/utils'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { usePageAccess } from "@/contexts/PageAccessContext"
+
+// Lazy load the dashboard components
+const OfficerDashboard = React.lazy(() => import('./Dashboard/OfficerDashboard'))
+const CustomerDashboard = React.lazy(() => import('./Dashboard/CustomerDashboard'))
 
 // Customer-specific data
 const customerData = {
@@ -428,7 +433,7 @@ const TestComponents = () => {
       
       <div>
         <h3 className="font-medium mb-2">Accordion Test</h3>
-        <Accordion type="single" collapsible>
+        <Accordion type="single">
           <AccordionItem value="item-1">
             <AccordionTrigger>Is this working?</AccordionTrigger>
             <AccordionContent>
@@ -474,7 +479,38 @@ const TestComponents = () => {
 
 const Index = () => {
   const location = useLocation();
-  const isActive = (path: string) => location.pathname === path;
+  const { currentRole, isTestMode, testRole } = usePageAccess();
+  const effectiveRole = isTestMode && testRole ? testRole : currentRole;
+
+  // Show appropriate dashboard based on role
+  if (effectiveRole === 'advantage-officer' || effectiveRole === 'advantage-ho') {
+    return (
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="space-y-4 text-center">
+            <div className="text-lg font-medium">Loading Officer Dashboard...</div>
+            <div className="text-sm text-gray-500">Please wait</div>
+          </div>
+        </div>
+      }>
+        <OfficerDashboard />
+      </Suspense>
+    )
+  } else if (effectiveRole === 'customer-site' || effectiveRole === 'customer-ho') {
+    return (
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="space-y-4 text-center">
+            <div className="text-lg font-medium">Loading Customer Dashboard...</div>
+            <div className="text-sm text-gray-500">Please wait</div>
+          </div>
+        </div>
+      }>
+        <CustomerDashboard userRole={effectiveRole as 'customer-site' | 'customer-ho'} />
+      </Suspense>
+    )
+  }
+
   const [selectedCustomer, setSelectedCustomer] = React.useState<string>(customers[2].id);
   const customer = customerData[selectedCustomer as keyof typeof customerData];
   const [activePeriod, setActivePeriod] = React.useState<'Daily' | 'Weekly' | 'Monthly' | 'Yearly'>('Monthly');

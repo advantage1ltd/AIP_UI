@@ -62,7 +62,7 @@ import { useTheme } from "@/components/theme-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
-import { USER_DATA, BUTTON_STYLES, COMMON_CLASSES } from "@/constants/header";
+import { USER_DATA, BUTTON_STYLES } from "@/constants/header";
 import { NotificationBell } from "./header/NotificationBell";
 import { Logo } from "./header/Logo";
 import { SearchInput } from "./header/SearchInput";
@@ -80,6 +80,13 @@ interface NavItem {
 interface HeaderProps {
   onMobileMenuClick?: () => void;
 }
+
+// Update the COMMON_CLASSES constant at the top of the file
+const COMMON_CLASSES = {
+  mobileHeader: "flex items-center justify-between h-16 px-4 bg-gradient-to-r from-blue-50 to-slate-50 lg:hidden",
+  desktopHeader: "hidden md:flex items-center justify-between h-16 w-full bg-gradient-to-r from-blue-50 via-blue-50/80 to-slate-50 border-b border-gray-200",
+  sheetContent: "w-[340px] sm:w-[400px] p-0 flex flex-col h-full bg-blue-950 text-white border-r-blue-900",
+};
 
 // Reusable components
 const UserProfileDropdown = () => (
@@ -585,7 +592,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full md:bg-[#334155] lg:bg-white border-b md:border-slate-700 lg:border-gray-200">
+    <header className="sticky top-0 z-50 w-full bg-gradient-to-r from-blue-50 to-slate-50 border-b border-gray-200 shadow-sm">
       {/* Mobile Header */}
       <div className={COMMON_CLASSES.mobileHeader}>
         {/* Left: Hamburger Menu */}
