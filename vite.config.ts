@@ -19,6 +19,8 @@ const fixFramerMotionPlugin = () => {
             ...(config.optimizeDeps?.include || []),
             'framer-motion',
             'framer-motion/dom',
+            'react',
+            'react-dom',
             'react/jsx-runtime'
           ],
           force: true
@@ -143,29 +145,71 @@ export default defineConfig(({ mode }) => ({
         drop_debugger: true
       }
     },
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: (id) => {
+          // Keep React and Framer Motion together to prevent context issues
+          if (id.includes('react') || id.includes('framer-motion')) {
+            return 'react-core';
+          }
+          
+          // Split Radix UI components into smaller chunks
           if (id.includes('@radix-ui/react-')) {
-            return 'radix';
+            if (id.includes('dialog') || id.includes('alert-dialog')) {
+              return 'radix-dialog';
+            }
+            if (id.includes('dropdown') || id.includes('select')) {
+              return 'radix-dropdown';
+            }
+            if (id.includes('accordion') || id.includes('tabs')) {
+              return 'radix-navigation';
+            }
+            return 'radix-core';
           }
-          if (id.includes('react') || id.includes('redux')) {
-            return 'react-vendor';
+          
+          // Split React Router and Redux
+          if (id.includes('react-router')) {
+            return 'react-router';
           }
-          if (id.includes('framer-motion')) {
-            return 'framer-motion';
+          if (id.includes('react-redux')) {
+            return 'react-redux';
           }
-          if (id.includes('date-fns') || 
-              id.includes('class-variance-authority') || 
-              id.includes('uuid') || 
-              id.includes('recharts') || 
-              id.includes('sonner') || 
-              id.includes('react-toastify') || 
-              id.includes('react-day-picker') || 
-              id.includes('tailwind-merge') || 
-              id.includes('@zxing/library') || 
-              id.includes('@tanstack/react-table')) {
-            return 'utils-vendor';
+          
+          // Split UI libraries
+          if (id.includes('recharts')) {
+            return 'recharts';
+          }
+          if (id.includes('lucide-react')) {
+            return 'lucide-icons';
+          }
+          
+          // Split utility libraries
+          if (id.includes('date-fns')) {
+            return 'date-utils';
+          }
+          if (id.includes('@tanstack/react-table')) {
+            return 'table-utils';
+          }
+          if (id.includes('class-variance-authority') || 
+              id.includes('tailwind-merge')) {
+            return 'style-utils';
+          }
+          if (id.includes('sonner') || 
+              id.includes('react-toastify')) {
+            return 'notification-utils';
+          }
+          if (id.includes('react-day-picker') || 
+              id.includes('react-csv')) {
+            return 'form-utils';
+          }
+          if (id.includes('@zxing/library')) {
+            return 'barcode-utils';
+          }
+          
+          // Group remaining utilities
+          if (id.includes('node_modules')) {
+            return 'vendor';
           }
         }
       }
