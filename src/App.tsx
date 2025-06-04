@@ -5,6 +5,8 @@ import { ThemeProvider } from './components/theme-provider'
 import { Toaster } from './components/ui/toaster'
 import { PageAccessProvider } from './contexts/PageAccessContext'
 import Profile from "./pages/Profile"
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
 // Error Boundary Component
 interface ErrorBoundaryState {
@@ -100,101 +102,126 @@ const OfficerSupport = lazy(() => import('./pages/customer/OfficerSupport'))
 const OfficerPerformancePage = lazy(() => import('./pages/management/OfficerPerformance'))
 const BeSafeBeSecureGraph = lazy(() => import('./pages/customer/BeSafeBeSecureGraph'))
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        if (error instanceof Error && error.message.includes('404')) {
+          return false // Don't retry 404s
+        }
+        return failureCount < 3 // Retry other errors up to 3 times
+      },
+      staleTime: 5 * 60 * 1000, // Data remains fresh for 5 minutes
+      gcTime: 30 * 60 * 1000, // Cache data for 30 minutes
+      refetchOnWindowFocus: import.meta.env.PROD, // Only refetch on window focus in production
+      refetchOnReconnect: true,
+    },
+    mutations: {
+      retry: 2,
+      onError: (error) => {
+        console.error('Mutation error:', error)
+      }
+    }
+  },
+})
+
 const App: React.FC = () => {
   return (
-    <ErrorBoundaryComponent>
-      <ThemeProvider defaultTheme="system" storageKey="aip-theme">
-        <BrowserRouter>
-          <PageAccessProvider>
-            <Suspense fallback={<div className="flex h-screen w-full items-center justify-center">Loading...</div>}>
-              <Routes>
-                <Route path="/" element={<Layout><Outlet /></Layout>}>
-                  <Route index element={<Index />} />
-                  <Route path="/action-calendar" element={<ActionCalendar />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/configure-views" element={<ConfigureViews />} />
-                  <Route path="/reports-dashboard" element={<ReportsDashboard />} />
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundaryComponent>
+        <ThemeProvider defaultTheme="system" storageKey="aip-theme">
+          <BrowserRouter>
+            <PageAccessProvider>
+              <Suspense fallback={<div className="flex h-screen w-full items-center justify-center">Loading...</div>}>
+                <Routes>
+                  <Route path="/" element={<Layout><Outlet /></Layout>}>
+                    <Route index element={<Index />} />
+                    <Route path="/action-calendar" element={<ActionCalendar />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/configure-views" element={<ConfigureViews />} />
+                    <Route path="/reports-dashboard" element={<ReportsDashboard />} />
 
-                  {/* Administration Routes */}
-                  <Route path="/administration">
-                    <Route path="user-setup" element={<UserSetup />} />
-                    <Route path="employee-registration" element={<EmployeeRegistration />} />
-                    <Route path="customer-setup" element={<CustomerSetup />} />
-                    <Route path="stock-control" element={<StockControl />} />
-                  </Route>
+                    {/* Administration Routes */}
+                    <Route path="/administration">
+                      <Route path="user-setup" element={<UserSetup />} />
+                      <Route path="employee-registration" element={<EmployeeRegistration />} />
+                      <Route path="customer-setup" element={<CustomerSetup />} />
+                      <Route path="stock-control" element={<StockControl />} />
+                    </Route>
 
-                  {/* CRM Routes */}
-                  <Route path="/crm">
-                    <Route path="dashboard" element={<CRMDashboard />} />
-                    <Route path="leads" element={<Leads />} />
-                    <Route path="contacts" element={<Contacts />} />
-                    <Route path="deals" element={<Deals />} />
-                    <Route path="pipeline" element={<Pipeline />} />
-                    <Route path="tasks" element={<Tasks />} />
-                  </Route>
+                    {/* CRM Routes */}
+                    <Route path="/crm">
+                      <Route path="dashboard" element={<CRMDashboard />} />
+                      <Route path="leads" element={<Leads />} />
+                      <Route path="contacts" element={<Contacts />} />
+                      <Route path="deals" element={<Deals />} />
+                      <Route path="pipeline" element={<Pipeline />} />
+                      <Route path="tasks" element={<Tasks />} />
+                    </Route>
 
-                  {/* Recruitment Routes */}
-                  <Route path="/recruitment">
-                    <Route path="vetting" element={<Vetting />} />
-                    <Route path="cbt" element={<CBT />} />
-                    <Route path="take-test" element={<TakeTest />} />
-                    <Route path="test-session/:testId" element={<TestSession />} />
-                  </Route>
+                    {/* Recruitment Routes */}
+                    <Route path="/recruitment">
+                      <Route path="vetting" element={<Vetting />} />
+                      <Route path="cbt" element={<CBT />} />
+                      <Route path="take-test" element={<TakeTest />} />
+                      <Route path="test-session/:testId" element={<TestSession />} />
+                    </Route>
 
-                  {/* Operations Routes */}
-                  <Route path="/operations">
-                    <Route path="incident-report" element={<IncidentReportPage />} />
-                    <Route path="mystery-shopper" element={<MysteryShopperPage />} />
-                    <Route path="site-visit" element={<SiteVisitPage />} />
-                    <Route path="holiday-requests" element={<HolidayRequestPage />} />
-                    <Route path="bank-holiday" element={<BankHolidayPage />} />
-                    <Route path="customer-satisfaction" element={<CustomerSatisfactionPage />} />
-                    <Route path="patrol-log" element={<PatrolLogPage />} />
-                    <Route path="safe-duress-words" element={<SafeDuressWordsPage />} />
-                    <Route path="officer-support" element={<OfficerSupportPage />} />
-                    <Route path="officer-expenses" element={<OfficerExpensesPage />} />
-                  </Route>
+                    {/* Operations Routes */}
+                    <Route path="/operations">
+                      <Route path="incident-report" element={<IncidentReportPage />} />
+                      <Route path="mystery-shopper" element={<MysteryShopperPage />} />
+                      <Route path="site-visit" element={<SiteVisitPage />} />
+                      <Route path="holiday-requests" element={<HolidayRequestPage />} />
+                      <Route path="bank-holiday" element={<BankHolidayPage />} />
+                      <Route path="customer-satisfaction" element={<CustomerSatisfactionPage />} />
+                      <Route path="patrol-log" element={<PatrolLogPage />} />
+                      <Route path="safe-duress-words" element={<SafeDuressWordsPage />} />
+                      <Route path="officer-support" element={<OfficerSupportPage />} />
+                      <Route path="officer-expenses" element={<OfficerExpensesPage />} />
+                    </Route>
 
-                  {/* Employee Routes */}
-                  <Route path="/employee">
-                    <Route path="uniform-equipment" element={<UniformEquipmentPage />} />
-                    <Route path="disciplinary" element={<DisciplinaryPage />} />
-                    <Route path="diary" element={<EmployeeDiaryPage />} />
-                  </Route>
+                    {/* Employee Routes */}
+                    <Route path="/employee">
+                      <Route path="uniform-equipment" element={<UniformEquipmentPage />} />
+                      <Route path="disciplinary" element={<DisciplinaryPage />} />
+                      <Route path="diary" element={<EmployeeDiaryPage />} />
+                    </Route>
 
-                  {/* Management Routes */}
-                  <Route path="/management">
-                    <Route path="customer-reporting" element={<CustomerReportingPage />} />
-                    <Route path="manager-support" element={<ManagerSupportPage />} />
-                    <Route path="incidents-report" element={<IncidentsReportPage />} />
-                    <Route path="officer-performance" element={<OfficerPerformancePage />} />
-                  </Route>
+                    {/* Management Routes */}
+                    <Route path="/management">
+                      <Route path="customer-reporting" element={<CustomerReportingPage />} />
+                      <Route path="manager-support" element={<ManagerSupportPage />} />
+                      <Route path="incidents-report" element={<IncidentsReportPage />} />
+                      <Route path="officer-performance" element={<OfficerPerformancePage />} />
+                    </Route>
 
-                  {/* Compliance Routes */}
-                  <Route path="/compliance">
-                    <Route path="contract-renewal" element={<ContractRenewalPage />} />
-                    <Route path="password-register" element={<PasswordRegisterPage />} />
-                    <Route path="asset-register" element={<AssetRegisterPage />} />
-                  </Route>
+                    {/* Compliance Routes */}
+                    <Route path="/compliance">
+                      <Route path="contract-renewal" element={<ContractRenewalPage />} />
+                      <Route path="password-register" element={<PasswordRegisterPage />} />
+                      <Route path="asset-register" element={<AssetRegisterPage />} />
+                    </Route>
 
-                  {/* Customer Routes */}
-                  <Route path="/customer">
-                    <Route path="dar" element={<CustomerDAR />} />
-                    <Route path="incident-graph" element={<IncidentGraph />} />
-                    <Route path="incident-report" element={<IncidentReport />} />
-                    <Route path="satisfaction-reports" element={<SatisfactionReports />} />
-                    <Route path="be-safe-be-secure-graph" element={<BeSafeBeSecureGraph />} />
-                    <Route path="officer-support" element={<OfficerSupport />} />
+                    {/* Customer Routes */}
+                    <Route path="/customer">
+                      <Route path="dar" element={<CustomerDAR />} />
+                      <Route path="incident-graph" element={<IncidentGraph />} />
+                      <Route path="incident-report" element={<IncidentReport />} />
+                      <Route path="satisfaction-reports" element={<SatisfactionReports />} />
+                      <Route path="be-safe-be-secure" element={<BeSafeBeSecureGraph />} />
+                    </Route>
                   </Route>
-                </Route>
-              </Routes>
-            </Suspense>
-            <Toaster />
-          </PageAccessProvider>
-        </BrowserRouter>
-      </ThemeProvider>
-    </ErrorBoundaryComponent>
+                </Routes>
+              </Suspense>
+              <Toaster />
+            </PageAccessProvider>
+          </BrowserRouter>
+        </ThemeProvider>
+      </ErrorBoundaryComponent>
+      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+    </QueryClientProvider>
   )
 }
 
