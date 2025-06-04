@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from "react"
+import { useState, useCallback, memo, useEffect } from "react"
 import { Incident, IncidentType, IncidentInvolved, StolenItem } from "@/types/incidents"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -143,14 +143,15 @@ const retailCategories = {
   ]
 } as const
 
-interface IncidentFormProps {
+export interface IncidentFormProps {
   initialData?: Incident | null
-  onSubmit: (data: Incident) => void
+  onSubmit: (incident: Incident) => void
   onCancel: () => void
-  onScanBarcode?: () => void
+  onScanBarcode: () => void
+  isLoading?: boolean
 }
 
-const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit, onCancel, onScanBarcode }) => {
+const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit, onCancel, onScanBarcode, isLoading = false }) => {
   const [stolenItems, setStolenItems] = useState<StolenItem[]>(initialData?.stolenItems || [])
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -196,6 +197,12 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
     },
   })
 
+  useEffect(() => {
+    if (initialData) {
+      setStolenItems(initialData.stolenItems || [])
+    }
+  }, [initialData])
+
   // Add useEffect to update totalValueRecovered when stolen items change
   React.useEffect(() => {
     const totalValue = stolenItems.reduce((sum, item) => sum + item.totalAmount, 0);
@@ -209,13 +216,18 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   }, [descriptionValue, form])
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    // Guard for dateOfIncident
+    const isValidDateOfIncident = values.dateOfIncident && !isNaN(new Date(values.dateOfIncident).getTime())
+    // Guard for timeOfIncident (should be a string, but check if it's valid for new Date)
+    const isValidTimeOfIncident = values.timeOfIncident && !isNaN(new Date(values.timeOfIncident).getTime())
+
     const formattedData: Incident = {
       id: initialData?.id || uuidv4(),
       customerName: values.customerName,
       siteName: values.siteName,
       officerName: values.officerName,
       officerRole: values.officerRole,
-      dateOfIncident: values.dateOfIncident.toISOString(),
+      dateOfIncident: isValidDateOfIncident ? new Date(values.dateOfIncident).toISOString() : '',
       timeOfIncident: values.timeOfIncident,
       incidentType: values.incidentType,
       description: values.description,
@@ -247,9 +259,10 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       crimeRefNumber: values.crimeRefNumber,
       // Additional fields
       dateInputted: new Date().toISOString(),
-      timeOfDay: format(new Date(values.timeOfIncident), 'HH:mm'),
-      dayOfWeek: format(values.dateOfIncident, 'EEEE'),
+      timeOfDay: values.timeOfIncident && isValidDateOfIncident ? format(new Date(`${values.dateOfIncident.toDateString()}T${values.timeOfIncident}`), 'HH:mm') : '',
+      dayOfWeek: isValidDateOfIncident ? format(new Date(values.dateOfIncident), 'EEEE') : '',
     }
+    console.log('Submitting incident:', formattedData)
     onSubmit(formattedData)
   }
 
@@ -1007,14 +1020,16 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                 variant="outline" 
                 onClick={onCancel}
                 className="h-9 px-4 text-sm"
+                disabled={isLoading}
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
                 className="h-9 px-4 text-sm bg-green-600 hover:bg-green-700 text-white"
+                disabled={isLoading}
               >
-                Save Incident
+                {isLoading ? "Saving..." : initialData ? "Update" : "Create"}
               </Button>
             </div>
           </div>
