@@ -21,9 +21,17 @@ const fixFramerMotionPlugin = () => {
             'framer-motion/dom',
             'react',
             'react-dom',
-            'react/jsx-runtime'
+            'react/jsx-runtime',
+            'react-redux',
+            'react-router-dom',
+            '@tanstack/react-query',
+            '@tanstack/react-query-devtools',
+            'lucide-react'
           ],
-          force: true
+          force: true,
+          esbuildOptions: {
+            target: 'esnext'
+          }
         }
       }
     },
@@ -49,20 +57,37 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react({
       jsxRuntime: 'automatic',
-      jsxImportSource: 'react'
+      jsxImportSource: 'react',
+      babel: {
+        plugins: [
+          ['@babel/plugin-transform-react-jsx', { runtime: 'automatic' }]
+        ]
+      }
     }),
     fixFramerMotionPlugin(),
-    ...(mode === 'production' ? [visualizer({ open: true, gzipSize: true, brotliSize: true })] : [])
+    ...(mode === 'production' ? [visualizer({ 
+      open: true, 
+      gzipSize: true, 
+      brotliSize: true,
+      filename: 'dist/stats.html'
+    })] : [])
   ],
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      'react': resolve(__dirname, 'node_modules/react'),
+      'react-dom': resolve(__dirname, 'node_modules/react-dom'),
+      'react/jsx-runtime': resolve(__dirname, 'node_modules/react/jsx-runtime'),
     },
     dedupe: [
       'react', 
       'react-dom', 
       'react/jsx-runtime',
-      'framer-motion'
+      'framer-motion',
+      '@tanstack/react-query',
+      'react-redux',
+      'react-router-dom',
+      'lucide-react'
     ]
   },
   optimizeDeps: {
@@ -73,6 +98,8 @@ export default defineConfig(({ mode }) => ({
       'react-dom',
       'react-redux',
       'react-router-dom',
+      '@tanstack/react-query',
+      '@tanstack/react-query-devtools',
       
       // Radix UI primitive packages
       '@radix-ui/react-primitive',
@@ -133,28 +160,56 @@ export default defineConfig(({ mode }) => ({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
-    commonjsOptions: {
-      transformMixedEsModules: true,
-      include: [/node_modules/],
-      extensions: ['.js', '.cjs', '.mjs'],
-    },
+    target: 'esnext',
     minify: 'terser',
     terserOptions: {
       compress: {
         drop_console: true,
-        drop_debugger: true
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn'],
+        passes: 2,
+        dead_code: true,
+        ecma: 2020,
+        keep_infinity: true,
+        module: true,
+        toplevel: true
+      },
+      format: {
+        comments: false,
+        ecma: 2020,
+        ascii_only: true,
+        beautify: false
+      },
+      mangle: {
+        safari10: true,
+        toplevel: true
       }
     },
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Keep React and Framer Motion together to prevent context issues
-          if (id.includes('react') || id.includes('framer-motion')) {
+          // Core React bundle
+          if (id.includes('react') || 
+              id.includes('react-dom') || 
+              id.includes('react/jsx-runtime') ||
+              id.includes('framer-motion') ||
+              id.includes('lucide-react')) {
             return 'react-core';
           }
+
+          // State management
+          if (id.includes('@tanstack/react-query') || 
+              id.includes('react-redux')) {
+            return 'state-management';
+          }
+
+          // Routing
+          if (id.includes('react-router')) {
+            return 'routing';
+          }
           
-          // Split Radix UI components into smaller chunks
+          // Radix UI components
           if (id.includes('@radix-ui/react-')) {
             if (id.includes('dialog') || id.includes('alert-dialog')) {
               return 'radix-dialog';
@@ -168,28 +223,24 @@ export default defineConfig(({ mode }) => ({
             return 'radix-core';
           }
           
-          // Split React Router and Redux
-          if (id.includes('react-router')) {
-            return 'react-router';
-          }
-          if (id.includes('react-redux')) {
-            return 'react-redux';
-          }
-          
-          // Split UI libraries
+          // UI Components
           if (id.includes('recharts')) {
-            return 'recharts';
-          }
-          if (id.includes('lucide-react')) {
-            return 'lucide-icons';
-          }
-          
-          // Split utility libraries
-          if (id.includes('date-fns')) {
-            return 'date-utils';
+            return 'charts';
           }
           if (id.includes('@tanstack/react-table')) {
-            return 'table-utils';
+            return 'table';
+          }
+          
+          // Form and Input Components
+          if (id.includes('react-day-picker') || 
+              id.includes('react-csv') ||
+              id.includes('react-hook-form')) {
+            return 'form-components';
+          }
+          
+          // Utilities
+          if (id.includes('date-fns')) {
+            return 'date-utils';
           }
           if (id.includes('class-variance-authority') || 
               id.includes('tailwind-merge')) {
@@ -197,20 +248,31 @@ export default defineConfig(({ mode }) => ({
           }
           if (id.includes('sonner') || 
               id.includes('react-toastify')) {
-            return 'notification-utils';
-          }
-          if (id.includes('react-day-picker') || 
-              id.includes('react-csv')) {
-            return 'form-utils';
+            return 'notifications';
           }
           if (id.includes('@zxing/library')) {
-            return 'barcode-utils';
+            return 'barcode';
           }
           
-          // Group remaining utilities
+          // Vendor bundle for remaining dependencies
           if (id.includes('node_modules')) {
             return 'vendor';
           }
+        },
+        // Optimize chunk loading
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+        // Ensure proper code splitting
+        maxSize: 500000,
+        minSize: 20000,
+        // Optimize for modern browsers
+        generatedCode: {
+          preset: 'es2015',
+          arrowFunctions: true,
+          constBindings: true,
+          objectShorthand: true,
+          reservedNamesAsProps: false
         }
       }
     }
