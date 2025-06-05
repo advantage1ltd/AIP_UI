@@ -34,22 +34,13 @@ const fixFramerMotionPlugin = () => {
           }
         }
       }
-    },
-    resolveId(id: string) {
-      if (id === 'react/jsx-runtime') {
-        return {
-          id: 'react/jsx-runtime',
-          external: false
-        };
-      }
-      return null;
     }
   }
 }
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: '/',
+  base: mode === 'production' ? '/' : '/',
   server: {
     host: "::",
     port: 8080,
@@ -78,17 +69,7 @@ export default defineConfig(({ mode }) => ({
       'react': resolve(__dirname, 'node_modules/react'),
       'react-dom': resolve(__dirname, 'node_modules/react-dom'),
       'react/jsx-runtime': resolve(__dirname, 'node_modules/react/jsx-runtime'),
-    },
-    dedupe: [
-      'react', 
-      'react-dom', 
-      'react/jsx-runtime',
-      'framer-motion',
-      '@tanstack/react-query',
-      'react-redux',
-      'react-router-dom',
-      'lucide-react'
-    ]
+    }
   },
   optimizeDeps: {
     exclude: [],
@@ -159,122 +140,22 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    sourcemap: false,
+    sourcemap: mode === 'development',
     target: 'esnext',
     minify: 'terser',
     terserOptions: {
       compress: {
         drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn'],
-        passes: 2,
-        dead_code: true,
-        ecma: 2020,
-        keep_infinity: true,
-        module: true,
-        toplevel: true
-      },
-      format: {
-        comments: false,
-        ecma: 2020,
-        ascii_only: true,
-        beautify: false
-      },
-      mangle: {
-        safari10: true,
-        toplevel: true
+        drop_debugger: true
       }
     },
-    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          // Core React bundle
-          if (id.includes('react') || 
-              id.includes('react-dom') || 
-              id.includes('react/jsx-runtime') ||
-              id.includes('framer-motion') ||
-              id.includes('lucide-react')) {
-            return 'react-core';
-          }
-
-          // State management
-          if (id.includes('@tanstack/react-query') || 
-              id.includes('react-redux')) {
-            return 'state-management';
-          }
-
-          // Routing
-          if (id.includes('react-router')) {
-            return 'routing';
-          }
-          
-          // Radix UI components
-          if (id.includes('@radix-ui/react-')) {
-            if (id.includes('dialog') || id.includes('alert-dialog')) {
-              return 'radix-dialog';
-            }
-            if (id.includes('dropdown') || id.includes('select')) {
-              return 'radix-dropdown';
-            }
-            if (id.includes('accordion') || id.includes('tabs')) {
-              return 'radix-navigation';
-            }
-            return 'radix-core';
-          }
-          
-          // UI Components
-          if (id.includes('recharts')) {
-            return 'charts';
-          }
-          if (id.includes('@tanstack/react-table')) {
-            return 'table';
-          }
-          
-          // Form and Input Components
-          if (id.includes('react-day-picker') || 
-              id.includes('react-csv') ||
-              id.includes('react-hook-form')) {
-            return 'form-components';
-          }
-          
-          // Utilities
-          if (id.includes('date-fns')) {
-            return 'date-utils';
-          }
-          if (id.includes('class-variance-authority') || 
-              id.includes('tailwind-merge')) {
-            return 'style-utils';
-          }
-          if (id.includes('sonner') || 
-              id.includes('react-toastify')) {
-            return 'notifications';
-          }
-          if (id.includes('@zxing/library')) {
-            return 'barcode';
-          }
-          
-          // Vendor bundle for remaining dependencies
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        },
-        // Optimize chunk loading
-        chunkFileNames: 'assets/[name]-[hash].js',
-        entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Ensure proper code splitting
-        maxSize: 500000,
-        minSize: 20000,
-        // Optimize for modern browsers
-        generatedCode: {
-          preset: 'es2015',
-          arrowFunctions: true,
-          constBindings: true,
-          objectShorthand: true,
-          reservedNamesAsProps: false
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['framer-motion', '@radix-ui/react-primitive']
         }
       }
     }
   }
-}));
+}))
