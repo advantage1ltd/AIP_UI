@@ -158,6 +158,8 @@ const App: React.FC = () => {
 
                   {/* CRM Routes */}
                   <Route path="crm">
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="leads" element={<Leads />} />
                     <Route path="contacts" element={<Contacts />} />
                     <Route path="deals" element={<Deals />} />
                     <Route path="pipeline" element={<Pipeline />} />
