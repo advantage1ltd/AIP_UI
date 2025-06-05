@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { Incident, StolenItem } from "@/types/incidents"
 import { IncidentForm } from "@/components/operations/IncidentForm"
 import { IncidentsTable } from "@/components/operations/IncidentsTable"
@@ -54,49 +54,127 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 import BarcodeScanner from '@/components/BarcodeScanner'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+
+// API endpoints
+const API_ENDPOINTS = {
+  incidents: '/api/incidents',
+  product: '/api/products'
+}
 
 export default function IncidentReportPage() {
+  const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
-  const [incidents, setIncidents] = useState<Incident[]>(mockIncidents)
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null)
   const [deletingIncident, setDeletingIncident] = useState<Incident | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [viewingIncident, setViewingIncident] = useState<Incident | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
   const [scanningBarcode, setScanningBarcode] = useState(false)
   const [isLoadingProduct, setIsLoadingProduct] = useState(false)
+  const itemsPerPage = 10
 
-  // Calculate statistics
-  const stats = {
+  // Fetch incidents with improved error handling
+  const { data: incidents = [], isLoading, error } = useQuery({
+    queryKey: ['incidents'],
+    queryFn: async () => {
+      try {
+        const response = await fetch(API_ENDPOINTS.incidents)
+        
+        // Log the response details for debugging
+        console.log('Response status:', response.status)
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()))
+        
+        if (!response.ok) {
+          // Try to get the error text
+          const errorText = await response.text()
+          console.error('Error response:', errorText)
+          throw new Error(`Failed to fetch incidents: ${response.status} ${response.statusText}\n${errorText}`)
+        }
+
+        const contentType = response.headers.get("content-type")
+        console.log('Content-Type:', contentType)
+        
+        if (!contentType || !contentType.includes("application/json")) {
+          const responseText = await response.text()
+          console.error('Non-JSON response:', responseText)
+          throw new Error(`Server returned non-JSON response. Content-Type: ${contentType}`)
+        }
+
+        const data = await response.json()
+        console.log('Fetched incidents:', data)
+        return data
+      } catch (error) {
+        console.error('Error fetching incidents:', error)
+        // Fallback to mock data if API fails
+        console.log('Falling back to mock data')
+        return mockIncidents
+      }
+    },
+    retry: 2,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
+  // Create/Update incident mutation
+  const mutation = useMutation({
+    mutationFn: async (incident: Incident) => {
+      const url = editingIncident 
+        ? `${API_ENDPOINTS.incidents}/${editingIncident.id}`
+        : API_ENDPOINTS.incidents
+      
+      const response = await fetch(url, {
+        method: editingIncident ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(incident)
+      })
+      
+      if (!response.ok) throw new Error('Failed to save incident')
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['incidents'] })
+      toast.success(editingIncident ? 'Incident updated successfully' : 'Incident created successfully')
+      setOpen(false)
+      setEditingIncident(null)
+    },
+    onError: (error) => {
+      console.error('Error saving incident:', error)
+      toast.error('Failed to save incident')
+    }
+  })
+
+  // Delete incident mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (incidentId: string) => {
+      const response = await fetch(`${API_ENDPOINTS.incidents}/${incidentId}`, {
+        method: 'DELETE'
+      })
+      if (!response.ok) throw new Error('Failed to delete incident')
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['incidents'] })
+      toast.success('Incident deleted successfully')
+      setDeletingIncident(null)
+    },
+    onError: (error) => {
+      console.error('Error deleting incident:', error)
+      toast.error('Failed to delete incident')
+    }
+  })
+
+  // Calculate statistics using useMemo with null checks
+  const stats = useMemo(() => ({
     totalAmountSaved: incidents.reduce((total, incident) => 
-      total + (incident.totalValueRecovered || 0), 0
+      total + (incident?.totalValueRecovered || 0), 0
     ),
-    uniqueStores: new Set(incidents.map(incident => incident.siteName)).size,
+    uniqueStores: new Set(incidents.map(incident => incident?.siteName).filter(Boolean)).size,
     totalIncidents: incidents.length
-  }
+  }), [incidents])
 
   const handleSubmit = useCallback((incident: Incident) => {
-    if (editingIncident) {
-      // Update existing incident
-      setIncidents(prev =>
-        prev.map(i => (i.id === editingIncident.id ? { ...incident, id: i.id } : i))
-      )
-      toast.success('Incident report updated successfully')
-    } else {
-      // Create new incident
-      const newIncident = {
-        ...incident,
-        id: (incidents.length + 1).toString(),
-        dateInputted: new Date().toISOString(),
-        userThatInput: "admin" // This would come from auth context
-      }
-      setIncidents(prev => [newIncident, ...prev])
-      toast.success('Incident report created successfully')
-    }
-    setOpen(false)
-    setEditingIncident(null)
-  }, [editingIncident, incidents])
+    mutation.mutate(incident)
+  }, [mutation])
 
   const handleEdit = useCallback((incident: Incident) => {
     setEditingIncident(incident)
@@ -104,6 +182,7 @@ export default function IncidentReportPage() {
   }, [])
 
   const handleView = useCallback((incident: Incident) => {
+    console.log('Viewing Incident:', incident)
     setViewingIncident(incident)
   }, [])
 
@@ -113,39 +192,38 @@ export default function IncidentReportPage() {
 
   const handleConfirmDelete = useCallback(() => {
     if (deletingIncident) {
-      setIncidents(prev => prev.filter(i => i.id !== deletingIncident.id))
-      toast.success('Incident deleted successfully')
-      setDeletingIncident(null)
+      deleteMutation.mutate(deletingIncident.id)
     }
-  }, [deletingIncident])
+  }, [deletingIncident, deleteMutation])
 
-  // Filter and paginate incidents
-  const filteredIncidents = incidents.filter(incident => 
-    incident.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    incident.incidentType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    incident.description.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-  
-  const totalPages = Math.ceil(filteredIncidents.length / itemsPerPage)
-  
-  // Get current page items
-  const paginatedIncidents = filteredIncidents.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
-  
-  // Handle page change
-  const handlePageChange = (page: number) => {
+  // Filter and paginate incidents using useMemo
+  const { filteredIncidents, totalPages, paginatedIncidents } = useMemo(() => {
+    const filtered = incidents.filter(incident => 
+      incident.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      incident.incidentType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      incident.description.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    
+    const total = Math.ceil(filtered.length / itemsPerPage)
+    
+    const paginated = filtered.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    )
+    
+    return { filteredIncidents: filtered, totalPages: total, paginatedIncidents: paginated }
+  }, [incidents, searchTerm, currentPage, itemsPerPage])
+
+  const handlePageChange = useCallback((page: number) => {
     if (page < 1 || page > totalPages) return
     setCurrentPage(page)
-  }
+  }, [totalPages])
 
-  const handleBarcodeScanned = async (barcode: string) => {
+  const handleBarcodeScanned = useCallback(async (barcode: string) => {
     try {
       setIsLoadingProduct(true)
       
-      // Call to your EAN API to fetch product details
-      const response = await fetch(`${process.env.NEXT_PUBLIC_EAN_API_URL}/api/products/${barcode}`, {
+      const response = await fetch(`${API_ENDPOINTS.product}/${barcode}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -153,13 +231,10 @@ export default function IncidentReportPage() {
         }
       })
       
-      if (!response.ok) {
-        throw new Error('Product not found')
-      }
+      if (!response.ok) throw new Error('Product not found')
       
       const productData = await response.json()
       
-      // Create new stolen item from scanned data
       const newItem: StolenItem = {
         id: Date.now().toString(),
         category: productData.category?.toLowerCase() || 'other',
@@ -170,7 +245,6 @@ export default function IncidentReportPage() {
         totalAmount: productData.price || 0
       }
 
-      // Update the incident with the new item
       if (editingIncident) {
         setEditingIncident({
           ...editingIncident,
@@ -187,6 +261,79 @@ export default function IncidentReportPage() {
       setIsLoadingProduct(false)
       setScanningBarcode(false)
     }
+  }, [editingIncident])
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading incident data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state with retry option
+  if (error) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-sm">
+          <div className="mb-4">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to Load Incidents</h2>
+          <p className="text-gray-600 mb-4">
+            {error instanceof Error ? error.message : 'An error occurred while loading incident data.'}
+          </p>
+          <div className="space-y-3">
+            <Button
+              onClick={() => window.location.reload()}
+              className="w-full"
+            >
+              Retry Loading
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                // Force refetch the data
+                queryClient.invalidateQueries({ queryKey: ['incidents'] })
+              }}
+              className="w-full"
+            >
+              Refresh Data
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Empty state
+  if (!incidents || incidents.length === 0) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-sm">
+          <div className="mb-4">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No Incidents Found</h2>
+          <p className="text-gray-600 mb-4">
+            There are no incident reports available. Create your first incident report to get started.
+          </p>
+          <Button
+            onClick={() => {
+              setEditingIncident(null)
+              setOpen(true)
+            }}
+            className="w-full"
+          >
+            Create New Incident
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -306,12 +453,20 @@ export default function IncidentReportPage() {
                         <div className="truncate">{incident.description}</div>
                       </TableCell>
                       <TableCell className="py-2 md:py-3 xl:py-4 whitespace-nowrap">
-                        £{(incident.totalValueRecovered !== undefined && incident.totalValueRecovered !== null)
-                           ? incident.totalValueRecovered.toFixed(2)
-                           : (incident.stolenItems && incident.stolenItems.length > 0)
-                             ? incident.stolenItems.reduce((sum, item) => sum + item.totalAmount, 0).toFixed(2)
-                             : '0.00'
-                      }
+                        £{(() => {
+                          const value = incident?.totalValueRecovered
+                          if (typeof value === 'number' && !isNaN(value)) {
+                            return value.toFixed(2)
+                          }
+                          if (Array.isArray(incident?.stolenItems) && incident.stolenItems.length > 0) {
+                            const total = incident.stolenItems.reduce(
+                              (sum, item) => sum + (typeof item?.totalAmount === 'number' ? item.totalAmount : 0),
+                              0
+                            )
+                            return total.toFixed(2)
+                          }
+                          return '0.00'
+                        })()}
                       </TableCell>
                       <TableCell className="py-2 md:py-3 xl:py-4">
                         <div className="flex items-center justify-end gap-1 sm:gap-2 xl:gap-3">
@@ -447,8 +602,11 @@ export default function IncidentReportPage() {
         <DialogContent className="max-w-[65vw] md:max-w-[60vw] lg:max-w-[50vw] h-[90vh] p-0">
           <DialogHeader className="px-4 py-3 border-b">
             <DialogTitle className="text-xl font-bold">
-              {editingIncident ? 'Edit Incident Report' : 'Officer Incident Report'}
+              {editingIncident ? 'Edit Incident Report' : 'New Incident Report'}
             </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500">
+              {editingIncident ? 'Update the incident details below' : 'Fill in the incident details below'}
+            </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto">
             <IncidentForm
@@ -459,6 +617,7 @@ export default function IncidentReportPage() {
                 setEditingIncident(null)
               }}
               onScanBarcode={() => setScanningBarcode(true)}
+              isLoading={mutation.isPending}
             />
           </div>
         </DialogContent>
@@ -471,12 +630,15 @@ export default function IncidentReportPage() {
         <DialogContent className="max-w-[65vw] md:max-w-[60vw] lg:max-w-[50vw] h-[90vh] p-0">
           <DialogHeader className="px-4 py-3 border-b">
             <DialogTitle className="text-xl font-bold">View Incident Details</DialogTitle>
+            <DialogDescription className="text-sm text-gray-500">
+              Incident ID: {viewingIncident?.id}
+            </DialogDescription>
           </DialogHeader>
           {viewingIncident && (
             <div className="flex-1 overflow-y-auto">
               <div className="bg-[#F8F3F1]">
                 <div className="w-full max-w-[98%] mx-auto px-4 py-4">
-                {/* Basic Information */}
+                  {/* Basic Information */}
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="h-6 w-6 text-blue-600">📋</div>
@@ -485,52 +647,66 @@ export default function IncidentReportPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div>
                         <label className="text-sm font-medium text-gray-500">Customer Name</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.customerName}</p>
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-500">Site Name</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.siteName}</p>
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-500">Officer Name</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.officerName}</p>
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-500">Officer Role</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.officerRole}</p>
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-500">Duty Manager</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.dutyManagerName}</p>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.customerName || 'N/A'}</p>
                       </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Site Name</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.siteName || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Officer Name</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.officerName || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Officer Role</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.officerRole || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Duty Manager</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.dutyManagerName || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Date Inputted</label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {viewingIncident.dateInputted ? new Date(viewingIncident.dateInputted).toLocaleDateString() : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {/* Incident Details */}
+                  {/* Incident Details */}
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="h-6 w-6 text-blue-600">🕒</div>
                       <h2 className="text-lg font-medium text-gray-900">Incident Details</h2>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
+                      <div>
                         <label className="text-sm font-medium text-gray-500">Date of Incident</label>
                         <p className="mt-1 text-sm text-gray-900">
-                        {new Date(viewingIncident.dateOfIncident).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-500">Time of Incident</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.timeOfIncident}</p>
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-500">Incident Type</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.incidentType}</p>
+                          {viewingIncident.dateOfIncident ? new Date(viewingIncident.dateOfIncident).toLocaleDateString() : 'N/A'}
+                        </p>
                       </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Time of Incident</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.timeOfIncident || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Incident Type</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.incidentType || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Total Value Recovered</label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          £{typeof viewingIncident.totalValueRecovered === 'number' && !isNaN(viewingIncident.totalValueRecovered)
+                            ? viewingIncident.totalValueRecovered.toFixed(2)
+                            : '0.00'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {/* Description */}
+                  {/* Description */}
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="h-6 w-6 text-blue-600">📝</div>
@@ -539,18 +715,18 @@ export default function IncidentReportPage() {
                     <div className="space-y-4">
                       <div>
                         <label className="text-sm font-medium text-gray-500">Incident Details</label>
-                        <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{viewingIncident.description}</p>
+                        <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{viewingIncident.description || 'N/A'}</p>
                       </div>
                       {viewingIncident.storeComments && (
                         <div>
                           <label className="text-sm font-medium text-gray-500">Store Comments</label>
                           <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{viewingIncident.storeComments}</p>
-                      </div>
-                    )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Police Involvement */}
+                  {/* Police Involvement */}
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="h-6 w-6 text-blue-600">👮</div>
@@ -560,88 +736,90 @@ export default function IncidentReportPage() {
                       <div>
                         <label className="text-sm font-medium text-gray-500">Was Police Involved?</label>
                         <p className="mt-1 text-sm text-gray-900">{viewingIncident.policeInvolvement ? "Yes" : "No"}</p>
-                    </div>
-                    {viewingIncident.policeInvolvement && (
+                      </div>
+                      {viewingIncident.policeInvolvement && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {viewingIncident.urnNumber && (
-                          <div>
+                          {viewingIncident.urnNumber && (
+                            <div>
                               <label className="text-sm font-medium text-gray-500">URN Number</label>
                               <p className="mt-1 text-sm text-gray-900">{viewingIncident.urnNumber}</p>
-                          </div>
-                        )}
-                        {viewingIncident.crimeRefNumber && (
-                          <div>
+                            </div>
+                          )}
+                          {viewingIncident.crimeRefNumber && (
+                            <div>
                               <label className="text-sm font-medium text-gray-500">Crime Reference Number</label>
                               <p className="mt-1 text-sm text-gray-900">{viewingIncident.crimeRefNumber}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Offender Details */}
-                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="h-6 w-6 text-blue-600">👤</div>
-                      <h2 className="text-lg font-medium text-gray-900">Offender Details</h2>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {viewingIncident.offenderName && (
+                  </div>
+
+                  {/* Offender Details */}
+                  {viewingIncident.offenderName && (
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="h-6 w-6 text-blue-600">👤</div>
+                        <h2 className="text-lg font-medium text-gray-900">Offender Details</h2>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
                           <label className="text-sm font-medium text-gray-500">Name</label>
                           <p className="mt-1 text-sm text-gray-900">{viewingIncident.offenderName}</p>
                         </div>
-                      )}
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Sex</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.offenderSex}</p>
-                      </div>
-                      {viewingIncident.offenderDOB && (
                         <div>
-                          <label className="text-sm font-medium text-gray-500">Date of Birth</label>
-                          <p className="mt-1 text-sm text-gray-900">
-                            {new Date(viewingIncident.offenderDOB).toLocaleDateString()}
-                          </p>
+                          <label className="text-sm font-medium text-gray-500">Sex</label>
+                          <p className="mt-1 text-sm text-gray-900">{viewingIncident.offenderSex || 'N/A'}</p>
                         </div>
-                      )}
-                      {viewingIncident.offenderAddress && (
-                        <>
+                        {viewingIncident.offenderDOB && (
                           <div>
-                            <label className="text-sm font-medium text-gray-500">Address</label>
-                            <p className="mt-1 text-sm text-gray-900">{viewingIncident.offenderAddress.numberAndStreet}</p>
-                    </div>
-                      <div>
-                            <label className="text-sm font-medium text-gray-500">Town</label>
-                            <p className="mt-1 text-sm text-gray-900">{viewingIncident.offenderAddress.town}</p>
-                        </div>
-                          <div>
-                            <label className="text-sm font-medium text-gray-500">Post Code</label>
-                            <p className="mt-1 text-sm text-gray-900">{viewingIncident.offenderAddress.postCode}</p>
+                            <label className="text-sm font-medium text-gray-500">Date of Birth</label>
+                            <p className="mt-1 text-sm text-gray-900">
+                              {new Date(viewingIncident.offenderDOB).toLocaleDateString()}
+                            </p>
+                          </div>
+                        )}
+                        {viewingIncident.offenderAddress && (
+                          <>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Address</label>
+                              <p className="mt-1 text-sm text-gray-900">{viewingIncident.offenderAddress.numberAndStreet || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Town</label>
+                              <p className="mt-1 text-sm text-gray-900">{viewingIncident.offenderAddress.town || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Post Code</label>
+                              <p className="mt-1 text-sm text-gray-900">{viewingIncident.offenderAddress.postCode || 'N/A'}</p>
+                            </div>
+                          </>
+                        )}
                       </div>
-                        </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Incident Categories */}
-                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="h-6 w-6 text-blue-600">🏷️</div>
-                      <h2 className="text-lg font-medium text-gray-900">Incident Categories</h2>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {viewingIncident.incidentInvolved?.map((type, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full bg-blue-600"></div>
-                          <p className="text-sm text-gray-900">{type}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  )}
 
-                {/* Stolen Items */}
-                {viewingIncident.stolenItems && viewingIncident.stolenItems.length > 0 && (
+                  {/* Incident Categories */}
+                  {viewingIncident.incidentInvolved && viewingIncident.incidentInvolved.length > 0 && (
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="h-6 w-6 text-blue-600">🏷️</div>
+                        <h2 className="text-lg font-medium text-gray-900">Incident Categories</h2>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {viewingIncident.incidentInvolved.map((type, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-blue-600"></div>
+                            <p className="text-sm text-gray-900">{type}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stolen Items */}
+                  {viewingIncident.stolenItems && viewingIncident.stolenItems.length > 0 && (
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                       <div className="flex items-center gap-2 mb-4">
                         <div className="h-6 w-6 text-blue-600">💰</div>
@@ -660,20 +838,43 @@ export default function IncidentReportPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {viewingIncident.stolenItems.map((item, index) => (
-                              <tr key={index} className="border-b">
-                                <td className="py-2 text-sm text-gray-900">{item.category}</td>
-                                <td className="py-2 text-sm text-gray-900">{item.productName}</td>
-                                <td className="py-2 text-sm text-gray-900">{item.description}</td>
-                                <td className="py-2 text-sm text-gray-900 text-right">£{item.cost.toFixed(2)}</td>
-                                <td className="py-2 text-sm text-gray-900 text-right">{item.quantity}</td>
-                                <td className="py-2 text-sm text-gray-900 text-right">£{item.totalAmount.toFixed(2)}</td>
-                              </tr>
-                            ))}
+                            {viewingIncident.stolenItems.map((item, index) => {
+                              const cost = typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0
+                              const quantity = typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
+                              // Fallback: calculate totalAmount if not present
+                              const totalAmount = typeof item.totalAmount === 'number' && !isNaN(item.totalAmount)
+                                ? item.totalAmount
+                                : cost * quantity
+                              return (
+                                <tr key={index} className="border-b">
+                                  <td className="py-2 text-sm text-gray-900">{item.category || 'N/A'}</td>
+                                  <td className="py-2 text-sm text-gray-900">{item.productName || 'N/A'}</td>
+                                  <td className="py-2 text-sm text-gray-900">{item.description || 'N/A'}</td>
+                                  <td className="py-2 text-sm text-gray-900 text-right">£{cost.toFixed(2)}</td>
+                                  <td className="py-2 text-sm text-gray-900 text-right">{quantity}</td>
+                                  <td className="py-2 text-sm text-gray-900 text-right">£{totalAmount.toFixed(2)}</td>
+                                </tr>
+                              )
+                            })}
                             <tr className="bg-gray-50">
                               <td colSpan={5} className="py-2 text-sm font-medium text-gray-900">Total Value</td>
                               <td className="py-2 text-sm font-medium text-gray-900 text-right">
-                                £{viewingIncident.stolenItems.reduce((sum, item) => sum + item.totalAmount, 0).toFixed(2)}
+                                £{Array.isArray(viewingIncident?.stolenItems)
+                                    ? (() => {
+                                        const total = viewingIncident.stolenItems.reduce(
+                                          (sum, item) => {
+                                            const cost = typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0
+                                            const quantity = typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
+                                            const totalAmount = typeof item.totalAmount === 'number' && !isNaN(item.totalAmount)
+                                              ? item.totalAmount
+                                              : cost * quantity
+                                            return sum + totalAmount
+                                          },
+                                          0
+                                        )
+                                        return typeof total === 'number' && !isNaN(total) ? total.toFixed(2) : '0.00'
+                                      })()
+                                    : '0.00'}
                               </td>
                             </tr>
                           </tbody>
@@ -681,11 +882,18 @@ export default function IncidentReportPage() {
                       </div>
                     </div>
                   )}
-                  </div>
+                </div>
               </div>
 
               {/* Form Actions */}
-              <div className="sticky bottom-0 bg-white border-t px-4 py-3 flex justify-end">
+              <div className="sticky bottom-0 bg-white border-t px-4 py-3 flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleEdit(viewingIncident)}
+                  className="h-9 px-4 text-sm"
+                >
+                  Edit
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => setViewingIncident(null)}
@@ -715,8 +923,9 @@ export default function IncidentReportPage() {
             <AlertDialogAction
               onClick={handleConfirmDelete}
               className="bg-red-600 hover:bg-red-700 text-white text-sm"
+              disabled={deleteMutation.isPending}
             >
-              Delete
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

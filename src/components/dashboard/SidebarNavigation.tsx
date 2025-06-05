@@ -142,7 +142,6 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
     '/operations/holiday-requests',
     '/operations/bank-holiday',
     '/operations/customer-satisfaction',
-    '/operations/patrol-log',
     '/operations/safe-duress-words',
     '/operations/officer-support',
     '/operations/officer-expenses'
@@ -389,12 +388,6 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                     to="/operations/customer-satisfaction"
                     icon={<BadgeCheck className="h-4 w-4" />}
                     label="Customer Satisfaction"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/operations/patrol-log"
-                    icon={<ClipboardCheck className="h-4 w-4" />}
-                    label="Patrol Log"
                     onClick={onNavigate}
                   />
                   <NavItem

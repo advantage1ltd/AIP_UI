@@ -137,13 +137,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         category: 'customer',
         path: '/operations/customer-satisfaction'
       },
-      {
-        id: 'patrol-log',
-        name: 'Patrol Log',
-        description: 'Officer patrol records and activity logs',
-        category: 'reports',
-        path: '/operations/patrol-log'
-      },
+   
       {
         id: 'safe-duress-words',
         name: 'Safe/Duress Words',

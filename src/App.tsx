@@ -83,6 +83,8 @@ const CustomerSetup = lazy(() => import('./pages/administration/CustomerSetup'))
 const StockControl = lazy(() => import('./pages/administration/StockControl'));
 
 // CRM
+const Dashboard = lazy(() => import('./pages/crm/CRMDashboard'));
+const Leads = lazy(() => import('./pages/crm/Leads'));
 const Contacts = lazy(() => import('./pages/crm/Contacts'));
 const Deals = lazy(() => import('./pages/crm/Deals'));
 const Pipeline = lazy(() => import('./pages/crm/Pipeline'));
@@ -98,6 +100,36 @@ const TestSession = lazy(() => import('./pages/recruitment/TestSession'));
 const IncidentReportPage = lazy(() => import('./pages/operations/IncidentReportPage'));
 const MysteryShopperPage = lazy(() => import('./pages/operations/MysteryShopperPage'));
 const SiteVisitPage = lazy(() => import('./pages/operations/SiteVisitPage'));
+const HolidayRequestPage = lazy(() => import('./pages/operations/HolidayRequestPage'));
+const BankHolidayPage = lazy(() => import('./pages/operations/BankHolidayPage'));
+const CustomerSatisfactionPage = lazy(() => import('./pages/operations/CustomerSatisfactionPage'));
+const SafeDuressWordsPage = lazy(() => import('./pages/operations/SafeDuressWordsPage'));
+const OfficerSupportPage = lazy(() => import('./pages/operations/OfficerSupportPage'));
+const OfficerExpensesPage = lazy(() => import('./pages/operations/OfficerExpensesPage'));
+
+//Employee
+const UniformEquipmentPage = lazy(() => import('./pages/employee/UniformEquipmentPage'));
+const DisciplinaryPage = lazy(() => import('./pages/employee/DisciplinaryPage'));
+const EmployeeDiaryPage = lazy(() => import('./pages/employee/EmployeeDiaryPage'));
+
+// Management
+const CustomerReportingPage = lazy(() => import('./pages/management/CustomerReportingPage'));
+const ManagerSupportPage = lazy(() => import('./pages/management/ManagerSupportPage'));
+const IncidentsReportPage = lazy(() => import('./pages/management/IncidentsReportPage'));
+const OfficerPerformancePage = lazy(() => import('./pages/management/OfficerPerformance'));
+
+// Compliance
+const ContractRenewalPage = lazy(() => import('./pages/compliance/ContractRenewalPage'));
+const PasswordRegisterPage = lazy(() => import('./pages/compliance/PasswordRegisterPage'));
+const AssetRegisterPage = lazy(() => import('./pages/compliance/AssetRegisterPage'));
+
+// Customer
+const DailyActivityReportPage = lazy(() => import('./pages/customer/DailyActivityReportPage'));
+const IncidentGraphPage = lazy(() => import('./pages/customer/IncidentGraph'));
+const CustomerIncidentReportPage = lazy(() => import('./pages/customer/IncidentReport'));
+const SatisfactionReportsPage = lazy(() => import('./pages/customer/SatisfactionReportsPage'));
+const BeSafeBeSecureGraphPage = lazy(() => import('./pages/customer/BeSafeBeSecureGraphPage'));
+const CustomerOfficerSupportPage = lazy(() => import('./pages/customer/CustomerOfficerSupportPage'));
 
 const App: React.FC = () => {
   return (
@@ -117,7 +149,7 @@ const App: React.FC = () => {
                   <Route path="/reports-dashboard" element={<ReportsDashboard />} />
 
                   {/* Administration Routes */}
-                  <Route path="/administration">
+                  <Route path="administration">
                     <Route path="user-setup" element={<UserSetup />} />
                     <Route path="employee-registration" element={<EmployeeRegistration />} />
                     <Route path="customer-setup" element={<CustomerSetup />} />
@@ -125,7 +157,7 @@ const App: React.FC = () => {
                   </Route>
 
                   {/* CRM Routes */}
-                  <Route path="/crm">
+                  <Route path="crm">
                     <Route path="contacts" element={<Contacts />} />
                     <Route path="deals" element={<Deals />} />
                     <Route path="pipeline" element={<Pipeline />} />
@@ -133,18 +165,56 @@ const App: React.FC = () => {
                   </Route>
 
                   {/* Recruitment Routes */}
-                  <Route path="/recruitment">
+                  <Route path="recruitment">
                     <Route path="vetting" element={<Vetting />} />
                     <Route path="cbt" element={<CBT />} />
                     <Route path="take-test" element={<TakeTest />} />
-                      <Route path="test-session" element={<TestSession />} />
+                    <Route path="test-session" element={<TestSession />} />
                   </Route>
 
                   {/* Operations Routes */}
-                  <Route path="/operations">
+                  <Route path="operations">
                     <Route path="incident-report" element={<IncidentReportPage />} />
                     <Route path="mystery-shopper" element={<MysteryShopperPage />} />
                     <Route path="site-visit" element={<SiteVisitPage />} />
+                    <Route path="holiday-requests" element={<HolidayRequestPage />} />
+                    <Route path="bank-holiday" element={<BankHolidayPage />} />
+                    <Route path="customer-satisfaction" element={<CustomerSatisfactionPage />} />
+                    <Route path="safe-duress-words" element={<SafeDuressWordsPage />} />
+                    <Route path="officer-support" element={<OfficerSupportPage />} />
+                    <Route path="officer-expenses" element={<OfficerExpensesPage />} />
+                  </Route>
+
+                  {/* Employee Routes */}
+                  <Route path="employee">
+                    <Route path="uniform-equipment" element={<UniformEquipmentPage />} />
+                    <Route path="disciplinary" element={<DisciplinaryPage />} />
+                    <Route path="diary" element={<EmployeeDiaryPage />} />
+                  </Route>
+
+                  {/* Management Routes */}
+                  <Route path="management">
+                    <Route path="customer-reporting" element={<CustomerReportingPage />} />
+                    <Route path="manager-support" element={<ManagerSupportPage />} />
+                    <Route path="incidents-report" element={<IncidentsReportPage />} />
+                    <Route path="officer-performance" element={<OfficerPerformancePage />} />
+                  </Route>
+
+                  {/* Compliance Routes */}
+                  <Route path="compliance">
+                    <Route path="contract-renewal" element={<ContractRenewalPage />} />
+                    <Route path="password-register" element={<PasswordRegisterPage />} />
+                    <Route path="asset-register" element={<AssetRegisterPage />} />
+                  </Route>
+
+                  {/* Customer Routes */}
+                  <Route path="customer">
+                    <Route path="dar" element={<DailyActivityReportPage />} />
+                    <Route path="incident-graph" element={<IncidentGraphPage />} />
+                    <Route path="incident-report" element={<CustomerIncidentReportPage />} />
+                    <Route path="satisfaction-reports" element={<SatisfactionReportsPage />} />
+                    <Route path="be-safe-be-secure-graph" element={<BeSafeBeSecureGraphPage />} />
+                    <Route path="officer-support" element={<CustomerOfficerSupportPage />} />
                   </Route>
                 </Route>
               </Routes>
