@@ -48,8 +48,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePageAccess } from "@/contexts/PageAccessContext"
 
 // Lazy load the dashboard components
-const OfficerDashboard = React.lazy(() => import('./Dashboard/OfficerDashboard'))
-const CustomerDashboard = React.lazy(() => import('./Dashboard/CustomerDashboard'))
+const OfficerDashboard = React.lazy(() => import('@/pages/Dashboard/OfficerDashboard'))
+const CustomerDashboard = React.lazy(() => import('@/pages/Dashboard/CustomerDashboard'))
 
 // Customer-specific data
 const customerData = {

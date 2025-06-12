@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import React, { useState } from "react"
 import { 
   DropdownMenu, 
@@ -62,11 +62,12 @@ import { useTheme } from "@/components/theme-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
-import { USER_DATA, BUTTON_STYLES } from "@/constants/header";
+import { USER_DATA, BUTTON_STYLES, COMMON_CLASSES } from "@/constants/header";
 import { NotificationBell } from "./header/NotificationBell";
 import { Logo } from "./header/Logo";
 import { SearchInput } from "./header/SearchInput";
 import { UserAvatar } from "./common/UserAvatar";
+import { logout, getUser } from "@/services/auth"
 
 // Define navigation items structure
 interface NavItem {
@@ -76,51 +77,84 @@ interface NavItem {
   roles: string[]; // Which roles can access this item
 }
 
-// Add HeaderProps interface
+// Header props interface
 interface HeaderProps {
   onMobileMenuClick?: () => void;
 }
 
-// Update the COMMON_CLASSES constant at the top of the file
-const COMMON_CLASSES = {
-  mobileHeader: "flex items-center justify-between h-16 px-4 bg-gradient-to-r from-blue-50 to-slate-50 lg:hidden",
-  desktopHeader: "hidden md:flex items-center justify-between h-16 w-full bg-gradient-to-r from-blue-50 via-blue-50/80 to-slate-50 border-b border-gray-200",
-  sheetContent: "w-[340px] sm:w-[400px] p-0 flex flex-col h-full bg-blue-950 text-white border-r-blue-900",
-};
+// UserProfileDropdown component
+const UserProfileDropdown = () => {
+  const navigate = useNavigate();
+  
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
-// Reusable components
-const UserProfileDropdown = () => (
-  <DropdownMenuContent className="w-56 bg-white text-gray-800 border-gray-200" align="end">
-    <DropdownMenuLabel className="font-normal">
-      <div className="flex flex-col space-y-1">
-        <p className="text-sm font-medium leading-none">David Ibanga</p>
-        <p className="text-xs leading-none text-muted-foreground">
-          David.Ibanga@advantage1.co.uk
-        </p>
-      </div>
-    </DropdownMenuLabel>
-    <DropdownMenuSeparator />
-    <DropdownMenuItem asChild className="cursor-pointer focus:bg-gray-100">
-      <Link to="/profile" className="flex w-full cursor-pointer items-center">
+  return (
+    <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuLabel>My Account</DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem>
         <User className="mr-2 h-4 w-4" />
         <span>Profile</span>
-      </Link>
-    </DropdownMenuItem>
-    <DropdownMenuItem asChild className="cursor-pointer focus:bg-gray-100">
-      <Link to="/settings" className="flex w-full cursor-pointer items-center">
+      </DropdownMenuItem>
+      <DropdownMenuItem>
         <Settings className="mr-2 h-4 w-4" />
         <span>Settings</span>
-      </Link>
-    </DropdownMenuItem>
-    <DropdownMenuSeparator />
-    <DropdownMenuItem className="cursor-pointer focus:bg-gray-100">
-      <LogOut className="mr-2 h-4 w-4" />
-      <span>Log out</span>
-    </DropdownMenuItem>
-  </DropdownMenuContent>
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={handleLogout}>
+        <LogOut className="mr-2 h-4 w-4" />
+        <span>Log out</span>
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  );
+};
+
+// NavigationMenu component
+const NavigationMenu = ({ 
+  navigationItems, 
+  hasAccess, 
+  handleNavigate 
+}: {
+  navigationItems: Array<{
+    section: string;
+    items: NavItem[];
+  }>;
+  hasAccess: (item: NavItem) => boolean;
+  handleNavigate: () => void;
+}) => (
+  <Accordion type="multiple" defaultValue={navigationItems.map(section => section.section)} className="w-full">
+    {navigationItems.map((section) => {
+      const accessibleItems = section.items.filter(hasAccess);
+      if (accessibleItems.length === 0) return null;
+      
+      return (
+        <AccordionItem key={section.section} value={section.section} className="border-blue-900">
+          <AccordionTrigger className="text-white hover:text-blue-200 hover:no-underline py-3">
+            {section.section}
+          </AccordionTrigger>
+          <AccordionContent className="space-y-1 pt-2">
+            {accessibleItems.map((item) => (
+              <Link
+                key={item.href}
+                to={item.href}
+                onClick={handleNavigate}
+                className="flex items-center gap-3 px-3 py-2 text-blue-200 hover:text-white hover:bg-blue-800 rounded-md transition-colors"
+              >
+                {item.icon}
+                <span className="text-sm">{item.title}</span>
+              </Link>
+            ))}
+          </AccordionContent>
+        </AccordionItem>
+      );
+    })}
+  </Accordion>
 );
 
-// Role selector content component
+// Role selector content component - only for test mode
 const RoleSelectorContent = ({ 
   currentRole, 
   testRole, 
@@ -140,7 +174,7 @@ const RoleSelectorContent = ({
   
   return (
     <DropdownMenuContent align="start" className="w-[calc(340px-48px)] sm:w-[calc(400px-48px)] bg-blue-900 text-white border-blue-800">
-      <DropdownMenuLabel className="text-blue-200 text-[15px]">Switch Role</DropdownMenuLabel>
+      <DropdownMenuLabel className="text-blue-200 text-[15px]">Switch Role (Test Mode)</DropdownMenuLabel>
       <DropdownMenuSeparator className="bg-blue-800" />
       <DropdownMenuRadioGroup 
         value={activeRole} 
@@ -169,80 +203,6 @@ const RoleSelectorContent = ({
   );
 };
 
-// Navigation menu component
-const NavigationMenu = ({ 
-  navigationItems, 
-  hasAccess, 
-  handleNavigate 
-}: {
-  navigationItems: Array<any>;
-  hasAccess: (item: NavItem) => boolean;
-  handleNavigate: () => void;
-}) => (
-  <Accordion type="multiple" className="space-y-4">
-    {navigationItems.map((section, idx) => {
-      const accessibleItems = section.items.filter(item => hasAccess(item));
-      if (accessibleItems.length === 0) return null;
-      
-      return (
-        <AccordionItem key={idx} value={section.section.toLowerCase()} className="border-none">
-          <AccordionTrigger className="flex items-center gap-3 rounded-lg px-4 py-3 hover:no-underline hover:bg-blue-900 text-white">
-            <span className="text-[17px] font-medium">{section.section}</span>
-          </AccordionTrigger>
-          <AccordionContent className="pb-3 pt-2">
-            <div className="space-y-2">
-              {accessibleItems.map((item, itemIdx) => (
-                <Link 
-                  key={itemIdx} 
-                  to={item.href}
-                  className="flex items-center gap-4 rounded-md px-4 py-3 text-[16px] font-medium text-blue-200 hover:bg-blue-800 hover:text-white"
-                  onClick={handleNavigate}
-                >
-                  {React.cloneElement(item.icon as React.ReactElement, { className: 'h-6 w-6' })}
-                  {item.title}
-                </Link>
-              ))}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      );
-    })}
-    
-    {/* Settings link - directly in mobile menu */}
-    <div className="px-4 py-2 mt-2">
-      <Link 
-        to="/settings"
-        className="flex items-center gap-4 rounded-md px-4 py-3 text-[16px] font-medium text-white bg-blue-800 hover:bg-blue-700"
-        onClick={handleNavigate}
-      >
-        <Settings className="h-6 w-6" />
-        Settings
-      </Link>
-    </div>
-  </Accordion>
-);
-
-// User profile section component
-const UserProfileSection = () => (
-  <div className="border-t border-blue-900 p-6 mt-auto bg-blue-900/50">
-    <div className="flex items-center gap-4">
-      <UserAvatar size="lg" showBorder={true} />
-      <div className="flex-1 min-w-0">
-        <p className="text-[17px] font-medium text-white truncate">{USER_DATA.name}</p>
-        <p className="text-[14px] text-blue-200 truncate">{USER_DATA.role}</p>
-      </div>
-      <Button 
-        variant="ghost" 
-        size="icon"
-        aria-label="Log out"
-        className="text-blue-200 hover:text-white hover:bg-blue-800 h-12 w-12"
-      >
-        <LogOut className="h-6 w-6" />
-      </Button>
-    </div>
-  </div>
-);
-
 export function Header({ onMobileMenuClick }: HeaderProps) {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -257,6 +217,10 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   } = usePageAccess();
   
   const { theme } = useTheme();
+
+  // Get authenticated user info
+  const authenticatedUser = getUser();
+  const isAuthenticated = !!authenticatedUser;
 
   // Define user roles
   const userRoles = [
@@ -544,8 +508,13 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
     }
   ];
 
-  // Handle role change
+  // Handle role change - only allowed in test mode for administrators
   const handleRoleChange = (roleId: string) => {
+    // Only allow role changes in test mode and if user is administrator
+    if (!isTestMode || !isAuthenticated || authenticatedUser.pageAccessRole !== 'administrator') {
+      return;
+    }
+    
     if (isTestMode) {
       setTestRole(roleId);
     } else {
@@ -553,8 +522,12 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
     }
   };
 
-  // Toggle test mode
+  // Toggle test mode - only allowed for administrators
   const toggleTestMode = () => {
+    if (!isAuthenticated || authenticatedUser.pageAccessRole !== 'administrator') {
+      return;
+    }
+    
     setIsTestMode(!isTestMode);
     if (!isTestMode) {
       setTestRole(currentRole);
@@ -563,11 +536,30 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
     }
   };
 
-  // Get current role name
+  // Get current role name based on authentication status
   const getCurrentRoleName = () => {
+    if (isAuthenticated) {
+      // For authenticated users, show their actual role
+      if (isTestMode && testRole && authenticatedUser.pageAccessRole === 'administrator') {
+        const role = userRoles.find(r => r.id === testRole);
+        return role ? `${role.name} (Test)` : 'Test Mode';
+      }
+      
+      // Show the user's actual role
+      const role = userRoles.find(r => r.id === authenticatedUser.pageAccessRole);
+      return role ? role.name : authenticatedUser.role;
+    }
+    
+    // Fallback for non-authenticated users
     const roleId = isTestMode && testRole ? testRole : currentRole;
     const role = userRoles.find(r => r.id === roleId);
     return role ? role.name : 'Select Role';
+  };
+
+  // Check if role switching should be enabled - only for administrators in test mode
+  const isRoleSwitchingEnabled = () => {
+    return isAuthenticated && 
+           authenticatedUser.pageAccessRole === 'administrator';
   };
 
   // Toggle mobile search
@@ -577,6 +569,11 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   
   // Get the user's current role ID
   const getCurrentRoleId = () => {
+    if (isAuthenticated) {
+      return isTestMode && testRole && authenticatedUser.pageAccessRole === 'administrator' 
+        ? testRole 
+        : authenticatedUser.pageAccessRole;
+    }
     return isTestMode && testRole ? testRole : currentRole;
   };
   
@@ -594,46 +591,56 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full bg-gradient-to-r from-blue-50 to-slate-50 border-b border-gray-200 shadow-sm">
       {/* Mobile Header */}
-      <div className={COMMON_CLASSES.mobileHeader}>
+      <div className="w-full h-[80px] bg-blue-200 pb-1 flex lg:hidden justify-between items-center px-5 py-4">
         {/* Left: Hamburger Menu */}
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
           <SheetTrigger asChild>
             <Button 
               variant="ghost" 
               size="icon" 
-              className={BUTTON_STYLES.ghost}
+              className="p-0 text-white hover:bg-slate-700"
               aria-label="Menu"
-              onClick={onMobileMenuClick}
             >
               <Menu className="h-10 w-10" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className={COMMON_CLASSES.sheetContent}>
+          
+          <SheetContent side="left" className="w-[340px] sm:w-[400px] p-0 flex flex-col h-full bg-blue-950 text-white border-r-blue-900">
             <SheetHeader className="p-6 border-b border-blue-900 shrink-0">
               <SheetTitle className="text-left flex items-center justify-center text-white">
-                <Logo variant="sheet" />
+                <img 
+                  src="/AdvantageOne.svg" 
+                  alt="Advantage One"
+                  className="h-17 w-auto" 
+                />
               </SheetTitle>
             </SheetHeader>
             
             <div className="flex-1 overflow-y-auto">
-              {/* Role selector in mobile menu */}
+              {/* Role display/selector in menu */}
               <div className="px-6 py-5 border-b border-blue-900">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-full h-10 gap-1 bg-blue-900 text-white border-blue-800 justify-between hover:bg-blue-800 hover:text-white">
-                      <span className="font-medium text-[15px]">Role: {getCurrentRoleName()}</span>
-                      <ChevronDown className="h-5 w-5 opacity-50" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <RoleSelectorContent 
-                    currentRole={currentRole}
-                    testRole={testRole}
-                    isTestMode={isTestMode}
-                    handleRoleChange={handleRoleChange}
-                    toggleTestMode={toggleTestMode}
-                    userRoles={userRoles}
-                  />
-                </DropdownMenu>
+                {isRoleSwitchingEnabled() ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="w-full h-10 gap-1 bg-blue-900 text-white border-blue-800 justify-between hover:bg-blue-800 hover:text-white">
+                        <span className="font-medium text-[15px]">Role: {getCurrentRoleName()}</span>
+                        <ChevronDown className="h-5 w-5 opacity-50" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <RoleSelectorContent 
+                      currentRole={currentRole}
+                      testRole={testRole}
+                      isTestMode={isTestMode}
+                      handleRoleChange={handleRoleChange}
+                      toggleTestMode={toggleTestMode}
+                      userRoles={userRoles}
+                    />
+                  </DropdownMenu>
+                ) : (
+                  <div className="w-full h-10 bg-blue-900 text-white border border-blue-800 rounded-md flex items-center px-3">
+                    <span className="font-medium text-[15px]">Role: {getCurrentRoleName()}</span>
+                  </div>
+                )}
               </div>
               
               <div className="px-5 py-4">
@@ -645,175 +652,108 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
               </div>
             </div>
             
-            {/* User profile section at bottom of mobile menu */}
-            <UserProfileSection />
+            {/* User profile section at bottom of menu */}
+            <div className="p-6 border-t border-blue-900 shrink-0">
+              <div className="flex items-center gap-3">
+                <UserAvatar size="md" showBorder={true} />
+                <div className="text-sm">
+                  <p className="font-medium text-white">
+                    {isAuthenticated ? authenticatedUser.displayName || authenticatedUser.username : 'David Ibanga'}
+                  </p>
+                  <p className="text-xs text-blue-200">
+                    {isAuthenticated ? authenticatedUser.role : 'IT manager'}
+                  </p>
+                </div>
+              </div>
+            </div>
           </SheetContent>
         </Sheet>
-        
-        {/* Center: Logo */}
-        <Logo variant="mobile" containerClassName="w-65" />
-        
-        {/* Right: User Avatar */}
-        <div className="flex items-center">
+
+        {/* Center: Logo and Search Toggle */}
+        <div className="flex items-center gap-4">
+          {!isSearchExpanded && (
+            <img 
+              src="/AdvantageOne.svg" 
+              alt="Advantage One"
+              className="h-12 w-auto" 
+            />
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleSearch}
+            className="text-white hover:bg-slate-700"
+            aria-label="Search"
+          >
+            <Search className="h-6 w-6" />
+          </Button>
+        </div>
+
+        {/* Right: Notifications and User Profile */}
+        <div className="flex items-center gap-3">
+          <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 focus:outline-none">
-                <UserAvatar size="md" />
-                <ChevronDown className="h-4 w-4 text-gray-500" />
-              </button>
+              <div className="flex items-center gap-2 cursor-pointer">
+                <UserAvatar size="sm" showBorder={true} />
+                <ChevronDown className="h-4 w-4 text-white" />
+              </div>
             </DropdownMenuTrigger>
             <UserProfileDropdown />
           </DropdownMenu>
         </div>
       </div>
-      
-      {/* Desktop/Tablet Header */}
+
+      {/* Desktop Header */}
       <div className={COMMON_CLASSES.desktopHeader}>
-        {/* Left: Empty space to balance the layout (desktop only) */}
-        <div className="w-64 hidden lg:block"></div>
+        {/* Left: Logo */}
+        <div className="flex items-center">
+          <Logo variant="desktop" />
+        </div>
         
-        {/* Center: Logo for iPad (md screens) and Search for larger screens */}
+        {/* Center: Search */}
         <div className="flex-1 flex justify-center items-center">
-          {/* iPad/Tablet Header with hamburger menu - md screens only */}
-          <div className="w-full md:flex lg:hidden justify-between items-center px-5">
-            {/* Left: Hamburger Menu */}
-            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="p-0 text-white hover:bg-slate-700"
-                  aria-label="Menu"
-                >
-                  <Menu className="h-10 w-10" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-[340px] sm:w-[400px] p-0 flex flex-col h-full bg-blue-950 text-white border-r-blue-900">
-                <SheetHeader className="p-6 border-b border-blue-900 shrink-0">
-                  <SheetTitle className="text-left flex items-center justify-center text-white">
-                    <img 
-                      src="/AdvantageOne.svg" 
-                      alt="Advantage One"
-                      className="h-17 w-auto" 
-                    />
-                  </SheetTitle>
-                </SheetHeader>
-                
-                <div className="flex-1 overflow-y-auto">
-                  {/* Role selector in menu */}
-                  <div className="px-6 py-5 border-b border-blue-900">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="w-full h-10 gap-1 bg-blue-900 text-white border-blue-800 justify-between hover:bg-blue-800 hover:text-white">
-                          <span className="font-medium text-[15px]">Role: {getCurrentRoleName()}</span>
-                          <ChevronDown className="h-5 w-5 opacity-50" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <RoleSelectorContent 
-                        currentRole={currentRole}
-                        testRole={testRole}
-                        isTestMode={isTestMode}
-                        handleRoleChange={handleRoleChange}
-                        toggleTestMode={toggleTestMode}
-                        userRoles={userRoles}
-                      />
-                    </DropdownMenu>
-                  </div>
-                  
-                  <div className="px-5 py-4">
-                    <NavigationMenu 
-                      navigationItems={navigationItems}
-                      hasAccess={hasAccess}
-                      handleNavigate={handleNavigate}
-                    />
-                  </div>
-                </div>
-                
-                {/* User profile section at bottom of menu */}
-                <UserProfileSection />
-              </SheetContent>
-            </Sheet>
-            
-            {/* Center: Logo */}
-            <Logo variant="ipad" containerClassName="max-w-xs py-4" />
-            
-            {/* Right: Notifications and User */}
-            <div className="flex items-center gap-4">
-              <NotificationBell className="text-white hover:text-blue-200" />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <div className="flex items-center gap-2 cursor-pointer">
-                    <UserAvatar size="md" showBorder={true} />
-                    <div className="hidden md:block text-sm">
-                      <p className="font-medium text-gray-900 dark:text-white">David Ibanga</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-300">IT manager</p>
-                    </div>
-                    <ChevronDown className="h-4 w-4 text-gray-400" />
-                  </div>
-                </DropdownMenuTrigger>
-                <UserProfileDropdown />
-              </DropdownMenu>
-            </div>
-          </div>
-          
-          {/* Desktop Search */}
-          <div className="hidden lg:block relative max-w-md w-full">
+          <div className="relative max-w-md w-full">
             <SearchInput />
           </div>
         </div>
         
-        {/* Right Side Actions - Desktop only */}
-        {/* 
-          Desktop Actions Section
-          - Only visible on lg screens
-          - Contains: Role selector, Notifications, Theme toggle, User profile
-          - Responsive spacing between items
-          - Adapts styling based on theme
-        */}
-        <div className="hidden lg:flex items-center gap-2 md:gap-4">
-          {/* Role Selector */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-1 md:bg-blue-900 md:text-white md:border-blue-800 lg:bg-white lg:text-black lg:border-gray-200">
-                <span className="font-medium">Role: {getCurrentRoleName()}</span>
-                <ChevronDown className="h-4 w-4 opacity-50 ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <RoleSelectorContent 
-              currentRole={currentRole}
-              testRole={testRole}
-              isTestMode={isTestMode}
-              handleRoleChange={handleRoleChange}
-              toggleTestMode={toggleTestMode}
-              userRoles={userRoles}
-            />
-          </DropdownMenu>
-
-          {/* Notification Bell */}
-          <Link 
-            to="/action-calendar" 
-            className="relative p-1 md:text-blue-200 md:hover:text-white lg:text-gray-600 lg:hover:text-gray-900 transition-colors"
-            aria-label="Notifications - 3 unread"
-          >
-            <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-[11px] font-medium text-white">
-              3
-            </span>
-          </Link>
-
-          {/* Theme Toggle */}
-          <div className="md:text-blue-200 md:hover:text-white lg:text-gray-600 lg:hover:text-gray-900">
-            <ThemeToggle />
-          </div>
-          
-          {/* User Profile */}
+        {/* Right: Role Selector, Notifications and User Profile */}
+        <div className="flex items-center gap-4">
+          {isRoleSwitchingEnabled() ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1 bg-white text-gray-700 border-gray-300 hover:bg-gray-50">
+                  <span className="font-medium">Role: {getCurrentRoleName()}</span>
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <RoleSelectorContent 
+                currentRole={currentRole}
+                testRole={testRole}
+                isTestMode={isTestMode}
+                handleRoleChange={handleRoleChange}
+                toggleTestMode={toggleTestMode}
+                userRoles={userRoles}
+              />
+            </DropdownMenu>
+          ) : (
+            <div className="bg-white text-gray-700 border border-gray-300 rounded-md px-3 py-1.5">
+              <span className="font-medium text-sm">Role: {getCurrentRoleName()}</span>
+            </div>
+          )}
+          <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <div className="flex items-center gap-2 cursor-pointer">
                 <UserAvatar size="md" showBorder={true} />
-                <div className="hidden md:block text-sm">
-                  <p className="font-medium text-gray-900 dark:text-white">David Ibanga</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-300">IT manager</p>
+                <div className="text-sm">
+                  <p className="font-medium text-gray-900">
+                    {isAuthenticated ? authenticatedUser.displayName || authenticatedUser.username : 'David Ibanga'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {isAuthenticated ? authenticatedUser.role : 'IT manager'}
+                  </p>
                 </div>
                 <ChevronDown className="h-4 w-4 text-gray-400" />
               </div>
@@ -825,16 +765,10 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
 
       {/* Mobile Search Overlay */}
       {isSearchExpanded && (
-        <>
-          <div className="absolute top-16 left-0 right-0 p-2 bg-white border-b z-30 md:hidden">
-            <SearchInput autoFocus />
-          </div>
-          <div 
-            className="fixed inset-0 bg-black/20 z-20 md:hidden" 
-            onClick={() => setIsSearchExpanded(false)}
-          />
-        </>
+        <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-b border-gray-200 p-4 z-40">
+          <SearchInput />
+        </div>
       )}
     </header>
-  );
+  )
 } 

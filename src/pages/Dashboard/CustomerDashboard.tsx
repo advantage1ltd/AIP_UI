@@ -90,6 +90,7 @@ interface Region {
 
 interface CustomerDashboardProps {
   userRole: CustomerRole
+  displayName?: string
 }
 
 interface DailyActivity {
@@ -564,7 +565,9 @@ const dailyActivities: DailyActivity[] = [
   }
 ]
 
-function CustomerDashboard({ userRole }: CustomerDashboardProps) {
+function CustomerDashboard({ userRole, displayName }: CustomerDashboardProps) {
+  console.log('🏢 CustomerDashboard props:', { userRole, displayName })
+  
   // State management
   const [error, setError] = React.useState<Error | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
@@ -668,6 +671,7 @@ function CustomerDashboard({ userRole }: CustomerDashboardProps) {
           <div className="flex items-center gap-2">
             <h1 className="text-base font-semibold md:text-lg lg:text-xl">
               {isSiteManager ? 'Customer Dashboard' : 'Customer Dashboard'}
+              <span className="ml-2 text-blue-700 font-bold">{displayName ? `(${displayName})` : ''}</span>
             </h1>
             {isSiteManager ? (
               <Store className="h-5 w-5 text-gray-500" />

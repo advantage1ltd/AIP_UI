@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { getUser } from '@/services/auth'
 import {
   FileWarning,
   FileSearch,
@@ -491,10 +492,15 @@ const IncidentTable: React.FC = () => {
   )
 }
 
-export default function OfficerDashboard() {
+export default function OfficerDashboard({ displayName }: { displayName?: string }) {
   // Error handling state
   const [error, setError] = React.useState<Error | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
+  
+  // Get the logged-in user information
+  const loggedInUser = getUser()
+  const userName = loggedInUser?.displayName || loggedInUser?.username || displayName || officerData.name
+  const userRole = loggedInUser?.role || officerData.role
 
   // Fetch data on mount
   React.useEffect(() => {
@@ -557,14 +563,14 @@ export default function OfficerDashboard() {
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Welcome back, {officerData.name}
+              Welcome back, {userName}
             </h1>
             <div className="text-gray-600 flex items-center gap-2">
               <Badge variant="outline" className="text-green-600 border-green-200">
                 {officerData.shiftStatus}
               </Badge>
               <span>•</span>
-              <span>{officerData.role}</span>              
+              <span>{userRole}</span>              
               <span className="flex items-center gap-1"></span>
             </div>
           </div>

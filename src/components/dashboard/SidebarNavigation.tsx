@@ -142,6 +142,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
     '/operations/holiday-requests',
     '/operations/bank-holiday',
     '/operations/customer-satisfaction',
+    '/operations/patrol-log',
     '/operations/safe-duress-words',
     '/operations/officer-support',
     '/operations/officer-expenses'
@@ -268,42 +269,54 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
               </AccordionTrigger>
               <AccordionContent className="pb-1 pt-0">
                 <div className="ml-4 space-y-1">
-                  <NavItem
-                    to="/crm/dashboard"
-                    icon={<LayoutDashboard className="h-4 w-4" />}
-                    label="Dashboard"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/crm/leads"
-                    icon={<UserPlus className="h-4 w-4" />}
-                    label="Leads"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/crm/contacts"
-                    icon={<Users className="h-4 w-4" />}
-                    label="Contacts"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/crm/deals"
-                    icon={<DollarSign className="h-4 w-4" />}
-                    label="Deals"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/crm/pipeline"
-                    icon={<GitBranch className="h-4 w-4" />}
-                    label="Pipeline"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/crm/tasks"
-                    icon={<CheckSquare className="h-4 w-4" />}
-                    label="Tasks"
-                    onClick={onNavigate}
-                  />
+                  {hasAccess('/crm/dashboard') && (
+                    <NavItem
+                      to="/crm/dashboard"
+                      icon={<LayoutDashboard className="h-4 w-4" />}
+                      label="Dashboard"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/crm/leads') && (
+                    <NavItem
+                      to="/crm/leads"
+                      icon={<UserPlus className="h-4 w-4" />}
+                      label="Leads"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/crm/contacts') && (
+                    <NavItem
+                      to="/crm/contacts"
+                      icon={<Users className="h-4 w-4" />}
+                      label="Contacts"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/crm/deals') && (
+                    <NavItem
+                      to="/crm/deals"
+                      icon={<DollarSign className="h-4 w-4" />}
+                      label="Deals"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/crm/pipeline') && (
+                    <NavItem
+                      to="/crm/pipeline"
+                      icon={<GitBranch className="h-4 w-4" />}
+                      label="Pipeline"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/crm/tasks') && (
+                    <NavItem
+                      to="/crm/tasks"
+                      icon={<CheckSquare className="h-4 w-4" />}
+                      label="Tasks"
+                      onClick={onNavigate}
+                    />
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -317,30 +330,38 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
               </AccordionTrigger>
               <AccordionContent className="pb-1 pt-0">
                 <div className="ml-4 space-y-1">
-                  <NavItem
-                    to="/administration/user-setup"
-                    icon={<User className="h-4 w-4" />}
-                    label="User Setup"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/administration/employee-registration"
-                    icon={<UserPlus className="h-4 w-4" />}
-                    label="Employee Registration"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/administration/customer-setup"
-                    icon={<Building2 className="h-4 w-4" />}
-                    label="Customer Setup"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/administration/stock-control"
-                    icon={<Store className="h-4 w-4" />}
-                    label="Stock Control"
-                    onClick={onNavigate}
-                  />
+                  {hasAccess('/administration/user-setup') && (
+                    <NavItem
+                      to="/administration/user-setup"
+                      icon={<User className="h-4 w-4" />}
+                      label="User Setup"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/administration/employee-registration') && (
+                    <NavItem
+                      to="/administration/employee-registration"
+                      icon={<UserPlus className="h-4 w-4" />}
+                      label="Employee Registration"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/administration/customer-setup') && (
+                    <NavItem
+                      to="/administration/customer-setup"
+                      icon={<Building2 className="h-4 w-4" />}
+                      label="Customer Setup"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/administration/stock-control') && (
+                    <NavItem
+                      to="/administration/stock-control"
+                      icon={<Store className="h-4 w-4" />}
+                      label="Stock Control"
+                      onClick={onNavigate}
+                    />
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -354,60 +375,86 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
               </AccordionTrigger>
               <AccordionContent className="pb-1 pt-0">
                 <div className="ml-4 space-y-1">
-                  <NavItem
-                    to="/operations/incident-report"
-                    icon={<FileWarning className="h-4 w-4" />}
-                    label="Incident Report"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/operations/mystery-shopper"
-                    icon={<FileSearch className="h-4 w-4" />}
-                    label="Mystery Shopper"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/operations/site-visit"
-                    icon={<Building className="h-4 w-4" />}
-                    label="Site Visit"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/operations/holiday-requests"
-                    icon={<Calendar className="h-4 w-4" />}
-                    label="Holiday Requests"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/operations/bank-holiday"
-                    icon={<CalendarRange className="h-4 w-4" />}
-                    label="Bank Holiday"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/operations/customer-satisfaction"
-                    icon={<BadgeCheck className="h-4 w-4" />}
-                    label="Customer Satisfaction"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/operations/safe-duress-words"
-                    icon={<Key className="h-4 w-4" />}
-                    label="Safe/Duress Words"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/operations/officer-support"
-                    icon={<HelpCircle className="h-4 w-4" />}
-                    label="Officer Support"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/operations/officer-expenses"
-                    icon={<Wallet className="h-4 w-4" />}
-                    label="Officer Expenses"
-                    onClick={onNavigate}
-                  />
+                  {hasAccess('/operations/incident-report') && (
+                    <NavItem
+                      to="/operations/incident-report"
+                      icon={<FileWarning className="h-4 w-4" />}
+                      label="Incident Report"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/operations/mystery-shopper') && (
+                    <NavItem
+                      to="/operations/mystery-shopper"
+                      icon={<FileSearch className="h-4 w-4" />}
+                      label="Mystery Shopper"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/operations/site-visit') && (
+                    <NavItem
+                      to="/operations/site-visit"
+                      icon={<Building className="h-4 w-4" />}
+                      label="Site Visit"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/operations/holiday-requests') && (
+                    <NavItem
+                      to="/operations/holiday-requests"
+                      icon={<Calendar className="h-4 w-4" />}
+                      label="Holiday Requests"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/operations/bank-holiday') && (
+                    <NavItem
+                      to="/operations/bank-holiday"
+                      icon={<CalendarRange className="h-4 w-4" />}
+                      label="Bank Holiday"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/operations/customer-satisfaction') && (
+                    <NavItem
+                      to="/operations/customer-satisfaction"
+                      icon={<BadgeCheck className="h-4 w-4" />}
+                      label="Customer Satisfaction"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/operations/patrol-log') && (
+                    <NavItem
+                      to="/operations/patrol-log"
+                      icon={<ClipboardCheck className="h-4 w-4" />}
+                      label="Patrol Log"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/operations/safe-duress-words') && (
+                    <NavItem
+                      to="/operations/safe-duress-words"
+                      icon={<Key className="h-4 w-4" />}
+                      label="Safe/Duress Words"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/operations/officer-support') && (
+                    <NavItem
+                      to="/operations/officer-support"
+                      icon={<HelpCircle className="h-4 w-4" />}
+                      label="Officer Support"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/operations/officer-expenses') && (
+                    <NavItem
+                      to="/operations/officer-expenses"
+                      icon={<Wallet className="h-4 w-4" />}
+                      label="Officer Expenses"
+                      onClick={onNavigate}
+                    />
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -421,24 +468,30 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
               </AccordionTrigger>
               <AccordionContent className="pb-1 pt-0">
                 <div className="ml-4 space-y-1">
-                  <NavItem
-                    to="/employee/uniform-equipment"
-                    icon={<Shirt className="h-4 w-4" />}
-                    label="Uniform & Equipment"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/employee/disciplinary"
-                    icon={<AlertTriangle className="h-4 w-4" />}
-                    label="Disciplinary"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/employee/diary"
-                    icon={<FileTextIcon className="h-4 w-4" />}
-                    label="Diary"
-                    onClick={onNavigate}
-                  />
+                  {hasAccess('/employee/uniform-equipment') && (
+                    <NavItem
+                      to="/employee/uniform-equipment"
+                      icon={<Shirt className="h-4 w-4" />}
+                      label="Uniform & Equipment"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/employee/disciplinary') && (
+                    <NavItem
+                      to="/employee/disciplinary"
+                      icon={<AlertTriangle className="h-4 w-4" />}
+                      label="Disciplinary"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/employee/diary') && (
+                    <NavItem
+                      to="/employee/diary"
+                      icon={<FileTextIcon className="h-4 w-4" />}
+                      label="Diary"
+                      onClick={onNavigate}
+                    />
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -452,30 +505,38 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
               </AccordionTrigger>
               <AccordionContent className="pb-1 pt-0">
                 <div className="ml-4 space-y-1">
-                  <NavItem
-                    to="/management/customer-reporting"
-                    icon={<FileText className="h-4 w-4" />}
-                    label="Customer Reporting"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/management/manager-support"
-                    icon={<Building2 className="h-4 w-4" />}
-                    label="Manager Support"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/management/incidents-report"
-                    icon={<FileWarning className="h-4 w-4" />}
-                    label="Incidents Report"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/management/officer-performance"
-                    icon={<UserCheck className="h-4 w-4" />}
-                    label="Officer Performance"
-                    onClick={onNavigate}
-                  />
+                  {hasAccess('/management/customer-reporting') && (
+                    <NavItem
+                      to="/management/customer-reporting"
+                      icon={<FileText className="h-4 w-4" />}
+                      label="Customer Reporting"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/management/manager-support') && (
+                    <NavItem
+                      to="/management/manager-support"
+                      icon={<Building2 className="h-4 w-4" />}
+                      label="Manager Support"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/management/incidents-report') && (
+                    <NavItem
+                      to="/management/incidents-report"
+                      icon={<FileWarning className="h-4 w-4" />}
+                      label="Incidents Report"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/management/officer-performance') && (
+                    <NavItem
+                      to="/management/officer-performance"
+                      icon={<UserCheck className="h-4 w-4" />}
+                      label="Officer Performance"
+                      onClick={onNavigate}
+                    />
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -489,24 +550,30 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
               </AccordionTrigger>
               <AccordionContent className="pb-1 pt-0">
                 <div className="ml-4 space-y-1">
-                  <NavItem
-                    to="/compliance/contract-renewal"
-                    icon={<FileText className="h-4 w-4" />}
-                    label="Contract Renewal"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/compliance/password-register"
-                    icon={<Key className="h-4 w-4" />}
-                    label="Password Register"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/compliance/asset-register"
-                    icon={<Boxes className="h-4 w-4" />}
-                    label="Asset Register"
-                    onClick={onNavigate}
-                  />
+                  {hasAccess('/compliance/contract-renewal') && (
+                    <NavItem
+                      to="/compliance/contract-renewal"
+                      icon={<FileText className="h-4 w-4" />}
+                      label="Contract Renewal"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/compliance/password-register') && (
+                    <NavItem
+                      to="/compliance/password-register"
+                      icon={<Key className="h-4 w-4" />}
+                      label="Password Register"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/compliance/asset-register') && (
+                    <NavItem
+                      to="/compliance/asset-register"
+                      icon={<Boxes className="h-4 w-4" />}
+                      label="Asset Register"
+                      onClick={onNavigate}
+                    />
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -520,24 +587,30 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
               </AccordionTrigger>
               <AccordionContent className="pb-1 pt-0">
                 <div className="ml-4 space-y-1">
-                  <NavItem
-                    to="/recruitment/vetting"
-                    icon={<FileTextIcon className="h-4 w-4" />}
-                    label="Vetting"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/recruitment/cbt"
-                    icon={<BookOpen className="h-4 w-4" />}
-                    label="CBT"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/recruitment/take-test"
-                    icon={<FileQuestion className="h-4 w-4" />}
-                    label="Take Test"
-                    onClick={onNavigate}
-                  />
+                  {hasAccess('/recruitment/vetting') && (
+                    <NavItem
+                      to="/recruitment/vetting"
+                      icon={<FileTextIcon className="h-4 w-4" />}
+                      label="Vetting"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/recruitment/cbt') && (
+                    <NavItem
+                      to="/recruitment/cbt"
+                      icon={<BookOpen className="h-4 w-4" />}
+                      label="CBT"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/recruitment/take-test') && (
+                    <NavItem
+                      to="/recruitment/take-test"
+                      icon={<FileQuestion className="h-4 w-4" />}
+                      label="Take Test"
+                      onClick={onNavigate}
+                    />
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -551,36 +624,46 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
               </AccordionTrigger>
               <AccordionContent className="pb-1 pt-0">
                 <div className="ml-4 space-y-1">
-                  <NavItem
-                    to="/customer/dar"
-                    icon={<FileText className="h-4 w-4" />}
-                    label="Daily Activity Report"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/customer/incident-graph"
-                    icon={<BarChart2 className="h-4 w-4" />}
-                    label="Incident Graph"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/customer/incident-report"
-                    icon={<FileWarning className="h-4 w-4" />}
-                    label="Incident Report"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/customer/satisfaction-reports"
-                    icon={<FileText className="h-4 w-4" />}
-                    label="Satisfaction Reports"
-                    onClick={onNavigate}
-                  />
-                  <NavItem
-                    to="/customer/be-safe-be-secure-graph"
-                    icon={<ShieldCheck className="h-4 w-4" />}
-                    label="Be Safe Be Secure Graph"
-                    onClick={onNavigate}
-                  />
+                  {hasAccess('/customer/dar') && (
+                    <NavItem
+                      to="/customer/dar"
+                      icon={<FileText className="h-4 w-4" />}
+                      label="Daily Activity Report"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/customer/incident-graph') && (
+                    <NavItem
+                      to="/customer/incident-graph"
+                      icon={<BarChart2 className="h-4 w-4" />}
+                      label="Incident Graph"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/customer/incident-report') && (
+                    <NavItem
+                      to="/customer/incident-report"
+                      icon={<FileWarning className="h-4 w-4" />}
+                      label="Incident Report"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/customer/satisfaction-reports') && (
+                    <NavItem
+                      to="/customer/satisfaction-reports"
+                      icon={<FileText className="h-4 w-4" />}
+                      label="Satisfaction Reports"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/customer/be-safe-be-secure-graph') && (
+                    <NavItem
+                      to="/customer/be-safe-be-secure-graph"
+                      icon={<ShieldCheck className="h-4 w-4" />}
+                      label="Be Safe Be Secure Graph"
+                      onClick={onNavigate}
+                    />
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>

@@ -1,11 +1,10 @@
 import * as React from "react";
 import { DayPicker } from "react-day-picker";
-import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button";
+import { Caption } from "@/components/common/DayPickerCustomCaption";
 
-export type CalendarProps = React.ComponentProps<typeof DayPicker>;
+type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
-function Calendar({
+export function Calendar({
   className,
   classNames,
   showOutsideDays = true,
@@ -14,38 +13,35 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-4 w-full", className)}
+      className={className}
       classNames={{
-        months: "space-y-4",
-        month: "space-y-4",
-        caption: "flex flex-col items-center gap-1",
-        caption_label: "text-2xl font-bold text-center mb-2",
-        nav: "flex justify-center w-full items-center gap-6 mt-1",
-        nav_button: cn(
-          buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-75 hover:opacity-100"
-        ),
-        nav_button_previous: "",
-        nav_button_next: "",
+        months: "flex flex-col space-y-4",
+        month: "space-y-2 xs:space-y-4",
+        caption: "flex items-center justify-between gap-2 w-full",
+        caption_label: "text-center text-lg font-semibold text-gray-900",
+        nav: "hidden",
+        nav_button: "hidden",
+        nav_button_previous: "hidden",
+        nav_button_next: "hidden",
         table: "w-full border-collapse space-y-1",
-        head_row: "grid grid-cols-7",
-        head_cell: "text-muted-foreground font-medium text-[0.8rem] text-center",
-        row: "grid grid-cols-7 mt-2",
-        cell: "text-center p-0 relative focus-within:relative focus-within:z-20",
-        day: cn(
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 rounded-md hover:bg-accent"
-        ),
-        day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-        day_today: "bg-accent text-accent-foreground",
-        day_outside: "text-muted-foreground opacity-50",
-        day_disabled: "text-muted-foreground opacity-50",
+        head_row: "flex",
+        head_cell: "text-gray-500 rounded-md w-7 xs:w-8 font-bold text-base text-center",
+        row: "flex w-full mt-1 xs:mt-2",
+        cell: "text-center text-xs p-0 relative w-7 h-7 xs:w-8 xs:h-8 focus-within:relative focus-within:z-20",
+        day: "h-7 w-7 xs:h-8 xs:w-8 p-0 font-normal aria-selected:opacity-100 hover:bg-gray-100 rounded-full transition-colors text-base cursor-pointer",
+        day_selected: "bg-blue-600 text-white hover:bg-blue-600 hover:text-white focus:bg-blue-600 focus:text-white rounded-full",
+        day_today: "bg-blue-50 text-blue-600 font-semibold rounded-full",
+        day_outside: "text-gray-400 opacity-50",
+        day_disabled: "text-red-600 bg-red-50 line-through opacity-70 cursor-not-allowed",
+        day_range_middle: "aria-selected:bg-gray-100 aria-selected:text-gray-900",
         day_hidden: "invisible",
-        ...classNames,
+        ...classNames
+      }}
+      components={{
+        MonthCaption: Caption,
+        ...props.components
       }}
       {...props}
     />
   );
 }
-Calendar.displayName = "Calendar";
-
-export { Calendar };

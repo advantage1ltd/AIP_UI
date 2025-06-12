@@ -216,54 +216,78 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   }, [descriptionValue, form])
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-    // Guard for dateOfIncident
-    const isValidDateOfIncident = values.dateOfIncident && !isNaN(new Date(values.dateOfIncident).getTime())
-    // Guard for timeOfIncident (should be a string, but check if it's valid for new Date)
-    const isValidTimeOfIncident = values.timeOfIncident && !isNaN(new Date(values.timeOfIncident).getTime())
+    try {
+      // Log form values for debugging
+      console.log('Form values:', values)
+      console.log('URN Number:', values.urnNumber)
+      console.log('Crime Ref Number:', values.crimeRefNumber)
+      console.log('Form validation state:', form.formState)
 
-    const formattedData: Incident = {
-      id: initialData?.id || uuidv4(),
-      customerName: values.customerName,
-      siteName: values.siteName,
-      officerName: values.officerName,
-      officerRole: values.officerRole,
-      dateOfIncident: isValidDateOfIncident ? new Date(values.dateOfIncident).toISOString() : '',
-      timeOfIncident: values.timeOfIncident,
-      incidentType: values.incidentType,
-      description: values.description,
-      incidentInvolved: values.incidentInvolved,
-      policeInvolvement: values.policeInvolvement,
-      dutyManagerName: values.dutyManagerName,
-      status: values.status,
-      priority: values.priority,
-      evidenceAttached: values.evidenceAttached,
-      offenderAddress: values.offenderAddress,
-      offenderSex: values.offenderSex,
-      stolenItems: stolenItems.map(item => ({
-        ...item,
-        totalAmount: item.cost * item.quantity
-      })),
-      // Optional fields
-      incidentDetails: values.incidentDetails,
-      storeComments: values.storeComments,
-      urnNumber: values.urnNumber,
-      totalValueRecovered: parseFloat(values.totalValueRecovered || '0'),
-      actionTaken: values.actionTaken,
-      witnessStatements: values.witnessStatements,
-      involvedParties: values.involvedParties,
-      reportNumber: values.reportNumber,
-      offenderName: values.offenderName,
-      offenderDOB: values.offenderDOB,
-      offenderPlaceOfBirth: values.offenderPlaceOfBirth,
-      policeID: values.policeID,
-      crimeRefNumber: values.crimeRefNumber,
-      // Additional fields
-      dateInputted: new Date().toISOString(),
-      timeOfDay: values.timeOfIncident && isValidDateOfIncident ? format(new Date(`${values.dateOfIncident.toDateString()}T${values.timeOfIncident}`), 'HH:mm') : '',
-      dayOfWeek: isValidDateOfIncident ? format(new Date(values.dateOfIncident), 'EEEE') : '',
+      // Guard for dateOfIncident
+      const isValidDateOfIncident = values.dateOfIncident && !isNaN(new Date(values.dateOfIncident).getTime())
+      
+      // Format time of day safely
+      let timeOfDay = ''
+      if (values.timeOfIncident && isValidDateOfIncident) {
+        try {
+          // Create a date object from today's date and the time value
+          const [hours, minutes] = values.timeOfIncident.split(':')
+          const date = new Date()
+          date.setHours(parseInt(hours, 10))
+          date.setMinutes(parseInt(minutes, 10))
+          timeOfDay = format(date, 'HH:mm')
+        } catch (error) {
+          console.error('Error formatting time:', error)
+          timeOfDay = values.timeOfIncident // fallback to original value
+        }
+      }
+
+      const formattedData: Incident = {
+        id: initialData?.id || uuidv4(),
+        customerName: values.customerName,
+        siteName: values.siteName,
+        officerName: values.officerName,
+        officerRole: values.officerRole,
+        dateOfIncident: isValidDateOfIncident ? new Date(values.dateOfIncident).toISOString() : '',
+        timeOfIncident: values.timeOfIncident,
+        incidentType: values.incidentType,
+        description: values.description,
+        incidentInvolved: values.incidentInvolved,
+        policeInvolvement: values.policeInvolvement,
+        dutyManagerName: values.dutyManagerName,
+        status: values.status,
+        priority: values.priority,
+        evidenceAttached: values.evidenceAttached,
+        offenderAddress: values.offenderAddress,
+        offenderSex: values.offenderSex,
+        stolenItems: stolenItems.map(item => ({
+          ...item,
+          totalAmount: item.cost * item.quantity
+        })),
+        // Optional fields
+        incidentDetails: values.incidentDetails,
+        storeComments: values.storeComments,
+        urnNumber: values.urnNumber || '',
+        totalValueRecovered: parseFloat(values.totalValueRecovered || '0'),
+        actionTaken: values.actionTaken,
+        witnessStatements: values.witnessStatements,
+        involvedParties: values.involvedParties,
+        reportNumber: values.reportNumber,
+        offenderName: values.offenderName,
+        offenderDOB: values.offenderDOB,
+        offenderPlaceOfBirth: values.offenderPlaceOfBirth,
+        policeID: values.policeID,
+        crimeRefNumber: values.crimeRefNumber || '',
+        // Additional fields
+        dateInputted: new Date().toISOString(),
+        timeOfDay,
+        dayOfWeek: isValidDateOfIncident ? format(new Date(values.dateOfIncident), 'EEEE') : '',
+      }
+      console.log('Submitting incident:', formattedData)
+      onSubmit(formattedData)
+    } catch (error) {
+      console.error('Error submitting incident:', error)
     }
-    console.log('Submitting incident:', formattedData)
-    onSubmit(formattedData)
   }
 
   const addStolenItem = () => {
@@ -1014,23 +1038,38 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
             </div>
 
             {/* Form Actions */}
-            <div className="flex justify-end items-center gap-3 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onCancel}
-                className="h-9 px-4 text-sm"
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                className="h-9 px-4 text-sm bg-green-600 hover:bg-green-700 text-white"
-                disabled={isLoading}
-              >
-                {isLoading ? "Saving..." : initialData ? "Update" : "Create"}
-              </Button>
+            <div className="flex flex-col gap-3 pt-4">
+              {/* Error Summary */}
+              {Object.keys(form.formState.errors).length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                  <p className="text-sm font-medium text-red-800 mb-2">Please fix the following errors:</p>
+                  <ul className="list-disc list-inside text-sm text-red-700">
+                    {Object.entries(form.formState.errors).map(([field, error]) => (
+                      <li key={field}>{error?.message as string}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              <div className="flex justify-end items-center gap-3">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={onCancel}
+                  className="h-9 px-4 text-sm"
+                  disabled={isLoading}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="h-9 px-4 text-sm bg-green-600 hover:bg-green-700 text-white"
+                  disabled={isLoading || !form.formState.isValid}
+                >
+                  {isLoading ? "Saving..." : initialData ? "Update" : "Create"}
+                  {!form.formState.isValid && " (Please fill required fields)"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

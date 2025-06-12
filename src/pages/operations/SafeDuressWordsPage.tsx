@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -39,26 +39,13 @@ import {
   History,
   KeyRound,
   Calendar,
-  User
+  User,
+  Loader2
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
-
-// Define types
-interface CodeWord {
-  word: string;
-  updatedAt: string;
-  updatedBy: string;
-}
-
-interface WordHistory {
-  id: string;
-  type: 'safe' | 'duress';
-  oldWord: string;
-  newWord: string;
-  changedAt: string;
-  changedBy: string;
-  reason: string;
-}
+import { toast } from 'react-toastify';
+import { safeDuressWordsService } from '@/services/safeDuressWordsService';
+import { CodeWord, WordHistory, WordHistoryFilters } from '@/types/safeDuressWords';
 
 // Reusable components
 const PageHeader = ({ onShowHistory, onShowUpdateDialog }) => (
@@ -433,71 +420,103 @@ const SafeDuressWordsPage: React.FC = () => {
   const [newWord, setNewWord] = useState('');
   const [reason, setReason] = useState('');
   const [authorizedCode, setAuthorizedCode] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // Mock current words with last update info
+  // Data state
   const [currentWords, setCurrentWords] = useState<{
     safe: CodeWord;
     duress: CodeWord;
-  }>({
-    safe: {
-      word: 'cat',
-      updatedAt: '2024-02-15',
-      updatedBy: 'John Smith'
-    },
-    duress: {
-      word: 'dog',
-      updatedAt: '2024-02-15',
-      updatedBy: 'John Smith'
-    }
+  } | null>(null);
+  
+  const [wordHistory, setWordHistory] = useState<WordHistory[]>([]);
+  const [historyPagination, setHistoryPagination] = useState({
+    page: 1,
+    pageSize: 10,
+    total: 0
   });
+  const [historyFilters, setHistoryFilters] = useState<WordHistoryFilters>({});
 
-  // Mock word change history
-  const [wordHistory] = useState<WordHistory[]>([
-    {
-      id: '1',
-      type: 'safe',
-      oldWord: 'bird',
-      newWord: 'cat',
-      changedAt: '2024-02-15 09:00',
-      changedBy: 'John Smith',
-      reason: 'Quarterly security protocol update'
-    },
-    {
-      id: '2',
-      type: 'duress',
-      oldWord: 'fish',
-      newWord: 'dog',
-      changedAt: '2024-02-15 09:00',
-      changedBy: 'John Smith',
-      reason: 'Quarterly security protocol update'
+  // Fetch current words
+  const fetchCurrentWords = async () => {
+    try {
+      setIsLoading(true);
+      const response = await safeDuressWordsService.getCurrentWords();
+      setCurrentWords(response.data);
+    } catch (error) {
+      console.error('Failed to fetch current words:', error);
+      toast.error('Failed to load current words. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  };
 
-  const handleUpdateWord = () => {
+  // Fetch word history
+  const fetchWordHistory = async () => {
+    try {
+      setIsHistoryLoading(true);
+      const response = await safeDuressWordsService.getWordHistory(
+        historyPagination.page,
+        historyPagination.pageSize,
+        historyFilters
+      );
+      setWordHistory(response.data);
+      setHistoryPagination(prev => ({
+        ...prev,
+        total: response.pagination.total
+      }));
+    } catch (error) {
+      console.error('Failed to fetch word history:', error);
+      toast.error('Failed to load word history. Please try again.');
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    fetchCurrentWords();
+  }, []);
+
+  // Load history when dialog is opened or filters/pagination change
+  useEffect(() => {
+    if (showHistory) {
+      fetchWordHistory();
+    }
+  }, [showHistory, historyPagination.page, historyPagination.pageSize, historyFilters]);
+
+  const handleUpdateWord = async () => {
     if (!updateType || !newWord || !reason || !authorizedCode) return;
     
-    // In a real application, you would:
-    // 1. Validate the authorization code
-    // 2. Make an API call to update the word
-    // 3. Log the change in a secure database
-    // 4. Notify relevant personnel
-
-    const currentDate = new Date().toISOString().split('T')[0];
-    
-    setCurrentWords(prev => ({
-      ...prev,
-      [updateType]: {
+    try {
+      setIsUpdating(true);
+      await safeDuressWordsService.updateCodeWord({
+        type: updateType,
         word: newWord,
-        updatedAt: currentDate,
-        updatedBy: 'Current User' // This would come from auth context
-      }
-    }));
+        reason,
+        authorizedCode
+      });
 
-    // Reset form
-    setNewWord('');
-    setReason('');
-    setAuthorizedCode('');
-    setShowUpdateDialog(false);
+      toast.success(`${updateType === 'safe' ? 'Safe' : 'Duress'} word updated successfully`);
+      
+      // Refresh data
+      await fetchCurrentWords();
+      if (showHistory) {
+        await fetchWordHistory();
+      }
+
+      // Reset form
+      setNewWord('');
+      setReason('');
+      setAuthorizedCode('');
+      setShowUpdateDialog(false);
+    } catch (error: any) {
+      console.error('Failed to update word:', error);
+      toast.error(error.response?.data?.error || 'Failed to update word. Please try again.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   // Communication protocol guidelines
@@ -513,6 +532,17 @@ const SafeDuressWordsPage: React.FC = () => {
     'Follow established response procedures',
     'Maintain situational awareness'
   ];
+
+  if (isLoading || !currentWords) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          <span className="text-gray-600">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">

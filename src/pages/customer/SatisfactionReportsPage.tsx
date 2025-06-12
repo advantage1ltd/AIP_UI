@@ -22,7 +22,7 @@ interface PerformanceRating {
   uniformAndAppearance: number
   professionalism: number
   customerServiceApproach: number
-  improvedFeelingSecurity: number
+  improvedFeelingOfSecurityWhenOfficerOnSite: number
   relationsWithStoreColleagues: number
   punctualityAndBreaks: number
   proactivity: number
@@ -70,7 +70,7 @@ const SatisfactionReports = () => {
         uniformAndAppearance: 8,
         professionalism: 9,
         customerServiceApproach: 7,
-        improvedFeelingSecurity: 9,
+        improvedFeelingOfSecurityWhenOfficerOnSite: 9,
         relationsWithStoreColleagues: 8,
         punctualityAndBreaks: 7,
         proactivity: 8
@@ -370,7 +370,7 @@ const SatisfactionReports = () => {
                       <RatingScale value={selectedSurvey.performanceRating.uniformAndAppearance} title="Uniform and Appearance" />
                       <RatingScale value={selectedSurvey.performanceRating.professionalism} title="Professionalism" />
                       <RatingScale value={selectedSurvey.performanceRating.customerServiceApproach} title="Customer Service Approach" />
-                      <RatingScale value={selectedSurvey.performanceRating.improvedFeelingSecurity} title="Improved Feeling of Security when Officer on Site" />
+                      <RatingScale value={selectedSurvey.performanceRating.improvedFeelingOfSecurityWhenOfficerOnSite} title="Improved Feeling of Security When Officer on Site" />
                       <RatingScale value={selectedSurvey.performanceRating.relationsWithStoreColleagues} title="Relations With Store Colleagues" />
                       <RatingScale value={selectedSurvey.performanceRating.punctualityAndBreaks} title="Punctuality / Breaks" />
                       <RatingScale value={selectedSurvey.performanceRating.proactivity} title="Proactivity" />
