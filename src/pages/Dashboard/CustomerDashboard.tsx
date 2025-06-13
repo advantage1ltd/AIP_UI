@@ -29,6 +29,7 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar } from 'recharts'
 import { cn } from '@/lib/utils'
 import { IncidentTable } from '@/components/dashboard/IncidentTable'
+import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 
 // Types and Interfaces
 interface CustomerStoreData {
@@ -666,6 +667,9 @@ function CustomerDashboard({ userRole, displayName }: CustomerDashboardProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="container mx-auto p-6 space-y-8">
+        {/* Dashboard Greeting */}
+        <DashboardGreeting className="mb-6" />
+
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
           <div className="flex items-center gap-2">

@@ -7,7 +7,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuGroup,
 } from '../ui/dropdown-menu';
 import { USER_DATA } from '@/constants/header';
 import { UserAvatar } from '../common/UserAvatar';
@@ -24,7 +23,7 @@ export const UserMenu = ({ className = '' }: UserMenuProps) => {
           <UserAvatar size="sm" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
+      <DropdownMenuContent className="w-56" align="end">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm leading-none">{USER_DATA.name}</p>
@@ -34,16 +33,14 @@ export const UserMenu = ({ className = '' }: UserMenuProps) => {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <User className="mr-2 h-4 w-4" />
-            <span>Profile</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <SettingsIcon className="mr-2 h-4 w-4" />
-            <span>Settings</span>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
+        <DropdownMenuItem>
+          <User className="mr-2 h-4 w-4" />
+          <span>Profile</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <SettingsIcon className="mr-2 h-4 w-4" />
+          <span>Settings</span>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-red-600">
           <LogOut className="mr-2 h-4 w-4" />
