@@ -74,6 +74,7 @@ import {
 } from "@/components/ui/pagination";
 import { holidayRequestService } from "@/services/holidayRequestService";
 import type { HolidayRequest, CreateHolidayRequestDTO, UpdateHolidayRequestDTO } from "@/types/holidayRequest";
+import { usePageAccess } from '@/contexts/PageAccessContext'
 
 const getStatusBadgeClass = (status: 'pending' | 'approved' | 'denied') => {
   switch (status) {
@@ -135,9 +136,11 @@ export default function HolidayRequestPage() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [isAdmin] = useState(true); // For demo purposes, set to true. In real app, this would come from auth context
+  const { currentRole } = usePageAccess();
   const itemsPerPage = 10;
   const { toast } = useToast();
+
+  const isAdminRole = currentRole && ['administrator', 'admin'].includes(currentRole.toLowerCase());
 
   // Fetch holiday requests
   const fetchRequests = async () => {
@@ -477,7 +480,7 @@ export default function HolidayRequestPage() {
           <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 xl:gap-4">
             <div className="flex items-center gap-2 sm:gap-4">
               <h3 className="text-sm sm:text-base xl:text-lg font-medium text-gray-800">Holiday Request Records</h3>
-              {isAdmin && (
+              {isAdminRole && (
                 <Button
                   type="button"
                   variant="outline"
@@ -625,7 +628,7 @@ export default function HolidayRequestPage() {
                                   <span className="sr-only">Edit</span>
                                 </Button>
                               )}
-                              {isAdmin && request.status === 'approved' && !request.archived && new Date() > new Date(request.endDate) && (
+                              {isAdminRole && request.status === 'approved' && !request.archived && new Date() > new Date(request.endDate) && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -638,7 +641,7 @@ export default function HolidayRequestPage() {
                                   <span className="sr-only">Archive</span>
                                 </Button>
                               )}
-                              {isAdmin && request.archived && (
+                              {isAdminRole && request.archived && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -996,35 +999,6 @@ export default function HolidayRequestPage() {
                 )}
               />
 
-              {/* Authorising Manager */}
-              <FormField
-                control={form.control}
-                name="authorisedBy"
-                render={({ field }) => (
-                  <FormItem className="space-y-1.5 sm:space-y-2">
-                    <FormLabel className="text-xs sm:text-sm font-medium text-gray-700">Authorising Manager</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-8 xs:h-9 sm:h-10 text-xs sm:text-sm">
-                          <SelectValue placeholder="Select a manager" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {mockManagers.map((manager) => (
-                          <SelectItem key={manager.id} value={manager.id} className="text-xs sm:text-sm">
-                            {manager.name} - {manager.role}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription className="text-[10px] xs:text-xs text-gray-500">
-                      Select the manager who will authorize your request
-                    </FormDescription>
-                    <FormMessage className="text-[10px] xs:text-xs" />
-                  </FormItem>
-                )}
-              />
-
               {/* Comments */}
               <FormField
                 control={form.control}
@@ -1176,10 +1150,17 @@ export default function HolidayRequestPage() {
                     <p className="text-xs sm:text-sm text-gray-900">{viewingRequest.comment}</p>
                   </div>
                 )}
+
+                {typeof viewingRequest?.daysLeftYTD === 'number' && (
+                  <div className="col-span-2">
+                    <h4 className="text-[10px] xs:text-xs font-medium text-gray-500">Days Left (out of 28 YTD)</h4>
+                    <p className="text-xs sm:text-sm text-gray-900">{viewingRequest.daysLeftYTD}</p>
+                  </div>
+                )}
               </div>
               
               {/* Admin Approval/Denial Section */}
-              {viewingRequest?.status === 'pending' && (
+              {isAdminRole && viewingRequest?.status === 'pending' && (
                 <div className="border-t border-gray-200 pt-3 xs:pt-4 mt-3 xs:mt-4">
                   <h3 className="text-xs sm:text-sm font-medium text-gray-900 mb-2 xs:mb-3">Approval Decision</h3>
                   
@@ -1189,27 +1170,25 @@ export default function HolidayRequestPage() {
                     const formData = new FormData(form);
                     const decision = formData.get('decision') as 'approved' | 'denied';
                     const reason = formData.get('reason') as string;
-                    
-                    if (decision && reason && viewingRequest) {
+                    const daysLeftYTD = Number(formData.get('daysLeftYTD'));
+                    const authorisedBy = formData.get('authorisedBy') as string;
+                    if (decision && reason && viewingRequest && authorisedBy) {
                       try {
                         setIsSubmitting(true);
-                        
-                        // Update the request status
                         const updatedRequest = await holidayRequestService.updateHolidayRequest(
                           viewingRequest.id,
                           {
                             status: decision,
                             comment: reason,
-                            dateAuthorised: new Date()
+                            dateAuthorised: new Date(),
+                            daysLeftYTD: !isNaN(daysLeftYTD) ? daysLeftYTD : undefined,
+                            authorisedBy,
                           }
                         );
-                        
-                        setRequests(prev => prev.map(r => 
+                        setRequests(prev => prev.map(r =>
                           r.id === viewingRequest.id ? updatedRequest : r
                         ));
-                        
                         setIsViewDialogOpen(false);
-                        
                         toast({
                           title: "Success",
                           description: `Holiday request ${decision} successfully.`,
@@ -1227,7 +1206,7 @@ export default function HolidayRequestPage() {
                     } else {
                       toast({
                         title: "Error",
-                        description: "Please select a decision and provide a reason.",
+                        description: "Please select a decision, provide a reason, and select an authorising manager.",
                         variant: "destructive"
                       });
                     }
@@ -1268,6 +1247,38 @@ export default function HolidayRequestPage() {
                           required
                           disabled={isSubmitting}
                         />
+                      </div>
+                      
+                      <div>
+                        <label className="text-[10px] xs:text-xs font-medium text-gray-700 mb-1 block">Days Left (out of 28 YTD)</label>
+                        <input
+                          type="number"
+                          name="daysLeftYTD"
+                          min={0}
+                          max={28}
+                          defaultValue={viewingRequest.daysLeftYTD ?? ''}
+                          className="w-24 xs:w-32 sm:w-40 border rounded px-2 py-1 text-xs sm:text-sm"
+                          placeholder="e.g. 18"
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-[10px] xs:text-xs font-medium text-gray-700 mb-1 block">Authorising Manager</label>
+                        <select
+                          name="authorisedBy"
+                          required
+                          className="w-full border rounded px-2 py-1 text-xs sm:text-sm"
+                          defaultValue={viewingRequest.authorisedBy || ''}
+                          disabled={isSubmitting}
+                        >
+                          <option value="" disabled>Select a manager</option>
+                          {mockManagers.map((manager) => (
+                            <option key={manager.id} value={manager.id}>
+                              {manager.name} - {manager.role}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       
                       <div className="flex justify-end gap-2 xs:gap-3">

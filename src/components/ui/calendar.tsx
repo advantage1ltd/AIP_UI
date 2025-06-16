@@ -1,6 +1,5 @@
 import * as React from "react";
 import { DayPicker } from "react-day-picker";
-import { Caption } from "@/components/common/DayPickerCustomCaption";
 
 type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
@@ -19,10 +18,10 @@ export function Calendar({
         month: "space-y-2 xs:space-y-4",
         caption: "flex items-center justify-between gap-2 w-full",
         caption_label: "text-center text-lg font-semibold text-gray-900",
-        nav: "hidden",
-        nav_button: "hidden",
-        nav_button_previous: "hidden",
-        nav_button_next: "hidden",
+        nav: "space-x-1 flex items-center",
+        nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+        nav_button_previous: "absolute left-1",
+        nav_button_next: "absolute right-1",
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell: "text-gray-500 rounded-md w-7 xs:w-8 font-bold text-base text-center",
@@ -37,10 +36,9 @@ export function Calendar({
         day_hidden: "invisible",
         ...classNames
       }}
-      components={{
-        MonthCaption: Caption,
-        ...props.components
-      }}
+      captionLayout="dropdown-buttons"
+      fromYear={1920}
+      toYear={new Date().getFullYear()}
       {...props}
     />
   );

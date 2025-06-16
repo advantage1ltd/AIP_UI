@@ -256,6 +256,7 @@ const App: React.FC = () => {
                           <Route path="mystery-shopper" element={<MysteryShopperPage />} />
                           <Route path="site-visit" element={<SiteVisitPage />} />
                           <Route path="holiday-request" element={<HolidayRequestPage />} />
+                          <Route path="holiday-requests" element={<HolidayRequestPage />} />
                           <Route path="bank-holiday" element={<BankHolidayPage />} />
                           <Route path="customer-satisfaction" element={<CustomerSatisfactionPage />} />
                           <Route path="safe-duress-words" element={<SafeDuressWordsPage />} />

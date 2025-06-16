@@ -68,7 +68,7 @@ export interface Incident {
     county?: string;
     postCode?: string;
   };
-  offenderSex?: 'Male' | 'Female' | 'N/A or N/K';
+  gender?: 'Male' | 'Female' | 'N/A or N/K';
   offenderDOB?: Date;
   offenderPlaceOfBirth?: string;
   policeID?: string;
@@ -84,4 +84,5 @@ export interface Incident {
   dateInputted: string;
   timeOfDay: string;
   dayOfWeek: string;
+  arrestSaveComment?: string;
 }

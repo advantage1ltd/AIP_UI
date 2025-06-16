@@ -16,22 +16,24 @@ export const DashboardGreeting = ({
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    const getGreeting = () => {
-      const hour = currentTime.getHours();
-      if (hour < 12) return 'Good Morning';
-      if (hour < 18) return 'Good Afternoon';
-      return 'Good Evening';
+    // Update immediately on mount
+    const updateGreeting = () => {
+      const hour = new Date().getHours();
+      if (hour < 12) setGreeting('Good Morning');
+      else if (hour < 17) setGreeting('Good Afternoon');
+      else setGreeting('Good Evening');
     };
 
-    setGreeting(getGreeting());
+    updateGreeting();
 
     // Update time every minute
     const timer = setInterval(() => {
       setCurrentTime(new Date());
+      updateGreeting();
     }, 60000);
 
     return () => clearInterval(timer);
-  }, [currentTime]);
+  }, []); // Remove currentTime dependency
 
   if (isLoading) {
     return (
