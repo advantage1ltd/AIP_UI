@@ -7,27 +7,43 @@ interface User {
 }
 
 export const login = async (username: string, password: string) => {
-  const response = await fetch('/api/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ username, password }),
-  });
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, password }),
+    });
 
-  const data = await response.json();
+    // First try to parse the response
+    let data;
+    try {
+      data = await response.json();
+    } catch (e) {
+      console.error('Failed to parse response:', e);
+      throw new Error('Server returned an invalid response');
+    }
 
-  if (!response.ok) {
-    throw new Error(data.message || 'Login failed');
-  }
+    // Check if the response was not ok
+    if (!response.ok) {
+      throw new Error(data?.message || 'Login failed');
+    }
 
-  if (data.success && data.data) {
+    // Validate the response format
+    if (!data.success || !data.data) {
+      throw new Error('Invalid response format');
+    }
+
+    // Store auth data
     localStorage.setItem('auth_token', Math.random().toString(36).slice(2));
     localStorage.setItem('user', JSON.stringify(data.data));
+    
     return data.data as User;
+  } catch (error) {
+    console.error('Login error:', error);
+    throw error;
   }
-
-  throw new Error('Invalid response format');
 };
 
 export const logout = () => {
