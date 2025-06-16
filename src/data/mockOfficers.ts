@@ -4,10 +4,13 @@ export interface Officer {
   role: string;
 }
 
-export const mockOfficers: Officer[] = [
-  { id: '1', name: 'Mr Robert Gray', role: 'Senior Officer' },
-  { id: '2', name: 'Ms Sarah Johnson', role: 'Officer' },
-  { id: '3', name: 'Mr James Smith', role: 'Senior Officer' },
-  { id: '4', name: 'Ms Emily Brown', role: 'Officer' },
-  { id: '5', name: 'Mr Michael Wilson', role: 'Officer' },
+export const mockOfficers = [
+  { id: "off1", name: "John Smith" },
+  { id: "off2", name: "Sarah Johnson" },
+  { id: "off3", name: "Michael Brown" },
+  { id: "off4", name: "Emily Davis" },
+  { id: "off5", name: "David Wilson" },
+  { id: "off6", name: "Lisa Thompson" },
+  { id: "off7", name: "Robert Garcia" },
+  { id: "off8", name: "Jennifer Lee" },
 ];

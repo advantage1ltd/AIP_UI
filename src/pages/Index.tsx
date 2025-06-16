@@ -46,10 +46,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePageAccess } from "@/contexts/PageAccessContext"
+import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 
 // Lazy load the dashboard components
-const OfficerDashboard = React.lazy(() => import('./Dashboard/OfficerDashboard'))
-const CustomerDashboard = React.lazy(() => import('./Dashboard/CustomerDashboard'))
+const OfficerDashboard = React.lazy(() => import('@/pages/Dashboard/OfficerDashboard'))
+const CustomerDashboard = React.lazy(() => import('@/pages/Dashboard/CustomerDashboard'))
 
 // Customer-specific data
 const customerData = {
@@ -627,20 +628,26 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden">
-      <div className="container mx-auto px-2 md:px-4 space-y-4 max-w-full md:max-w-7xl">
+    <div className="min-h-screen bg-slate-50 p-6">
+      <div className="space-y-6">
+        <DashboardGreeting />
+        
         {/* Customer Selection */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
-          <h1 className="text-base font-semibold md:text-lg lg:text-xl">Dashboard</h1>
-          <div className="w-full md:w-auto">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Customer Overview</h2>
+            <Badge variant="secondary" className="text-xs">Admin View</Badge>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
             <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
               <SelectTrigger className="w-full text-sm md:w-[200px]">
                 <SelectValue placeholder="Select customer" />
               </SelectTrigger>
               <SelectContent>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id} className="text-sm">
-                    {c.name}
+                {customers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.name}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -1,24 +1,28 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { Provider } from 'react-redux'
-import { store } from './store/store'
 import App from './App'
 import './index.css'
+import { Provider } from 'react-redux'
+import { store } from './store/store'
 
-// Create root element
-const rootElement = document.getElementById('root')
-if (!rootElement) {
-  throw new Error('Failed to find the root element')
+async function startApp() {
+  if (import.meta.env.DEV) {
+    try {
+      const { initMockServiceWorker } = await import('./mocks/browser')
+      await initMockServiceWorker()
+      console.log('Mock Service Worker initialized successfully')
+    } catch (error) {
+      console.error('Failed to initialize Mock Service Worker:', error)
+    }
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <Provider store={store}>
+        <App />
+      </Provider>
+    </React.StrictMode>
+  )
 }
 
-// Create root
-const root = ReactDOM.createRoot(rootElement)
-
-// Render app
-root.render(
-  <React.StrictMode>
-    <Provider store={store}>
-      <App />
-    </Provider>
-  </React.StrictMode>
-)
+startApp()

@@ -20,7 +20,7 @@ interface LayoutProps {
  * Main layout component that provides the application structure
  * Includes sidebar navigation, header, main content area, and footer
  */
-const Layout = ({ children }: LayoutProps) => {
+export const Layout = ({ children }: LayoutProps) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const location = useLocation()
   const { theme } = useTheme()
@@ -97,4 +97,4 @@ const Layout = ({ children }: LayoutProps) => {
   )
 }
 
-export default Layout
+export { Layout as default }

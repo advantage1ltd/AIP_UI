@@ -17,13 +17,11 @@ interface QuizState {
 }
 
 interface PreloadedState {
-  users: any[];
   contacts: ContactsState;
   quiz: QuizState;
 }
 
 const preloadedState: PreloadedState = {
-  users: [],
   contacts: {
     contacts: [],
     loading: false,

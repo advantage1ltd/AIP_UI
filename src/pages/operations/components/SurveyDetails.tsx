@@ -6,10 +6,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Building2, User, Star, Check, AlertCircle } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { format } from 'date-fns';
 
 interface SurveyDetailsProps {
   survey: CustomerSurvey;
@@ -40,6 +42,9 @@ export const SurveyDetails: React.FC<SurveyDetailsProps> = ({ survey, open, onCl
       <DialogContent className="w-[calc(100%-16px)] sm:max-w-xl max-w-md mx-auto max-h-[90vh] p-3 sm:p-4 md:p-6 overflow-hidden">
         <DialogHeader className="pb-2 space-y-1">
           <DialogTitle className="text-base sm:text-lg font-semibold">Survey Details</DialogTitle>
+          <DialogDescription>
+            Survey conducted on {format(new Date(survey.date), 'PPP')}
+          </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="max-h-[70vh] pr-2 -mr-2">

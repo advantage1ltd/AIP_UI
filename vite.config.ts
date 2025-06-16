@@ -42,8 +42,9 @@ const fixFramerMotionPlugin = () => {
 export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? '/' : '/',
   server: {
-    host: "::",
-    port: 8080,
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: false,
   },
   plugins: [
     react({

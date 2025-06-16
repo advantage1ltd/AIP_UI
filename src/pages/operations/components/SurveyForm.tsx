@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -21,13 +21,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MOCK_CUSTOMERS, MOCK_REGIONS, MOCK_LOCATIONS, RATING_SCALE, CustomerSurvey } from './types';
-import { Minus, Plus, Calendar, Map, Building, User, Award, Star, Smile, UserCheck, Shield, Users, Clock, Zap } from 'lucide-react';
+import { Minus, Plus, Map, Building, User, Award, Star, Smile, UserCheck, Shield, Users, Clock, Zap, ClipboardList } from 'lucide-react';
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 type RatingFields = {
   uniformAndAppearance: number;
   professionalism: number;
   customerServiceApproach: number;
-  improvedFeelingSecurity: number;
+  improvedFeelingOfSecurityWhenOfficerOnSite: number;
   relationsWithStoreColleagues: number;
   punctualityBreaks: number;
   proactivity: number;
@@ -43,21 +49,21 @@ const formSchema = z.object({
     uniformAndAppearance: z.number().min(1).max(10),
     professionalism: z.number().min(1).max(10),
     customerServiceApproach: z.number().min(1).max(10),
-    improvedFeelingSecurity: z.number().min(1).max(10),
+    improvedFeelingOfSecurityWhenOfficerOnSite: z.number().min(1).max(10),
     relationsWithStoreColleagues: z.number().min(1).max(10),
     punctualityBreaks: z.number().min(1).max(10),
     proactivity: z.number().min(1).max(10)
   }),
   storeManagerName: z.string().min(2, 'Store manager name is required'),
   areaManagerName: z.string().min(2, 'Area manager name is required'),
-  followUpActions: z.array(z.string()),
-  datesToBeCompleted: z.array(z.string())
+  followUpActions: z.array(z.string()).min(1, 'At least one follow-up action is required'),
+  datesToBeCompleted: z.array(z.string()).min(1, 'At least one completion date is required')
 });
 
 interface SurveyFormProps {
-  onSubmit: (data: z.infer<typeof formSchema>) => void;
+  onSubmit: (data: CustomerSurvey) => void;
   onCancel: () => void;
-  initialData?: CustomerSurvey;
+  initialData?: CustomerSurvey | null;
 }
 
 // Form section wrapper for consistent styling
@@ -74,10 +80,10 @@ const FormSection = ({ title, icon, children }: { title: string; icon?: React.Re
 // Rating icon mapping for different categories
 const getRatingIcon = (name: keyof RatingFields) => {
   const iconMap = {
-    uniformAndAppearance: <User className="h-3.5 w-3.5" />,
-    professionalism: <UserCheck className="h-3.5 w-3.5" />,
+    uniformAndAppearance: <Award className="h-3.5 w-3.5" />,
+    professionalism: <Star className="h-3.5 w-3.5" />,
     customerServiceApproach: <Smile className="h-3.5 w-3.5" />,
-    improvedFeelingSecurity: <Shield className="h-3.5 w-3.5" />,
+    improvedFeelingOfSecurityWhenOfficerOnSite: <Shield className="h-3.5 w-3.5" />,
     relationsWithStoreColleagues: <Users className="h-3.5 w-3.5" />,
     punctualityBreaks: <Clock className="h-3.5 w-3.5" />,
     proactivity: <Zap className="h-3.5 w-3.5" />
@@ -129,141 +135,168 @@ const MobileRatingScale = ({
   </div>
 );
 
-export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit, onCancel, initialData }) => {
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: initialData || {
-      officerName: '',
-      date: new Date().toISOString().split('T')[0],
-      customer: '',
-      region: '',
-      location: '',
-      ratings: {
-        uniformAndAppearance: 0,
-        professionalism: 0,
-        customerServiceApproach: 0,
-        improvedFeelingSecurity: 0,
-        relationsWithStoreColleagues: 0,
-        punctualityBreaks: 0,
-        proactivity: 0
-      },
-      followUpActions: [''],
-      datesToBeCompleted: [''],
-      storeManagerName: '',
-      areaManagerName: ''
-    }
+export const SurveyForm: React.FC<SurveyFormProps> = ({
+  onSubmit,
+  onCancel,
+  initialData
+}) => {
+  const form = useForm();
+  const [formData, setFormData] = useState<Omit<CustomerSurvey, 'id'>>({
+    officerName: initialData?.officerName || '',
+    date: initialData?.date || format(new Date(), 'yyyy-MM-dd'),
+    customer: initialData?.customer || '',
+    region: initialData?.region || '',
+    location: initialData?.location || '',
+    ratings: initialData?.ratings || {
+      uniformAndAppearance: 5,
+      professionalism: 5,
+      customerServiceApproach: 5,
+      improvedFeelingOfSecurityWhenOfficerOnSite: 5,
+      relationsWithStoreColleagues: 5,
+      punctualityBreaks: 5,
+      proactivity: 5
+    },
+    storeManagerName: initialData?.storeManagerName || '',
+    areaManagerName: initialData?.areaManagerName || '',
+    followUpActions: initialData?.followUpActions || [''],
+    datesToBeCompleted: initialData?.datesToBeCompleted || ['']
   });
 
-  useEffect(() => {
-    if (initialData) {
-      // Format dates properly for the form
-      const formattedData = {
-        ...initialData,
-        date: initialData.date,
-        datesToBeCompleted: initialData.datesToBeCompleted || ['']
-      };
-      form.reset(formattedData);
-    }
-  }, [initialData, form]);
+  const [showSecondAction, setShowSecondAction] = useState(
+    initialData?.followUpActions?.length > 1 || false
+  );
+  const [showThirdAction, setShowThirdAction] = useState(
+    initialData?.followUpActions?.length > 2 || false
+  );
 
-  const handleSubmit = (values: z.infer<typeof formSchema>) => {
-    onSubmit(values);
-  };
-
-  // Watch the followUpActions and datesToBeCompleted arrays to manage them
-  const followUpActions = form.watch('followUpActions');
-  const datesToBeCompleted = form.watch('datesToBeCompleted');
-
-  // Add a new empty action field
-  const addAction = () => {
-    const currentActions = form.getValues('followUpActions');
-    form.setValue('followUpActions', [...currentActions, '']);
-    form.setValue('datesToBeCompleted', [...form.getValues('datesToBeCompleted'), '']);
-  };
-
-  // Remove an action at the specified index
-  const removeAction = (index: number) => {
-    const currentActions = form.getValues('followUpActions');
-    const currentDates = form.getValues('datesToBeCompleted');
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     
-    if (currentActions.length > 1) {
-      form.setValue('followUpActions', currentActions.filter((_, i) => i !== index));
-      form.setValue('datesToBeCompleted', currentDates.filter((_, i) => i !== index));
-    }
+    // Filter out empty follow-up actions
+    const filteredActions = formData.followUpActions.filter(action => action.trim() !== '');
+    const filteredDates = formData.datesToBeCompleted.filter(date => date.trim() !== '');
+    
+    onSubmit({
+      ...formData,
+      followUpActions: filteredActions,
+      datesToBeCompleted: filteredDates,
+      id: initialData?.id || '' // This will be handled by the API for new surveys
+    });
+  };
+
+  const handleRatingChange = (field: keyof typeof formData.ratings, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      ratings: {
+        ...prev.ratings,
+        [field]: Number(value)
+      }
+    }));
+  };
+
+  const handleFollowUpActionChange = (index: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      followUpActions: prev.followUpActions.map((action, i) => 
+        i === index ? value : action
+      )
+    }));
+  };
+
+  const handleDateToCompleteChange = (index: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      datesToBeCompleted: prev.datesToBeCompleted.map((date, i) => 
+        i === index ? value : date
+      )
+    }));
+  };
+
+  const addSecondAction = () => {
+    setShowSecondAction(true);
+    setFormData(prev => ({
+      ...prev,
+      followUpActions: [...prev.followUpActions, ''],
+      datesToBeCompleted: [...prev.datesToBeCompleted, '']
+    }));
+  };
+
+  const addThirdAction = () => {
+    setShowThirdAction(true);
+    setFormData(prev => ({
+      ...prev,
+      followUpActions: [...prev.followUpActions, ''],
+      datesToBeCompleted: [...prev.datesToBeCompleted, '']
+    }));
   };
 
   const renderRatingField = (name: keyof RatingFields, label: string) => (
-    <FormField
-      control={form.control}
-      name={`ratings.${name}`}
-      render={({ field }) => (
-        <FormItem className="space-y-1 md:space-y-2 mb-3 md:mb-4 lg:mb-5 bg-white dark:bg-gray-800 rounded-lg p-2 border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <FormLabel className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5 truncate">
-            {getRatingIcon(name)}
-            <span className="truncate">{label}</span>
-            {field.value > 0 && (
-              <span className="ml-auto text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                {field.value}/10
-              </span>
-            )}
-          </FormLabel>
-          
-          {/* Mobile Rating UI - Only visible on smaller screens */}
-          <div className="block sm:hidden">
-            <MobileRatingScale 
-              value={field.value.toString()} 
-              onChange={field.onChange}
-              name={name}
-            />
-            <div className="flex justify-between mt-1 px-1 text-[8px]">
-              <span className="text-red-600 dark:text-red-400">Poor</span>
-              <span className="text-blue-600 dark:text-blue-400">Excellent</span>
-            </div>
-          </div>
-          
-          {/* Desktop Rating UI - Hidden on mobile */}
-          <div className="hidden sm:block bg-gray-50 dark:bg-gray-900 p-2 md:p-3 rounded-md border border-gray-200 dark:border-gray-700">
-            <RadioGroup
-              className="flex justify-between gap-0"
-              value={field.value.toString()}
-              onValueChange={(value) => field.onChange(parseInt(value))}
-            >
-              {RATING_SCALE.map((score) => (
-                <div key={score} className="flex flex-col items-center">
-                  <div className="relative">
-                    <RadioGroupItem
-                      value={score.toString()}
-                      id={`${name}-${score}`}
-                      className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 border-2 data-[state=checked]:border-primary data-[state=checked]:text-primary"
-                    />
-                  </div>
-                  <label
-                    htmlFor={`${name}-${score}`}
-                    className="mt-0.5 md:mt-1 text-[10px] sm:text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    {score}
-                  </label>
-                </div>
-              ))}
-            </RadioGroup>
-            <div className="flex justify-between mt-1.5 md:mt-3 px-1 text-[8px] xs:text-[10px] md:text-xs">
-              <span className="font-medium text-red-600 dark:text-red-400">Poor</span>
-              <span className="font-medium text-yellow-600 dark:text-yellow-400 hidden xs:inline">Satisfactory</span>
-              <span className="font-medium text-green-600 dark:text-green-400 hidden xs:inline">Good</span>
-              <span className="font-medium text-blue-600 dark:text-blue-400">Excellent</span>
-            </div>
-          </div>
-          
-          <FormMessage className="text-[10px] xs:text-xs text-red-500" />
-        </FormItem>
-      )}
-    />
+    <div className="flex flex-col">
+      <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <div className="flex items-center gap-1">
+          {getRatingIcon(name)}
+          <span>{label}</span>
+        </div>
+      </Label>
+      <MobileRatingScale
+        value={formData.ratings[name].toString()}
+        onChange={(value) => handleRatingChange(name, value)}
+        name={name}
+      />
+    </div>
+  );
+
+  const renderFollowUpActionField = (index: number, label: string) => (
+    <div className="space-y-2">
+      <FormField
+        control={form.control}
+        name={`followUpActions.${index}`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              {label}
+            </FormLabel>
+            <FormControl>
+              <Input 
+                {...field}
+                placeholder="Enter follow-up action"
+                className="h-8 md:h-9 text-xs md:text-sm"
+                value={formData.followUpActions[index] || ''}
+                onChange={(e) => handleFollowUpActionChange(index, e.target.value)}
+              />
+            </FormControl>
+            <FormMessage className="text-[10px]" />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={form.control}
+        name={`datesToBeCompleted.${index}`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              Completion Date
+            </FormLabel>
+            <FormControl>
+              <Input 
+                {...field}
+                type="date"
+                className="h-8 md:h-9 text-xs md:text-sm"
+                value={formData.datesToBeCompleted[index] || ''}
+                onChange={(e) => handleDateToCompleteChange(index, e.target.value)}
+              />
+            </FormControl>
+            <FormMessage className="text-[10px]" />
+          </FormItem>
+        )}
+      />
+    </div>
   );
 
   return (
     <div className="w-full max-w-full overflow-hidden min-w-[320px]">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3 md:space-y-4 max-w-full">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information Section */}
           <FormSection title="Basic Information" icon={<User className="h-4 w-4 md:h-5 md:w-5" />}>
             <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 md:gap-4">
@@ -283,6 +316,8 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit, onCancel, init
                         {...field} 
                         className="h-8 md:h-9 text-xs md:text-sm"
                         placeholder="Enter officer name"
+                        value={formData.officerName}
+                        onChange={(e) => setFormData(prev => ({ ...prev, officerName: e.target.value }))}
                       />
                     </FormControl>
                     <FormMessage className="text-[10px]" />
@@ -297,19 +332,40 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit, onCancel, init
                   <FormItem className="col-span-2 xs:col-span-1">
                     <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">
                       <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
+                        <CalendarIcon className="h-3 w-3" />
                         <span>Survey Date</span>
                       </div>
                     </FormLabel>
                     <FormControl>
-                      <div className="relative">
-                        <Input 
-                          type="date" 
-                          {...field} 
-                          className="h-8 md:h-9 text-xs md:text-sm pl-7 md:pl-9"
-                        />
-                        <Calendar className="absolute left-2 md:left-3 top-2 md:top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                      </div>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !formData.date && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.date ? format(new Date(formData.date), "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={formData.date ? new Date(formData.date) : undefined}
+                            onSelect={(date) => {
+                              if (date instanceof Date) {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  date: format(date, 'yyyy-MM-dd')
+                                }));
+                              }
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </FormControl>
                     <FormMessage className="text-[10px]" />
                   </FormItem>
@@ -327,7 +383,10 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit, onCancel, init
                         <span>Customer</span>
                       </div>
                     </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select 
+                      value={formData.customer} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, customer: value }))}
+                    >
                       <FormControl>
                         <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm">
                           <SelectValue placeholder="Select customer" />
@@ -357,7 +416,10 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit, onCancel, init
                         <span>Region</span>
                       </div>
                     </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select 
+                      value={formData.region} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, region: value }))}
+                    >
                       <FormControl>
                         <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm">
                           <SelectValue placeholder="Select region" />
@@ -387,7 +449,10 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit, onCancel, init
                         <span>Location</span>
                       </div>
                     </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select 
+                      value={formData.location} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, location: value }))}
+                    >
                       <FormControl>
                         <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm">
                           <SelectValue placeholder="Select location" />
@@ -411,12 +476,12 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit, onCancel, init
           {/* Performance Ratings Section */}
           <FormSection title="Performance Ratings" icon={<Star className="h-4 w-4 md:h-5 md:w-5" />}>
             <div className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-3 md:gap-4 sm:space-y-0">
-              {renderRatingField('uniformAndAppearance', 'Uniform and Appearance')}
+              {renderRatingField('uniformAndAppearance', 'Uniform & Appearance')}
               {renderRatingField('professionalism', 'Professionalism')}
-              {renderRatingField('customerServiceApproach', 'Customer Service')}
-              {renderRatingField('improvedFeelingSecurity', 'Security Feeling')}
-              {renderRatingField('relationsWithStoreColleagues', 'Store Relations')}
-              {renderRatingField('punctualityBreaks', 'Punctuality')}
+              {renderRatingField('customerServiceApproach', 'Customer Service Approach')}
+              {renderRatingField('improvedFeelingOfSecurityWhenOfficerOnSite', 'Improved Feeling of Security When Officer on Site')}
+              {renderRatingField('relationsWithStoreColleagues', 'Relations with Store Colleagues')}
+              {renderRatingField('punctualityBreaks', 'Punctuality & Breaks')}
               {renderRatingField('proactivity', 'Proactivity')}
             </div>
           </FormSection>
@@ -440,6 +505,8 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit, onCancel, init
                         {...field} 
                         placeholder="Enter store manager name"
                         className="h-8 md:h-9 text-xs md:text-sm"
+                        value={formData.storeManagerName}
+                        onChange={(e) => setFormData(prev => ({ ...prev, storeManagerName: e.target.value }))}
                       />
                     </FormControl>
                     <FormMessage className="text-[10px]" />
@@ -473,94 +540,61 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit, onCancel, init
           </FormSection>
 
           {/* Follow-up Actions Section */}
-          <FormSection title="Follow-up Actions" icon={<Clock className="h-4 w-4 md:h-5 md:w-5" />}>
-            <div className="space-y-2 md:space-y-3">
-              {followUpActions.map((_, index) => (
-                <div key={index} className="flex flex-col xs:flex-row gap-2 pb-2 border-b border-gray-100 dark:border-gray-700 last:border-b-0 last:pb-0">
-                  <div className="flex-1">
-                    <FormField
-                      control={form.control}
-                      name={`followUpActions.${index}`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className={`text-[10px] xs:text-xs font-medium ${index !== 0 ? 'sr-only' : ''}`}>
-                            Action
-                          </FormLabel>
-                          <FormControl>
-                            <Input 
-                              {...field} 
-                              placeholder="Enter follow-up action"
-                              className="h-8 md:h-9 text-xs md:text-sm"
-                            />
-                          </FormControl>
-                          <FormMessage className="text-[10px]" />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="xs:w-1/3">
-                    <FormField
-                      control={form.control}
-                      name={`datesToBeCompleted.${index}`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className={`text-[10px] xs:text-xs font-medium ${index !== 0 ? 'sr-only' : ''}`}>
-                            Due Date
-                          </FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="date" 
-                              {...field} 
-                              className="h-8 md:h-9 text-xs md:text-sm"
-                            />
-                          </FormControl>
-                          <FormMessage className="text-[10px]" />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="flex xs:flex-col items-center justify-end">
-                    {index === followUpActions.length - 1 ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7 md:h-8 md:w-8 mt-[22px] xs:mt-auto"
-                        onClick={addAction}
-                      >
-                        <Plus className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7 md:h-8 md:w-8 mt-[22px] xs:mt-auto text-red-500 hover:text-red-600 hover:bg-red-50"
-                        onClick={() => removeAction(index)}
-                      >
-                        <Minus className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+          <FormSection title="Follow-up Actions" icon={<ClipboardList className="h-4 w-4 md:h-5 md:w-5" />}>
+            <div className="space-y-4">
+              {/* First (required) follow-up action */}
+              {renderFollowUpActionField(0, "Primary Follow-up Action")}
+
+              {/* Second follow-up action (optional) */}
+              {showSecondAction && renderFollowUpActionField(1, "Secondary Follow-up Action")}
+
+              {/* Third follow-up action (optional) */}
+              {showThirdAction && renderFollowUpActionField(2, "Additional Follow-up Action")}
+
+              {/* Action buttons */}
+              <div className="flex gap-2 mt-4">
+                {!showSecondAction && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowSecondAction(true);
+                      form.setValue('followUpActions.1', '');
+                      form.setValue('datesToBeCompleted.1', '');
+                    }}
+                    className="text-xs h-8"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Add Second Action
+                  </Button>
+                )}
+                {showSecondAction && !showThirdAction && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowThirdAction(true);
+                      form.setValue('followUpActions.2', '');
+                      form.setValue('datesToBeCompleted.2', '');
+                    }}
+                    className="text-xs h-8"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Add Third Action
+                  </Button>
+                )}
+              </div>
             </div>
           </FormSection>
 
           {/* Submit/Cancel Buttons */}
-          <div className="flex flex-col xs:flex-row gap-2 xs:gap-3 xs:justify-end mt-3 md:mt-4 lg:mt-6">
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full xs:w-auto order-2 xs:order-1 h-9 md:h-10 text-xs md:text-sm"
-              onClick={onCancel}
-            >
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button type="button" variant="outline" onClick={onCancel} className="h-8 md:h-9 text-xs md:text-sm">
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              className="w-full xs:w-auto order-1 xs:order-2 h-9 md:h-10 text-xs md:text-sm"
-            >
+            <Button type="submit" className="h-8 md:h-9 text-xs md:text-sm">
               {initialData ? 'Update Survey' : 'Submit Survey'}
             </Button>
           </div>

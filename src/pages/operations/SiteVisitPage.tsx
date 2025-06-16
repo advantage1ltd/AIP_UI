@@ -1,12 +1,14 @@
 import * as React from "react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { MoreHorizontal, Plus, Pencil, Trash2, Search, X } from "lucide-react";
 import * as z from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-
+import type { SiteVisit } from "@/types/siteVisit";
 import axios from 'axios';
+import { toast } from 'react-toastify';
+import { siteVisitService } from '@/services/siteVisitService'
 
 import { Button } from "@/components/ui/button";
 import {
@@ -48,7 +50,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/components/ui/use-toast";
 import {
   Card,
   CardContent,
@@ -125,7 +126,7 @@ const mockVisits = [
     regionName: "Store Detective",
     location: "SAR",
     locationName: "SD Alfia Road", 
-    visitType: "retail",
+    visitType: "retail" as const,
     officerName: "Gurjit Singh Gutha",
     idBadgeExpiry: "2024-12-15",
     siaLicenceNumber: "1234567890123456",
@@ -136,9 +137,11 @@ const mockVisits = [
     ecrCompletion: "Good",
     top20Lines: "Good",
     assignmentInstructions: "Good",
-    assignmentInstructionsUnderstood: "Yes",
-    healthAndSafetyUnderstood: "Yes",
+    assignmentInstructionsUnderstood: "Yes" as const,
+    healthAndSafetyUnderstood: "Yes" as const,
+    healthAndSafetyInPlace: "Yes" as const,
     dateHSRiskAssessment: "2023-11-20",
+    trainingInstructionsGivenDate: "2023-11-15",
     jumper: "Good",
     shirt: "Good",
     tie: "Good",
@@ -150,12 +153,15 @@ const mockVisits = [
     trainingInstructions: "Regular site patrols completed",
     securityOfficerSign: "G. Singh",
     managerName: "GB2",
-    followUpAction: "None required",
+    followUpAction: "",
+    followUpActionDate: "",
     date: "2023-12-10",
-    assignmentInstructionsInPlace: "Yes",
+    assignmentInstructionsInPlace: "Yes" as const,
     assignmentInstructionsDate: "2023-05-15",
     createdAt: "2023-12-10T12:30:00.000Z",
-    status: "Completed"
+    status: "Completed" as const,
+    recommendations: "",
+    updatedAt: "2023-12-10T12:30:00.000Z"
   },
   {
     id: "sv002",
@@ -180,7 +186,9 @@ const mockVisits = [
     assignmentInstructions: "Good",
     assignmentInstructionsUnderstood: "Yes",
     healthAndSafetyUnderstood: "Yes",
+    healthAndSafetyInPlace: "Yes",
     dateHSRiskAssessment: "2023-10-05",
+    trainingInstructionsGivenDate: "2023-10-05",
     jumper: "Good",
     shirt: "Fair",
     tie: "Good",
@@ -193,11 +201,14 @@ const mockVisits = [
     securityOfficerSign: "J. Smith",
     managerName: "GB3",
     followUpAction: "Follow-up training scheduled",
+    followUpActionDate: "2024-02-15",
     date: "2024-01-22",
     assignmentInstructionsInPlace: "Yes",
     assignmentInstructionsDate: "2023-06-10",
     createdAt: "2024-01-22T09:15:00.000Z",
-    status: "Follow-up Required"
+    status: "Follow-up Required",
+    recommendations: "Additional training needed",
+    updatedAt: "2024-01-22T09:15:00.000Z"
   },
   {
     id: "sv003",
@@ -222,7 +233,9 @@ const mockVisits = [
     assignmentInstructions: "Good",
     assignmentInstructionsUnderstood: "Yes",
     healthAndSafetyUnderstood: "Yes",
+    healthAndSafetyInPlace: "Yes",
     dateHSRiskAssessment: "2023-09-15",
+    trainingInstructionsGivenDate: "2023-09-15",
     jumper: "Good",
     shirt: "Good",
     tie: "Good",
@@ -231,15 +244,18 @@ const mockVisits = [
     trousers: "Good",
     epaulettes: "Good",
     shoes: "Good",
-    trainingInstructions: "",
+    trainingInstructions: "Standard training completed",
     securityOfficerSign: "J. Smith",
     managerName: "GB2",
     followUpAction: "",
+    followUpActionDate: "",
     date: "2024-02-08",
     assignmentInstructionsInPlace: "Yes",
     assignmentInstructionsDate: "2023-07-05",
     createdAt: "2024-02-08T14:45:00.000Z",
-    status: "Completed"
+    status: "Completed",
+    recommendations: "",
+    updatedAt: "2024-02-08T14:45:00.000Z"
   }
 ];
 
@@ -255,7 +271,7 @@ const additionalMockVisits = Array.from({ length: 15 }, (_, i) => ({
   regionName: i % 3 === 0 ? "Store Detective" : "Loss Prevention",
   location: i % 2 === 0 ? "SAR" : "SHR",
   locationName: i % 2 === 0 ? "SD Alfia Road" : "SD High Road",
-  visitType: i % 2 === 0 ? "retail" : "warehouse",
+  visitType: (i % 2 === 0 ? "retail" : "warehouse") as 'retail' | 'warehouse' | 'office',
   officerName: i % 2 === 0 ? "Gurjit Singh Gutha" : "John Smith",
   idBadgeExpiry: `2024-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
   siaLicenceNumber: `${Math.floor(1000000000000000 + Math.random() * 9000000000000000)}`,
@@ -266,9 +282,11 @@ const additionalMockVisits = Array.from({ length: 15 }, (_, i) => ({
   ecrCompletion: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Acceptable" : "Training/Improvement Required",
   top20Lines: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
   assignmentInstructions: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
-  assignmentInstructionsUnderstood: i % 5 === 0 ? "No" : "Yes",
-  healthAndSafetyUnderstood: i % 5 === 0 ? "No" : "Yes",
+  assignmentInstructionsUnderstood: i % 5 === 0 ? "No" : "Yes" as 'Yes' | 'No',
+  healthAndSafetyUnderstood: i % 5 === 0 ? "No" : "Yes" as 'Yes' | 'No',
+  healthAndSafetyInPlace: i % 5 === 0 ? "No" : "Yes" as 'Yes' | 'No',
   dateHSRiskAssessment: `2023-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
+  trainingInstructionsGivenDate: `2023-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
   jumper: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
   shirt: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
   tie: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
@@ -281,15 +299,45 @@ const additionalMockVisits = Array.from({ length: 15 }, (_, i) => ({
   securityOfficerSign: i % 2 === 0 ? "G. Singh" : "J. Smith",
   managerName: i % 2 === 0 ? "GB2" : "GB3",
   followUpAction: i % 3 === 0 ? "" : i % 3 === 1 ? "Follow-up training scheduled" : "Escalated to senior management",
+  followUpActionDate: i % 3 === 0 ? "" : `2024-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
   date: `${2023 + Math.floor(i / 8)}-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
-  assignmentInstructionsInPlace: i % 5 === 0 ? "No" : "Yes",
+  assignmentInstructionsInPlace: i % 5 === 0 ? "No" : "Yes" as 'Yes' | 'No',
   assignmentInstructionsDate: `2023-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
   createdAt: new Date(2023, Math.floor(i / 4), 15 + i).toISOString(),
-  status: i % 4 === 0 ? "Follow-up Required" : "Completed"
+  status: i % 4 === 0 ? "Follow-up Required" : "Completed" as 'Completed' | 'Follow-up Required',
+  recommendations: i % 3 === 0 ? "" : "Additional training recommended",
+  updatedAt: new Date(2023, Math.floor(i / 4), 15 + i).toISOString()
 }));
 
 // Update the mock data constant
-const allMockVisits = [...mockVisits, ...additionalMockVisits];
+export const allMockVisits: SiteVisit[] = [...mockVisits, ...additionalMockVisits].map(visit => ({
+  ...visit,
+  visitType: visit.visitType as 'retail' | 'warehouse' | 'office',
+  healthAndSafetyInPlace: (visit.healthAndSafetyInPlace || 'Yes') as 'Yes' | 'No',
+  healthAndSafetyUnderstood: (visit.healthAndSafetyUnderstood || 'Yes') as 'Yes' | 'No',
+  assignmentInstructionsUnderstood: (visit.assignmentInstructionsUnderstood || 'Yes') as 'Yes' | 'No',
+  assignmentInstructionsInPlace: (visit.assignmentInstructionsInPlace || 'Yes') as 'Yes' | 'No',
+  status: (visit.status || 'Completed') as 'Completed' | 'Follow-up Required',
+  trainingInstructionsGivenDate: visit.trainingInstructionsGivenDate || visit.date || visit.createdAt.split('T')[0],
+  dateHSRiskAssessment: visit.dateHSRiskAssessment || visit.date || visit.createdAt.split('T')[0],
+  assignmentInstructionsDate: visit.assignmentInstructionsDate || visit.date || visit.createdAt.split('T')[0],
+  date: visit.date || visit.createdAt.split('T')[0],
+  jumper: visit.jumper || 'Good',
+  shirt: visit.shirt || 'Good',
+  tie: visit.tie || 'Good',
+  hiVisJacket: visit.hiVisJacket || 'Good',
+  jacket: visit.jacket || 'Good',
+  trousers: visit.trousers || 'Good',
+  epaulettes: visit.epaulettes || 'Good',
+  shoes: visit.shoes || 'Good',
+  trainingInstructions: visit.trainingInstructions || '',
+  securityOfficerSign: visit.securityOfficerSign || '',
+  managerName: visit.managerName || '',
+  followUpAction: visit.followUpAction || '',
+  followUpActionDate: visit.followUpActionDate || '',
+  recommendations: visit.recommendations || '',
+  updatedAt: visit.updatedAt || visit.createdAt
+}));
 
 // Add formatDate helper at the top of the file after imports
 const formatDate = (date: Date) => {
@@ -298,8 +346,8 @@ const formatDate = (date: Date) => {
 
 // Form validation schema
 const formSchema = z.object({
-  actionId: z.string(),
-  siteVisitId: z.string(),
+  actionId: z.string().optional(),
+  siteVisitId: z.string().optional(),
   customer: z.string({
     required_error: "Please select a customer",
   }).refine((value) => mockCustomers.some(c => c.id === value), {
@@ -328,65 +376,27 @@ const formSchema = z.object({
   }),
   siaLicenceNumber: z.string({
     required_error: "Please enter SIA licence number",
-  }).regex(/^[0-9]{16}$/, "SIA licence number must be 16 digits"),
-  siaLicenceExpiry: z.string({
-    required_error: "Please enter SIA licence expiry",
-  }),
-  recordOfIncidentsCompletion: z.string({
-    required_error: "Please select record of incidents completion status",
-  }),
-  dailyOccurrenceBookCompletion: z.string({
-    required_error: "Please select daily occurrence book completion status",
-  }),
-  pocketBookCompletion: z.string({
-    required_error: "Please select pocket book completion status",
-  }),
-  ecrCompletion: z.string({
-    required_error: "Please select ECR/Crime reporting status",
-  }),
-  top20Lines: z.string({
-    required_error: "Please select top 20 lines status",
-  }),
-  assignmentInstructions: z.string({
-    required_error: "Please select assignment instructions status",
-  }),
-  assignmentInstructionsUnderstood: z.string({
-    required_error: "Please select if assignment instructions are understood",
-  }),
-  healthAndSafetyUnderstood: z.string({
-    required_error: "Please select if health and safety is understood",
-  }),
-  dateHSRiskAssessment: z.string({
-    required_error: "Please enter H&S risk assessment date",
-  }),
-  jumper: z.string({
-    required_error: "Please select jumper status",
-  }),
-  shirt: z.string({
-    required_error: "Please select shirt status",
-  }),
-  tie: z.string({
-    required_error: "Please select tie status",
-  }),
-  hiVisJacket: z.string({
-    required_error: "Please select hi-vis jacket status",
-  }),
-  jacket: z.string({
-    required_error: "Please select jacket status",
-  }),
-  trousers: z.string({
-    required_error: "Please select trousers status",
-  }),
-  epaulettes: z.string({
-    required_error: "Please select epaulettes status",
-  }),
-  shoes: z.string({
-    required_error: "Please select shoes status",
-  }),
+  }).min(1, "SIA licence number is required"),
+  siaLicenceExpiry: z.string().optional(),
+  recordOfIncidentsCompletion: z.string().optional(),
+  dailyOccurrenceBookCompletion: z.string().optional(),
+  pocketBookCompletion: z.string().optional(),
+  ecrCompletion: z.string().optional(),
+  top20Lines: z.string().optional(),
+  assignmentInstructions: z.string().optional(),
+  assignmentInstructionsUnderstood: z.string().optional(),
+  healthAndSafetyUnderstood: z.string().optional(),
+  dateHSRiskAssessment: z.string().optional(),
+  jumper: z.string().optional(),
+  shirt: z.string().optional(),
+  tie: z.string().optional(),
+  hiVisJacket: z.string().optional(),
+  jacket: z.string().optional(),
+  trousers: z.string().optional(),
+  epaulettes: z.string().optional(),
+  shoes: z.string().optional(),
   trainingInstructions: z.string().optional(),
-  securityOfficerSign: z.string({
-    required_error: "Security officer signature is required",
-  }),
+  securityOfficerSign: z.string().optional(),
   managerName: z.string({
     required_error: "Please select a manager",
   }).refine((value) => mockManagers.some(m => m.id === value), {
@@ -396,12 +406,12 @@ const formSchema = z.object({
   date: z.string({
     required_error: "Please select a date",
   }),
-  assignmentInstructionsInPlace: z.string({
-    required_error: "Please select if assignment instructions are in place",
-  }),
-  assignmentInstructionsDate: z.string({
-    required_error: "Please enter assignment instructions date",
-  }),
+  assignmentInstructionsInPlace: z.string().optional(),
+  assignmentInstructionsDate: z.string().optional(),
+  healthAndSafetyInPlace: z.string().optional(),
+  trainingInstructionsGivenDate: z.string().optional(),
+  followUpActionDate: z.string().optional(),
+  recommendations: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -416,7 +426,35 @@ export default function SiteVisitPage() {
   const [editingVisit, setEditingVisit] = useState<any>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const { toast } = useToast();
+
+  // Load initial data
+  useEffect(() => {
+    const loadVisits = async () => {
+      try {
+        setIsLoading(true);
+        const response = await siteVisitService.getSiteVisits({
+          page: currentPage,
+          pageSize: itemsPerPage,
+          search: searchQuery
+        });
+        setVisits(response.data);
+      } catch (error) {
+        console.error('Failed to load visits:', error);
+        toast.error('Failed to load site visits', {
+          position: "top-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadVisits();
+  }, [currentPage, itemsPerPage, searchQuery, toast]);
 
   // Filter visits based on search query
   const filteredVisits = useMemo(() => {
@@ -456,8 +494,8 @@ export default function SiteVisitPage() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      actionId: mockData.actionId,
-      siteVisitId: mockData.siteVisitId,
+      actionId: mockData.actionId || `ACT-${Date.now()}`,
+      siteVisitId: mockData.siteVisitId || `SV-${Date.now()}`,
       customer: "",
       region: "",
       location: "",
@@ -490,68 +528,134 @@ export default function SiteVisitPage() {
       date: formatDate(new Date()),
       assignmentInstructionsInPlace: "",
       assignmentInstructionsDate: "",
+      healthAndSafetyInPlace: "",
+      trainingInstructionsGivenDate: "",
+      followUpActionDate: "",
+      recommendations: "",
     },
   });
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
-    if (editingVisit) {
-      // Update existing visit
-      const updatedVisit = {
-        ...editingVisit,
-        ...data,
-        customerName: mockCustomers.find(c => c.id === data.customer)?.name || '',
-        officerName: mockOfficers.find(o => o.id === data.officerName)?.name || '',
-        managerName: mockManagers.find(m => m.id === data.managerName)?.name || '',
-        locationName: mockLocations.find(l => l.id === data.location)?.name || '',
-        regionName: mockRegions.find(r => r.id === data.region)?.name || '',
-        updatedAt: new Date().toISOString()
-      };
-      
-      // Update the visits array with the edited visit
-      setVisits(currentVisits => 
-        currentVisits.map(visit => 
-          visit.id === editingVisit.id ? updatedVisit : visit
-        )
-      );
-      
-      toast({
-        title: "Success",
-        description: "Site visit has been updated successfully",
-      });
-    } else {
-      // Create new visit
-      const newVisit = {
-        id: `sv${Math.floor(Math.random() * 10000).toString().padStart(3, '0')}`,
-        ...data,
-        customerName: mockCustomers.find(c => c.id === data.customer)?.name || '',
-        officerName: mockOfficers.find(o => o.id === data.officerName)?.name || '',
-        managerName: mockManagers.find(m => m.id === data.managerName)?.name || '',
-        locationName: mockLocations.find(l => l.id === data.location)?.name || '',
-        regionName: mockRegions.find(r => r.id === data.region)?.name || '',
-        status: 'Completed',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      // Add the new visit to the beginning of the array
-      setVisits(currentVisits => [newVisit, ...currentVisits]);
-      
-      toast({
-        title: "Success",
-        description: "New site visit has been created successfully",
-      });
-    }
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    console.log('=== FORM SUBMISSION STARTED ===')
+    console.log('onSubmit called with data:', data)
+    console.log('editingVisit:', editingVisit)
     
-    // Close dialog and reset form
-    setIsDialogOpen(false);
-    setEditingVisit(null);
-    form.reset();
-  };
+    setIsLoading(true)
+    try {
+      // Common data transformation
+      const commonData = {
+        actionId: data.actionId || `ACT-${Date.now()}`,
+        siteVisitId: data.siteVisitId || `SV-${Date.now()}`,
+        customer: data.customer,
+        region: data.region,
+        location: data.location,
+        visitType: data.visitType as 'retail' | 'warehouse' | 'office',
+        date: data.date,
+        idBadgeExpiry: data.idBadgeExpiry || '',
+        siaLicenceNumber: data.siaLicenceNumber || '',
+        siaLicenceExpiry: data.siaLicenceExpiry || '',
+        recordOfIncidentsCompletion: data.recordOfIncidentsCompletion || 'Yes',
+        dailyOccurrenceBookCompletion: data.dailyOccurrenceBookCompletion || 'Yes',
+        pocketBookCompletion: data.pocketBookCompletion || 'Yes',
+        ecrCompletion: data.ecrCompletion || 'Yes',
+        top20Lines: data.top20Lines || 'Completed',
+        assignmentInstructions: data.assignmentInstructions || 'In place',
+        assignmentInstructionsUnderstood: (data.assignmentInstructionsUnderstood || 'Yes') as 'Yes' | 'No',
+        healthAndSafetyUnderstood: (data.healthAndSafetyUnderstood || 'Yes') as 'Yes' | 'No',
+        dateHSRiskAssessment: data.dateHSRiskAssessment || data.date,
+        jumper: data.jumper || 'Good',
+        shirt: data.shirt || 'Good',
+        tie: data.tie || 'Good',
+        hiVisJacket: data.hiVisJacket || 'Good',
+        jacket: data.jacket || 'Good',
+        trousers: data.trousers || 'Good',
+        epaulettes: data.epaulettes || 'Good',
+        shoes: data.shoes || 'Good',
+        trainingInstructions: data.trainingInstructions || '',
+        securityOfficerSign: data.securityOfficerSign || 'Digital Signature',
+        followUpAction: data.followUpAction || '',
+        followUpActionDate: data.followUpActionDate || '',
+        assignmentInstructionsInPlace: (data.assignmentInstructionsInPlace || 'Yes') as 'Yes' | 'No',
+        assignmentInstructionsDate: data.assignmentInstructionsDate || data.date,
+        healthAndSafetyInPlace: (data.healthAndSafetyInPlace || 'Yes') as 'Yes' | 'No',
+        trainingInstructionsGivenDate: data.trainingInstructionsGivenDate || data.date,
+        recommendations: data.recommendations || '',
+        status: 'Completed' as 'Completed' | 'Follow-up Required',
+        // Add display names
+        customerName: mockCustomers.find(c => c.id === data.customer)?.name || data.customer,
+        officerName: mockOfficers.find(o => o.id === data.officerName)?.name || data.officerName,
+        managerName: mockManagers.find(m => m.id === data.managerName)?.name || data.managerName || 'Manager',
+        locationName: mockLocations.find(l => l.id === data.location)?.name || data.location,
+        regionName: mockRegions.find(r => r.id === data.region)?.name || data.region,
+      }
+
+      console.log('Transformed data:', commonData)
+
+      if (editingVisit) {
+        console.log('=== UPDATING EXISTING VISIT ===')
+        console.log('Calling updateSiteVisit with ID:', editingVisit.id)
+        
+        const updated = await siteVisitService.updateSiteVisit(editingVisit.id, commonData)
+        console.log('Update successful:', updated)
+        
+        setVisits(currentVisits => currentVisits.map(visit => visit.id === editingVisit.id ? updated : visit))
+        toast.success('Site visit has been updated successfully! 🎉', {
+          position: "top-right",
+          autoClose: 4000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } else {
+        console.log('=== CREATING NEW VISIT ===')
+        console.log('Calling createSiteVisit')
+        
+        const created = await siteVisitService.createSiteVisit(commonData)
+        console.log('Create successful:', created)
+        
+        setVisits(currentVisits => [created, ...currentVisits])
+        toast.success('New site visit has been created successfully! ✨', {
+          position: "top-right",
+          autoClose: 4000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      }
+      
+      console.log('=== CLOSING DIALOG ===')
+      setIsDialogOpen(false)
+      setEditingVisit(null)
+      form.reset()
+      
+      console.log('=== FORM SUBMISSION COMPLETED SUCCESSFULLY ===')
+    } catch (error) {
+      console.error('=== FORM SUBMISSION ERROR ===')
+      console.error('Save/Update error:', error)
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      
+      toast.error(`Failed to save site visit: ${error instanceof Error ? error.message : 'Unknown error'}`, {
+        position: "top-right",
+        autoClose: 6000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } finally {
+      setIsLoading(false)
+      console.log('=== FORM SUBMISSION ENDED ===')
+    }
+  }
 
   // Handle create site visit
   const handleCreateVisit = () => {
     setEditingVisit(null);
     form.reset({
+      actionId: `ACT-${Date.now()}`,
+      siteVisitId: `SV-${Date.now()}`,
       customer: '',
       region: '',
       location: '',
@@ -580,8 +684,12 @@ export default function SiteVisitPage() {
       dateHSRiskAssessment: '',
       assignmentInstructionsInPlace: '',
       assignmentInstructionsDate: '',
+      healthAndSafetyInPlace: '',
+      trainingInstructionsGivenDate: '',
+      followUpActionDate: '',
       trainingInstructions: '',
       followUpAction: '',
+      recommendations: '',
       securityOfficerSign: '',
       managerName: ''
     });
@@ -590,11 +698,10 @@ export default function SiteVisitPage() {
 
   // Handle edit site visit
   const handleEditVisit = (visit: any) => {
-    // Set the current visit being edited
     setEditingVisit(visit);
-    
-    // Map the data back to the form
     form.reset({
+      actionId: visit.actionId || `ACT-${Date.now()}`,
+      siteVisitId: visit.siteVisitId || `SV-${Date.now()}`,
       customer: mockCustomers.find(c => c.name === visit.customerName)?.id || '',
       region: mockRegions.find(r => r.name === visit.regionName)?.id || '',
       location: mockLocations.find(l => l.name === visit.locationName)?.id || '',
@@ -623,13 +730,15 @@ export default function SiteVisitPage() {
       dateHSRiskAssessment: visit.dateHSRiskAssessment || '',
       assignmentInstructionsInPlace: visit.assignmentInstructionsInPlace || '',
       assignmentInstructionsDate: visit.assignmentInstructionsDate || '',
+      healthAndSafetyInPlace: visit.healthAndSafetyInPlace || '',
+      trainingInstructionsGivenDate: visit.trainingInstructionsGivenDate || '',
+      followUpActionDate: visit.followUpActionDate || '',
       trainingInstructions: visit.trainingInstructions || '',
       followUpAction: visit.followUpAction || '',
+      recommendations: visit.recommendations || '',
       securityOfficerSign: visit.securityOfficerSign || '',
-      managerName: mockManagers.find(m => m.name === visit.managerName)?.id || ''
+      managerName: mockManagers.find(m => m.name === visit.managerName)?.id || '',
     });
-    
-    // Open the dialog
     setIsDialogOpen(true);
   };
   
@@ -640,16 +749,33 @@ export default function SiteVisitPage() {
   };
   
   // Handle confirm delete
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deleteId) {
-      setVisits(currentVisits => currentVisits.filter(visit => visit.id !== deleteId));
-      setIsDeleteDialogOpen(false);
-      setDeleteId(null);
-      
-      toast({
-        title: "Success",
-        description: "Site visit has been deleted successfully",
-      });
+      try {
+        await siteVisitService.deleteSiteVisit(deleteId);
+        setVisits(currentVisits => currentVisits.filter(visit => visit.id !== deleteId));
+        setIsDeleteDialogOpen(false);
+        setDeleteId(null);
+        
+        toast.success('Site visit has been deleted successfully! 🗑️', {
+          position: "top-right",
+          autoClose: 4000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } catch (error) {
+        console.error('Delete error:', error);
+        toast.error('Failed to delete site visit', {
+          position: "top-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      }
     }
   };
 
@@ -1520,29 +1646,26 @@ export default function SiteVisitPage() {
               </div>
               
               <div className="border rounded-lg p-4">
-                <h3 className="font-medium text-base mb-4">Assignment Instructions</h3>
+                <h3 className="font-medium text-base mb-4">Assignment Instructions in place</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="assignmentInstructions"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Assignment Instructions</FormLabel>
+                        <FormLabel>Assignment Instructions in place</FormLabel>
                         <Select 
                           onValueChange={field.onChange} 
                           defaultValue={field.value}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select rating" />
+                              <SelectValue placeholder="Select..." />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {ratingOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="Yes">Yes</SelectItem>
+                            <SelectItem value="No">No</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -1555,7 +1678,46 @@ export default function SiteVisitPage() {
                     name="assignmentInstructionsUnderstood"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Instructions Understood</FormLabel>
+                        <FormLabel>Assignment Instructions Understood</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Yes">Yes</SelectItem>
+                            <SelectItem value="No">No</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="assignmentInstructionsDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assignment Instructions Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="assignmentInstructionsInPlace"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>H&S Instructions In Place</FormLabel>
                         <Select 
                           onValueChange={field.onChange} 
                           defaultValue={field.value}
@@ -1616,24 +1778,13 @@ export default function SiteVisitPage() {
                   
                   <FormField
                     control={form.control}
-                    name="assignmentInstructionsInPlace"
+                    name="trainingInstructionsGivenDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Instructions In Place</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Yes">Yes</SelectItem>
-                            <SelectItem value="No">No</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>Training Instructions Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1641,10 +1792,10 @@ export default function SiteVisitPage() {
                   
                   <FormField
                     control={form.control}
-                    name="assignmentInstructionsDate"
+                    name="followUpActionDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Instructions Date</FormLabel>
+                        <FormLabel>Follow-up Action Date</FormLabel>
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
@@ -1737,11 +1888,53 @@ export default function SiteVisitPage() {
                 />
               </div>
               
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="recommendations"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Recommendations</FormLabel>
+                      <FormControl>
+                        <textarea 
+                          {...field}
+                          className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          placeholder="Enter any recommendations..."
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
               <DialogFooter className="px-4 pb-4 sm:px-6 sm:pb-6 pt-4 flex flex-col sm:flex-row gap-2 sm:gap-0">
                 <Button variant="outline" type="button" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto order-2 sm:order-1">
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto order-1 sm:order-2">
+                <Button 
+                  type="submit" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto order-1 sm:order-2"
+                  onClick={() => {
+                    console.log('=== SUBMIT BUTTON CLICKED ===')
+                    console.log('Form isValid:', form.formState.isValid)
+                    console.log('Form errors:', form.formState.errors)
+                    console.log('Form values:', form.getValues())
+                    console.log('Is submitting:', form.formState.isSubmitting)
+                    console.log('isDirty:', form.formState.isDirty)
+                    console.log('isSubmitSuccessful:', form.formState.isSubmitSuccessful)
+                    console.log('submitCount:', form.formState.submitCount)
+                    
+                    // Try manual validation
+                    const values = form.getValues()
+                    const validationResult = formSchema.safeParse(values)
+                    console.log('Manual validation result:', validationResult)
+                    
+                    if (!validationResult.success) {
+                      console.log('Validation errors:', validationResult.error.errors)
+                    }
+                  }}
+                >
                   {editingVisit ? "Update Site Visit" : "Create Site Visit"}
                 </Button>
               </DialogFooter>

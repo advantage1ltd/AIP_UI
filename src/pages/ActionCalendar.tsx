@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Calendar } from "@/components/ui/calendar"
 import { AddTaskForm } from "@/components/action-calendar/AddTaskForm"
 import { TaskList } from "@/components/action-calendar/TaskList"
+import { usePageAccess } from "@/contexts/PageAccessContext"
 import { 
   Plus, 
   CalendarDays, 
@@ -18,7 +19,8 @@ import {
   MinusCircle, 
   ArrowDownCircle,
   Calendar as CalendarIcon,
-  Filter
+  Filter,
+  Lock
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { startOfWeek, endOfWeek, isSameWeek, isSameDay, isSameMonth, format, isToday } from "date-fns"
@@ -43,8 +45,19 @@ const ActionCalendar = () => {
   const [tasks, setTasks] = useState<Task[]>([])
   const [activeTab, setActiveTab] = useState<string>("day")
   const { toast } = useToast()
+  const { currentRole } = usePageAccess()
+  const isAdmin = currentRole === 'administrator'
 
   const handleAddTask = (newTask: Omit<Task, 'id' | 'status'>) => {
+    if (!isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Only administrators can create and assign tasks.",
+        variant: "destructive"
+      })
+      return
+    }
+
     const task: Task = {
       ...newTask,
       id: Math.random().toString(36).substr(2, 9),
@@ -58,6 +71,15 @@ const ActionCalendar = () => {
   }
 
   const handleUpdateTaskStatus = (taskId: string, newStatus: Task['status'], notes?: string) => {
+    if (!isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Only administrators can update task status.",
+        variant: "destructive"
+      })
+      return
+    }
+
     setTasks(tasks.map(task =>
       task.id === taskId ? { ...task, status: newStatus, statusNotes: notes } : task
     ))
@@ -68,12 +90,30 @@ const ActionCalendar = () => {
   }
 
   const handleUpdateTask = (taskId: string, updatedTask: Partial<Task>) => {
+    if (!isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Only administrators can update tasks.",
+        variant: "destructive"
+      })
+      return
+    }
+
     setTasks(tasks.map(task =>
       task.id === taskId ? { ...task, ...updatedTask } : task
     ))
   }
 
   const handleDeleteTask = (taskId: string) => {
+    if (!isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Only administrators can delete tasks.",
+        variant: "destructive"
+      })
+      return
+    }
+
     setTasks(tasks.filter(task => task.id !== taskId))
   }
 
@@ -99,29 +139,44 @@ const ActionCalendar = () => {
                 Action Calendar
               </h1>
               <p className="text-sm text-gray-500 mt-1">
-                Plan, organize, and track your tasks efficiently
+                {isAdmin 
+                  ? "Plan, organize, and assign tasks efficiently"
+                  : "View your assigned tasks and their status"
+                }
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" className="gap-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900">
-                <Filter className="h-4 w-4" />
-                <span>Filter</span>
-              </Button>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="gap-2 bg-[#1a1a1a] hover:bg-[#333333]">
-                    <Plus className="h-4 w-4" />
+                          <div className="flex items-center gap-3">
+                <Button variant="outline" size="sm" className="gap-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900">
+                  <Filter className="h-4 w-4" />
+                  <span>Filter</span>
+                </Button>
+                {isAdmin ? (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-2 bg-[#1a1a1a] hover:bg-[#333333]">
+                        <Plus className="h-4 w-4" />
+                        <span>Create Task</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[550px]">
+                      <DialogHeader>
+                        <DialogTitle>Create New Task</DialogTitle>
+                      </DialogHeader>
+                      <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
+                    </DialogContent>
+                  </Dialog>
+                ) : (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="gap-2 border-gray-200 text-gray-500 cursor-not-allowed"
+                    disabled
+                  >
+                    <Lock className="h-4 w-4" />
                     <span>Create Task</span>
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[550px]">
-                  <DialogHeader>
-                    <DialogTitle>Create New Task</DialogTitle>
-                  </DialogHeader>
-                  <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
-                </DialogContent>
-              </Dialog>
-            </div>
+                )}
+              </div>
           </div>
         </div>
       </div>
@@ -178,7 +233,7 @@ const ActionCalendar = () => {
 
           <div className="grid gap-4 sm:gap-6 md:grid-cols-12">
             {/* Calendar Card */}
-            <div className="md:col-span-7 lg:col-span-5 order-2 md:order-1">
+            <div className=" md:col-span-7 lg:col-span-4 order-2 md:order-1">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 text-gray-700" />
@@ -186,37 +241,39 @@ const ActionCalendar = () => {
                 </div>
                 <p className="text-sm sm:text-md text-gray-500">{format(date, "MMMM yyyy")}</p>
               </div>
-              
               <Card className="border-0 shadow-sm bg-white overflow-hidden">
-                <CardContent className="p-0">
-                  <div className="p-3 sm:p-5 pb-0">
+                <CardContent className="p-2">
+                  <div className="p-3 sm:p-5">
                     <Calendar
                       mode="single"
                       selected={date}
                       onSelect={(date) => date && setDate(date)}
-                      className="w-full"
+                      className="w-full mx-auto"
+                      showOutsideDays={true}
                       classNames={{
-                        months: "space-y-4",
-                        month: "space-y-4",
-                        caption: "flex flex-col items-center gap-1",
-                        caption_label: "text-2xl font-bold text-center mb-2",
-                        nav: "flex justify-center w-full items-center gap-6 mt-1",
+                        months: "space-y-4 w-full flex justify-center",
+                        month: "space-y-4 w-full",
+                        caption: "flex items-center justify-between px-2 py-1",
+                        caption_label: "text-sm font-medium",
+                        nav: "flex items-center gap-1",
                         nav_button: cn(
-                          buttonVariants({ variant: "outline" }),
-                          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+                          "h-7 w-7 bg-transparent p-0 opacity-75 hover:opacity-100",
+                          "text-gray-600 hover:text-gray-900",
+                          "hover:bg-gray-100 rounded-md",
+                          "flex items-center justify-center transition-all"
                         ),
-                        nav_button_previous: "",
-                        nav_button_next: "",
-                        table: "w-full border-collapse",
-                        head_row: "grid grid-cols-7 mb-2",
-                        head_cell: "text-sm font-normal text-center text-muted-foreground",
-                        row: "grid grid-cols-7 mt-2",
-                        cell: "text-center p-0 relative focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md",
+                        table: "w-full border-collapse space-y-1",
+                        head_row: "flex justify-between w-full",
+                        head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem] text-center",
+                        row: "flex w-full mt-2 justify-between",
+                        cell: cn(
+                          "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-accent",
+                          "first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md"
+                        ),
                         day: cn(
-                          "h-9 w-9 p-0 font-normal text-sm rounded-md",
-                          "hover:bg-accent hover:text-accent-foreground",
-                          "focus:bg-accent focus:text-accent-foreground",
-                          "aria-selected:opacity-100"
+                          "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+                          "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                          "rounded-md transition-colors"
                         ),
                         day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
                         day_today: "bg-accent text-accent-foreground",
@@ -338,22 +395,27 @@ const ActionCalendar = () => {
                             </div>
                             <h3 className="text-lg font-medium mb-2 text-gray-900">No Tasks Scheduled</h3>
                             <p className="text-sm text-gray-500 max-w-md">
-                              No tasks are scheduled for this period.
+                              {isAdmin 
+                                ? "No tasks are scheduled for this period. Create a new task to get started."
+                                : "No tasks have been assigned to you for this period."
+                              }
                             </p>
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button className="mt-4 gap-2 bg-[#1a1a1a] hover:bg-[#333333]">
-                                  <Plus className="h-4 w-4" />
-                                  <span>Create Task</span>
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="sm:max-w-[550px]">
-                                <DialogHeader>
-                                  <DialogTitle>Create New Task</DialogTitle>
-                                </DialogHeader>
-                                <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
-                              </DialogContent>
-                            </Dialog>
+                            {isAdmin && (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button className="mt-4 gap-2 bg-[#1a1a1a] hover:bg-[#333333]">
+                                    <Plus className="h-4 w-4" />
+                                    <span>Create Task</span>
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[550px]">
+                                  <DialogHeader>
+                                    <DialogTitle>Create New Task</DialogTitle>
+                                  </DialogHeader>
+                                  <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
+                                </DialogContent>
+                              </Dialog>
+                            )}
                           </div>
                         )}
                       </div>
@@ -384,22 +446,27 @@ const ActionCalendar = () => {
                             </div>
                             <h3 className="text-lg font-medium mb-2 text-gray-900">No Tasks Scheduled</h3>
                             <p className="text-sm text-gray-500 max-w-md">
-                              No tasks are scheduled for this period.
+                              {isAdmin 
+                                ? "No tasks are scheduled for this period. Create a new task to get started."
+                                : "No tasks have been assigned to you for this period."
+                              }
                             </p>
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button className="mt-4 gap-2 bg-[#1a1a1a] hover:bg-[#333333]">
-                                  <Plus className="h-4 w-4" />
-                                  <span>Create Task</span>
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="sm:max-w-[550px]">
-                                <DialogHeader>
-                                  <DialogTitle>Create New Task</DialogTitle>
-                                </DialogHeader>
-                                <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
-                              </DialogContent>
-                            </Dialog>
+                            {isAdmin && (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button className="mt-4 gap-2 bg-[#1a1a1a] hover:bg-[#333333]">
+                                    <Plus className="h-4 w-4" />
+                                    <span>Create Task</span>
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[550px]">
+                                  <DialogHeader>
+                                    <DialogTitle>Create New Task</DialogTitle>
+                                  </DialogHeader>
+                                  <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
+                                </DialogContent>
+                              </Dialog>
+                            )}
                           </div>
                         )}
                       </div>
@@ -430,22 +497,27 @@ const ActionCalendar = () => {
                             </div>
                             <h3 className="text-lg font-medium mb-2 text-gray-900">No Tasks Scheduled</h3>
                             <p className="text-sm text-gray-500 max-w-md">
-                              No tasks are scheduled for this period.
+                              {isAdmin 
+                                ? "No tasks are scheduled for this period. Create a new task to get started."
+                                : "No tasks have been assigned to you for this period."
+                              }
                             </p>
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button className="mt-4 gap-2 bg-[#1a1a1a] hover:bg-[#333333]">
-                                  <Plus className="h-4 w-4" />
-                                  <span>Create Task</span>
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="sm:max-w-[550px]">
-                                <DialogHeader>
-                                  <DialogTitle>Create New Task</DialogTitle>
-                                </DialogHeader>
-                                <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
-                              </DialogContent>
-                            </Dialog>
+                            {isAdmin && (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button className="mt-4 gap-2 bg-[#1a1a1a] hover:bg-[#333333]">
+                                    <Plus className="h-4 w-4" />
+                                    <span>Create Task</span>
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[550px]">
+                                  <DialogHeader>
+                                    <DialogTitle>Create New Task</DialogTitle>
+                                  </DialogHeader>
+                                  <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
+                                </DialogContent>
+                              </Dialog>
+                            )}
                           </div>
                         )}
                       </div>

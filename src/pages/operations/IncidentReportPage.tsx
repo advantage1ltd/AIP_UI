@@ -3,7 +3,7 @@ import { Incident, StolenItem } from "@/types/incidents"
 import { IncidentForm } from "@/components/operations/IncidentForm"
 import { IncidentsTable } from "@/components/operations/IncidentsTable"
 import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
+import { useToast } from '@/components/ui/use-toast'
 import {
   Dialog,
   DialogContent,
@@ -55,15 +55,12 @@ import {
 } from "@/components/ui/pagination"
 import BarcodeScanner from '@/components/BarcodeScanner'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-
-// API endpoints
-const API_ENDPOINTS = {
-  incidents: '/api/incidents',
-  product: '/api/products'
-}
+import { incidentsApi } from "@/services/api/incidents"
+import { Toaster } from '@/components/ui/toaster'
 
 export default function IncidentReportPage() {
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null)
   const [deletingIncident, setDeletingIncident] = useState<Incident | null>(null)
@@ -74,103 +71,77 @@ export default function IncidentReportPage() {
   const [isLoadingProduct, setIsLoadingProduct] = useState(false)
   const itemsPerPage = 10
 
-  // Fetch incidents with improved error handling
-  const { data: incidents = [], isLoading, error } = useQuery({
-    queryKey: ['incidents'],
-    queryFn: async () => {
-      try {
-        const response = await fetch(API_ENDPOINTS.incidents)
-        
-        // Log the response details for debugging
-        console.log('Response status:', response.status)
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()))
-        
-        if (!response.ok) {
-          // Try to get the error text
-          const errorText = await response.text()
-          console.error('Error response:', errorText)
-          throw new Error(`Failed to fetch incidents: ${response.status} ${response.statusText}\n${errorText}`)
-        }
-
-        const contentType = response.headers.get("content-type")
-        console.log('Content-Type:', contentType)
-        
-        if (!contentType || !contentType.includes("application/json")) {
-          const responseText = await response.text()
-          console.error('Non-JSON response:', responseText)
-          throw new Error(`Server returned non-JSON response. Content-Type: ${contentType}`)
-        }
-
-        const data = await response.json()
-        console.log('Fetched incidents:', data)
-        return data
-      } catch (error) {
-        console.error('Error fetching incidents:', error)
-        // Fallback to mock data if API fails
-        console.log('Falling back to mock data')
-        return mockIncidents
-      }
-    },
-    retry: 2,
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+  // Fetch incidents using the API service
+  const { data: incidentsResponse = { data: [], pagination: { currentPage: 1, totalPages: 1 } }, isLoading, error } = useQuery({
+    queryKey: ['incidents', currentPage, searchTerm],
+    queryFn: () => incidentsApi.getIncidents({
+      page: currentPage,
+      pageSize: itemsPerPage,
+      search: searchTerm
+    })
   })
 
-  // Create/Update incident mutation
+  // Create/Update incident mutation using the API service
   const mutation = useMutation({
     mutationFn: async (incident: Incident) => {
-      const url = editingIncident 
-        ? `${API_ENDPOINTS.incidents}/${editingIncident.id}`
-        : API_ENDPOINTS.incidents
-      
-      const response = await fetch(url, {
-        method: editingIncident ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(incident)
-      })
-      
-      if (!response.ok) throw new Error('Failed to save incident')
-      return response.json()
+      if (editingIncident) {
+        return await incidentsApi.updateIncident(editingIncident.id, incident)
+      } else {
+        return await incidentsApi.createIncident(incident)
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
-      toast.success(editingIncident ? 'Incident updated successfully' : 'Incident created successfully')
+      toast({
+        title: 'Success',
+        description: editingIncident ? 'Incident updated successfully' : 'Incident created successfully',
+      })
       setOpen(false)
       setEditingIncident(null)
     },
     onError: (error) => {
       console.error('Error saving incident:', error)
-      toast.error('Failed to save incident')
+      toast({
+        title: 'Error',
+        description: `Failed to save incident: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: 'destructive',
+      })
     }
   })
 
-  // Delete incident mutation
+  // Delete incident mutation using the API service
   const deleteMutation = useMutation({
     mutationFn: async (incidentId: string) => {
-      const response = await fetch(`${API_ENDPOINTS.incidents}/${incidentId}`, {
-        method: 'DELETE'
-      })
-      if (!response.ok) throw new Error('Failed to delete incident')
+      await incidentsApi.deleteIncident(incidentId)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
-      toast.success('Incident deleted successfully')
+      toast({
+        title: 'Success',
+        description: 'Incident deleted successfully',
+      })
       setDeletingIncident(null)
     },
     onError: (error) => {
       console.error('Error deleting incident:', error)
-      toast.error('Failed to delete incident')
+      toast({
+        title: 'Error',
+        description: `Failed to delete incident: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: 'destructive',
+      })
     }
   })
 
   // Calculate statistics using useMemo with null checks
   const stats = useMemo(() => ({
-    totalAmountSaved: incidents.reduce((total, incident) => 
-      total + (incident?.totalValueRecovered || 0), 0
+    totalAmountSaved: Array.prototype.reduce.call(
+      incidentsResponse.data,
+      (acc: number, incident: Incident) => acc + (incident.totalValueRecovered || 0),
+      0
     ),
-    uniqueStores: new Set(incidents.map(incident => incident?.siteName).filter(Boolean)).size,
-    totalIncidents: incidents.length
-  }), [incidents])
+    uniqueStores: new Set(incidentsResponse.data.map(incident => incident?.siteName).filter(Boolean)).size,
+    totalIncidents: incidentsResponse.data.length
+  }), [incidentsResponse.data])
 
   const handleSubmit = useCallback((incident: Incident) => {
     mutation.mutate(incident)
@@ -196,23 +167,11 @@ export default function IncidentReportPage() {
     }
   }, [deletingIncident, deleteMutation])
 
-  // Filter and paginate incidents using useMemo
-  const { filteredIncidents, totalPages, paginatedIncidents } = useMemo(() => {
-    const filtered = incidents.filter(incident => 
-      incident.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      incident.incidentType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      incident.description.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    
-    const total = Math.ceil(filtered.length / itemsPerPage)
-    
-    const paginated = filtered.slice(
-      (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage
-    )
-    
-    return { filteredIncidents: filtered, totalPages: total, paginatedIncidents: paginated }
-  }, [incidents, searchTerm, currentPage, itemsPerPage])
+  // Update pagination to use the API response
+  const { totalPages } = incidentsResponse.pagination
+
+  // Update the filtered and paginated incidents
+  const paginatedIncidents = incidentsResponse.data
 
   const handlePageChange = useCallback((page: number) => {
     if (page < 1 || page > totalPages) return
@@ -223,26 +182,22 @@ export default function IncidentReportPage() {
     try {
       setIsLoadingProduct(true)
       
-      const response = await fetch(`${API_ENDPOINTS.product}/${barcode}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_EAN_API_KEY}`
-        }
-      })
-      
-      if (!response.ok) throw new Error('Product not found')
-      
-      const productData = await response.json()
+      // Mock product data instead of API call
+      const mockProduct = {
+        name: `Product ${barcode}`,
+        category: 'Electronics',
+        price: 99.99,
+        description: 'Mock product description'
+      }
       
       const newItem: StolenItem = {
         id: Date.now().toString(),
-        category: productData.category?.toLowerCase() || 'other',
-        description: productData.description || '',
-        productName: productData.name || '',
-        cost: productData.price || 0,
+        category: mockProduct.category.toLowerCase(),
+        description: mockProduct.description,
+        productName: mockProduct.name,
+        cost: mockProduct.price,
         quantity: 1,
-        totalAmount: productData.price || 0
+        totalAmount: mockProduct.price
       }
 
       if (editingIncident) {
@@ -252,11 +207,18 @@ export default function IncidentReportPage() {
         })
       }
       
-      toast.success('Product found and added to stolen items')
+      toast({
+        title: 'Success',
+        description: 'Product found and added to stolen items',
+      })
       
     } catch (error) {
-      console.error('Error fetching product:', error)
-      toast.error('Product not found or scanning error occurred')
+      console.error('Error with barcode:', error)
+      toast({
+        title: 'Error',
+        description: 'Error processing barcode',
+        variant: 'destructive',
+      })
     } finally {
       setIsLoadingProduct(false)
       setScanningBarcode(false)
@@ -311,7 +273,7 @@ export default function IncidentReportPage() {
   }
 
   // Empty state
-  if (!incidents || incidents.length === 0) {
+  if (!incidentsResponse.data || incidentsResponse.data.length === 0) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-sm">
@@ -338,6 +300,7 @@ export default function IncidentReportPage() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-100">
+      <Toaster />
       <div className="container mx-auto py-4 sm:py-6 lg:py-8 xl:py-10 2xl:py-12 px-2 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 max-w-screen-2xl">
         {/* Header Section */}
         <div className="flex flex-col space-y-4 sm:space-y-6 lg:space-y-8 xl:space-y-10">
@@ -501,7 +464,7 @@ export default function IncidentReportPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {filteredIncidents.length === 0 && (
+                  {incidentsResponse.data.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 xl:py-12">
                         <p className="text-gray-500 text-sm xl:text-base">No incidents found</p>
@@ -525,7 +488,7 @@ export default function IncidentReportPage() {
         </div>
 
         {/* Pagination */}
-        {filteredIncidents.length > 0 && totalPages > 1 && (
+        {incidentsResponse.data.length > 0 && totalPages > 1 && (
           <div className="flex justify-center py-3 sm:py-4 xl:py-6 border-t border-gray-200">
             <Pagination>
               <PaginationContent className="flex flex-wrap items-center gap-1 sm:gap-0">

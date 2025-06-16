@@ -29,6 +29,7 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar } from 'recharts'
 import { cn } from '@/lib/utils'
 import { IncidentTable } from '@/components/dashboard/IncidentTable'
+import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 
 // Types and Interfaces
 interface CustomerStoreData {
@@ -90,6 +91,7 @@ interface Region {
 
 interface CustomerDashboardProps {
   userRole: CustomerRole
+  displayName?: string
 }
 
 interface DailyActivity {
@@ -564,7 +566,9 @@ const dailyActivities: DailyActivity[] = [
   }
 ]
 
-function CustomerDashboard({ userRole }: CustomerDashboardProps) {
+function CustomerDashboard({ userRole, displayName }: CustomerDashboardProps) {
+  console.log('🏢 CustomerDashboard props:', { userRole, displayName })
+  
   // State management
   const [error, setError] = React.useState<Error | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
@@ -663,11 +667,15 @@ function CustomerDashboard({ userRole }: CustomerDashboardProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="container mx-auto p-6 space-y-8">
+        {/* Dashboard Greeting */}
+        <DashboardGreeting className="mb-6" />
+
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
           <div className="flex items-center gap-2">
             <h1 className="text-base font-semibold md:text-lg lg:text-xl">
               {isSiteManager ? 'Customer Dashboard' : 'Customer Dashboard'}
+              <span className="ml-2 text-blue-700 font-bold">{displayName ? `(${displayName})` : ''}</span>
             </h1>
             {isSiteManager ? (
               <Store className="h-5 w-5 text-gray-500" />

@@ -39,9 +39,25 @@ export const usePageAccess = () => {
 export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [currentRole, setCurrentRole] = useState<string | null>('administrator');
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
   const [isTestMode, setIsTestMode] = useState<boolean>(false);
   const [testRole, setTestRole] = useState<string | null>(null);
+
+  // Initialize currentRole from localStorage on app start
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.pageAccessRole) {
+          console.log('🔄 Initializing currentRole from localStorage:', user.pageAccessRole);
+          setCurrentRole(user.pageAccessRole);
+        }
+      } catch (error) {
+        console.error('Error parsing user from localStorage:', error);
+      }
+    }
+  }, []);
 
   // Define available pages - Comprehensive list of all application pages
   const availablePages: Page[] = [];
@@ -501,13 +517,18 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (currentRole) {
         const currentPath = window.location.pathname;
         
+        // Skip redirect for login page
+        if (currentPath === '/login') {
+          return;
+        }
+        
         // Skip redirect for administrators viewing settings page
         if (currentRole === 'administrator' && currentPath === '/settings') {
           return;
         }
         
-        // Always allow access to the home page (index)
-        if (currentPath === '/') {
+        // Always allow access to the home page (index) and dashboard routes
+        if (currentPath === '/' || currentPath.includes('dashboard')) {
           return;
         }
         
@@ -519,7 +540,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch (error) {
       console.error('Error in redirect effect:', error);
     }
-  }, [currentRole, pageAccessByRole, testRole, isTestMode, navigate]);
+  }, [currentRole, pageAccessByRole, testRole, isTestMode]);
 
   // Toggle test mode when URL has ?test=true
   useEffect(() => {

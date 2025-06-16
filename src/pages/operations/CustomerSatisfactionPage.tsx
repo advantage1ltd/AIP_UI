@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SurveyTable } from '@/pages/operations/components/SurveyTable';
 import { SurveyForm } from '@/pages/operations/components/SurveyForm';
 import { SurveyDetails } from '@/pages/operations/components/SurveyDetails';
-import { CustomerSurvey, SurveyFilters, PaginationState } from '@/pages/operations/components/types';
+import { CustomerSurvey, CustomerSurveyFilters } from '@/types/customerSatisfaction';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ClipboardList, FileSpreadsheet, BarChart3, Users, Building, MapPin, 
@@ -15,9 +15,24 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from 'date-fns';
 import { cn } from "@/lib/utils";
+import { customerSatisfactionService } from '@/services/customerSatisfactionService';
+import { toast } from 'react-toastify';
+import { DashboardMetrics } from '@/pages/operations/components/DashboardMetrics';
+import { MobileSurveyCard } from '@/pages/operations/components/MobileSurveyCard';
+import { PageHeader } from '@/pages/operations/components/PageHeader';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Generate mock data with more variety
-const generateMockSurveys = (count = 25): CustomerSurvey[] => {
+export const generateMockSurveys = (count = 25): CustomerSurvey[] => {
   const customers = ['Shoprite Holdings', 'Pick n Pay', 'Woolworths', 'Spar Group', 'Game Stores'];
   const regions = ['Western Cape', 'Eastern Cape', 'Gauteng', 'KwaZulu-Natal', 'Free State'];
   const locations = [
@@ -30,236 +45,47 @@ const generateMockSurveys = (count = 25): CustomerSurvey[] => {
   ];
   const actions = [
     'Improve security measures', 'Staff training', 'Update protocols',
-    'Enhance customer service', 'Implement new technology', 'Review procedures',
-    'Increase visibility', 'Coordinate with store management'
+    'Enhance customer service approach', 'Implement new technology', 'Review procedures',
+    'Conduct follow-up assessment', 'Update documentation'
   ];
-  
-  // Generate different dates within the last 3 months
-  const getRandomDate = () => {
-    const date = new Date();
-    date.setDate(date.getDate() - Math.floor(Math.random() * 90));
-    return date.toISOString().split('T')[0];
-  };
+  const officerNames = [
+    'John Doe', 'Mary Johnson', 'Peter Smith', 'Susan Brown',
+    'David Wilson', 'Linda Davis', 'Michael Taylor', 'Sarah Martinez'
+  ];
 
-  return Array.from({ length: count }, (_, index) => ({
-  id: String(index + 1),
-    officerName: `Officer ${index + 1}`,
-    date: getRandomDate(),
-    customer: customers[Math.floor(Math.random() * customers.length)],
-    region: regions[Math.floor(Math.random() * regions.length)],
-    location: locations[Math.floor(Math.random() * locations.length)],
-  ratings: {
-      uniformAndAppearance: Math.floor(Math.random() * 5) + 5, // 5-10 rating
-      professionalism: Math.floor(Math.random() * 5) + 5,
-      customerServiceApproach: Math.floor(Math.random() * 5) + 5,
-      improvedFeelingSecurity: Math.floor(Math.random() * 5) + 5,
-      relationsWithStoreColleagues: Math.floor(Math.random() * 5) + 5,
-      punctualityBreaks: Math.floor(Math.random() * 5) + 5,
-      proactivity: Math.floor(Math.random() * 5) + 5
-    },
-    storeManagerName: managerNames[Math.floor(Math.random() * managerNames.length)],
-    areaManagerName: managerNames[Math.floor(Math.random() * managerNames.length)],
-    followUpActions: Array.from(
-      { length: Math.floor(Math.random() * 3) + 1 }, 
-      () => actions[Math.floor(Math.random() * actions.length)]
-    ),
-    datesToBeCompleted: Array.from(
-      { length: Math.floor(Math.random() * 3) + 1 }, 
-      () => {
-        const date = new Date();
-        date.setDate(date.getDate() + Math.floor(Math.random() * 30) + 1);
-        return date.toISOString().split('T')[0];
-      }
-    )
-  }));
-};
+  return Array.from({ length: count }, (_, i) => {
+    const numActions = Math.floor(Math.random() * 3) + 1;
+    const followUpActions = Array.from({ length: numActions }, () => 
+      actions[Math.floor(Math.random() * actions.length)]
+    );
+    const datesToBeCompleted = Array.from({ length: numActions }, () => {
+      const date = new Date();
+      date.setDate(date.getDate() + Math.floor(Math.random() * 30));
+      return date.toISOString().split('T')[0];
+    });
 
-// Component for page header
-const PageHeader = ({ showForm, editingSurvey }: { showForm: boolean; editingSurvey: CustomerSurvey | null }) => (
-  <div className="mb-4 md:mb-6 lg:mb-8">
-    <div className="flex items-center gap-2 md:gap-3 mb-1 md:mb-2">
-      {showForm ? (
-        <ClipboardList className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
-      ) : (
-        <FileSpreadsheet className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
-      )}
-      <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900">
-        {showForm 
-          ? (editingSurvey ? 'Edit Survey' : 'New Survey') 
-          : 'Customer Satisfaction Surveys'}
-      </h1>
-    </div>
-    <p className="text-sm md:text-base lg:text-lg text-gray-600">
-      {showForm 
-        ? `${editingSurvey ? 'Edit the' : 'Complete the'} form below to ${editingSurvey ? 'update' : 'submit'} a customer satisfaction survey.`
-        : 'View and manage customer satisfaction surveys across all locations.'
-      }
-    </p>
-  </div>
-);
-
-// Dashboard metrics component with responsive grid
-const DashboardMetrics = ({ surveys }: { surveys: CustomerSurvey[] }) => {
-  // Calculate metrics
-  const totalSurveys = surveys.length;
-  const averageRating = useMemo(() => {
-    if (totalSurveys === 0) return 0;
-    const sum = surveys.reduce((acc, survey) => {
-      const ratings = Object.values(survey.ratings);
-      const avgSurveyRating = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
-      return acc + avgSurveyRating;
-    }, 0);
-    return Math.round((sum / totalSurveys) * 10) / 10; // Round to 1 decimal
-  }, [surveys, totalSurveys]);
-
-  const uniqueCustomers = useMemo(() => {
-    return new Set(surveys.map(s => s.customer)).size;
-  }, [surveys]);
-
-  const uniqueLocations = useMemo(() => {
-    return new Set(surveys.map(s => s.location)).size;
-  }, [surveys]);
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">
-      <Card className="bg-primary text-primary-foreground shadow-sm">
-        <CardHeader className="p-2 md:p-4 pb-0">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 md:h-5 md:w-5 text-primary-foreground" />
-            <CardTitle className="text-sm md:text-base">Total Surveys</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="p-2 md:p-4 pt-1 md:pt-2">
-          <p className="text-2xl md:text-3xl font-bold">{totalSurveys}</p>
-          <p className="text-xs md:text-sm text-primary-foreground/70">Overall submission count</p>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-indigo-600 text-white shadow-sm">
-        <CardHeader className="p-2 md:p-4 pb-0">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 md:h-5 md:w-5 text-white" />
-            <CardTitle className="text-sm md:text-base">Avg. Rating</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="p-2 md:p-4 pt-1 md:pt-2">
-          <p className="text-2xl md:text-3xl font-bold">{averageRating}/10</p>
-          <p className="text-xs md:text-sm text-white/70">Customer satisfaction score</p>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-emerald-600 text-white shadow-sm">
-        <CardHeader className="p-2 md:p-4 pb-0">
-          <div className="flex items-center gap-2">
-            <Building className="h-4 w-4 md:h-5 md:w-5 text-white" />
-            <CardTitle className="text-sm md:text-base">Customers</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="p-2 md:p-4 pt-1 md:pt-2">
-          <p className="text-2xl md:text-3xl font-bold">{uniqueCustomers}</p>
-          <p className="text-xs md:text-sm text-white/70">Unique clients surveyed</p>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-rose-600 text-white shadow-sm">
-        <CardHeader className="p-2 md:p-4 pb-0">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 md:h-5 md:w-5 text-white" />
-            <CardTitle className="text-sm md:text-base">Locations</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="p-2 md:p-4 pt-1 md:pt-2">
-          <p className="text-2xl md:text-3xl font-bold">{uniqueLocations}</p>
-          <p className="text-xs md:text-sm text-white/70">Unique sites covered</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-// Mobile survey card component for better mobile display
-const MobileSurveyCard = ({ 
-  survey, 
-  onEdit, 
-  onView, 
-  onDelete 
-}: { 
-  survey: CustomerSurvey; 
-  onEdit: (survey: CustomerSurvey) => void;
-  onView: (survey: CustomerSurvey) => void;
-  onDelete: (id: string) => void;
-}) => {
-  // Calculate average rating
-  const avgRating = useMemo(() => {
-    const ratings = Object.values(survey.ratings);
-    const sum = ratings.reduce((acc, rating) => acc + rating, 0);
-    return Math.round((sum / ratings.length) * 10) / 10;
-  }, [survey.ratings]);
-
-  return (
-    <Card className="mb-3 shadow-sm">
-      <CardHeader className="p-3 pb-2">
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="text-base font-medium">{survey.officerName}</CardTitle>
-            <CardDescription className="text-xs mt-0.5">
-              {new Date(survey.date).toLocaleDateString()}
-            </CardDescription>
-          </div>
-          <div className="bg-primary/10 text-primary rounded-full px-2 py-1 text-xs font-medium">
-            {avgRating}/10
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="p-3 pt-0">
-        <div className="grid grid-cols-2 gap-2 text-xs mt-2 text-gray-700">
-          <div>
-            <p className="font-medium text-gray-500">Customer</p>
-            <p className="truncate">{survey.customer}</p>
-          </div>
-          <div>
-            <p className="font-medium text-gray-500">Location</p>
-            <p className="truncate">{survey.location}</p>
-          </div>
-          <div>
-            <p className="font-medium text-gray-500">Region</p>
-            <p>{survey.region}</p>
-          </div>
-          <div>
-            <p className="font-medium text-gray-500">Manager</p>
-            <p className="truncate">{survey.storeManagerName}</p>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 mt-3 border-t pt-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 w-8 p-0" 
-            onClick={() => onView(survey)}
-          >
-            <Eye className="h-3.5 w-3.5" />
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 w-8 p-0" 
-            onClick={() => onEdit(survey)}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 w-8 p-0 text-rose-600 hover:bg-rose-50 hover:text-rose-700" 
-            onClick={() => onDelete(survey.id)}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+    return {
+      id: (i + 1).toString(),
+      officerName: officerNames[Math.floor(Math.random() * officerNames.length)],
+      date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      customer: customers[Math.floor(Math.random() * customers.length)],
+      region: regions[Math.floor(Math.random() * regions.length)],
+      location: locations[Math.floor(Math.random() * locations.length)],
+      ratings: {
+        uniformAndAppearance: Math.floor(Math.random() * 5) + 5,
+        professionalism: Math.floor(Math.random() * 5) + 5,
+        customerServiceApproach: Math.floor(Math.random() * 5) + 5,
+        improvedFeelingOfSecurityWhenOfficerOnSite: Math.floor(Math.random() * 5) + 5,
+        relationsWithStoreColleagues: Math.floor(Math.random() * 5) + 5,
+        punctualityBreaks: Math.floor(Math.random() * 5) + 5,
+        proactivity: Math.floor(Math.random() * 5) + 5
+      },
+      storeManagerName: managerNames[Math.floor(Math.random() * managerNames.length)],
+      areaManagerName: managerNames[Math.floor(Math.random() * managerNames.length)],
+      followUpActions,
+      datesToBeCompleted
+    };
+  });
 };
 
 // Helper function to generate CSV data
@@ -271,8 +97,8 @@ const generateCsvData = (data: CustomerSurvey[]): string => {
   // Define headers, flattening the ratings
   const headers = [
     'ID', 'Officer Name', 'Date', 'Customer', 'Region', 'Location',
-    'Rating: Uniform & Appearance', 'Rating: Professionalism', 'Rating: Customer Service',
-    'Rating: Improved Security Feeling', 'Rating: Relations w/ Colleagues', 'Rating: Punctuality & Breaks',
+    'Rating: Uniform & Appearance', 'Rating: Professionalism', 'Rating: Customer Service Approach',
+    'Rating: Improved Feeling of Security When Officer on Site', 'Rating: Relations with Store Colleagues', 'Rating: Punctuality & Breaks',
     'Rating: Proactivity', 'Store Manager Name', 'Area Manager Name',
     'Follow Up Actions', 'Dates To Be Completed'
   ];
@@ -290,7 +116,7 @@ const generateCsvData = (data: CustomerSurvey[]): string => {
       ratings.uniformAndAppearance ?? '',
       ratings.professionalism ?? '',
       ratings.customerServiceApproach ?? '',
-      ratings.improvedFeelingSecurity ?? '',
+      ratings.improvedFeelingOfSecurityWhenOfficerOnSite ?? '',
       ratings.relationsWithStoreColleagues ?? '',
       ratings.punctualityBreaks ?? '',
       ratings.proactivity ?? '',
@@ -317,13 +143,14 @@ const CustomerSatisfactionPage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingSurvey, setEditingSurvey] = useState<CustomerSurvey | null>(null);
   const [viewingSurvey, setViewingSurvey] = useState<CustomerSurvey | null>(null);
-  const [surveys, setSurveys] = useState<CustomerSurvey[]>(() => generateMockSurveys(50));
-  const [pagination, setPagination] = useState<PaginationState>({
+  const [surveys, setSurveys] = useState<CustomerSurvey[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [pagination, setPagination] = useState({
     currentPage: 1,
     pageSize: 10,
-    total: 50
+    total: 0
   });
-  const [filters, setFilters] = useState<SurveyFilters>({
+  const [filters, setFilters] = useState<CustomerSurveyFilters>({
     search: '',
     customer: '',
     region: '',
@@ -332,8 +159,37 @@ const CustomerSatisfactionPage: React.FC = () => {
   });
   const [downloadStartDate, setDownloadStartDate] = useState<Date | undefined>();
   const [downloadEndDate, setDownloadEndDate] = useState<Date | undefined>();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [surveyToDelete, setSurveyToDelete] = useState<string | null>(null);
 
-  // Event handlers with useCallback to prevent unnecessary rerenders
+  // Fetch surveys
+  const fetchSurveys = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await customerSatisfactionService.getSurveys(
+        pagination.currentPage,
+        pagination.pageSize,
+        filters
+      );
+      setSurveys(response.data);
+      setPagination(prev => ({
+        ...prev,
+        total: response.pagination.total
+      }));
+    } catch (error) {
+      console.error('Failed to fetch surveys:', error);
+      toast.error('Failed to load surveys. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [pagination.currentPage, pagination.pageSize, filters]);
+
+  // Initial load
+  useEffect(() => {
+    fetchSurveys();
+  }, [fetchSurveys]);
+
+  // Event handlers
   const handleNewSurvey = useCallback(() => {
     setEditingSurvey(null);
     setShowForm(true);
@@ -344,35 +200,57 @@ const CustomerSatisfactionPage: React.FC = () => {
     setShowForm(true);
   }, []);
 
-  const handleViewSurvey = useCallback((survey: CustomerSurvey) => {
-    setViewingSurvey(survey);
+  const handleViewSurvey = useCallback(async (survey: CustomerSurvey) => {
+    try {
+      const fullSurvey = await customerSatisfactionService.getSurvey(survey.id);
+      setViewingSurvey(fullSurvey);
+    } catch (error) {
+      console.error('Failed to fetch survey details:', error);
+      toast.error('Failed to load survey details. Please try again.');
+    }
   }, []);
 
-  const handleDeleteSurvey = useCallback((id: string) => {
-    setSurveys(prev => {
-      const updatedSurveys = prev.filter(survey => survey.id !== id);
-      return updatedSurveys;
-    });
-    // Update will happen in useEffect
+  const handleDeleteSurvey = useCallback(async (id: string) => {
+    setSurveyToDelete(id);
+    setDeleteDialogOpen(true);
   }, []);
 
-  const handleSurveySubmit = useCallback((survey: CustomerSurvey) => {
-    setSurveys(prev => {
-    if (editingSurvey) {
-      // Update existing survey
-        return prev.map(s => s.id === editingSurvey.id 
-          ? { ...survey, id: editingSurvey.id } 
-          : s
-        );
-    } else {
-        // Add new survey with next available ID
-        return [...prev, { ...survey, id: String(prev.length + 1) }];
-      }
-    });
+  const confirmDelete = useCallback(async () => {
+    if (!surveyToDelete) return;
     
-    setShowForm(false);
-    setEditingSurvey(null);
-  }, [editingSurvey]);
+    try {
+      await customerSatisfactionService.deleteSurvey(surveyToDelete);
+      toast.success('Survey deleted successfully');
+      fetchSurveys(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to delete survey:', error);
+      toast.error('Failed to delete survey. Please try again.');
+    } finally {
+      setDeleteDialogOpen(false);
+      setSurveyToDelete(null);
+    }
+  }, [surveyToDelete, fetchSurveys]);
+
+  const handleSurveySubmit = useCallback(async (survey: CustomerSurvey) => {
+    try {
+      if (editingSurvey) {
+        await customerSatisfactionService.updateSurvey(editingSurvey.id, survey);
+        toast.success('Survey updated successfully');
+      } else {
+        await customerSatisfactionService.createSurvey(survey);
+        toast.success('Survey created successfully');
+      }
+      setShowForm(false);
+      setEditingSurvey(null);
+      fetchSurveys(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to save survey:', error);
+      toast.error(editingSurvey 
+        ? 'Failed to update survey. Please try again.'
+        : 'Failed to create survey. Please try again.'
+      );
+    }
+  }, [editingSurvey, fetchSurveys]);
 
   const handleCancelForm = useCallback(() => {
     setShowForm(false);
@@ -386,7 +264,7 @@ const CustomerSatisfactionPage: React.FC = () => {
     }));
   }, []);
 
-  const handleFiltersChange = useCallback((newFilters: SurveyFilters) => {
+  const handleFiltersChange = useCallback((newFilters: CustomerSurveyFilters) => {
     setFilters(newFilters);
     setPagination(prev => ({
       ...prev,
@@ -528,7 +406,7 @@ const CustomerSatisfactionPage: React.FC = () => {
                     <div className="sm:hidden p-3">
                       <div className="flex justify-between items-center mb-3">
                         <h3 className="text-sm font-medium text-gray-700">
-                          {filteredSurveys.length} Survey{filteredSurveys.length !== 1 ? 's' : ''}
+                          {isLoading ? 'Loading...' : `${surveys.length} Survey${surveys.length !== 1 ? 's' : ''}`}
                         </h3>
                         <Button size="sm" className="h-8 text-xs" onClick={handleNewSurvey}>
                           Add New
@@ -543,6 +421,7 @@ const CustomerSatisfactionPage: React.FC = () => {
                           value={filters.search}
                           onChange={(e) => handleFiltersChange({...filters, search: e.target.value})}
                           className="w-full pl-8 text-xs h-8"
+                          disabled={isLoading}
                         />
                         <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
                       </div>
@@ -560,6 +439,7 @@ const CustomerSatisfactionPage: React.FC = () => {
                                     "w-full justify-start text-left font-normal h-8 text-xs",
                                     !downloadStartDate && "text-muted-foreground"
                                   )}
+                                  disabled={isLoading}
                                 >
                                   <CalendarIcon className="mr-1 h-3.5 w-3.5" />
                                   {downloadStartDate ? format(downloadStartDate, "PPP") : <span>Start date</span>}
@@ -583,6 +463,7 @@ const CustomerSatisfactionPage: React.FC = () => {
                                     "w-full justify-start text-left font-normal h-8 text-xs",
                                     !downloadEndDate && "text-muted-foreground"
                                   )}
+                                  disabled={isLoading}
                                 >
                                   <CalendarIcon className="mr-1 h-3.5 w-3.5" />
                                   {downloadEndDate ? format(downloadEndDate, "PPP") : <span>End date</span>}
@@ -605,7 +486,7 @@ const CustomerSatisfactionPage: React.FC = () => {
                           size="sm" 
                           className="w-full h-8 text-xs" 
                           onClick={handleDownloadCsv}
-                          disabled={!downloadStartDate || !downloadEndDate}
+                          disabled={!downloadStartDate || !downloadEndDate || isLoading}
                         >
                            <Download className="mr-1 h-3.5 w-3.5" /> Download CSV
                         </Button>
@@ -613,9 +494,13 @@ const CustomerSatisfactionPage: React.FC = () => {
                       
                       {/* Mobile card list with pagination */}
                       <div className="mt-4"> 
-                        {paginatedSurveys.length > 0 ? (
+                        {isLoading ? (
+                          <div className="text-center py-8 text-sm text-gray-500">
+                            Loading surveys...
+                          </div>
+                        ) : surveys.length > 0 ? (
                           <>
-                            {paginatedSurveys.map(survey => (
+                            {surveys.map(survey => (
                               <MobileSurveyCard 
                                 key={survey.id}
                                 survey={survey}
@@ -627,14 +512,14 @@ const CustomerSatisfactionPage: React.FC = () => {
                             
                             {/* Mobile pagination */}
                             <div className="flex justify-between items-center mt-4 pt-2 border-t text-xs text-gray-500">
-                              <span>Page {pagination.currentPage} of {Math.ceil(filteredSurveys.length / pagination.pageSize)}</span>
+                              <span>Page {pagination.currentPage} of {Math.ceil(pagination.total / pagination.pageSize)}</span>
                               <div className="flex gap-2">
                                 <Button 
                                   variant="outline" 
                                   size="sm" 
                                   className="h-8 w-8 p-0" 
                                   onClick={() => handlePageChange(pagination.currentPage - 1)}
-                                  disabled={pagination.currentPage === 1}
+                                  disabled={pagination.currentPage === 1 || isLoading}
                                 >
                                   <ChevronLeft className="h-4 w-4" />
                                 </Button>
@@ -643,7 +528,7 @@ const CustomerSatisfactionPage: React.FC = () => {
                                   size="sm" 
                                   className="h-8 w-8 p-0" 
                                   onClick={() => handlePageChange(pagination.currentPage + 1)}
-                                  disabled={pagination.currentPage >= Math.ceil(filteredSurveys.length / pagination.pageSize)}
+                                  disabled={pagination.currentPage >= Math.ceil(pagination.total / pagination.pageSize) || isLoading}
                                 >
                                   <ChevronRight className="h-4 w-4" />
                                 </Button>
@@ -672,6 +557,7 @@ const CustomerSatisfactionPage: React.FC = () => {
                                   "w-[180px] justify-start text-left font-normal h-9",
                                   !downloadStartDate && "text-muted-foreground"
                                 )}
+                                disabled={isLoading}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                 {downloadStartDate ? format(downloadStartDate, "PPP") : <span>Start date</span>}
@@ -695,6 +581,7 @@ const CustomerSatisfactionPage: React.FC = () => {
                                     "w-[180px] justify-start text-left font-normal h-9",
                                     !downloadEndDate && "text-muted-foreground"
                                   )}
+                                  disabled={isLoading}
                                 >
                                   <CalendarIcon className="mr-2 h-4 w-4" />
                                   {downloadEndDate ? format(downloadEndDate, "PPP") : <span>End date</span>}
@@ -716,14 +603,14 @@ const CustomerSatisfactionPage: React.FC = () => {
                             size="sm" 
                             className="h-9" 
                             onClick={handleDownloadCsv}
-                            disabled={!downloadStartDate || !downloadEndDate}
+                            disabled={!downloadStartDate || !downloadEndDate || isLoading}
                           >
                             <Download className="mr-2 h-4 w-4" /> Download CSV
                           </Button>
                       </div>
                       
                       <SurveyTable 
-                        surveys={paginatedSurveys}
+                        surveys={surveys}
                         pagination={pagination}
                         filters={filters}
                         onNewSurvey={handleNewSurvey}
@@ -732,6 +619,7 @@ const CustomerSatisfactionPage: React.FC = () => {
                         onDeleteSurvey={handleDeleteSurvey}
                         onPageChange={handlePageChange}
                         onFiltersChange={handleFiltersChange}
+                        isLoading={isLoading}
                       />
                     </div>
                   </div>
@@ -752,6 +640,24 @@ const CustomerSatisfactionPage: React.FC = () => {
             )}
           </motion.div>
         </AnimatePresence>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the survey and remove it from our servers.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setSurveyToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {viewingSurvey && (
           <SurveyDetails

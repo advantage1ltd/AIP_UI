@@ -1,30 +1,60 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
 import { usePageAccess } from '@/contexts/PageAccessContext';
 
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-  path: string;
-}
+// interface ProtectedRouteProps {
+//   children: React.ReactNode;
+//   path: string;
+// }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, path }) => {
-  const { hasAccess, currentRole, isTestMode, testRole } = usePageAccess();
+// Removed duplicate named export to resolve error
+// export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, path }) => {
+//   const { hasAccess, currentRole, isTestMode, testRole } = usePageAccess();
+//   if (!currentRole) {
+//     return <Navigate to="/" replace />;
+//   }
+//   if (currentRole === 'administrator' && path === '/settings') {
+//     return <>{children}</>;
+//   }
+//   if (!hasAccess(path)) {
+//     return <Navigate to="/" replace />;
+//   }
+//   return <>{children}</>;
+// };
 
-  // If no role is set, redirect to login or home
-  if (!currentRole) {
-    return <Navigate to="/" replace />;
+export default function ProtectedRoute() {
+  const [isChecking, setIsChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { currentRole } = usePageAccess();
+
+  useEffect(() => {
+    // Check authentication status
+    const checkAuth = () => {
+      const token = localStorage.getItem('auth_token');
+      const hasValidSession = !!token && !!currentRole;
+      setIsAuthenticated(hasValidSession);
+      setIsChecking(false);
+    };
+
+    // Only check once, avoid continuous re-checking
+    if (isChecking) {
+      const timeoutId = setTimeout(checkAuth, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [currentRole, isChecking]);
+
+  // Show loading state during check to prevent flashing
+  if (isChecking) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
-  // Special case: always allow administrators to access settings
-  if (currentRole === 'administrator' && path === '/settings') {
-    return <>{children}</>;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
-  // Check access based on current role or test role
-  if (!hasAccess(path)) {
-    // If user doesn't have access to this page, redirect to their first accessible page
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{children}</>;
-}; 
+  return <Outlet />;
+} 

@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { v4 as uuidv4 } from 'uuid';
-import { Pencil, Trash2, Eye, ChevronLeft, ChevronRight, Search, Plus, Calendar, Filter } from "lucide-react";
+import { Pencil, Trash2, Eye, ChevronLeft, ChevronRight, Search, Plus, Calendar, Filter, Archive, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -50,43 +50,16 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-// Mock officers data
-const mockOfficers = [
-  { id: "off1", name: "John Smith" },
-  { id: "off2", name: "Sarah Johnson" },
-  { id: "off3", name: "Michael Brown" },
-  { id: "off4", name: "Emily Davis" },
-  { id: "off5", name: "David Wilson" },
-  { id: "off6", name: "Lisa Thompson" },
-  { id: "off7", name: "Robert Garcia" },
-  { id: "off8", name: "Jennifer Lee" },
-];
-
-// Mock managers data (reusing from holiday request)
-const mockManagers = [
-  { id: "m1", name: "John Smith", role: "Senior Manager" },
-  { id: "m2", name: "Sarah Johnson", role: "Department Head" },
-  { id: "m3", name: "Michael Brown", role: "Team Lead" },
-  { id: "m4", name: "Emily Davis", role: "Operations Manager" },
-];
-
-interface BankHoliday {
-  id: string;
-  officerId: string;
-  holidayDate: Date;
-  dateOfRequest: Date;
-  authorisedBy: string;
-  dateAuthorised: Date | null;
-  status: "authorized" | "declined" | "pending";
-}
+import { bankHolidayService } from "@/services/bankHolidayService";
+import type { BankHoliday } from "@/types/bankHoliday";
+import { mockOfficers } from "@/data/mockOfficers";
+import { mockManagers } from "@/data/mockManagers";
 
 const formSchema = z.object({
   officerId: z.string().min(1, "Officer is required"),
   holidayDate: z.date({
     required_error: "Bank holiday date is required",
-  }),
-  authorisedBy: z.string().min(1, "Authorising manager is required"),
-  dateAuthorised: z.date().optional(),
+  })
 });
 
 // Generate mock holiday data
@@ -124,6 +97,7 @@ const generateMockHolidays = (): BankHoliday[] => {
       authorisedBy: managerId,
       dateAuthorised: authDate,
       status: status as "authorized" | "declined" | "pending",
+      archived: false
     });
   }
 
@@ -210,40 +184,59 @@ const ActionButtons = ({
   holiday,
   onEdit,
   onView,
-  onDelete
+  onDelete,
+  onArchive,
+  onUnarchive
 }: { 
   holiday: BankHoliday;
   onEdit: (holiday: BankHoliday) => void;
   onView: (holiday: BankHoliday) => void;
   onDelete: (id: string) => void;
+  onArchive: (id: string) => void;
+  onUnarchive: (id: string) => void;
 }) => (
-  <div className="flex gap-1 justify-end">
+  <div className="flex items-center justify-center gap-2">
     <Button
-      variant="ghost"
-      size="icon"
+      variant="outline"
+      size="sm"
       onClick={() => onEdit(holiday)}
-      className="h-7 w-7"
+      className="h-8 w-8 rounded-full bg-blue-50 border-blue-200 hover:bg-blue-100 p-0"
       title="Edit Holiday"
     >
-      <Pencil className="h-3.5 w-3.5" />
+      <Pencil className="h-3.5 w-3.5 text-blue-600" />
     </Button>
     <Button
-      variant="ghost"
-      size="icon"
+      variant="outline"
+      size="sm"
       onClick={() => onView(holiday)}
-      className="h-7 w-7"
+      className="h-8 w-8 rounded-full bg-gray-50 border-gray-200 hover:bg-gray-100 p-0"
       title="View Details"
     >
-      <Eye className="h-3.5 w-3.5" />
+      <Eye className="h-3.5 w-3.5 text-gray-600" />
     </Button>
+    {holiday.status === 'authorized' && (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => holiday.archived ? onUnarchive(holiday.id) : onArchive(holiday.id)}
+        className="h-8 w-8 rounded-full bg-purple-50 border-purple-200 hover:bg-purple-100 p-0"
+        title={holiday.archived ? "Unarchive Holiday" : "Archive Holiday"}
+      >
+        {holiday.archived ? (
+          <Archive className="h-3.5 w-3.5 text-purple-600" />
+        ) : (
+          <Archive className="h-3.5 w-3.5 text-purple-600" />
+        )}
+      </Button>
+    )}
     <Button
-      variant="ghost"
-      size="icon"
+      variant="outline"
+      size="sm"
       onClick={() => onDelete(holiday.id)}
-      className="h-7 w-7 text-destructive hover:bg-destructive/10"
+      className="h-8 w-8 rounded-full bg-red-50 border-red-200 hover:bg-red-100 p-0"
       title="Delete Holiday"
     >
-      <Trash2 className="h-3.5 w-3.5" />
+      <Trash2 className="h-3.5 w-3.5 text-red-600" />
     </Button>
   </div>
 );
@@ -377,14 +370,44 @@ const MemoizedActionButtons = React.memo(ActionButtons);
 const MemoizedStatusBadge = React.memo(StatusBadge);
 const MemoizedHolidayMobileCard = React.memo(HolidayMobileCard);
 
+// Add this component
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center p-4">
+    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+  </div>
+);
+
+// Add this component
+const LoadingRow = () => (
+  <TableRow>
+    <TableCell colSpan={5}>
+      <LoadingSpinner />
+    </TableCell>
+  </TableRow>
+);
+
+// Add this component
+const LoadingCard = () => (
+  <Card className="mb-2 shadow-sm sm:hidden">
+    <CardContent className="p-3">
+      <div className="flex items-center justify-center py-4">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    </CardContent>
+  </Card>
+);
+
 export default function BankHolidayPage() {
   const [holidays, setHolidays] = useState<BankHoliday[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [editingHoliday, setEditingHoliday] = useState<BankHoliday | null>(null);
   const [viewingHoliday, setViewingHoliday] = useState<BankHoliday | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [showArchived, setShowArchived] = useState(false);
   const itemsPerPage = 10;
   const { toast } = useToast();
 
@@ -393,65 +416,113 @@ export default function BankHolidayPage() {
     defaultValues: {
       officerId: "",
       holidayDate: undefined,
-      authorisedBy: "",
-      dateAuthorised: undefined,
     },
   });
 
-  // Initialize with mock data
+  // Fetch holidays
+  const fetchHolidays = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await bankHolidayService.getBankHolidays({
+        search: searchTerm,
+        page: currentPage,
+        limit: itemsPerPage,
+        archived: showArchived
+      });
+      
+      setHolidays(response.data);
+      setTotalPages(response.totalPages);
+    } catch (error) {
+      console.error('Error fetching bank holidays:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch bank holidays. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchTerm, currentPage, itemsPerPage, showArchived, toast]);
+
+  // Initial fetch
   useEffect(() => {
-    setHolidays(generateMockHolidays());
-  }, []);
+    fetchHolidays();
+  }, [fetchHolidays]);
+
+  // Reset to first page when search or archive filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, showArchived]);
 
   useEffect(() => {
     if (editingHoliday) {
       form.reset({
         officerId: editingHoliday.officerId,
         holidayDate: editingHoliday.holidayDate,
-        authorisedBy: editingHoliday.authorisedBy,
-        dateAuthorised: editingHoliday.dateAuthorised || undefined,
       });
     }
   }, [editingHoliday, form]);
 
-  const onSubmit = useCallback((values: z.infer<typeof formSchema>) => {
-    const formattedHoliday: BankHoliday = {
-      id: editingHoliday?.id || uuidv4(),
-      officerId: values.officerId,
-      holidayDate: values.holidayDate,
-      dateOfRequest: editingHoliday?.dateOfRequest || new Date(),
-      authorisedBy: values.authorisedBy,
-      dateAuthorised: values.dateAuthorised || null,
-      status: "pending" as "pending" | "authorized" | "declined"
-    };
+  const onSubmit = useCallback(async (values: z.infer<typeof formSchema>) => {
+    try {
+      if (editingHoliday) {
+        const updatedHoliday = await bankHolidayService.updateBankHoliday(editingHoliday.id, {
+          officerId: values.officerId,
+          holidayDate: values.holidayDate
+        });
+        
+        setHolidays(prev => prev.map(holiday => 
+          holiday.id === editingHoliday.id ? updatedHoliday : holiday
+        ));
+        
+        toast({
+          title: "Success",
+          description: "Bank holiday updated successfully",
+        });
+      } else {
+        const newHoliday = await bankHolidayService.createBankHoliday({
+          officerId: values.officerId,
+          holidayDate: values.holidayDate
+        });
+        
+        setHolidays(prev => [newHoliday, ...prev]);
+        setCurrentPage(1);
+        
+        toast({
+          title: "Success",
+          description: "Bank holiday created successfully",
+        });
+      }
 
-    if (editingHoliday) {
-      setHolidays(prev => prev.map(holiday => 
-        holiday.id === editingHoliday.id ? formattedHoliday : holiday
-      ));
+      setIsDialogOpen(false);
+      form.reset();
+      setEditingHoliday(null);
+    } catch (error) {
+      console.error('Error submitting bank holiday:', error);
       toast({
-        title: "Success",
-        description: "Bank holiday updated successfully",
-      });
-    } else {
-      setHolidays(prev => [...prev, formattedHoliday]);
-      toast({
-        title: "Success",
-        description: "Bank holiday created successfully",
+        title: "Error",
+        description: "Failed to submit bank holiday. Please try again.",
+        variant: "destructive"
       });
     }
-
-    setIsDialogOpen(false);
-    form.reset();
-    setEditingHoliday(null);
   }, [editingHoliday, form, toast]);
 
-  const handleDelete = useCallback((id: string) => {
-    setHolidays(prev => prev.filter(h => h.id !== id));
-    toast({
-      title: "Success",
-      description: "Bank holiday deleted successfully",
-    });
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      await bankHolidayService.deleteBankHoliday(id);
+      setHolidays(prev => prev.filter(h => h.id !== id));
+      toast({
+        title: "Success",
+        description: "Bank holiday deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting bank holiday:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete bank holiday. Please try again.",
+        variant: "destructive"
+      });
+    }
   }, [toast]);
 
   const handleViewHoliday = useCallback((holiday: BankHoliday) => {
@@ -468,31 +539,49 @@ export default function BankHolidayPage() {
     setCurrentPage(page);
   }, []);
 
-  const filteredHolidays = useMemo(() => {
-    if (!searchTerm.trim()) return holidays;
-    
-    return holidays.filter((holiday) => {
-      const officerName = mockOfficers.find(o => o.id === holiday.officerId)?.name || '';
-      const searchLower = searchTerm.toLowerCase();
-      return officerName.toLowerCase().includes(searchLower);
-    });
-  }, [holidays, searchTerm]);
+  // Add these handlers after the existing handlers
+  const handleArchive = useCallback(async (id: string) => {
+    try {
+      const updatedHoliday = await bankHolidayService.archiveBankHoliday(id);
+      setHolidays(prev => prev.map(h => 
+        h.id === id ? updatedHoliday : h
+      ));
+      toast({
+        title: "Success",
+        description: "Bank holiday archived successfully.",
+      });
+    } catch (error) {
+      console.error('Error archiving bank holiday:', error);
+      toast({
+        title: "Error",
+        description: "Failed to archive bank holiday. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
 
-  const paginatedHolidays = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredHolidays.slice(startIndex, endIndex);
-  }, [filteredHolidays, currentPage]);
+  const handleUnarchive = useCallback(async (id: string) => {
+    try {
+      const updatedHoliday = await bankHolidayService.unarchiveBankHoliday(id);
+      setHolidays(prev => prev.map(h => 
+        h.id === id ? updatedHoliday : h
+      ));
+      toast({
+        title: "Success",
+        description: "Bank holiday unarchived successfully.",
+      });
+    } catch (error) {
+      console.error('Error unarchiving bank holiday:', error);
+      toast({
+        title: "Error",
+        description: "Failed to unarchive bank holiday. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
 
-  const totalPages = useMemo(() => 
-    Math.max(1, Math.ceil(filteredHolidays.length / itemsPerPage)), 
-    [filteredHolidays.length]
-  );
-
-  // Reset to first page when search changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+  // Update the filtered holidays logic
+  const paginatedHolidays = useMemo(() => holidays, [holidays]);
 
   const getOfficerName = useCallback((officerId: string) => 
     mockOfficers.find(o => o.id === officerId)?.name || 'Unknown',
@@ -517,6 +606,11 @@ export default function BankHolidayPage() {
   
   const declinedCount = useMemo(() => 
     holidays.filter(h => h.status === "declined").length, 
+    [holidays]
+  );
+
+  const totalCount = useMemo(() => 
+    holidays.length,
     [holidays]
   );
 
@@ -580,32 +674,6 @@ export default function BankHolidayPage() {
                         />
                       )}
                     />
-
-                    <FormField
-                      control={form.control}
-                      name="authorisedBy"
-                      render={({ field }) => (
-                        <SelectField 
-                          field={field}
-                          label="Authorised By"
-                          placeholder="Select manager"
-                          options={mockManagers}
-                          additionalInfo="role"
-                        />
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="dateAuthorised"
-                      render={({ field }) => (
-                        <DateField 
-                          field={field}
-                          label="Date Authorised"
-                          disabled={!form.getValues("authorisedBy")}
-                        />
-                      )}
-                    />
                   </div>
 
                   <DialogFooter className="flex-col gap-2 sm:flex-row sm:gap-0 sm:justify-end pt-2">
@@ -640,7 +708,7 @@ export default function BankHolidayPage() {
               <CardDescription className="text-[10px] sm:text-xs text-primary-foreground/70">All recorded holidays</CardDescription>
             </CardHeader>
             <CardContent className="p-2 sm:p-3 md:p-4 pt-1">
-              <div className="text-xl sm:text-2xl md:text-3xl font-bold">{holidays.length}</div>
+              <div className="text-xl sm:text-2xl md:text-3xl font-bold">{totalCount}</div>
             </CardContent>
           </Card>
           <Card className="bg-amber-600 text-white shadow-sm">
@@ -682,36 +750,60 @@ export default function BankHolidayPage() {
             <CardHeader className="p-2 sm:p-3 md:p-4 pb-1.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
                 <CardTitle className="text-sm sm:text-base md:text-lg">Bank Holiday Records</CardTitle>
-                <div className="relative w-full sm:w-64 md:w-72">
-                  <Input
-                    type="text"
-                    placeholder="Search by officer name..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-8 h-8 sm:h-9 text-xs sm:text-sm"
-                  />
-                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <Select
+                    value={showArchived ? "archived" : "active"}
+                    onValueChange={(value) => setShowArchived(value === "archived")}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger className="w-full sm:w-[140px] h-8 sm:h-9 text-xs sm:text-sm">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="relative w-full sm:w-64 md:w-72">
+                    <Input
+                      type="text"
+                      placeholder="Search by officer name..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-8 h-8 sm:h-9 text-xs sm:text-sm"
+                      disabled={isLoading}
+                    />
+                    <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               {/* Mobile view - card layout */}
               <div className="p-2 sm:hidden">
-                {paginatedHolidays.map((holiday) => (
-                  <MemoizedHolidayMobileCard
-                    key={holiday.id}
-                    holiday={holiday}
-                    getOfficerName={getOfficerName}
-                    getManagerName={getManagerName}
-                    onEdit={handleEditHoliday}
-                    onView={handleViewHoliday}
-                    onDelete={handleDelete}
-                  />
-                ))}
-                {paginatedHolidays.length === 0 && (
-                  <div className="text-center py-4 text-xs text-muted-foreground">
-                    No holidays found
-                  </div>
+                {isLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <LoadingCard key={i} />
+                  ))
+                ) : (
+                  <>
+                    {paginatedHolidays.map((holiday) => (
+                      <MemoizedHolidayMobileCard
+                        key={holiday.id}
+                        holiday={holiday}
+                        getOfficerName={getOfficerName}
+                        getManagerName={getManagerName}
+                        onEdit={handleEditHoliday}
+                        onView={handleViewHoliday}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                    {paginatedHolidays.length === 0 && (
+                      <div className="text-center py-4 text-xs text-muted-foreground">
+                        No holidays found
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -719,7 +811,7 @@ export default function BankHolidayPage() {
               <div className="hidden sm:block overflow-x-auto min-w-[320px]">
                 <div className="flex justify-between items-center px-3 py-2 bg-muted/10">
                   <div className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    {filteredHolidays.length} {filteredHolidays.length === 1 ? 'record' : 'records'} found
+                    {paginatedHolidays.length} {paginatedHolidays.length === 1 ? 'record' : 'records'} found
                   </div>
                   <div className="flex gap-2">
                     {searchTerm && (
@@ -728,6 +820,7 @@ export default function BankHolidayPage() {
                         size="sm"
                         className="h-7 text-xs flex items-center gap-1"
                         onClick={() => setSearchTerm("")}
+                        disabled={isLoading}
                       >
                         <Filter className="h-3.5 w-3.5" />
                         <span className="hidden md:inline">Clear Filter</span>
@@ -747,64 +840,49 @@ export default function BankHolidayPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedHolidays.map((holiday) => (
-                      <TableRow key={holiday.id} className="hover:bg-muted/10">
-                        <TableCell className="font-medium text-xs sm:text-sm p-2 sm:p-3 truncate max-w-[80px] sm:max-w-[120px]">
-                          {getOfficerName(holiday.officerId)}
-                        </TableCell>
-                        <TableCell className="text-xs sm:text-sm p-2 sm:p-3 whitespace-nowrap">
-                          {format(holiday.holidayDate, 'dd/MM/yy')}
-                        </TableCell>
-                        <TableCell className="text-xs sm:text-sm p-2 sm:p-3 hidden sm:table-cell truncate max-w-[120px]">
-                          {getManagerName(holiday.authorisedBy)}
-                        </TableCell>
-                        <TableCell className="p-2 sm:p-3">
-                          <MemoizedStatusBadge status={holiday.status} />
-                        </TableCell>
-                        <TableCell className="p-1 sm:p-2">
-                          <div className="flex items-center justify-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEditHoliday(holiday)}
-                              className="h-8 w-8 rounded-full bg-blue-50 border-blue-200 hover:bg-blue-100 p-0"
-                              title="Edit Holiday"
-                            >
-                              <Pencil className="h-3.5 w-3.5 text-blue-600" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewHoliday(holiday)}
-                              className="h-8 w-8 rounded-full bg-gray-50 border-gray-200 hover:bg-gray-100 p-0"
-                              title="View Details"
-                            >
-                              <Eye className="h-3.5 w-3.5 text-gray-600" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDelete(holiday.id)}
-                              className="h-8 w-8 rounded-full bg-red-50 border-red-200 hover:bg-red-100 p-0"
-                              title="Delete Holiday"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-red-600" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {paginatedHolidays.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-4 sm:py-6 text-xs sm:text-sm text-muted-foreground">
-                          No holidays found
-                        </TableCell>
-                      </TableRow>
+                    {isLoading ? (
+                      <LoadingRow />
+                    ) : (
+                      <>
+                        {paginatedHolidays.map((holiday) => (
+                          <TableRow key={holiday.id} className="hover:bg-muted/10">
+                            <TableCell className="font-medium text-xs sm:text-sm p-2 sm:p-3 truncate max-w-[80px] sm:max-w-[120px]">
+                              {getOfficerName(holiday.officerId)}
+                            </TableCell>
+                            <TableCell className="text-xs sm:text-sm p-2 sm:p-3 whitespace-nowrap">
+                              {format(holiday.holidayDate, 'dd/MM/yy')}
+                            </TableCell>
+                            <TableCell className="text-xs sm:text-sm p-2 sm:p-3 hidden sm:table-cell truncate max-w-[120px]">
+                              {getManagerName(holiday.authorisedBy)}
+                            </TableCell>
+                            <TableCell className="p-2 sm:p-3">
+                              <MemoizedStatusBadge status={holiday.status} />
+                            </TableCell>
+                            <TableCell className="p-1 sm:p-2">
+                              <MemoizedActionButtons
+                                holiday={holiday}
+                                onEdit={handleEditHoliday}
+                                onView={handleViewHoliday}
+                                onDelete={handleDelete}
+                                onArchive={handleArchive}
+                                onUnarchive={handleUnarchive}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {paginatedHolidays.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-4 sm:py-6 text-xs sm:text-sm text-muted-foreground">
+                              No holidays found
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     )}
                   </TableBody>
                 </Table>
               </div>
-              {filteredHolidays.length > 0 && (
+              {paginatedHolidays.length > 0 && (
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
@@ -820,9 +898,9 @@ export default function BankHolidayPage() {
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="w-[calc(100%-16px)] sm:w-auto max-w-md p-3 sm:p-4 md:p-6">
           <DialogHeader className="space-y-1">
-            <DialogTitle className="text-lg">Holiday Details</DialogTitle>
+            <DialogTitle className="text-lg">Bank Holiday Details</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
-              Complete details of the selected bank holiday
+              View or manage the bank holiday request details below.
             </DialogDescription>
           </DialogHeader>
 
@@ -860,28 +938,199 @@ export default function BankHolidayPage() {
                 </CardContent>
               </Card>
 
-              <DialogFooter className="flex-col gap-2 sm:flex-row sm:gap-3 sm:justify-end pt-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsViewDialogOpen(false)} 
-                  className="w-full sm:w-auto text-xs sm:text-sm h-8 sm:h-9"
-                  size="sm"
-                >
-                  Close
-                </Button>
-                <Button 
-                  onClick={() => {
-                    setViewingHoliday(null);
-                    setIsViewDialogOpen(false);
-                    setEditingHoliday(viewingHoliday);
-                    setIsDialogOpen(true);
-                  }}
-                  className="w-full sm:w-auto text-xs sm:text-sm h-8 sm:h-9"
-                  size="sm"
-                >
-                  Edit
-                </Button>
-              </DialogFooter>
+              {/* Admin Approval/Denial Section */}
+              {viewingHoliday.status === 'pending' && (
+                <div className="border-t border-gray-200 pt-3 xs:pt-4 mt-3 xs:mt-4">
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-900 mb-2 xs:mb-3">Approval Decision</h3>
+                  
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const form = e.target as HTMLFormElement;
+                    const formData = new FormData(form);
+                    const decision = formData.get('decision') as 'authorized' | 'declined';
+                    const reason = formData.get('reason') as string;
+                    const authorisedBy = formData.get('authorisedBy') as string;
+                    const dateAuthorised = formData.get('dateAuthorised') as string;
+                    
+                    if (decision && reason && authorisedBy && dateAuthorised && viewingHoliday) {
+                      try {
+                        const updatedHoliday = await bankHolidayService.updateBankHoliday(
+                          viewingHoliday.id,
+                          {
+                            status: decision,
+                            authorisedBy,
+                            dateAuthorised: new Date(dateAuthorised),
+                            reason
+                          }
+                        );
+                        
+                        setHolidays(prev => prev.map(h => 
+                          h.id === viewingHoliday.id ? updatedHoliday : h
+                        ));
+                        
+                        toast({
+                          title: "Success",
+                          description: `Bank holiday request ${decision === 'authorized' ? 'approved' : 'declined'} successfully.`,
+                        });
+                        
+                        setIsViewDialogOpen(false);
+                        setViewingHoliday(null);
+                      } catch (error) {
+                        console.error('Error updating bank holiday request:', error);
+                        toast({
+                          title: "Error",
+                          description: "Failed to update bank holiday request. Please try again.",
+                          variant: "destructive"
+                        });
+                      }
+                    } else {
+                      toast({
+                        title: "Error",
+                        description: "Please fill in all required fields.",
+                        variant: "destructive"
+                      });
+                    }
+                  }} className="space-y-3">
+                    <div className="flex gap-2">
+                      <div className="flex items-center">
+                        <input
+                          type="radio"
+                          name="decision"
+                          value="authorized"
+                          id="approve"
+                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                          required
+                        />
+                        <label htmlFor="approve" className="ml-2 text-xs sm:text-sm text-gray-700">
+                          Approve
+                        </label>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="radio"
+                          name="decision"
+                          value="declined"
+                          id="deny"
+                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                          required
+                        />
+                        <label htmlFor="deny" className="ml-2 text-xs sm:text-sm text-gray-700">
+                          Deny
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 p-2 sm:p-3 border rounded-lg bg-muted/20">
+                      <div>
+                        <label htmlFor="authorisedBy" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                          Authorised By
+                        </label>
+                        <Select name="authorisedBy" required>
+                          <SelectTrigger className="w-full h-9 text-sm">
+                            <SelectValue placeholder="Select authorising manager" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {mockManagers.map((manager) => (
+                              <SelectItem 
+                                key={manager.id} 
+                                value={manager.id}
+                                className="text-sm"
+                              >
+                                {manager.name} - {manager.role}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="dateAuthorised" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                          Date Authorised
+                        </label>
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            id="dateAuthorised"
+                            name="dateAuthorised"
+                            className="pl-8 text-sm h-9"
+                            defaultValue={format(new Date(), "yyyy-MM-dd")}
+                            required
+                          />
+                          <Calendar className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="reason" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        Reason
+                      </label>
+                      <textarea
+                        id="reason"
+                        name="reason"
+                        rows={3}
+                        className="w-full text-xs sm:text-sm rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                        placeholder="Provide a reason for your decision..."
+                        required
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button 
+                        variant="outline" 
+                        type="button"
+                        onClick={() => setIsViewDialogOpen(false)} 
+                        className="text-xs sm:text-sm h-8 sm:h-9"
+                        size="sm"
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit"
+                        className="text-xs sm:text-sm h-8 sm:h-9"
+                        size="sm"
+                      >
+                        Submit Decision
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {viewingHoliday.status !== 'pending' && (
+                <>
+                  {viewingHoliday.reason && (
+                    <div className="border-t border-gray-200 pt-3 xs:pt-4 mt-3 xs:mt-4">
+                      <h3 className="text-xs sm:text-sm font-medium text-gray-900 mb-2">Manager's Comment</h3>
+                      <p className="text-xs sm:text-sm text-gray-600 bg-muted/20 p-2 sm:p-3 rounded-md">
+                        {viewingHoliday.reason}
+                      </p>
+                    </div>
+                  )}
+                  <DialogFooter className="flex-col gap-2 sm:flex-row sm:gap-3 sm:justify-end pt-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsViewDialogOpen(false)} 
+                      className="w-full sm:w-auto text-xs sm:text-sm h-8 sm:h-9"
+                      size="sm"
+                    >
+                      Close
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        setViewingHoliday(null);
+                        setIsViewDialogOpen(false);
+                        setEditingHoliday(viewingHoliday);
+                        setIsDialogOpen(true);
+                      }}
+                      className="w-full sm:w-auto text-xs sm:text-sm h-8 sm:h-9"
+                      size="sm"
+                    >
+                      Edit
+                    </Button>
+                  </DialogFooter>
+                </>
+              )}
             </div>
           )}
         </DialogContent>

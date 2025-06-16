@@ -41,6 +41,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { v4 as uuidv4 } from "uuid"
 import React from "react"
+import { Badge } from "@/components/ui/badge"
+import { incidentService } from "@/services/incidentService"
 
 const formSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
@@ -85,11 +87,12 @@ const formSchema = z.object({
     county: z.string().optional(),
     postCode: z.string().optional(),
   }),
-  offenderSex: z.enum(['Male', 'Female', 'N/A or N/K']).default('N/A or N/K'),
+  gender: z.enum(['Male', 'Female', 'N/A or N/K']).default('N/A or N/K'),
   offenderDOB: z.date().optional(),
   offenderPlaceOfBirth: z.string().optional(),
   policeID: z.string().optional(),
   crimeRefNumber: z.string().optional(),
+  arrestSaveComment: z.string().optional(),
 })
 
 const incidentTypes: IncidentType[] = [
@@ -153,6 +156,77 @@ export interface IncidentFormProps {
 
 const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit, onCancel, onScanBarcode, isLoading = false }) => {
   const [stolenItems, setStolenItems] = useState<StolenItem[]>(initialData?.stolenItems || [])
+  const [incidentType, setIncidentType] = useState(initialData?.incidentType || '')
+  const [arrestSaveComment, setArrestSaveComment] = useState(initialData?.arrestSaveComment || '')
+  const [formErrors, setFormErrors] = useState<{ arrestSaveComment?: string }>({})
+  const [offenderVerified, setOffenderVerified] = useState(false)
+  const [repeatOffenderCount, setRepeatOffenderCount] = useState(0)
+  const [isSearchingOffender, setIsSearchingOffender] = useState(false)
+  const [offenderHistory, setOffenderHistory] = useState<{
+    incidents: Array<{
+      date: string;
+      store: string;
+      type: string;
+    }>;
+  } | null>(null)
+
+  const searchOffender = async (name: string, dob?: Date) => {
+    setIsSearchingOffender(true);
+    try {
+      // Get all incidents from the service
+      const allIncidents = await incidentService.getAll();
+      
+      // Filter incidents by offender name and DOB if provided
+      const matchingIncidents = allIncidents.filter(incident => {
+        const nameMatch = incident.offenderName?.toLowerCase() === name.toLowerCase();
+        if (!nameMatch) return false;
+        
+        if (dob && incident.offenderDOB) {
+          const incidentDOB = new Date(incident.offenderDOB);
+          return incidentDOB.getTime() === dob.getTime();
+        }
+        return true;
+      });
+
+      if (matchingIncidents.length > 0) {
+        // Format the incidents for display
+        const history = {
+          incidents: matchingIncidents.map(incident => ({
+            date: format(new Date(incident.dateOfIncident), 'yyyy-MM-dd'),
+            store: incident.siteName,
+            type: incident.incidentType
+          }))
+        };
+        
+        setOffenderHistory(history);
+        setOffenderVerified(true);
+        setRepeatOffenderCount(history.incidents.length);
+        
+        // Auto-fill other fields if available
+        const mostRecentIncident = matchingIncidents[0];
+        if (mostRecentIncident.offenderAddress) {
+          form.setValue('offenderAddress', mostRecentIncident.offenderAddress);
+        }
+        if (mostRecentIncident.gender) {
+          form.setValue('gender', mostRecentIncident.gender);
+        }
+        if (mostRecentIncident.offenderPlaceOfBirth) {
+          form.setValue('offenderPlaceOfBirth', mostRecentIncident.offenderPlaceOfBirth);
+        }
+      } else {
+        setOffenderVerified(false);
+        setRepeatOffenderCount(0);
+        setOffenderHistory(null);
+      }
+    } catch (error) {
+      console.error('Error searching offender:', error);
+      setOffenderVerified(false);
+      setRepeatOffenderCount(0);
+      setOffenderHistory(null);
+    } finally {
+      setIsSearchingOffender(false);
+    }
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -189,11 +263,12 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         county: "",
         postCode: "",
       },
-      offenderSex: initialData?.offenderSex || 'N/A or N/K',
+      gender: initialData?.gender || 'N/A or N/K',
       offenderDOB: initialData?.offenderDOB ? new Date(initialData.offenderDOB) : undefined,
       offenderPlaceOfBirth: initialData?.offenderPlaceOfBirth || "",
       policeID: initialData?.policeID || "",
       crimeRefNumber: initialData?.crimeRefNumber || "",
+      arrestSaveComment: initialData?.arrestSaveComment || "",
     },
   })
 
@@ -216,54 +291,86 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   }, [descriptionValue, form])
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-    // Guard for dateOfIncident
-    const isValidDateOfIncident = values.dateOfIncident && !isNaN(new Date(values.dateOfIncident).getTime())
-    // Guard for timeOfIncident (should be a string, but check if it's valid for new Date)
-    const isValidTimeOfIncident = values.timeOfIncident && !isNaN(new Date(values.timeOfIncident).getTime())
+    try {
+      // Log form values for debugging
+      console.log('Form values:', values)
+      console.log('URN Number:', values.urnNumber)
+      console.log('Crime Ref Number:', values.crimeRefNumber)
+      console.log('Form validation state:', form.formState)
 
-    const formattedData: Incident = {
-      id: initialData?.id || uuidv4(),
-      customerName: values.customerName,
-      siteName: values.siteName,
-      officerName: values.officerName,
-      officerRole: values.officerRole,
-      dateOfIncident: isValidDateOfIncident ? new Date(values.dateOfIncident).toISOString() : '',
-      timeOfIncident: values.timeOfIncident,
-      incidentType: values.incidentType,
-      description: values.description,
-      incidentInvolved: values.incidentInvolved,
-      policeInvolvement: values.policeInvolvement,
-      dutyManagerName: values.dutyManagerName,
-      status: values.status,
-      priority: values.priority,
-      evidenceAttached: values.evidenceAttached,
-      offenderAddress: values.offenderAddress,
-      offenderSex: values.offenderSex,
-      stolenItems: stolenItems.map(item => ({
-        ...item,
-        totalAmount: item.cost * item.quantity
-      })),
-      // Optional fields
-      incidentDetails: values.incidentDetails,
-      storeComments: values.storeComments,
-      urnNumber: values.urnNumber,
-      totalValueRecovered: parseFloat(values.totalValueRecovered || '0'),
-      actionTaken: values.actionTaken,
-      witnessStatements: values.witnessStatements,
-      involvedParties: values.involvedParties,
-      reportNumber: values.reportNumber,
-      offenderName: values.offenderName,
-      offenderDOB: values.offenderDOB,
-      offenderPlaceOfBirth: values.offenderPlaceOfBirth,
-      policeID: values.policeID,
-      crimeRefNumber: values.crimeRefNumber,
-      // Additional fields
-      dateInputted: new Date().toISOString(),
-      timeOfDay: values.timeOfIncident && isValidDateOfIncident ? format(new Date(`${values.dateOfIncident.toDateString()}T${values.timeOfIncident}`), 'HH:mm') : '',
-      dayOfWeek: isValidDateOfIncident ? format(new Date(values.dateOfIncident), 'EEEE') : '',
+      // Guard for dateOfIncident
+      const isValidDateOfIncident = values.dateOfIncident && !isNaN(new Date(values.dateOfIncident).getTime())
+      
+      // Format time of day safely
+      let timeOfDay = ''
+      if (values.timeOfIncident && isValidDateOfIncident) {
+        try {
+          // Create a date object from today's date and the time value
+          const [hours, minutes] = values.timeOfIncident.split(':')
+          const date = new Date()
+          date.setHours(parseInt(hours, 10))
+          date.setMinutes(parseInt(minutes, 10))
+          timeOfDay = format(date, 'HH:mm')
+        } catch (error) {
+          console.error('Error formatting time:', error)
+          timeOfDay = values.timeOfIncident // fallback to original value
+        }
+      }
+
+      let errors: { arrestSaveComment?: string } = {}
+      if (values.incidentType === 'Arrest - Saved?' && !values.arrestSaveComment.trim()) {
+        errors.arrestSaveComment = 'This comment is required.'
+      }
+      setFormErrors(errors)
+      if (Object.keys(errors).length > 0) return
+
+      const formattedData: Incident = {
+        id: initialData?.id || uuidv4(),
+        customerName: values.customerName,
+        siteName: values.siteName,
+        officerName: values.officerName,
+        officerRole: values.officerRole,
+        dateOfIncident: isValidDateOfIncident ? new Date(values.dateOfIncident).toISOString() : '',
+        timeOfIncident: values.timeOfIncident,
+        incidentType: values.incidentType,
+        description: values.description,
+        incidentInvolved: values.incidentInvolved,
+        policeInvolvement: values.policeInvolvement,
+        dutyManagerName: values.dutyManagerName,
+        status: values.status,
+        priority: values.priority,
+        evidenceAttached: values.evidenceAttached,
+        offenderAddress: values.offenderAddress,
+        gender: values.gender,
+        stolenItems: stolenItems.map(item => ({
+          ...item,
+          totalAmount: item.cost * item.quantity
+        })),
+        // Optional fields
+        incidentDetails: values.incidentDetails,
+        storeComments: values.storeComments,
+        urnNumber: values.urnNumber || '',
+        totalValueRecovered: parseFloat(values.totalValueRecovered || '0'),
+        actionTaken: values.actionTaken,
+        witnessStatements: values.witnessStatements,
+        involvedParties: values.involvedParties,
+        reportNumber: values.reportNumber,
+        offenderName: values.offenderName,
+        offenderDOB: values.offenderDOB,
+        offenderPlaceOfBirth: values.offenderPlaceOfBirth,
+        policeID: values.policeID,
+        crimeRefNumber: values.crimeRefNumber || '',
+        // Additional fields
+        dateInputted: new Date().toISOString(),
+        timeOfDay,
+        dayOfWeek: isValidDateOfIncident ? format(new Date(values.dateOfIncident), 'EEEE') : '',
+        arrestSaveComment: values.arrestSaveComment,
+      }
+      console.log('Submitting incident:', formattedData)
+      onSubmit(formattedData)
+    } catch (error) {
+      console.error('Error submitting incident:', error)
     }
-    console.log('Submitting incident:', formattedData)
-    onSubmit(formattedData)
   }
 
   const addStolenItem = () => {
@@ -484,6 +591,12 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                               selected={field.value}
                               onSelect={field.onChange}
                               initialFocus
+                              ISOWeek
+                              captionLayout="dropdown"
+                              defaultMonth={new Date(1990, 0)}
+                              disabled={(date) =>
+                                date > new Date() || date < new Date('1920-01-01')
+                              }
                             />
                           </PopoverContent>
                         </Popover>
@@ -512,7 +625,13 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-medium">Type of Incident *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          value={incidentType}
+                          onValueChange={value => {
+                            setIncidentType(value)
+                            if (value !== 'Arrest - Saved?') setArrestSaveComment('')
+                          }}
+                        >
                           <FormControl>
                             <SelectTrigger className="h-11">
                               <SelectValue placeholder="Select type" />
@@ -526,6 +645,21 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                             ))}
                           </SelectContent>
                         </Select>
+                        {incidentType === 'Arrest - Saved?' && (
+                          <div className="mt-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Arrest Save Comment <span className="text-red-500">*</span></label>
+                            <textarea
+                              className="w-full border rounded px-2 py-1 text-sm"
+                              value={arrestSaveComment}
+                              onChange={e => setArrestSaveComment(e.target.value)}
+                              required
+                              placeholder="Did this lead to a save or was the item lost after arrest?"
+                            />
+                            {formErrors.arrestSaveComment && (
+                              <p className="text-xs text-red-600 mt-1">{formErrors.arrestSaveComment}</p>
+                            )}
+                          </div>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -679,16 +813,63 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
               </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="offenderName"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-medium">Offender Name</FormLabel>
-                        <FormControl>
-                          <Input className="h-11" {...field} placeholder="Enter offender name" />
-                        </FormControl>
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <FormControl>
+                              <Input className="h-11" {...field} placeholder="Enter offender name" />
+                            </FormControl>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-11 whitespace-nowrap"
+                              onClick={() => {
+                                if (!field.value) return;
+                                const dob = form.getValues('offenderDOB');
+                                searchOffender(field.value, dob);
+                              }}
+                              disabled={isSearchingOffender}
+                            >
+                              {isSearchingOffender ? 'Searching...' : 'Search History'}
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={cn(
+                              "border",
+                              repeatOffenderCount > 0 
+                                ? "bg-red-50 text-red-800 border-red-100"
+                                : "bg-green-50 text-green-800 border-green-100"
+                            )}>
+                              Repeat Offender Count: {repeatOffenderCount}
+                            </Badge>
+                            <Badge variant="outline" className={cn(
+                              "border",
+                              offenderVerified
+                                ? "bg-green-50 text-green-800 border-green-100"
+                                : "bg-blue-50 text-blue-800 border-blue-100"
+                            )}>
+                              {offenderVerified ? 'Details Verified' : 'Details Not Verified'}
+                            </Badge>
+                          </div>
+                          {offenderHistory && (
+                            <div className="mt-2 p-2 bg-gray-50 rounded-md">
+                              <p className="text-sm font-medium text-gray-700 mb-1">Previous Incidents:</p>
+                              <div className="space-y-1">
+                                {offenderHistory.incidents.map((incident, index) => (
+                                  <div key={index} className="text-xs text-gray-600">
+                                    {format(new Date(incident.date), 'dd MMM yyyy')} - {incident.store} - {incident.type}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -696,10 +877,10 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
 
                   <FormField
                     control={form.control}
-                    name="offenderSex"
+                    name="gender"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Offender Sex</FormLabel>
+                        <FormLabel className="text-base font-medium">Gender</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger className="h-11">
@@ -721,24 +902,27 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     control={form.control}
                     name="offenderDOB"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-base font-medium">Offender DOB</FormLabel>
+                      <FormItem className="flex flex-col">
+                        <FormLabel className="text-base font-medium">Date of Birth</FormLabel>
                         <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
                                 variant={"outline"}
                                 className={cn(
-                                  "w-full h-11 pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
+                                  "w-full h-11 pl-3 text-left font-normal bg-white",
+                                  !field.value && "text-muted-foreground hover:bg-gray-50",
+                                  field.value && "text-gray-900 hover:bg-gray-50"
                                 )}
                               >
-                                {field.value ? (
-                                  format(field.value, "PPP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-5 w-5 opacity-50" />
+                                <div className="flex items-center">
+                                  <CalendarIcon className="h-4 w-4 mr-2 opacity-50" />
+                                  {field.value ? (
+                                    <span>{format(field.value, "PPP")}</span>
+                                  ) : (
+                                    <span className="text-gray-500">Select date of birth</span>
+                                  )}
+                                </div>
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
@@ -748,9 +932,23 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                               selected={field.value}
                               onSelect={field.onChange}
                               initialFocus
+                              disabled={(date) =>
+                                date > new Date() || date < new Date('1920-01-01')
+                              }
+                              defaultMonth={field.value || new Date(1990, 0)}
+                              fromYear={1920}
+                              toYear={new Date().getFullYear()}
+                              captionLayout="dropdown"
                             />
                           </PopoverContent>
                         </Popover>
+                        {field.value && (
+                          <div className="mt-1.5 text-sm text-gray-600">
+                            <span className="bg-gray-100 px-2 py-1 rounded">
+                              Age: <span className="font-medium">{Math.floor((new Date().getTime() - field.value.getTime()) / (365.25 * 24 * 60 * 60 * 1000))}</span>
+                            </span>
+                          </div>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -781,6 +979,34 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                           <FormLabel className="text-base font-medium">Town</FormLabel>
                           <FormControl>
                             <Input className="h-11" {...field} placeholder="Enter town" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="offenderAddress.county"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-medium">County</FormLabel>
+                          <FormControl>
+                            <Input className="h-11" {...field} placeholder="Enter county" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="offenderPlaceOfBirth"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-medium">Place of Birth</FormLabel>
+                          <FormControl>
+                            <Input className="h-11" {...field} placeholder="Enter place of birth" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1014,23 +1240,38 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
             </div>
 
             {/* Form Actions */}
-            <div className="flex justify-end items-center gap-3 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onCancel}
-                className="h-9 px-4 text-sm"
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                className="h-9 px-4 text-sm bg-green-600 hover:bg-green-700 text-white"
-                disabled={isLoading}
-              >
-                {isLoading ? "Saving..." : initialData ? "Update" : "Create"}
-              </Button>
+            <div className="flex flex-col gap-3 pt-4">
+              {/* Error Summary */}
+              {Object.keys(form.formState.errors).length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                  <p className="text-sm font-medium text-red-800 mb-2">Please fix the following errors:</p>
+                  <ul className="list-disc list-inside text-sm text-red-700">
+                    {Object.entries(form.formState.errors).map(([field, error]) => (
+                      <li key={field}>{error?.message as string}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              <div className="flex justify-end items-center gap-3">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={onCancel}
+                  className="h-9 px-4 text-sm"
+                  disabled={isLoading}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="h-9 px-4 text-sm bg-green-600 hover:bg-green-700 text-white"
+                  disabled={isLoading || !form.formState.isValid}
+                >
+                  {isLoading ? "Saving..." : initialData ? "Update" : "Create"}
+                  {!form.formState.isValid && " (Please fill required fields)"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

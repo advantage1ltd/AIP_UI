@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Pencil, Trash2, Search, Plus } from "lucide-react"
+import { ChevronLeft, ChevronRight, Pencil, Trash2, Search, Plus, User2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,8 +15,14 @@ import {
 import { UserDialog } from "./UserDialog"
 import { User } from "@/data/users"
 import { format } from "date-fns"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface UsersTableProps {
   users: User[]
@@ -31,22 +37,48 @@ export function UsersTable({ users, onCreateUser, onUpdateUser, onDeleteUser }: 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | undefined>()
   const [userToDelete, setUserToDelete] = useState<string | undefined>()
+  const [filterStatus, setFilterStatus] = useState("All")
   const itemsPerPage = 10
 
   const filteredUsers = users.filter(user => {
     const searchLower = searchQuery.toLowerCase()
-    return (
+    const matchesSearch = 
       user.username.toLowerCase().includes(searchLower) ||
       user.email.toLowerCase().includes(searchLower) ||
-      user.role.toLowerCase().includes(searchLower) ||
-      user.department.toLowerCase().includes(searchLower) ||
-      user.status.toLowerCase().includes(searchLower)
-    )
+      user.status.toLowerCase().includes(searchLower) ||
+      user.assignedCustomers?.some(customer => 
+        customer.name.toLowerCase().includes(searchLower)
+      )
+    
+    if (filterStatus === "All") return matchesSearch
+    return matchesSearch && user.status === filterStatus
   })
 
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage)
+
+  // Get user initials for avatar
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+  }
+
+  // Get random pastel color for avatar background
+  const getAvatarColor = (name: string) => {
+    const colors = [
+      'bg-blue-100 text-blue-600',
+      'bg-purple-100 text-purple-600',
+      'bg-green-100 text-green-600',
+      'bg-pink-100 text-pink-600',
+      'bg-yellow-100 text-yellow-600',
+    ]
+    const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    return colors[index % colors.length]
+  }
 
   const handleNewUser = () => {
     setSelectedUser(undefined)
@@ -78,183 +110,111 @@ export function UsersTable({ users, onCreateUser, onUpdateUser, onDeleteUser }: 
     }
   }
 
-  // Function to determine which columns to hide on different screen sizes
-  const getResponsiveClasses = (column: string) => {
-    switch (column) {
-      case 'email':
-        return 'hidden md:table-cell'
-      case 'department':
-        return 'hidden lg:table-cell'
-      case 'lastLogin':
-        return 'hidden md:table-cell'
-      default:
-        return ''
-    }
-  }
-
   return (
-    <div className="space-y-2 md:space-y-4">
-      {/* Custom Table Actions - With New Button */}
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-purple-600">User Management</h1>
+        <p className="text-gray-500">Manage your team members and their account permissions here</p>
+      </div>
+
+      {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex flex-1 w-full">
-          <div className="relative flex-1 w-full sm:w-[400px]">
-            <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+        <div className="flex flex-1 w-full max-w-md">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
             <Input 
               placeholder="Search users..."
-              className="pl-10 h-11 text-base bg-white border-2 border-gray-200 hover:border-gray-300 focus:border-[#324053] focus:ring-2 focus:ring-[#324053]/20 rounded-lg shadow-sm" 
+              className="pl-10 h-10" 
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value)
-                setCurrentPage(1)
-              }}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="ml-2 flex-shrink-0 hidden md:block">
-            <span className="inline-flex h-11 items-center px-3 py-1 text-sm bg-gray-100 rounded-lg">
-              {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
-            </span>
-          </div>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-[120px] ml-2">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <Button 
-          onClick={handleNewUser} 
-          style={{ backgroundColor: '#324053' }} 
-          className="w-full sm:w-auto h-11 px-4 sm:px-6 hover:opacity-90 shadow-sm"
+          onClick={() => setIsDialogOpen(true)}
+          className="bg-[#1e1b4b] hover:bg-[#1e1b4b]/90"
         >
-          <Plus className="mr-2 h-4 w-4" />
-          Add New User
+          <User2 className="mr-2 h-4 w-4" />
+          Add User
         </Button>
       </div>
 
-      <div className="rounded-lg border bg-white shadow">
+      {/* Users Table */}
+      <div className="rounded-lg border bg-white">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Username</TableHead>
-              <TableHead className={getResponsiveClasses('email')}>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead className={getResponsiveClasses('department')}>Department</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className={getResponsiveClasses('lastLogin')}>Last Login</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>Company</TableHead>
+              <TableHead>Officer Type</TableHead>
+              <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedUsers.map((user) => (
-              <TableRow key={user.id} className="text-sm">
-                <TableCell className="font-medium py-2 md:py-4">{user.username}</TableCell>
-                <TableCell className={getResponsiveClasses('email')}>{user.email}</TableCell>
+            {filteredUsers.map((user) => (
+              <TableRow key={user.id}>
                 <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    user.role === 'Admin' 
-                      ? 'bg-purple-100 text-purple-700'
-                      : user.role === 'Manager'
-                      ? 'bg-blue-100 text-blue-700'
-                      : user.role === 'Support'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-gray-100 text-gray-700'
-                  }`}>
-                    {user.role}
-                  </span>
-                </TableCell>
-                <TableCell className={getResponsiveClasses('department')}>{user.department}</TableCell>
-                <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    user.status === 'active'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
-                  }`}>
-                    {user.status}
-                  </span>
-                </TableCell>
-                <TableCell className={getResponsiveClasses('lastLogin')}>
-                  {format(new Date(user.lastLogin), 'MMM d, yyyy HH:mm')}
-                </TableCell>
-                <TableCell className="text-right">
-                  <TooltipProvider>
-                    <div className="flex justify-end gap-1 md:gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditUser(user)}
-                            className="h-7 w-7 md:h-8 md:w-8 p-0 hover:bg-blue-50"
-                          >
-                            <Pencil className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Edit user</p>
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteClick(user.id)}
-                            className="h-7 w-7 md:h-8 md:w-8 p-0 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-3 w-3 md:h-4 md:w-4 text-red-600" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Delete user</p>
-                        </TooltipContent>
-                      </Tooltip>
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-full ${getAvatarColor(user.username)}`}>
+                      {getInitials(user.username)}
                     </div>
-                  </TooltipProvider>
+                    <div>
+                      <div className="font-medium">{user.username}</div>
+                      <div className="text-sm text-gray-500">{user.username.toLowerCase()}</div>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>
+                  <div className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                    user.status === 'active' 
+                      ? 'bg-green-50 text-green-700'
+                      : 'bg-red-50 text-red-700'
+                  }`}>
+                    {user.status === 'active' ? 'Active' : 'Inactive'}
+                  </div>
+                </TableCell>
+                <TableCell>{user.officerType || '-'}</TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditUser(user)}
+                      className="h-8 w-8 p-0 hover:bg-blue-50"
+                    >
+                      <Pencil className="h-4 w-4 text-blue-600" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteClick(user.id)}
+                      className="h-8 w-8 p-0 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
-            {paginatedUsers.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                  No users found.
-                </TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
-
-        {/* Pagination - Always visible with page size info */}
-        <div className="flex flex-col sm:flex-row items-center justify-between px-2 py-2 sm:px-4 sm:py-4 border-t text-xs sm:text-sm">
-          <div className="text-gray-500 mb-2 sm:mb-0">
-            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredUsers.length)} of{" "}
-            {filteredUsers.length} results
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="h-8 px-2 sm:h-9 sm:px-3"
-            >
-              <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
-              <span className="hidden sm:inline">Previous</span>
-            </Button>
-            <div className="text-gray-500 min-w-[80px] text-center">
-              Page {currentPage} of {Math.max(totalPages, 1)}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages || totalPages === 0}
-              className="h-8 px-2 sm:h-9 sm:px-3"
-            >
-              <span className="hidden sm:inline">Next</span>
-              <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 sm:ml-1" />
-            </Button>
-          </div>
-        </div>
       </div>
 
-      {/* Create/Edit Dialog */}
+      {/* User Dialog */}
       <UserDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
@@ -264,7 +224,7 @@ export function UsersTable({ users, onCreateUser, onUpdateUser, onDeleteUser }: 
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(undefined)}>
-        <AlertDialogContent className="max-w-[90vw] sm:max-w-[425px]">
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -273,12 +233,10 @@ export function UsersTable({ users, onCreateUser, onUpdateUser, onDeleteUser }: 
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmDelete}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }

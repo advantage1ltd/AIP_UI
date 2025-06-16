@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { getUser } from '@/services/auth'
 import {
   FileWarning,
   FileSearch,
@@ -60,7 +61,7 @@ interface OfficerData {
     incidentsThisMonth: number
     incidentsLastMonth: number
     totalValueSaved: number
-    responseTime: number
+    expensesYTD: number
     completionRate: number
     holidayBooked: number
     hoursWorked: number
@@ -113,6 +114,7 @@ interface StatCardProps {
   icon: React.ElementType
   gradient: string
   subtitle?: string
+  link?: string
 }
 
 interface ProgressCardProps {
@@ -137,7 +139,7 @@ const officerData: OfficerData = {
     incidentsThisMonth: 24,
     incidentsLastMonth: 18,
     totalValueSaved: 45600,
-    responseTime: 95,
+    expensesYTD: 1250.75,
     completionRate: 92,
     holidayBooked: 5,
     hoursWorked: 156,
@@ -240,40 +242,49 @@ const StatCard: React.FC<StatCardProps> = ({
   trend, 
   icon: Icon, 
   gradient,
-  subtitle 
-}) => (
-  <Card className={`relative overflow-hidden border-0 shadow-lg ${gradient}`}>
-    <CardContent className="p-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <p className="text-white/80 text-sm font-medium">{title}</p>
-          <div className="space-y-1">
-            <p className="text-3xl font-bold text-white">{value}</p>
-            {subtitle && <p className="text-white/70 text-xs">{subtitle}</p>}
-          </div>
-          {change && (
-            <div className="flex items-center gap-1">
-              {trend === 'up' ? (
-                <ArrowUpRight className="h-4 w-4 text-white/80" />
-              ) : (
-                <ArrowDownRight className="h-4 w-4 text-white/80" />
-              )}
-              <span className="text-white/80 text-sm">{change}</span>
+  subtitle,
+  link
+}) => {
+  const content = (
+    <Card className={`relative overflow-hidden border-0 shadow-lg ${gradient} ${link ? 'cursor-pointer hover:shadow-xl transition-shadow' : ''}`}>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <p className="text-white/80 text-sm font-medium">{title}</p>
+            <div className="space-y-1">
+              <p className="text-3xl font-bold text-white">{value}</p>
+              {subtitle && <p className="text-white/70 text-xs">{subtitle}</p>}
             </div>
-          )}
+            {change && (
+              <div className="flex items-center gap-1">
+                {trend === 'up' ? (
+                  <ArrowUpRight className="h-4 w-4 text-white/80" />
+                ) : (
+                  <ArrowDownRight className="h-4 w-4 text-white/80" />
+                )}
+                <span className="text-white/80 text-sm">{change}</span>
+              </div>
+            )}
+          </div>
+          <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
+            <Icon className="h-6 w-6 text-white" />
+          </div>
         </div>
-        <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
-          <Icon className="h-6 w-6 text-white" />
+        
+        {/* Background Pattern */}
+        <div className="absolute -bottom-6 -right-6 opacity-10">
+          <Icon className="h-24 w-24 text-white" />
         </div>
-      </div>
-      
-      {/* Background Pattern */}
-      <div className="absolute -bottom-6 -right-6 opacity-10">
-        <Icon className="h-24 w-24 text-white" />
-      </div>
-    </CardContent>
-  </Card>
-)
+      </CardContent>
+    </Card>
+  );
+
+  if (link) {
+    return <Link to={link}>{content}</Link>;
+  }
+
+  return content;
+}
 
 const QuickActionCard = ({ 
   icon: Icon, 
@@ -491,10 +502,15 @@ const IncidentTable: React.FC = () => {
   )
 }
 
-export default function OfficerDashboard() {
+export default function OfficerDashboard({ displayName }: { displayName?: string }) {
   // Error handling state
   const [error, setError] = React.useState<Error | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
+  
+  // Get the logged-in user information
+  const loggedInUser = getUser()
+  const userName = loggedInUser?.displayName || loggedInUser?.username || displayName || officerData.name
+  const userRole = loggedInUser?.role || officerData.role
 
   // Fetch data on mount
   React.useEffect(() => {
@@ -557,14 +573,14 @@ export default function OfficerDashboard() {
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Welcome back, {officerData.name}
+              Welcome back, {userName}
             </h1>
             <div className="text-gray-600 flex items-center gap-2">
               <Badge variant="outline" className="text-green-600 border-green-200">
                 {officerData.shiftStatus}
               </Badge>
               <span>•</span>
-              <span>{officerData.role}</span>              
+              <span>{userRole}</span>              
               <span className="flex items-center gap-1"></span>
             </div>
           </div>
@@ -580,6 +596,7 @@ export default function OfficerDashboard() {
             icon={Shield}
             gradient="bg-gradient-to-br from-blue-500 to-blue-700"
             subtitle={`Target: ${officerData.monthlyTarget.incidents}`}
+            link="/operations/incident-report"
           />
           <StatCard
             title="Value Saved"
@@ -589,22 +606,25 @@ export default function OfficerDashboard() {
             icon={TrendingUp}
             gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
             subtitle="This month"
+            link="/operations/incident-report"
           />
           <StatCard
-            title="Response Rate"
-            value={`${officerData.stats.responseTime}%`}
-            change="+5% improvement"
+            title="Expenses YTD"
+            value={`£${officerData.stats.expensesYTD.toFixed(2)}`}
+            change="+£150 from last month"
             trend="up"
-            icon={Timer}
+            icon={Wallet}
             gradient="bg-gradient-to-br from-purple-500 to-purple-700"
-            subtitle="Average response time"
+            subtitle="Year to date"
+            link="/operations/officer-expenses"
           />
           <StatCard
-            title="Holiday Booked"
-            value={`${officerData.stats.holidayBooked} days`}
+            title="Holiday Days Left YTD"
+            value={28 - officerData.stats.holidayBooked}
             icon={CalendarRange}
             gradient="bg-gradient-to-br from-amber-500 to-orange-600"
-            subtitle="This year"
+            subtitle="Year to date"
+            link="/operations/holiday-requests"
           />
         </div>
 

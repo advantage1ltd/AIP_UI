@@ -1,16 +1,21 @@
+import React from 'react'
 import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics'
 import { RecentActivity } from '@/components/dashboard/RecentActivity'
 import { TaskScheduler } from '@/components/dashboard/TaskScheduler'
 import { PerformanceGraph } from '@/components/dashboard/PerformanceGraph'
 
-const DashboardPage = () => {
+interface DashboardPageProps {
+  displayName?: string
+}
+
+const DashboardPage: React.FC<DashboardPageProps> = ({ displayName }) => {
   return (
     <>
       {/* Header */}
       <header className="flex flex-col gap-1 mb-4 sm:mb-6 lg:mb-8">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
         <p className="text-sm text-gray-600 dark:text-gray-300">
-          Welcome back! Here's what's happening today.
+          Welcome back{displayName ? `, ${displayName}` : ''}! Here's what's happening today.
         </p>
       </header>
 

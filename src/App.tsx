@@ -1,12 +1,21 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom"
-import { Suspense, lazy, Component, ReactNode, ErrorInfo } from 'react'
-import Layout from './components/layout/Layout'
+import { Suspense, lazy, Component, ReactNode, ErrorInfo, useEffect } from 'react'
+import { Layout } from './components/layout/Layout'
 import { ThemeProvider } from './components/theme-provider'
 import { Toaster } from './components/ui/toaster'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 import { PageAccessProvider } from './contexts/PageAccessContext'
 import Profile from "./pages/Profile"
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { Provider } from 'react-redux'
+import { store } from './store/store'
+import LoginPage from './pages/LoginPage'
+import ProtectedRoute from './components/ProtectedRoute'
+import DashboardPage from './pages/Dashboard/DashboardPage'
+import OfficerDashboard from './pages/Dashboard/OfficerDashboard'
+import CustomerDashboard from './pages/Dashboard/CustomerDashboard'
 
 // Create a client
 const queryClient = new QueryClient({
@@ -18,19 +27,23 @@ const queryClient = new QueryClient({
   },
 })
 
-// Loading component
-const LoadingSpinner = () => (
-  <div className="flex h-screen w-full items-center justify-center">
-    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-  </div>
-)
+// Loading component with logging
+const LoadingSpinner = () => {
+  console.log('LoadingSpinner rendering...')
+  return (
+    <div className="flex h-screen w-full items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+    </div>
+  )
+}
 
-// Error Boundary Component
+// Error Boundary State interface
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
 }
 
+// Error Boundary Component with enhanced logging
 class ErrorBoundaryComponent extends Component<{ children: ReactNode }, ErrorBoundaryState> {
   constructor(props: { children: ReactNode }) {
     super(props);
@@ -38,11 +51,13 @@ class ErrorBoundaryComponent extends Component<{ children: ReactNode }, ErrorBou
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    console.error('ErrorBoundary caught an error:', error);
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
+    console.error('Error details:', error);
+    console.error('Component stack:', errorInfo.componentStack);
   }
 
   render() {
@@ -51,6 +66,9 @@ class ErrorBoundaryComponent extends Component<{ children: ReactNode }, ErrorBou
         <div className="flex h-screen w-full flex-col items-center justify-center gap-4 p-4">
           <h1 className="text-2xl font-bold text-destructive">Something went wrong</h1>
           <p className="text-muted-foreground">{this.state.error?.message}</p>
+          <pre className="mt-2 max-w-full overflow-auto bg-gray-100 p-4 text-sm">
+            {this.state.error?.stack}
+          </pre>
           <button 
             onClick={() => window.location.reload()}
             className="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
@@ -62,6 +80,44 @@ class ErrorBoundaryComponent extends Component<{ children: ReactNode }, ErrorBou
     }
 
     return this.props.children;
+  }
+}
+
+// Root component with logging
+const RootComponent = () => {
+  useEffect(() => {
+    console.log('Root component mounted');
+  }, []);
+
+  return (
+    <Layout>
+      <Outlet />
+    </Layout>
+  );
+};
+
+// Role-based redirect function
+const roleRedirect = (role?: string) => {
+  if (!role) return '/login'
+  if (role === 'Administrator') return '/officer-dashboard'
+  if (role === 'Advantage One Officer') return '/officer-dashboard'
+  if (role.startsWith('Customer')) return '/customer-dashboard'
+  return '/login'
+}
+
+// Get user info helper
+function getUserInfo(): { role?: string; userRole: 'customer-site' | 'customer-ho' } {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    console.log('🔍 getUserInfo - user from localStorage:', user)
+    const userRole = user.role?.toLowerCase().includes('head office') ? 'customer-ho' : 'customer-site'
+    console.log('🎯 Determined userRole:', userRole, 'from role:', user.role)
+    return {
+      ...user,
+      userRole
+    }
+  } catch {
+    return { userRole: 'customer-site' }
   }
 }
 
@@ -89,6 +145,7 @@ const Contacts = lazy(() => import('./pages/crm/Contacts'));
 const Deals = lazy(() => import('./pages/crm/Deals'));
 const Pipeline = lazy(() => import('./pages/crm/Pipeline'));
 const Tasks = lazy(() => import('./pages/crm/Tasks'));
+const RoleBasedRedirect = lazy(() => import('./components/RoleBasedRedirect'));
 
 // Recruitment
 const Vetting = lazy(() => import('./pages/recruitment/Vetting'));
@@ -132,103 +189,127 @@ const BeSafeBeSecureGraphPage = lazy(() => import('./pages/customer/BeSafeBeSecu
 const CustomerOfficerSupportPage = lazy(() => import('./pages/customer/CustomerOfficerSupportPage'));
 
 const App: React.FC = () => {
+  const user = getUserInfo()
+  useEffect(() => {
+    console.log('App component mounted');
+  }, []);
+
   return (
-    <ErrorBoundaryComponent>
-      <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system" storageKey="aip-theme">
-        <BrowserRouter>
-          <PageAccessProvider>
-              <Suspense fallback={<LoadingSpinner />}>
-              <Routes>
-                <Route path="/" element={<Layout><Outlet /></Layout>}>
-                  <Route index element={<Index />} />
-                  <Route path="/action-calendar" element={<ActionCalendar />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/configure-views" element={<ConfigureViews />} />
-                  <Route path="/reports-dashboard" element={<ReportsDashboard />} />
+    <Provider store={store}>
+      <ErrorBoundaryComponent>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider defaultTheme="system" storageKey="aip-theme">
+            <BrowserRouter>
+              <PageAccessProvider>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <Routes>
+                    {/* Public Routes */}
+                    <Route path="/login" element={<LoginPage />} />
 
-                  {/* Administration Routes */}
-                  <Route path="administration">
-                    <Route path="user-setup" element={<UserSetup />} />
-                    <Route path="employee-registration" element={<EmployeeRegistration />} />
-                    <Route path="customer-setup" element={<CustomerSetup />} />
-                    <Route path="stock-control" element={<StockControl />} />
-                  </Route>
+                    {/* Protected Routes */}
+                    <Route element={<ProtectedRoute />}>
+                      <Route element={<RootComponent />}>
+                        {/* Redirect root to appropriate dashboard based on role */}
+                        <Route index element={<RoleBasedRedirect />} />
 
-                  {/* CRM Routes */}
-                  <Route path="crm">
-                    <Route path="dashboard" element={<Dashboard />} />
-                    <Route path="leads" element={<Leads />} />
-                    <Route path="contacts" element={<Contacts />} />
-                    <Route path="deals" element={<Deals />} />
-                    <Route path="pipeline" element={<Pipeline />} />
-                    <Route path="tasks" element={<Tasks />} />
-                  </Route>
+                        {/* Role-specific dashboards */}
+                        <Route path="/admin-dashboard" element={<Index />} />
+                        <Route path="/officer-dashboard" element={<OfficerDashboard />} />
+                        <Route path="/customer-dashboard" element={<CustomerDashboard userRole={user.userRole} />} />
 
-                  {/* Recruitment Routes */}
-                  <Route path="recruitment">
-                    <Route path="vetting" element={<Vetting />} />
-                    <Route path="cbt" element={<CBT />} />
-                    <Route path="take-test" element={<TakeTest />} />
-                    <Route path="test-session" element={<TestSession />} />
-                  </Route>
+                        {/* Other protected routes */}
+                        <Route path="/profile" element={<Profile />} />
+                        <Route path="/action-calendar" element={<ActionCalendar />} />
+                        <Route path="/settings" element={<Settings />} />
+                        <Route path="/configure-views" element={<ConfigureViews />} />
+                        <Route path="/reports-dashboard" element={<ReportsDashboard />} />
 
-                  {/* Operations Routes */}
-                  <Route path="operations">
-                    <Route path="incident-report" element={<IncidentReportPage />} />
-                    <Route path="mystery-shopper" element={<MysteryShopperPage />} />
-                    <Route path="site-visit" element={<SiteVisitPage />} />
-                    <Route path="holiday-requests" element={<HolidayRequestPage />} />
-                    <Route path="bank-holiday" element={<BankHolidayPage />} />
-                    <Route path="customer-satisfaction" element={<CustomerSatisfactionPage />} />
-                    <Route path="safe-duress-words" element={<SafeDuressWordsPage />} />
-                    <Route path="officer-support" element={<OfficerSupportPage />} />
-                    <Route path="officer-expenses" element={<OfficerExpensesPage />} />
-                  </Route>
+                        {/* Administration routes */}
+                        <Route path="/administration">
+                          <Route path="user-setup" element={<UserSetup />} />
+                          <Route path="employee-registration" element={<EmployeeRegistration />} />
+                          <Route path="customer-setup" element={<CustomerSetup />} />
+                          <Route path="stock-control" element={<StockControl />} />
+                        </Route>
 
-                  {/* Employee Routes */}
-                  <Route path="employee">
-                    <Route path="uniform-equipment" element={<UniformEquipmentPage />} />
-                    <Route path="disciplinary" element={<DisciplinaryPage />} />
-                    <Route path="diary" element={<EmployeeDiaryPage />} />
-                  </Route>
+                        {/* CRM routes */}
+                        <Route path="/crm">
+                          <Route path="dashboard" element={<Dashboard />} />
+                          <Route path="leads" element={<Leads />} />
+                          <Route path="contacts" element={<Contacts />} />
+                          <Route path="deals" element={<Deals />} />
+                          <Route path="pipeline" element={<Pipeline />} />
+                          <Route path="tasks" element={<Tasks />} />
+                        </Route>
 
-                  {/* Management Routes */}
-                  <Route path="management">
-                    <Route path="customer-reporting" element={<CustomerReportingPage />} />
-                    <Route path="manager-support" element={<ManagerSupportPage />} />
-                    <Route path="incidents-report" element={<IncidentsReportPage />} />
-                    <Route path="officer-performance" element={<OfficerPerformancePage />} />
-                  </Route>
+                        {/* Recruitment routes */}
+                        <Route path="/recruitment">
+                          <Route path="vetting" element={<Vetting />} />
+                          <Route path="cbt" element={<CBT />} />
+                          <Route path="take-test" element={<TakeTest />} />
+                          <Route path="test-session" element={<TestSession />} />
+                        </Route>
 
-                  {/* Compliance Routes */}
-                  <Route path="compliance">
-                    <Route path="contract-renewal" element={<ContractRenewalPage />} />
-                    <Route path="password-register" element={<PasswordRegisterPage />} />
-                    <Route path="asset-register" element={<AssetRegisterPage />} />
-                  </Route>
+                        {/* Operations routes */}
+                        <Route path="/operations">
+                          <Route path="incident-report" element={<IncidentReportPage />} />
+                          <Route path="mystery-shopper" element={<MysteryShopperPage />} />
+                          <Route path="site-visit" element={<SiteVisitPage />} />
+                          <Route path="holiday-request" element={<HolidayRequestPage />} />
+                          <Route path="holiday-requests" element={<HolidayRequestPage />} />
+                          <Route path="bank-holiday" element={<BankHolidayPage />} />
+                          <Route path="customer-satisfaction" element={<CustomerSatisfactionPage />} />
+                          <Route path="safe-duress-words" element={<SafeDuressWordsPage />} />
+                          <Route path="officer-support" element={<OfficerSupportPage />} />
+                          <Route path="officer-expenses" element={<OfficerExpensesPage />} />
+                        </Route>
 
-                  {/* Customer Routes */}
-                  <Route path="customer">
-                    <Route path="dar" element={<DailyActivityReportPage />} />
-                    <Route path="incident-graph" element={<IncidentGraphPage />} />
-                    <Route path="incident-report" element={<CustomerIncidentReportPage />} />
-                    <Route path="satisfaction-reports" element={<SatisfactionReportsPage />} />
-                    <Route path="be-safe-be-secure-graph" element={<BeSafeBeSecureGraphPage />} />
-                    <Route path="officer-support" element={<CustomerOfficerSupportPage />} />
-                  </Route>
-                </Route>
-              </Routes>
-            </Suspense>
-          </PageAccessProvider>
-        </BrowserRouter>
+                        {/* Employee routes */}
+                        <Route path="/employee">
+                          <Route path="uniform-equipment" element={<UniformEquipmentPage />} />
+                          <Route path="disciplinary" element={<DisciplinaryPage />} />
+                          <Route path="diary" element={<EmployeeDiaryPage />} />
+                        </Route>
+
+                        {/* Management routes */}
+                        <Route path="/management">
+                          <Route path="customer-reporting" element={<CustomerReportingPage />} />
+                          <Route path="manager-support" element={<ManagerSupportPage />} />
+                          <Route path="incidents-report" element={<IncidentsReportPage />} />
+                          <Route path="officer-performance" element={<OfficerPerformancePage />} />
+                        </Route>
+
+                        {/* Compliance routes */}
+                        <Route path="/compliance">
+                          <Route path="contract-renewal" element={<ContractRenewalPage />} />
+                          <Route path="password-register" element={<PasswordRegisterPage />} />
+                          <Route path="asset-register" element={<AssetRegisterPage />} />
+                        </Route>
+
+                        {/* Customer routes */}
+                        <Route path="/customer">
+                          <Route path="daily-activity-report" element={<DailyActivityReportPage />} />
+                          <Route path="incident-graph" element={<IncidentGraphPage />} />
+                          <Route path="incident-report" element={<CustomerIncidentReportPage />} />
+                          <Route path="satisfaction-reports" element={<SatisfactionReportsPage />} />
+                          <Route path="be-safe-be-secure-graph" element={<BeSafeBeSecureGraphPage />} />
+                          <Route path="officer-support" element={<CustomerOfficerSupportPage />} />
+                        </Route>
+                      </Route>
+                    </Route>
+                  </Routes>
+                </Suspense>
+              </PageAccessProvider>
+            </BrowserRouter>
+          </ThemeProvider>
+          <ReactQueryDevtools initialIsOpen={false} />
           <Toaster />
-      </ThemeProvider>
-        <ReactQueryDevtools initialIsOpen={false} />
-      </QueryClientProvider>
-    </ErrorBoundaryComponent>
-  )
+          <ToastContainer />
+        </QueryClientProvider>
+      </ErrorBoundaryComponent>
+    </Provider>
+  );
 }
 
-export default App
+export default App;
+

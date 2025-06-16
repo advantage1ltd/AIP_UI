@@ -14,7 +14,7 @@ export interface CustomerSurvey {
     uniformAndAppearance: number;
     professionalism: number;
     customerServiceApproach: number;
-    improvedFeelingSecurity: number;
+    improvedFeelingOfSecurityWhenOfficerOnSite: number;
     relationsWithStoreColleagues: number;
     punctualityBreaks: number;
     proactivity: number;
