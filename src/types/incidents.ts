@@ -24,19 +24,16 @@ export enum IncidentInvolved {
 export type OffenderSex = 'Male' | 'Female' | 'N/A or N/K'
 
 export interface OffenderAddress {
-  houseNumber: string
-  numberAndStreet: string
-  villageOrSuburb: string
-  town: string
-  county: string
-  postCode: string
+  numberAndStreet?: string;
+  town?: string;
+  postCode?: string;
 }
 
 export interface StolenItem {
   id: string;
-  category: string;
-  description: string;
-  productName: string;
+  category?: string;
+  description?: string;
+  productName?: string;
   cost: number;
   quantity: number;
   totalAmount: number;
@@ -44,45 +41,29 @@ export interface StolenItem {
 
 export interface Incident {
   id: string;
-  customerName: string;
-  siteName: string;
-  officerName: string;
-  officerRole: string;
-  dateOfIncident: string;
-  timeOfIncident: string;
-  incidentType: string;
-  description: string;
-  incidentDetails?: string;
+  customerId?: string;
+  customerName?: string;
+  siteName?: string;
+  officerName?: string;
+  officerRole?: string;
+  dutyManagerName?: string;
+  dateInputted: string | Date;
+  dateOfIncident: string | Date;
+  timeOfIncident?: string;
+  incidentType?: string;
+  description?: string;
   storeComments?: string;
-  incidentInvolved: string[];
-  policeInvolvement: boolean;
-  dutyManagerName: string;
-  status: 'pending' | 'resolved' | 'in-progress';
-  priority: 'low' | 'medium' | 'high';
-  evidenceAttached: boolean;
-  offenderAddress?: {
-    houseName?: string;
-    numberAndStreet?: string;
-    villageOrSuburb?: string;
-    town?: string;
-    county?: string;
-    postCode?: string;
-  };
-  gender?: 'Male' | 'Female' | 'N/A or N/K';
-  offenderDOB?: Date;
-  offenderPlaceOfBirth?: string;
-  policeID?: string;
-  crimeRefNumber?: string;
+  totalValueRecovered?: number;
+  policeInvolvement?: boolean;
   urnNumber?: string;
-  totalValueRecovered: number;
-  stolenItems: StolenItem[];
-  actionTaken?: string;
-  witnessStatements?: string[];
-  involvedParties?: string[];
-  reportNumber?: string;
+  crimeRefNumber?: string;
   offenderName?: string;
-  dateInputted: string;
-  timeOfDay: string;
-  dayOfWeek: string;
-  arrestSaveComment?: string;
+  offenderSex?: string;
+  offenderDOB?: string | Date;
+  offenderAddress?: OffenderAddress;
+  incidentInvolved?: string[];
+  stolenItems?: StolenItem[];
+  viewConfig?: {
+    enabledPages: string[];
+  };
 }

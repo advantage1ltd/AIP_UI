@@ -23,14 +23,15 @@ export interface CustomerSurvey {
 }
 
 export interface CustomerSurveyFilters {
-  search?: string;
-  customer?: string;
-  region?: string;
-  location?: string;
+  search: string;
+  customer: string;
+  region: string;
+  location: string;
   dateRange?: {
-    from: string;
-    to: string;
+    from?: Date;
+    to?: Date;
   };
+  customerId?: string;
 }
 
 export interface CustomerSurveyResponse {

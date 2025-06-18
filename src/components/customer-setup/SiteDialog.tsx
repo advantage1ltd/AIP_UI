@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useForm } from "react-hook-form"
 import { UK_COUNTIES } from "@/lib/constants"
 import { DUMMY_CUSTOMERS } from "@/data/customers"
-import { DUMMY_REGIONS } from "@/data/regions"
+import { DUMMY_REGIONS } from "@/data/mockRegions"
 import { useState, useEffect } from "react"
 
 interface SiteDialogProps {
@@ -46,44 +46,42 @@ export function SiteDialog({ open, onOpenChange, site, selectedCustomerId }: Sit
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-[95vw] sm:max-w-[500px] xl:max-w-[800px] p-4 sm:p-6 xl:p-8 max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg md:text-xl xl:text-2xl 2xl:text-3xl">
             {site ? "Edit Site" : "New Site"}
           </DialogTitle>
         </DialogHeader>
-
         <Form {...form}>
-          <form className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                name="customerId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Customer</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                      disabled={!!selectedCustomerId}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select customer" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {DUMMY_CUSTOMERS
-                          .filter(customer => !selectedCustomerId || customer.id === selectedCustomerId)
-                          .map((customer) => (
+          <form onSubmit={form.handleSubmit((data) => {
+            console.log(data)
+            onOpenChange(false)
+          })} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {!selectedCustomerId && (
+                <FormField
+                  name="customerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Customer</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select customer" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {DUMMY_CUSTOMERS.map((customer) => (
                             <SelectItem key={customer.id} value={customer.id}>
                               {customer.companyName}
                             </SelectItem>
                           ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
-              />
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 name="regionId"
@@ -209,33 +207,39 @@ export function SiteDialog({ open, onOpenChange, site, selectedCustomerId }: Sit
                   <FormItem>
                     <FormLabel>Telephone</FormLabel>
                     <FormControl>
-                      <Input type="tel" {...field} />
+                      <Input {...field} />
                     </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                name="isCoreSite"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Core Site</FormLabel>
+                    </div>
                   </FormItem>
                 )}
               />
             </div>
 
-            <FormField
-              name="isCoreSite"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <FormLabel>This is a core site</FormLabel>
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end gap-4">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
+              <Button type="submit">
                 {site ? "Update Site" : "Create Site"}
               </Button>
             </div>

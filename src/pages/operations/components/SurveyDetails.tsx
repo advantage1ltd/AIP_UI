@@ -17,9 +17,15 @@ interface SurveyDetailsProps {
   survey: CustomerSurvey;
   open: boolean;
   onClose: () => void;
+  isCustomerView?: boolean;
 }
 
-export const SurveyDetails: React.FC<SurveyDetailsProps> = ({ survey, open, onClose }) => {
+export const SurveyDetails: React.FC<SurveyDetailsProps> = ({
+  survey,
+  open,
+  onClose,
+  isCustomerView = false
+}) => {
   // Format date nicely but shorter for mobile
   const formatDate = (dateString: string) => {
     const options: Intl.DateTimeFormatOptions = {

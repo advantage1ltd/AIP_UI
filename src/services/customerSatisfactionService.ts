@@ -7,7 +7,7 @@ import type {
   CustomerSurveyUpdateRequest
 } from '@/types/customerSatisfaction';
 
-const BASE_URL = '/customer-satisfaction';
+const BASE_URL = '/customers/satisfaction-reports';
 
 export const customerSatisfactionService = {
   // Get paginated list of surveys with optional filters
@@ -16,18 +16,19 @@ export const customerSatisfactionService = {
     pageSize: number = 10,
     filters?: CustomerSurveyFilters
   ): Promise<CustomerSurveyResponse> {
-    const params = new URLSearchParams({
+    const params = {
       page: page.toString(),
       pageSize: pageSize.toString(),
       ...(filters?.search && { search: filters.search }),
       ...(filters?.customer && { customer: filters.customer }),
       ...(filters?.region && { region: filters.region }),
       ...(filters?.location && { location: filters.location }),
-      ...(filters?.dateRange?.from && { from: filters.dateRange.from }),
-      ...(filters?.dateRange?.to && { to: filters.dateRange.to })
-    });
+      ...(filters?.dateRange?.from && { from: filters.dateRange.from.toISOString() }),
+      ...(filters?.dateRange?.to && { to: filters.dateRange.to.toISOString() })
+    };
 
-    const response = await api.get(`${BASE_URL}?${params.toString()}`);
+    const searchParams = new URLSearchParams(params);
+    const response = await api.get(`${BASE_URL}?${searchParams.toString()}`);
     return response.data;
   },
 

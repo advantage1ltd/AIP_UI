@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react"
-import { Table, TableBody } from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import { CustomerDialog } from "./CustomerDialog"
 import { CustomerTableHeader } from "./table-components/CustomerTableHeader"
-import { CustomerTableRow } from "./table-components/CustomerTableRow"
+import { CustomerTableRow } from "./CustomerTableRow"
 import { DUMMY_CUSTOMERS } from "@/data/customers"
 import { TableActions } from "./table-components/TableActions"
+import type { Customer } from "@/types/customer"
 
 interface CustomersTableProps {
   onCustomerSelect: (customerId: string | null) => void
@@ -14,15 +15,15 @@ interface CustomersTableProps {
 }
 
 export function CustomersTable({ onCustomerSelect, selectedCustomerId }: CustomersTableProps) {
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedCustomer, setSelectedCustomer] = useState<any | undefined>()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>()
   const [selectedRows, setSelectedRows] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
   const cleanup = useCallback(() => {
-    setIsDialogOpen(false)
+    setDialogOpen(false)
     setSelectedCustomer(undefined)
     setSelectedRows([])
   }, [])
@@ -49,14 +50,15 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId }: Custome
     }
   }, [cleanup])
 
-  const handleNewCustomer = () => {
-    setSelectedCustomer(undefined)
-    setIsDialogOpen(true)
+  const handleEdit = (customer: Customer) => {
+    setSelectedCustomer(customer)
+    setDialogOpen(true)
   }
 
-  const handleEditCustomer = (customer: any) => {
-    setSelectedCustomer(customer)
-    setIsDialogOpen(true)
+  const handleSave = (updatedCustomer: Customer) => {
+    // In a real app, this would be an API call
+    console.log('Saving customer:', updatedCustomer)
+    setDialogOpen(false)
   }
 
   // Filter customers based on search query
@@ -88,84 +90,51 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId }: Custome
   }
 
   return (
-    <div className="space-y-2 md:space-y-4">
-      <TableActions 
-        title="Customers"
-        searchQuery={searchQuery}
-        onSearchChange={(value) => {
-          setSearchQuery(value)
-          setCurrentPage(1) // Reset to first page on search
-        }}
-        onNew={handleNewCustomer}
-        searchPlaceholder="Search customers..."
-        newButtonText="New Customer"
-      />
-
-      <div className="rounded-lg border bg-white/50 backdrop-blur-sm shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <CustomerTableHeader />
-            <TableBody>
-              {currentCustomers.length > 0 ? (
-                currentCustomers.map((customer) => (
-                  <CustomerTableRow 
-                    key={customer.id}
-                    customer={customer}
-                    isSelected={selectedRows.includes(customer.id)}
-                    onSelect={toggleRowSelection}
-                    onEdit={handleEditCustomer}
-                  />
-                ))
-              ) : (
-                <tr className="h-16">
-                  <td colSpan={7} className="text-center text-xs md:text-sm text-gray-500">
-                    {searchQuery ? 'No matching customers found' : 'No customers found'}
-                  </td>
-                </tr>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-semibold">Customers</h2>
+        <Button 
+          onClick={() => {
+            setSelectedCustomer(undefined)
+            setDialogOpen(true)
+          }}
+          className="bg-purple-600 hover:bg-purple-700"
+        >
+          Add Customer
+        </Button>
       </div>
-      
-      {/* Pagination */}
-      {filteredCustomers.length > itemsPerPage && (
-        <div className="flex items-center justify-between pt-1">
-          <div className="text-xs text-gray-500">
-            Showing {Math.min(filteredCustomers.length, startIndex + 1)}-{Math.min(filteredCustomers.length, endIndex)} of {filteredCustomers.length}
-          </div>
-          <div className="flex items-center space-x-1">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="h-7 w-7 p-0"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              <span className="sr-only">Previous page</span>
-            </Button>
-            <div className="text-xs px-2">
-              Page {currentPage} of {totalPages}
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="h-7 w-7 p-0"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-              <span className="sr-only">Next page</span>
-            </Button>
-          </div>
-        </div>
-      )}
 
-      <CustomerDialog 
-        open={isDialogOpen} 
-        onOpenChange={setIsDialogOpen}
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Company Name</TableHead>
+              <TableHead>Company Number</TableHead>
+              <TableHead>VAT Number</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {DUMMY_CUSTOMERS.map((customer) => (
+              <CustomerTableRow
+                key={customer.id}
+                customer={customer}
+                isSelected={customer.id === selectedCustomerId}
+                onSelect={onCustomerSelect}
+                onEdit={handleEdit}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <CustomerDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
         customer={selectedCustomer}
+        onSave={handleSave}
       />
     </div>
   )

@@ -1,60 +1,33 @@
-import React, { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import { usePageAccess } from '@/contexts/PageAccessContext';
+import React from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserRole } from '@/types/user';
 
-// interface ProtectedRouteProps {
-//   children: React.ReactNode;
-//   path: string;
-// }
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  allowedRoles?: UserRole[];
+}
 
-// Removed duplicate named export to resolve error
-// export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, path }) => {
-//   const { hasAccess, currentRole, isTestMode, testRole } = usePageAccess();
-//   if (!currentRole) {
-//     return <Navigate to="/" replace />;
-//   }
-//   if (currentRole === 'administrator' && path === '/settings') {
-//     return <>{children}</>;
-//   }
-//   if (!hasAccess(path)) {
-//     return <Navigate to="/" replace />;
-//   }
-//   return <>{children}</>;
-// };
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
 
-export default function ProtectedRoute() {
-  const [isChecking, setIsChecking] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const { currentRole } = usePageAccess();
-
-  useEffect(() => {
-    // Check authentication status
-    const checkAuth = () => {
-      const token = localStorage.getItem('auth_token');
-      const hasValidSession = !!token && !!currentRole;
-      setIsAuthenticated(hasValidSession);
-      setIsChecking(false);
-    };
-
-    // Only check once, avoid continuous re-checking
-    if (isChecking) {
-      const timeoutId = setTimeout(checkAuth, 100);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [currentRole, isChecking]);
-
-  // Show loading state during check to prevent flashing
-  if (isChecking) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-      </div>
-    );
+  if (isLoading) {
+    // You could render a loading spinner here
+    return <div>Loading...</div>;
   }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  if (!user) {
+    // Redirect to login page if not authenticated
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return <Outlet />;
-} 
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // Redirect to dashboard if user doesn't have required role
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+export default ProtectedRoute; 

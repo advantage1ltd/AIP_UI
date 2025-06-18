@@ -156,8 +156,13 @@ const regionDefinitions = {
 // Add type for graph type
 type GraphType = 'value' | 'quantity' | 'type';
 
-const IncidentGraph = () => {
-  console.log('Component rendering');
+interface IncidentGraphProps {
+  customerId?: string;
+  customerName?: string;
+}
+
+const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName }) => {
+  console.log('Component rendering with customer:', customerId);
 
   const [startDate, setStartDate] = useState<Date>()
   const [endDate, setEndDate] = useState<Date>()

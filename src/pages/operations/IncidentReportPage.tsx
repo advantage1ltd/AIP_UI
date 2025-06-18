@@ -58,7 +58,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { incidentsApi } from "@/services/api/incidents"
 import { Toaster } from '@/components/ui/toaster'
 
-export default function IncidentReportPage() {
+interface IncidentReportPageProps {
+  isCustomerView?: boolean;
+  customerId?: string;
+}
+
+export default function IncidentReportPage({ isCustomerView = false, customerId }: IncidentReportPageProps) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [open, setOpen] = useState(false)

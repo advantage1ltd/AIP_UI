@@ -7,16 +7,18 @@ import { format } from 'date-fns';
 
 interface MobileSurveyCardProps {
   survey: CustomerSurvey;
-  onEdit: (survey: CustomerSurvey) => void;
+  onEdit?: (survey: CustomerSurvey) => void;
   onView: (survey: CustomerSurvey) => void;
-  onDelete: (id: string) => void;
+  onDelete?: (id: string) => void;
+  isCustomerView?: boolean;
 }
 
 export const MobileSurveyCard: React.FC<MobileSurveyCardProps> = ({
   survey,
   onEdit,
   onView,
-  onDelete
+  onDelete,
+  isCustomerView = false
 }) => {
   // Calculate average rating
   const ratings = Object.values(survey.ratings);

@@ -1,171 +1,132 @@
-export interface Customer {
-  id: string
-  companyName: string
-  status: 'active' | 'dormant' | 'potential'
-  address: {
-    building: string
-    street: string
-    village: string
-    town: string
-    county: string
-    postcode: string
-  }
-  contact: {
-    title: string
-    forename: string
-    surname: string
-    position: string
-    email: string
-    phone: string
-  }
+import type { Customer, CustomerWithRelations } from "@/types/customer"
+import { DUMMY_REGIONS } from "./mockRegions"
+import { DUMMY_SITES } from "./mockSites"
+
+const now = new Date().toISOString()
+
+const baseCustomer = {
+  status: 'active' as const,
+  customerType: 'retail' as const,
+  createdAt: now,
+  updatedAt: now
 }
 
 export const DUMMY_CUSTOMERS: Customer[] = [
   {
-    id: "36",
-    companyName: "Midcounties Co-Operative",
-    status: "active",
+    ...baseCustomer,
+    id: "1",
+    companyName: "Central England COOP",
+    companyNumber: "31278R",
+    vatNumber: "GB 915 1416 82",
     address: {
-      building: "Co-Op House",
+      building: "Central House",
+      street: "Herrick Way",
+      village: "Westcotes",
+      town: "Leicester",
+      county: "Leicestershire",
+      postcode: "LE3 5QH"
+    },
+    contact: {
+      title: "Mr",
+      forename: "James",
+      surname: "Mitchell",
+      position: "Head of Security",
+      email: "james.mitchell@centralengland.coop",
+      phone: "0116 254 1234"
+    },
+    viewConfig: {
+      id: "vc1",
+      customerId: "1",
+      customerType: "retail",
+      enabledPages: [
+        "daily-activity",
+        "incident-graph",
+        "incident-report",
+        "customer-satisfaction",
+        "be-safe-be-secure"
+      ],
+      createdAt: now,
+      updatedAt: now
+    }
+  },
+  {
+    ...baseCustomer,
+    id: "2",
+    companyName: "Midcounties COOP",
+    companyNumber: "2582R",
+    vatNumber: "GB 476 6063 78",
+    address: {
+      building: "Co-operative House",
       street: "Warwick Technology Park",
-      village: "",
       town: "Warwick",
       county: "Warwickshire",
       postcode: "CV34 6DA"
     },
     contact: {
-      title: "Mr",
-      forename: "John",
-      surname: "Smith",
-      position: "Operations Manager",
-      email: "john.smith@midcounties.coop",
-      phone: "01926 516000"
-    }
-  },
-  {
-    id: "39",
-    companyName: "Central England Co-Operative",
-    status: "active",
-    address: {
-      building: "Central House",
-      street: "Hermes Road",
-      village: "",
-      town: "Lichfield",
-      county: "Staffordshire",
-      postcode: "WS13 6RH"
-    },
-    contact: {
-      title: "Ms",
-      forename: "Sarah",
-      surname: "Johnson",
-      position: "Regional Director",
-      email: "s.johnson@centralengland.coop",
-      phone: "01543 414141"
-    }
-  },
-  {
-    id: "41",
-    companyName: "Gloucester Charities Trust",
-    status: "active",
-    address: {
-      building: "Trust House",
-      street: "67 London Road",
-      village: "",
-      town: "Gloucester",
-      county: "Gloucestershire",
-      postcode: "GL1 3HF"
-    },
-    contact: {
       title: "Mrs",
-      forename: "Emma",
-      surname: "Wilson",
-      position: "Trust Manager",
-      email: "e.wilson@gct.org",
-      phone: "01452 500500"
+      forename: "Sarah",
+      surname: "Thompson",
+      position: "Security Manager",
+      email: "sarah.thompson@midcounties.coop",
+      phone: "01926 516 000"
+    },
+    viewConfig: {
+      id: "vc2",
+      customerId: "2",
+      customerType: "retail",
+      enabledPages: [
+        "daily-activity",
+        "incident-graph",
+        "incident-report",
+        "customer-satisfaction",
+        "be-safe-be-secure"
+      ],
+      createdAt: now,
+      updatedAt: now
     }
   },
   {
-    id: "42",
-    companyName: "YMCA",
-    status: "active",
+    ...baseCustomer,
+    id: "3",
+    companyName: "Heart of England COOP",
+    companyNumber: "1399R",
+    vatNumber: "GB 712 3091 45",
     address: {
-      building: "YMCA Building",
-      street: "Priors Road",
-      village: "",
-      town: "Cheltenham",
-      county: "Gloucestershire",
-      postcode: "GL52 5AH"
+      building: "22",
+      street: "Abbey Street",
+      town: "Nuneaton",
+      county: "Warwickshire",
+      postcode: "CV11 5BU"
     },
     contact: {
       title: "Mr",
       forename: "David",
-      surname: "Brown",
-      position: "Center Manager",
-      email: "d.brown@ymca.org",
-      phone: "01242 257373"
-    }
-  },
-  {
-    id: "43",
-    companyName: "FM Security",
-    status: "active",
-    address: {
-      building: "Security House",
-      street: "Tewkesbury Road",
-      village: "",
-      town: "Cheltenham",
-      county: "Gloucestershire",
-      postcode: "GL51 9SL"
-    },
-    contact: {
-      title: "Mr",
-      forename: "Michael",
-      surname: "Taylor",
-      position: "Operations Director",
-      email: "m.taylor@fmsecurity.co.uk",
-      phone: "01242 222333"
-    }
-  },
-  {
-    id: "44",
-    companyName: "Lloyds Pharmacy",
-    status: "active",
-    address: {
-      building: "Sapphire Court",
-      street: "Walsgrave Triangle",
-      village: "",
-      town: "Coventry",
-      county: "West Midlands",
-      postcode: "CV2 2TX"
-    },
-    contact: {
-      title: "Mrs",
-      forename: "Rachel",
-      surname: "Green",
-      position: "Regional Manager",
-      email: "r.green@lloydspharmacy.co.uk",
-      phone: "02476 437000"
-    }
-  },
-  {
-    id: "46",
-    companyName: "The Hospital Company",
-    status: "active",
-    address: {
-      building: "Hospital House",
-      street: "Business Park",
-      village: "",
-      town: "Worcester",
-      county: "Worcestershire",
-      postcode: "WR4 9FA"
-    },
-    contact: {
-      title: "Dr",
-      forename: "James",
       surname: "Wilson",
-      position: "Director",
-      email: "j.wilson@hospitalco.com",
-      phone: "01905 888999"
+      position: "Operations Director",
+      email: "david.wilson@heartofengland.coop",
+      phone: "02476 382 331"
+    },
+    viewConfig: {
+      id: "vc3",
+      customerId: "3",
+      customerType: "retail",
+      enabledPages: [
+        "daily-activity",
+        "incident-graph",
+        "incident-report",
+        "customer-satisfaction",
+        "be-safe-be-secure"
+      ],
+      createdAt: now,
+      updatedAt: now
     }
   }
 ]
+
+export function getCustomersWithRelations(): CustomerWithRelations[] {
+  return DUMMY_CUSTOMERS.map(customer => ({
+    ...customer,
+    regions: DUMMY_REGIONS.filter(region => region.customerId === customer.id),
+    sites: DUMMY_SITES.filter(site => site.customerId === customer.id)
+  }))
+}

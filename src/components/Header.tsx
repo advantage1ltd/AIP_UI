@@ -53,7 +53,8 @@ import {
   UserPlus,
   DollarSign,
   GitBranch,
-  CheckSquare
+  CheckSquare,
+  Shield
 } from "lucide-react"
 import { usePageAccess } from "@/contexts/PageAccessContext"
 import { Badge } from "@/components/ui/badge"
@@ -200,6 +201,40 @@ const RoleSelectorContent = ({
         )}
       </DropdownMenuItem>
     </DropdownMenuContent>
+  );
+};
+
+const RoleDisplay = () => {
+  const { currentRole, isTestMode, testRole } = usePageAccess();
+  
+  const getRoleName = (roleId: string | null) => {
+    switch(roleId) {
+      case 'advantage-officer':
+        return 'Advantage One Officer';
+      case 'advantage-ho':
+        return 'Advantage One HO Officer';
+      case 'administrator':
+        return 'Administrator';
+      case 'customer-site':
+        return 'Customer Site Manager';
+      case 'customer-ho':
+        return 'Customer Head Office Manager';
+      default:
+        return 'Unknown Role';
+    }
+  };
+
+  const activeRole = isTestMode && testRole ? testRole : currentRole;
+  const roleName = getRoleName(activeRole);
+
+  return (
+    <div className="flex items-center gap-2">
+      <Shield className="h-4 w-4 text-muted-foreground" />
+      <span className="text-sm font-medium">{roleName}</span>
+      {isTestMode && (
+        <Badge variant="outline" className="ml-2">Test Mode</Badge>
+      )}
+    </div>
   );
 };
 
@@ -511,7 +546,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   // Handle role change - only allowed in test mode for administrators
   const handleRoleChange = (roleId: string) => {
     // Only allow role changes in test mode and if user is administrator
-    if (!isTestMode || !isAuthenticated || authenticatedUser.pageAccessRole !== 'administrator') {
+    if (!isTestMode || !isAuthenticated || authenticatedUser.pageAccessRole !== 'Administrator') {
       return;
     }
     
@@ -524,7 +559,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
 
   // Toggle test mode - only allowed for administrators
   const toggleTestMode = () => {
-    if (!isAuthenticated || authenticatedUser.pageAccessRole !== 'administrator') {
+    if (!isAuthenticated || authenticatedUser.pageAccessRole !== 'Administrator') {
       return;
     }
     
@@ -540,7 +575,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   const getCurrentRoleName = () => {
     if (isAuthenticated) {
       // For authenticated users, show their actual role
-      if (isTestMode && testRole && authenticatedUser.pageAccessRole === 'administrator') {
+      if (isTestMode && testRole && authenticatedUser.pageAccessRole === 'Administrator') {
         const role = userRoles.find(r => r.id === testRole);
         return role ? `${role.name} (Test)` : 'Test Mode';
       }
@@ -559,7 +594,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   // Check if role switching should be enabled - only for administrators in test mode
   const isRoleSwitchingEnabled = () => {
     return isAuthenticated && 
-           authenticatedUser.pageAccessRole === 'administrator';
+           authenticatedUser.pageAccessRole === 'Administrator';
   };
 
   // Toggle mobile search
@@ -570,7 +605,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   // Get the user's current role ID
   const getCurrentRoleId = () => {
     if (isAuthenticated) {
-      return isTestMode && testRole && authenticatedUser.pageAccessRole === 'administrator' 
+      return isTestMode && testRole && authenticatedUser.pageAccessRole === 'Administrator' 
         ? testRole 
         : authenticatedUser.pageAccessRole;
     }
@@ -658,7 +693,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                 <UserAvatar size="md" showBorder={true} />
                 <div className="text-sm">
                   <p className="font-medium text-white">
-                    {isAuthenticated ? authenticatedUser.displayName || authenticatedUser.username : 'David Ibanga'}
+                    {isAuthenticated ? `${authenticatedUser.firstName} ${authenticatedUser.lastName}` : 'David Ibanga'}
                   </p>
                   <p className="text-xs text-blue-200">
                     {isAuthenticated ? authenticatedUser.role : 'IT manager'}
@@ -749,7 +784,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                 <UserAvatar size="md" showBorder={true} />
                 <div className="text-sm">
                   <p className="font-medium text-gray-900">
-                    {isAuthenticated ? authenticatedUser.displayName || authenticatedUser.username : 'David Ibanga'}
+                    {isAuthenticated ? `${authenticatedUser.firstName} ${authenticatedUser.lastName}` : 'David Ibanga'}
                   </p>
                   <p className="text-xs text-gray-500">
                     {isAuthenticated ? authenticatedUser.role : 'IT manager'}

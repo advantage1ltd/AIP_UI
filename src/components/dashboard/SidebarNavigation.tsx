@@ -120,7 +120,7 @@ const NavItem = ({ to, icon, label, onClick, className }: NavItemProps) => {
 }
 
 export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate, onMobileClose }) => {
-  const { hasAccess } = usePageAccess();
+  const { hasAccess, currentRole } = usePageAccess();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -132,7 +132,8 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
     '/administration/user-setup',
     '/administration/employee-registration',
     '/administration/customer-setup',
-    '/administration/stock-control'
+    '/administration/stock-control',
+    '/customer/views-config'
   ];
   
   const operationsPaths = [
@@ -165,8 +166,9 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
     '/customer/dar',
     '/customer/incident-graph',
     '/customer/incident-report',
-    '/customer/satisfaction-reports',
-    '/customer/be-safe-be-secure-graph'
+            '/customer/satisfaction-report',
+    '/customer/be-safe-be-secure',
+    '/customer/reporting'
   ];
   
   const compliancePaths = [
@@ -242,6 +244,15 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           </div>
         )}
 
+        {hasAccess('/customer/reporting') && (
+          <NavItem
+            to="/management/customer-reporting"
+            icon={<FileText className="h-4 w-4" />}
+            label="Customer Reporting"
+            onClick={onNavigate}
+          />
+        )}
+
         {hasAccess('/action-calendar') && (
           <a
             href="/action-calendar"
@@ -260,15 +271,61 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           </a>
         )}
 
-        <Accordion type="single" defaultValue={["crm"]} className="space-y-1">
-          {showCrmSection && (
-            <AccordionItem value="crm" className="border-none">
-              <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
-                <Building2 className="h-4 w-4" />
-                <span className="flex-1 text-left">CRM</span>
+        <Accordion type="multiple" className="space-y-2">
+          {showAdminSection && (
+            <AccordionItem value="admin">
+              <AccordionTrigger className="text-sm">
+                <div className="flex items-center gap-2">
+                  <UserCog className="h-4 w-4" />
+                  <span>Administration</span>
+                </div>
               </AccordionTrigger>
-              <AccordionContent className="pb-1 pt-0">
-                <div className="ml-4 space-y-1">
+              <AccordionContent className="space-y-1 pt-1">
+                {hasAccess('/administration/user-setup') && (
+                  <NavItem
+                    to="/administration/user-setup"
+                    icon={<User className="h-4 w-4" />}
+                    label="User Setup"
+                    onClick={onNavigate}
+                  />
+                )}
+                {hasAccess('/administration/employee-registration') && (
+                  <NavItem
+                    to="/administration/employee-registration"
+                    icon={<UserPlus className="h-4 w-4" />}
+                    label="Employee Registration"
+                    onClick={onNavigate}
+                  />
+                )}
+                {hasAccess('/administration/customer-setup') && (
+                  <NavItem
+                    to="/administration/customer-setup"
+                    icon={<Building className="h-4 w-4" />}
+                    label="Customer Setup"
+                    onClick={onNavigate}
+                  />
+                )}
+                {hasAccess('/administration/stock-control') && (
+                  <NavItem
+                    to="/administration/stock-control"
+                    icon={<Boxes className="h-4 w-4" />}
+                    label="Stock Control"
+                    onClick={onNavigate}
+                  />
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          )}
+
+          {showCrmSection && (
+            <AccordionItem value="crm">
+              <AccordionTrigger className="text-sm">
+                <div className="flex items-center gap-2">
+                  <Users2 className="h-4 w-4" />
+                  <span>CRM</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-1 pt-1">
                   {hasAccess('/crm/dashboard') && (
                     <NavItem
                       to="/crm/dashboard"
@@ -288,7 +345,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                   {hasAccess('/crm/contacts') && (
                     <NavItem
                       to="/crm/contacts"
-                      icon={<Users className="h-4 w-4" />}
+                    icon={<Users2 className="h-4 w-4" />}
                       label="Contacts"
                       onClick={onNavigate}
                     />
@@ -317,68 +374,23 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                       onClick={onNavigate}
                     />
                   )}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          )}
-
-          {showAdminSection && (
-            <AccordionItem value="administration" className="border-none">
-              <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
-                <UserCog className="h-4 w-4" />
-                <span className="flex-1 text-left">Administration</span>
-              </AccordionTrigger>
-              <AccordionContent className="pb-1 pt-0">
-                <div className="ml-4 space-y-1">
-                  {hasAccess('/administration/user-setup') && (
-                    <NavItem
-                      to="/administration/user-setup"
-                      icon={<User className="h-4 w-4" />}
-                      label="User Setup"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/administration/employee-registration') && (
-                    <NavItem
-                      to="/administration/employee-registration"
-                      icon={<UserPlus className="h-4 w-4" />}
-                      label="Employee Registration"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/administration/customer-setup') && (
-                    <NavItem
-                      to="/administration/customer-setup"
-                      icon={<Building2 className="h-4 w-4" />}
-                      label="Customer Setup"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/administration/stock-control') && (
-                    <NavItem
-                      to="/administration/stock-control"
-                      icon={<Store className="h-4 w-4" />}
-                      label="Stock Control"
-                      onClick={onNavigate}
-                    />
-                  )}
-                </div>
               </AccordionContent>
             </AccordionItem>
           )}
 
           {showOperationsSection && (
-            <AccordionItem value="operations" className="border-none">
-              <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
+            <AccordionItem value="operations">
+              <AccordionTrigger className="text-sm">
+                <div className="flex items-center gap-2">
                 <Radio className="h-4 w-4" />
-                <span className="flex-1 text-left">Operations</span>
+                  <span>Operations</span>
+                </div>
               </AccordionTrigger>
-              <AccordionContent className="pb-1 pt-0">
-                <div className="ml-4 space-y-1">
+              <AccordionContent className="space-y-1 pt-1">
                   {hasAccess('/operations/incident-report') && (
                     <NavItem
                       to="/operations/incident-report"
-                      icon={<FileWarning className="h-4 w-4" />}
+                    icon={<AlertTriangle className="h-4 w-4" />}
                       label="Incident Report"
                       onClick={onNavigate}
                     />
@@ -455,19 +467,19 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                       onClick={onNavigate}
                     />
                   )}
-                </div>
               </AccordionContent>
             </AccordionItem>
           )}
 
           {showEmployeeSection && (
-            <AccordionItem value="employee" className="border-none">
-              <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
+            <AccordionItem value="employee">
+              <AccordionTrigger className="text-sm">
+                <div className="flex items-center gap-2">
                 <Users2 className="h-4 w-4" />
-                <span className="flex-1 text-left">Employee</span>
+                  <span>Employee</span>
+                </div>
               </AccordionTrigger>
-              <AccordionContent className="pb-1 pt-0">
-                <div className="ml-4 space-y-1">
+              <AccordionContent className="space-y-1 pt-1">
                   {hasAccess('/employee/uniform-equipment') && (
                     <NavItem
                       to="/employee/uniform-equipment"
@@ -492,19 +504,19 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                       onClick={onNavigate}
                     />
                   )}
-                </div>
               </AccordionContent>
             </AccordionItem>
           )}
 
           {showManagementSection && (
-            <AccordionItem value="management" className="border-none">
-              <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
+            <AccordionItem value="management">
+              <AccordionTrigger className="text-sm">
+                <div className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
-                <span className="flex-1 text-left">Management</span>
+                  <span>Management</span>
+                </div>
               </AccordionTrigger>
-              <AccordionContent className="pb-1 pt-0">
-                <div className="ml-4 space-y-1">
+              <AccordionContent className="space-y-1 pt-1">
                   {hasAccess('/management/customer-reporting') && (
                     <NavItem
                       to="/management/customer-reporting"
@@ -516,7 +528,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                   {hasAccess('/management/manager-support') && (
                     <NavItem
                       to="/management/manager-support"
-                      icon={<Building2 className="h-4 w-4" />}
+                    icon={<Building className="h-4 w-4" />}
                       label="Manager Support"
                       onClick={onNavigate}
                     />
@@ -537,19 +549,19 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                       onClick={onNavigate}
                     />
                   )}
-                </div>
               </AccordionContent>
             </AccordionItem>
           )}
 
           {showComplianceSection && (
-            <AccordionItem value="compliance" className="border-none">
-              <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
+            <AccordionItem value="compliance">
+              <AccordionTrigger className="text-sm">
+                <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" />
-                <span className="flex-1 text-left">Compliance</span>
+                  <span>Compliance</span>
+                </div>
               </AccordionTrigger>
-              <AccordionContent className="pb-1 pt-0">
-                <div className="ml-4 space-y-1">
+              <AccordionContent className="space-y-1 pt-1">
                   {hasAccess('/compliance/contract-renewal') && (
                     <NavItem
                       to="/compliance/contract-renewal"
@@ -574,19 +586,19 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                       onClick={onNavigate}
                     />
                   )}
-                </div>
               </AccordionContent>
             </AccordionItem>
           )}
 
           {showRecruitmentSection && (
-            <AccordionItem value="recruitment" className="border-none">
-              <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
+            <AccordionItem value="recruitment">
+              <AccordionTrigger className="text-sm">
+                <div className="flex items-center gap-2">
                 <GraduationCap className="h-4 w-4" />
-                <span className="flex-1 text-left">Recruitment</span>
+                  <span>Recruitment</span>
+                </div>
               </AccordionTrigger>
-              <AccordionContent className="pb-1 pt-0">
-                <div className="ml-4 space-y-1">
+              <AccordionContent className="space-y-1 pt-1">
                   {hasAccess('/recruitment/vetting') && (
                     <NavItem
                       to="/recruitment/vetting"
@@ -611,19 +623,19 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                       onClick={onNavigate}
                     />
                   )}
-                </div>
               </AccordionContent>
             </AccordionItem>
           )}
 
           {showCustomerSection && (
-            <AccordionItem value="customer" className="border-none">
-              <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground hover:no-underline">
+            <AccordionItem value="customer">
+              <AccordionTrigger className="text-sm">
+                <div className="flex items-center gap-2">
                 <Building className="h-4 w-4" />
-                <span className="flex-1 text-left">Customer</span>
+                  <span>Customer</span>
+                </div>
               </AccordionTrigger>
-              <AccordionContent className="pb-1 pt-0">
-                <div className="ml-4 space-y-1">
+              <AccordionContent className="space-y-1 pt-1">
                   {hasAccess('/customer/dar') && (
                     <NavItem
                       to="/customer/dar"
@@ -648,46 +660,37 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                       onClick={onNavigate}
                     />
                   )}
-                  {hasAccess('/customer/satisfaction-reports') && (
+                {hasAccess('/customer/satisfaction-report') && (
                     <NavItem
-                      to="/customer/satisfaction-reports"
+                    to="/customer/satisfaction-report"
                       icon={<FileText className="h-4 w-4" />}
                       label="Satisfaction Reports"
                       onClick={onNavigate}
                     />
                   )}
-                  {hasAccess('/customer/be-safe-be-secure-graph') && (
+                {hasAccess('/customer/be-safe-be-secure') && (
                     <NavItem
-                      to="/customer/be-safe-be-secure-graph"
+                    to="/customer/be-safe-be-secure"
                       icon={<ShieldCheck className="h-4 w-4" />}
-                      label="Be Safe Be Secure Graph"
+                    label="Be Safe Be Secure"
                       onClick={onNavigate}
                     />
                   )}
-                </div>
               </AccordionContent>
             </AccordionItem>
           )}
         </Accordion>
 
         {hasAccess('/settings') && (
-          <div className="px-2 pt-4">
-            <a
-              href="/settings"
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium bg-blue-600 hover:bg-blue-700 text-white",
-                location.pathname === "/settings" && "bg-blue-700"
-              )}
-              onClick={handleNavigation("/settings")}
-              onKeyDown={handleKeyDown("/settings")}
-              tabIndex={0}
-            >
-              <Cog className="h-5 w-5" />
-              <span>Settings</span>
-            </a>
-          </div>
+          <NavItem
+            to="/settings"
+            icon={<SettingsIcon className="h-4 w-4" />}
+            label="Settings"
+            onClick={onNavigate}
+            className="mt-4"
+          />
         )}
       </div>
     </div>
-  )
-}
+  );
+};

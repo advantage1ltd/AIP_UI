@@ -1,12 +1,6 @@
-interface User {
-  id: string;
-  username: string;
-  displayName: string;
-  role: string;
-  pageAccessRole: string;
-}
+import { User, AuthResponse, AdvantageOneUser, CustomerUser } from '@/types/user';
 
-export const login = async (username: string, password: string) => {
+export const login = async (username: string, password: string): Promise<User> => {
   try {
     const response = await fetch('/api/login', {
       method: 'POST',
@@ -17,7 +11,7 @@ export const login = async (username: string, password: string) => {
     });
 
     // First try to parse the response
-    let data;
+    let data: AuthResponse;
     try {
       data = await response.json();
     } catch (e) {
@@ -36,10 +30,14 @@ export const login = async (username: string, password: string) => {
     }
 
     // Store auth data
-    localStorage.setItem('auth_token', Math.random().toString(36).slice(2));
-    localStorage.setItem('user', JSON.stringify(data.data));
+    localStorage.setItem('auth_token', data.data.token);
+    localStorage.setItem('user', JSON.stringify(data.data.user));
     
-    return data.data as User;
+    const userData = data.data.user;
+    const isAdvantageOneRole = ['AdvantageOneOfficer', 'AdvantageOneHOOfficer', 'Administrator'].includes(userData.role);
+    return isAdvantageOneRole 
+      ? { ...userData, assignedCustomerIds: (userData as any).assignedCustomerIds || [] } as AdvantageOneUser
+      : { ...userData, companyId: (userData as any).companyId || userData.id } as CustomerUser;
   } catch (error) {
     console.error('Login error:', error);
     throw error;

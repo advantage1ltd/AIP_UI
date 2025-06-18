@@ -11,13 +11,13 @@ interface AddressSectionProps {
 export function AddressSection({ form }: AddressSectionProps) {
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold">Head Office Address</h3>
+      <h3 className="font-semibold">Address</h3>
       <div className="grid grid-cols-2 gap-4">
         <FormField
           name="address.building"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Building Address</FormLabel>
+              <FormLabel>Building</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>
@@ -28,7 +28,7 @@ export function AddressSection({ form }: AddressSectionProps) {
           name="address.street"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Number and Street</FormLabel>
+              <FormLabel>Street</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>
@@ -39,7 +39,7 @@ export function AddressSection({ form }: AddressSectionProps) {
           name="address.village"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Village or Suburb</FormLabel>
+              <FormLabel>Village/Area (Optional)</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>
@@ -50,7 +50,7 @@ export function AddressSection({ form }: AddressSectionProps) {
           name="address.town"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Town</FormLabel>
+              <FormLabel>Town/City</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>
@@ -83,7 +83,7 @@ export function AddressSection({ form }: AddressSectionProps) {
           name="address.postcode"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Post Code</FormLabel>
+              <FormLabel>Postcode</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>

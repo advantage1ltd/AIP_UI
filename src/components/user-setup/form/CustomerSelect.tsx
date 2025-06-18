@@ -1,8 +1,13 @@
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 
+interface Customer {
+  id: string;
+  name: string;
+}
+
 interface CustomerSelectProps {
-  availableCustomers: string[]
+  availableCustomers: Customer[]
   selectedCustomers: string[]
   assignedCustomers: string[]
   onSelectedChange: (customers: string[]) => void
@@ -34,8 +39,8 @@ export function CustomerSelect({
           }}
         >
           {availableCustomers.map((customer) => (
-            <option key={customer} value={customer} className="py-1">
-              {customer}
+            <option key={customer.id} value={customer.id} className="py-1">
+              {customer.name}
             </option>
           ))}
         </select>
@@ -53,11 +58,14 @@ export function CustomerSelect({
               onAssignedChange(values);
             }}
           >
-            {assignedCustomers.map((customer) => (
-              <option key={customer} value={customer} className="py-1">
-                {customer}
-              </option>
-            ))}
+            {assignedCustomers.map((customerId) => {
+              const customer = availableCustomers.find(c => c.id === customerId);
+              return (
+                <option key={customerId} value={customerId} className="py-1">
+                  {customer?.name || customerId}
+                </option>
+              );
+            })}
           </select>
           <div className="flex justify-center gap-4">
             <Button 

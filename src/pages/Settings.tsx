@@ -17,15 +17,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { usePageAccess } from '@/contexts/PageAccessContext'
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { savePageAccessSettings } from '@/api/pageAccess'
+import { PageAccess } from '@/contexts/PageAccessContext'
 
 // Define types for our page access configuration
-interface Page {
-  id: string
-  name: string
-  description: string
-  category: 'dashboard' | 'reports' | 'management' | 'customer' | 'settings' | 'recruitment'
-  path: string
-}
+type Page = PageAccess;
 
 interface UserRole {
   id: string
@@ -93,19 +89,31 @@ const Settings = () => {
     );
   }, [pageAccessByRole, availablePages]);
 
+  // Load saved settings on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('pageAccessSettings');
+    if (savedSettings) {
+      try {
+        const parsedSettings = JSON.parse(savedSettings);
+        setPageAccessByRole(parsedSettings);
+      } catch (error) {
+        console.error('Error loading saved settings:', error);
+      }
+    }
+  }, []);
+
   // Filter pages based on search query
-  const filteredPages = availablePages.filter(page => {
-    const searchLower = searchQuery.toLowerCase();
+  const filteredPages = availablePages?.filter(page => {
+    const searchLower = searchQuery?.toLowerCase() || '';
     return (
-      page.name.toLowerCase().includes(searchLower) ||
-      page.description.toLowerCase().includes(searchLower) ||
-      page.category.toLowerCase().includes(searchLower)
+      page?.title?.toLowerCase().includes(searchLower) ||
+      page?.path?.toLowerCase().includes(searchLower)
     );
-  });
+  }) || [];
 
   // Group pages by category for better organization
   const pagesByCategory = filteredPages.reduce((acc, page) => {
-    const category = page.category;
+    const category = page.path.split('/')[1] || 'dashboard';
     if (!acc[category]) {
       acc[category] = [];
     }
@@ -172,7 +180,7 @@ const Settings = () => {
 
   // Group pages by subcategory for better organization
   const pagesBySubcategory = filteredPages.reduce((acc, page) => {
-    const subcategory = subcategoryMap[page.id] || categoryDisplayNames[page.category];
+    const subcategory = subcategoryMap[page.id] || categoryDisplayNames[page.path.split('/')[1] || 'dashboard'];
     if (!acc[subcategory]) {
       acc[subcategory] = [];
     }
@@ -202,40 +210,52 @@ const Settings = () => {
 
   // Handle toggle change
   const handleToggle = (pageId: string, roleId: string) => {
-    setPageAccessByRole((prev: Record<string, string[]>) => {
-      const newAccess = { ...prev };
-      const roleAccess = [...(newAccess[roleId] || [])];
-      
-      if (roleAccess.includes(pageId)) {
-        // Remove access
-        newAccess[roleId] = roleAccess.filter(id => id !== pageId);
-      } else {
-        // Add access
-        newAccess[roleId] = [...roleAccess, pageId];
-      }
-      
-      return newAccess;
-    });
+    const newAccess = { ...pageAccessByRole };
+    const roleAccess = [...(newAccess[roleId] || [])];
+    
+    if (roleAccess.includes(pageId)) {
+      // Remove access
+      newAccess[roleId] = roleAccess.filter(id => id !== pageId);
+    } else {
+      // Add access
+      newAccess[roleId] = [...roleAccess, pageId];
+    }
+    
+    setPageAccessByRole(newAccess);
+    localStorage.setItem('pageAccessSettings', JSON.stringify(newAccess));
   };
 
   // Handle save changes
-  const handleSave = () => {
-    // Here you would typically save to your backend
-    toast({
-      title: adminAccessModified ? "Warning: Admin Access Modified" : "Settings Saved",
-      description: adminAccessModified 
-        ? "You have modified administrator access. This may affect system functionality."
-        : "Page access settings have been saved successfully.",
-      variant: adminAccessModified ? "destructive" : "default",
-    });
+  const handleSave = async () => {
+    try {
+      await savePageAccessSettings({ pageAccessByRole });
+      localStorage.setItem('pageAccessSettings', JSON.stringify(pageAccessByRole));
+
+      toast({
+        title: adminAccessModified ? "Warning: Admin Access Modified" : "Settings Saved",
+        description: adminAccessModified 
+          ? "You have modified administrator access. This may affect system functionality."
+          : "Page access settings have been saved successfully.",
+        variant: adminAccessModified ? "destructive" : "default",
+      });
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast({
+        title: "Error Saving Settings",
+        description: "There was a problem saving your changes. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Handle reset admin access
   const handleResetAdminAccess = () => {
-    setPageAccessByRole((prev: Record<string, string[]>) => ({
-      ...prev,
+    const newAccess = {
+      ...pageAccessByRole,
       administrator: availablePages.map(page => page.id)
-    }));
+    };
+    setPageAccessByRole(newAccess);
+    localStorage.setItem('pageAccessSettings', JSON.stringify(newAccess));
     toast({
       title: "Admin Access Reset",
       description: "Administrator access has been restored to full access.",
@@ -389,8 +409,8 @@ const Settings = () => {
                           <tr key={page.id + '-lg'} className="border-t hover:bg-muted/20 transition-colors">
                             <td className="py-3 px-4 border-l-2 border-l-transparent hover:border-l-primary">
                               <div>
-                                <div className="font-medium text-sm">{page.name}</div>
-                                <div className="text-xs text-muted-foreground mt-0.5">{page.description}</div>
+                                <div className="font-medium text-sm">{page.title}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">{page.path}</div>
                               </div>
                             </td>
                             {userRoles.map(role => (
@@ -456,8 +476,8 @@ const Settings = () => {
                             {/* Page details */}
                             <td className="py-3 px-4 border-l-2 border-l-transparent hover:border-l-primary">
                               <div>
-                                <div className="font-medium text-sm">{page.name}</div>
-                                <div className="text-xs text-muted-foreground mt-0.5">{page.description}</div>
+                                <div className="font-medium text-sm">{page.title}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">{page.path}</div>
                               </div>
                             </td>
                             {/* Single switch column for the selected role */}
