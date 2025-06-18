@@ -8,8 +8,8 @@ import { store } from './store/store'
 async function startApp() {
   if (import.meta.env.DEV) {
     try {
-      const { initMockServiceWorker } = await import('./mocks/browser')
-      await initMockServiceWorker()
+      const { restartMockServiceWorker } = await import('./mocks/browser')
+      await restartMockServiceWorker()
       console.log('Mock Service Worker initialized successfully')
     } catch (error) {
       console.error('Failed to initialize Mock Service Worker:', error)

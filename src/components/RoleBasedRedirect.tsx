@@ -12,14 +12,14 @@ const RoleBasedRedirect = () => {
     
     // Only redirect if we have a valid role and user
     if (currentRole && user) {
-      let redirectPath = '/admin-dashboard' // default
+      let redirectPath = '/dashboard' // default
       
-      if (user.role === 'Administrator') {
-        redirectPath = '/admin-dashboard'
-      } else if (user.role === 'Advantage One Officer') {
-        redirectPath = '/officer-dashboard'
+      if (user.role === 'Administrator' || user.role === 'AdvantageOneHOOfficer') {
+        redirectPath = '/dashboard'
+      } else if (user.role === 'AdvantageOneOfficer') {
+        redirectPath = '/dashboard'
       } else if (user.role?.startsWith('Customer')) {
-        redirectPath = '/customer-dashboard'
+        redirectPath = '/dashboard'
       }
       
       console.log('🔄 Role-based redirect to:', redirectPath)

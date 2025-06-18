@@ -31,6 +31,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+interface CustomerSatisfactionPageProps {
+  isCustomerView?: boolean;
+  customerId?: string;
+}
+
 // Generate mock data with more variety
 export const generateMockSurveys = (count = 25): CustomerSurvey[] => {
   const customers = ['Shoprite Holdings', 'Pick n Pay', 'Woolworths', 'Spar Group', 'Game Stores'];
@@ -138,7 +143,10 @@ const generateCsvData = (data: CustomerSurvey[]): string => {
   return [headers.join(','), ...rows].join('\n');
 };
 
-const CustomerSatisfactionPage: React.FC = () => {
+const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({ 
+  isCustomerView = false,
+  customerId
+}) => {
   // State management
   const [showForm, setShowForm] = useState(false);
   const [editingSurvey, setEditingSurvey] = useState<CustomerSurvey | null>(null);
@@ -671,4 +679,4 @@ const CustomerSatisfactionPage: React.FC = () => {
   );
 };
 
-export default CustomerSatisfactionPage;
+export default CustomerSatisfactionPage; 

@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Eye, EyeOff, User2 } from 'lucide-react'
 import { Alert } from '@/components/ui/alert'
 import { usePageAccess } from '@/contexts/PageAccessContext'
-import { login } from '@/services/auth'
+import { useAuth } from '@/contexts/AuthContext'
+import { UserRole } from '@/types/user'
 
 interface LoginError {
   type: 'credentials' | 'network' | 'server' | 'validation';
@@ -43,6 +44,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const { setCurrentRole } = usePageAccess()
+  const { login } = useAuth()
 
   const validateForm = (): boolean => {
     if (!username.trim()) {
@@ -74,7 +76,9 @@ export default function LoginPage() {
 
     setLoading(true)
     try {
-      const user = await login(username, password)
+      await login(username, password)
+      const user = JSON.parse(localStorage.getItem('user') || '{}')
+      
       console.log('✅ Login successful:', {
         username: user.username,
         role: user.role,
@@ -87,17 +91,11 @@ export default function LoginPage() {
       console.log('🔍 Full user object from login:', user)
       setCurrentRole(user.pageAccessRole)
 
-      // Redirect to appropriate dashboard based on role
-      let redirectPath = '/'
-      if (user.role === 'Administrator') {
-        redirectPath = '/admin-dashboard'
-      } else if (user.role === 'Advantage One Officer') {
-        redirectPath = '/officer-dashboard'
-      } else if (user.role?.startsWith('Customer')) {
-        redirectPath = '/customer-dashboard'
-      }
-      
+      // All users now go to /dashboard
+      const redirectPath = '/dashboard'
       console.log('🔄 Redirecting to:', redirectPath)
+      
+      // Use replace to prevent going back to login page
       navigate(redirectPath, { replace: true })
     } catch (err) {
       console.error('❌ Login error:', err)

@@ -7,21 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { EmployeeSelect } from "./form/EmployeeSelect"
 import { CustomerSelect } from "./form/CustomerSelect"
+import { User, AVAILABLE_CUSTOMERS, UserRole, AdvantageOneUser } from "@/types/user"
 
 interface UserFormProps {
   mode: 'new' | 'edit'
   user?: User
+  onSubmit: (data: any) => void
   onCancel: () => void
-}
-
-export interface User {
-  id: string
-  employeeName: string
-  userName: string
-  role: string
-  email: string
-  jobTitle: string
-  isDeleted: boolean
 }
 
 // Mock employee data
@@ -38,35 +30,32 @@ const employeesList = [
   "Jennifer Garcia"
 ]
 
-const availableCustomers = [
-  "Midcounties Co-Operative",
-  "Central England Co-Operative",
-  "Gloucester Charities Trust",
-  "YMCA",
-  "FM Security",
-  "Lloyds Pharmacy",
-  "The Hospital Company",
-  "AAH Pharmaceuticals",
-  "Heart of England Cooperative",
-  "Eastbrook Tewksbury"
-]
+export function UserForm({ mode, user, onSubmit, onCancel }: UserFormProps) {
+  const [formData, setFormData] = useState({
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    username: user?.username || '',
+    email: user?.email || '',
+    password: '',
+    role: user?.role || 'AdvantageOneOfficer',
+    pageAccessRole: user?.pageAccessRole || 'AdvantageOneOfficer',
+    assignedCustomerIds: user?.role === 'AdvantageOneOfficer' || user?.role === 'AdvantageOneHOOfficer' || user?.role === 'Administrator' 
+      ? (user as AdvantageOneUser)?.assignedCustomerIds || []
+      : [],
+  })
 
-export function UserForm({ mode, user, onCancel }: UserFormProps) {
-  const [selectedCustomers, setSelectedCustomers] = useState<string[]>([])
-  const [assignedCustomers, setAssignedCustomers] = useState<string[]>([])
-  const [employeeValue, setEmployeeValue] = useState(user?.employeeName || "")
+  const [selectedCustomers, setSelectedCustomers] = useState<string[]>(
+    user?.role === 'AdvantageOneOfficer' || user?.role === 'AdvantageOneHOOfficer' || user?.role === 'Administrator'
+      ? (user as AdvantageOneUser)?.assignedCustomerIds || []
+      : []
+  )
 
-  const handleAddCustomer = () => {
-    if (selectedCustomers.length > 0) {
-      setAssignedCustomers([...assignedCustomers, ...selectedCustomers])
-      setSelectedCustomers([])
-    }
-  }
-
-  const handleRemoveCustomer = () => {
-    if (assignedCustomers.length > 0) {
-      setAssignedCustomers([])
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSubmit({
+      ...formData,
+      assignedCustomerIds: selectedCustomers
+    })
   }
 
   return (
@@ -77,92 +66,113 @@ export function UserForm({ mode, user, onCancel }: UserFormProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form className="space-y-6">
-          <div className="flex items-center gap-2 p-4 bg-purple-50 rounded-lg">
-            <Checkbox id="recordDeleted" className="border-purple-400" />
-            <Label htmlFor="recordDeleted" className="text-purple-700 font-medium">
-              Record Is Deleted?
-            </Label>
-          </div>
-
-          <EmployeeSelect
-            value={employeeValue}
-            onChange={setEmployeeValue}
-            employeesList={employeesList}
-          />
-
-          <div className="space-y-2">
-            <Label htmlFor="jobTitle" className="text-gray-700">Job Title</Label>
-            <Input 
-              id="jobTitle" 
-              placeholder="Enter job title"
-              defaultValue={user?.jobTitle}
-              className="bg-white/50 border-purple-200 focus:border-purple-400" 
-            />
-          </div>
-
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-gray-700">Email Address</Label>
+              <Label htmlFor="firstName" className="text-gray-700">First Name</Label>
               <Input 
-                id="email" 
-                type="email"
-                placeholder="Enter email address"
-                defaultValue={user?.email}
-                className="bg-white/50 border-purple-200 focus:border-purple-400" 
+                id="firstName"
+                name="firstName"
+                value={formData.firstName}
+                onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                className="bg-white/50 border-purple-200 focus:border-purple-400"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName" className="text-gray-700">Last Name</Label>
+              <Input 
+                id="lastName"
+                name="lastName"
+                value={formData.lastName}
+                onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                className="bg-white/50 border-purple-200 focus:border-purple-400"
+                required
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="userName" className="text-gray-700">
-              User Name <span className="text-sm text-gray-500">(Max 20 chars)</span>
+            <Label htmlFor="email" className="text-gray-700">Email Address</Label>
+            <Input 
+              id="email" 
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              className="bg-white/50 border-purple-200 focus:border-purple-400"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="username" className="text-gray-700">
+              Username <span className="text-sm text-gray-500">(Max 20 chars)</span>
             </Label>
             <Input 
-              id="userName" 
+              id="username" 
+              name="username"
               maxLength={20}
-              defaultValue={user?.userName}
-              className="bg-white/50 border-purple-200 focus:border-purple-400" 
+              value={formData.username}
+              onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+              className="bg-white/50 border-purple-200 focus:border-purple-400"
+              required
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-gray-700">
-              Password <span className="text-sm text-gray-500">(Case Sensitive)</span>
-            </Label>
-            <Input 
-              id="password" 
-              type="password"
-              className="bg-white/50 border-purple-200 focus:border-purple-400" 
-            />
-          </div>
+          {mode === 'new' && (
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-gray-700">
+                Password <span className="text-sm text-gray-500">(Case Sensitive)</span>
+              </Label>
+              <Input 
+                id="password" 
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                className="bg-white/50 border-purple-200 focus:border-purple-400"
+                required
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
-            <Label htmlFor="role" className="text-gray-700">User Status</Label>
-            <Select defaultValue={user?.role}>
+            <Label htmlFor="role" className="text-gray-700">User Role</Label>
+            <Select 
+              value={formData.role}
+              onValueChange={(value) => {
+                setFormData(prev => ({
+                  ...prev,
+                  role: value as UserRole,
+                  pageAccessRole: value as UserRole
+                }))
+              }}
+            >
               <SelectTrigger className="bg-white/50 border-purple-200">
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="advantage-officer">Advantage One Officer</SelectItem>
-                <SelectItem value="advantage-editor">Advantage One HO Editor</SelectItem>
-                <SelectItem value="advantage-manager">Advantage One HO Manager</SelectItem>
-                <SelectItem value="administrator">Administrator</SelectItem>
-                <SelectItem value="customer-site-manager">Customer-Site Manager</SelectItem>
-                <SelectItem value="customer-ho-manager">Customer-Head Office Manager</SelectItem>
+                <SelectItem value="AdvantageOneOfficer">Advantage One Officer</SelectItem>
+                <SelectItem value="AdvantageOneHOOfficer">Advantage One HO Officer</SelectItem>
+                <SelectItem value="Administrator">Administrator</SelectItem>
+                <SelectItem value="CustomerSiteManager">Customer-Site Manager</SelectItem>
+                <SelectItem value="CustomerHOManager">Customer-Head Office Manager</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <CustomerSelect
-            availableCustomers={availableCustomers}
-            selectedCustomers={selectedCustomers}
-            assignedCustomers={assignedCustomers}
-            onSelectedChange={setSelectedCustomers}
-            onAssignedChange={setAssignedCustomers}
-            onAdd={handleAddCustomer}
-            onRemove={handleRemoveCustomer}
-          />
+          {formData.role === 'AdvantageOneOfficer' && (
+            <CustomerSelect
+              availableCustomers={AVAILABLE_CUSTOMERS}
+              selectedCustomers={selectedCustomers}
+              assignedCustomers={selectedCustomers}
+              onSelectedChange={setSelectedCustomers}
+              onAssignedChange={setSelectedCustomers}
+              onAdd={() => setSelectedCustomers(prev => [...prev, ...selectedCustomers])}
+              onRemove={() => setSelectedCustomers([])}
+            />
+          )}
 
           <div className="flex justify-center gap-4 pt-6">
             <Button 

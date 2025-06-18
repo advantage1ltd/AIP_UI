@@ -40,13 +40,14 @@ interface SurveyTableProps {
     total: number;
   };
   filters: CustomerSurveyFilters;
-  onNewSurvey: () => void;
-  onEditSurvey: (survey: CustomerSurvey) => void;
+  onNewSurvey?: () => void;
+  onEditSurvey?: (survey: CustomerSurvey) => void;
   onViewSurvey: (survey: CustomerSurvey) => void;
-  onDeleteSurvey: (id: string) => void;
+  onDeleteSurvey?: (id: string) => void;
   onPageChange: (page: number) => void;
   onFiltersChange: (filters: CustomerSurveyFilters) => void;
   isLoading: boolean;
+  isCustomerView?: boolean;
 }
 
 export const SurveyTable: React.FC<SurveyTableProps> = ({
@@ -59,7 +60,8 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
   onDeleteSurvey,
   onPageChange,
   onFiltersChange,
-  isLoading
+  isLoading,
+  isCustomerView = false
 }) => {
   // Calculate average rating for a survey
   const getAverageRating = (survey: CustomerSurvey) => {
@@ -113,9 +115,11 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={onNewSurvey} disabled={isLoading}>
-          <PlusCircle className="mr-2 h-4 w-4" /> New Survey
-        </Button>
+        {!isCustomerView && (
+          <Button onClick={onNewSurvey} disabled={isLoading}>
+            <PlusCircle className="mr-2 h-4 w-4" /> New Survey
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -164,22 +168,26 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        onClick={() => onEditSurvey(survey)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-destructive"
-                        onClick={() => onDeleteSurvey(survey.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!isCustomerView && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => onEditSurvey?.(survey)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-destructive"
+                            onClick={() => onDeleteSurvey?.(survey.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

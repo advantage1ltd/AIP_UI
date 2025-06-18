@@ -1,69 +1,133 @@
-export type UserStatus = 
-  | 'Advantage One Officer'
-  | 'Advantage one HO Editor'
-  | 'Advantage One HO Manager'
+export type UserRole = 
+  | 'AdvantageOneOfficer'
+  | 'AdvantageOneHOOfficer'
   | 'Administrator'
-  | 'Customer - Site Manager'
-  | 'Customer - Head Office Manager';
-
-export type OfficerType = 'Retail Officer' | 'Static Officer' | 'Both';
+  | 'CustomerSiteManager'
+  | 'CustomerHOManager';
 
 export interface Customer {
   id: string;
-  name: string;
-}
-
-export interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  username: string;
-  email: string;
-  password?: string;
-  status: UserStatus;
-  signature: string;
-  signatureCode: string;
-  jobTitle: string;
-  userCompany: string;
-  officerType: OfficerType;
-  assignedCustomers: Customer[];
+  companyName: string;
+  companyNumber: string;
+  vatNumber: string;
+  status: 'active' | 'inactive';
+  customerType: CustomerType[];
+  regions: Region[];
+  sites: Site[];
   createdAt: string;
-  lastLogin?: string;
+  updatedAt: string;
 }
 
-export interface CreateUserInput {
+export interface Region {
+  id: string;
+  name: string;
+  customerId: string;
+  manager: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Site {
+  id: string;
+  name: string;
+  regionId: string;
+  customerId: string;
+  address: {
+    buildingName: string;
+    street: string;
+    town: string;
+    county: string;
+    postcode: string;
+  };
+  isCoreSite: boolean;
+  sinNumber: string;
+  telephone: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CustomerType = 
+  | 'Event'
+  | 'Static'
+  | 'Gatehouse'
+  | 'Retail'
+  | 'Mobile Patrol'
+  | 'Keyholding & Alarm Response'
+  | 'Other';
+
+export interface BaseUser {
+  id: string;
+  username: string;
+  password?: string;  // Optional since we don't want to expose it in responses
   firstName: string;
   lastName: string;
-  username: string;
   email: string;
-  password: string;
-  status: UserStatus;
-  signature: string;
-  signatureCode: string;
-  jobTitle: string;
-  userCompany: string;
-  officerType: OfficerType;
-  assignedCustomers: Customer[];
+  role: UserRole;
+  pageAccessRole: UserRole;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface UpdateUserInput {
+export interface CustomerUser extends BaseUser {
+  role: Extract<UserRole, 'CustomerSiteManager' | 'CustomerHOManager'>;
+  companyId: string;
+}
+
+export interface AdvantageOneUser extends BaseUser {
+  role: Extract<UserRole, 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator'>;
+  assignedCustomerIds?: string[];
+}
+
+export type User = CustomerUser | AdvantageOneUser;
+
+export interface Employee {
   id: string;
-  firstName?: string;
-  lastName?: string;
-  username?: string;
-  email?: string;
-  status?: UserStatus;
-  signature?: string;
-  signatureCode?: string;
-  jobTitle?: string;
-  userCompany?: string;
-  officerType?: OfficerType;
-  assignedCustomers?: Customer[];
+  userId: string;
+  name: string;
+  jobRole: string;
+  department: string;
+  startDate: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
 }
 
-export const AVAILABLE_CUSTOMERS: Customer[] = [
-  { id: '1', name: 'Central England COOP' },
-  { id: '2', name: 'Midcounties COOP' },
-  { id: '3', name: 'Heart of England COOP' },
-  { id: '4', name: 'Eastbrook Tewksbury' }
+export interface AuthResponse {
+  success: boolean;
+  data?: {
+    user: Omit<User, 'password'>;
+    token: string;
+  };
+  message?: string;
+}
+
+export interface UserResponse {
+  success: boolean;
+  data: User;
+  message?: string;
+}
+
+export interface UsersResponse {
+  success: boolean;
+  data: User[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    pageSize: number;
+    totalCount: number;
+  };
+  message?: string;
+}
+
+export const AVAILABLE_CUSTOMERS = [
+  { id: "COOP001", name: "Central England COOP" },
+  { id: "COOP002", name: "Midcounties COOP" },
+  { id: "COOP003", name: "Heart of England COOP" }
 ];
+
+export interface CreateUserInput extends Omit<User, 'id' | 'createdAt' | 'updatedAt'> {}
+export interface UpdateUserInput extends Partial<Omit<User, 'createdAt' | 'updatedAt'>> {
+  id: string;
+}

@@ -1,164 +1,531 @@
-import { Suspense, lazy } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
-import Layout from './components/layout/Layout'
-import { AnimatePresence, motion } from 'framer-motion'
+import React, { lazy } from 'react';
+import { createBrowserRouter, Outlet } from 'react-router-dom';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { Layout } from '@/components/layout/Layout';
+import LoginPage from '@/pages/LoginPage';
+import Index from '@/pages/Index';
+import CustomerReportingPage from '@/pages/management/CustomerReportingPage';
+import CustomerDetailPage from '@/pages/customer/CustomerDetailPage';
+import ActionCalendar from '@/pages/ActionCalendar';
+import { UserRole } from '@/types/user';
+import { PageAccessProvider } from '@/contexts/PageAccessContext';
 
-// Loading component
-const PageLoader = () => (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    className="fixed inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm"
-  >
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-  </motion.div>
-)
+// Import all the necessary pages
+import UserSetup from '@/pages/administration/UserSetup';
+import EmployeeRegistration from '@/pages/administration/EmployeeRegistration';
+import CustomerSetup from '@/pages/administration/CustomerSetup';
+import StockControl from '@/pages/administration/StockControl';
+import IncidentReportPage from '@/pages/operations/IncidentReportPage';
+import MysteryShopperPage from '@/pages/operations/MysteryShopperPage';
+import SiteVisitPage from '@/pages/operations/SiteVisitPage';
+import HolidayRequestPage from '@/pages/operations/HolidayRequestPage';
+import BankHolidayPage from '@/pages/operations/BankHolidayPage';
+import CustomerSatisfactionPage from '@/pages/operations/CustomerSatisfactionPage';
+import PatrolLogPage from '@/pages/operations/PatrolLogPage';
+import SafeDuressWordsPage from '@/pages/operations/SafeDuressWordsPage';
+import OfficerSupportPage from '@/pages/operations/OfficerSupportPage';
+import OfficerExpensesPage from '@/pages/operations/OfficerExpensesPage';
+import UniformEquipmentPage from '@/pages/employee/UniformEquipmentPage';
+import DisciplinaryPage from '@/pages/employee/DisciplinaryPage';
+import EmployeeDiaryPage from '@/pages/employee/EmployeeDiaryPage';
+import ManagerSupportPage from '@/pages/management/ManagerSupportPage';
+import IncidentsReportPage from '@/pages/management/IncidentsReportPage';
+import OfficerPerformance from '@/pages/management/OfficerPerformance';
+import Settings from '@/pages/Settings';
+import Profile from '@/pages/Profile';
 
-// Wrap component with motion for smooth transitions
-const withMotion = (Component: React.ComponentType) => {
-  return () => {
-    const location = useLocation();
-    
-    return (
-      <motion.div
-        key={location.pathname}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15, ease: "easeInOut" }}
-        className="h-full w-full"
-      >
-        <Suspense fallback={<PageLoader />}>
-          <Component />
-        </Suspense>
-      </motion.div>
-    )
+// Import CRM pages
+import CRMDashboard from '@/pages/crm/CRMDashboard';
+import Contacts from '@/pages/crm/Contacts';
+import Leads from '@/pages/crm/Leads';
+import Deals from '@/pages/crm/Deals';
+import Pipeline from '@/pages/crm/Pipeline';
+import Tasks from '@/pages/crm/Tasks';
+
+// Import compliance pages
+import ContractRenewalPage from '@/pages/compliance/ContractRenewalPage';
+import PasswordRegisterPage from '@/pages/compliance/PasswordRegisterPage';
+import AssetRegisterPage from '@/pages/compliance/AssetRegisterPage';
+
+// Import recruitment pages
+import Vetting from '@/pages/recruitment/Vetting';
+import CBT from '@/pages/recruitment/CBT';
+import TakeTest from '@/pages/recruitment/TakeTest';
+
+// Import customer pages with lazy loading
+const DailyActivityReportPage = lazy(() => import('./pages/customer/CustomerDailyActivityReport'));
+const IncidentGraphPage = lazy(() => import('./pages/customer/CustomerIncidentGraph'));
+const CustomerIncidentReportPage = lazy(() => import('./pages/customer/CustomerIncidentReport'));
+const CustomerSatisfactionReport = lazy(() => import('./pages/customer/CustomerSatisfactionReport'));
+const BeSafeBeSecureGraphPage = lazy(() => import('./pages/customer/BeSafeBeSecureGraphPage'));
+const CustomerOfficerSupportPage = lazy(() => import('./pages/customer/CustomerOfficerSupportPage'));
+const CustomerReporting = lazy(() => import('./pages/customer/CustomerReporting'));
+const CustomerViewsConfig = lazy(() => import('./pages/customer/CustomerViewsConfig'));
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: (
+      <PageAccessProvider>
+        <Outlet />
+      </PageAccessProvider>
+    ),
+    children: [
+      {
+        path: 'login',
+        element: <LoginPage />,
+      },
+      {
+        path: '/',
+        element: <Layout />,
+        children: [
+          {
+            path: '/',
+            element: (
+              <ProtectedRoute>
+                <Index />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'dashboard',
+            element: (
+              <ProtectedRoute>
+                <Index />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'action-calendar',
+            element: (
+              <ProtectedRoute>
+                <ActionCalendar />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'profile',
+            element: (
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator'] as UserRole[]}>
+                <Settings />
+              </ProtectedRoute>
+            ),
+          },
+          // Administration routes
+          {
+            path: 'administration/user-setup',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <UserSetup />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'administration/employee-registration',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <EmployeeRegistration />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'administration/customer-setup',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <CustomerSetup />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'administration/stock-control',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <StockControl />
+              </ProtectedRoute>
+            ),
+          },
+          // Operations routes
+          {
+            path: 'operations/incident-report',
+            element: (
+              <ProtectedRoute>
+                <IncidentReportPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'operations/mystery-shopper',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <MysteryShopperPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'operations/site-visit',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <SiteVisitPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'operations/holiday-requests',
+            element: (
+              <ProtectedRoute>
+                <HolidayRequestPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'operations/bank-holiday',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <BankHolidayPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'operations/customer-satisfaction',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <CustomerSatisfactionPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'operations/patrol-log',
+            element: (
+              <ProtectedRoute>
+                <PatrolLogPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'operations/safe-duress-words',
+            element: (
+              <ProtectedRoute>
+                <SafeDuressWordsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'operations/officer-support',
+            element: (
+              <ProtectedRoute>
+                <OfficerSupportPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'operations/officer-expenses',
+            element: (
+              <ProtectedRoute>
+                <OfficerExpensesPage />
+              </ProtectedRoute>
+            ),
+          },
+          // Employee routes
+          {
+            path: 'employee/uniform-equipment',
+            element: (
+              <ProtectedRoute>
+                <UniformEquipmentPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'employee/disciplinary',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <DisciplinaryPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'employee/diary',
+            element: (
+              <ProtectedRoute>
+                <EmployeeDiaryPage />
+              </ProtectedRoute>
+            ),
+          },
+          // Management routes
+          {
+            path: 'management/customer-reporting',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer', 'CustomerHOManager'] as UserRole[]}>
+                <CustomerReportingPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'management/manager-support',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <ManagerSupportPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'management/incidents-report',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <IncidentsReportPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'management/officer-performance',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <OfficerPerformance />
+              </ProtectedRoute>
+            ),
+          },
+          // Customer routes
+          {
+            path: 'customer/reporting',
+            element: (
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <CustomerReporting />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/daily-activity-report',
+            element: (
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <DailyActivityReportPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/incident-graph',
+            element: (
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <IncidentGraphPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/incident-report',
+            element: (
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <CustomerIncidentReportPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/satisfaction-report',
+            element: (
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <CustomerSatisfactionReport />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/be-safe-be-secure',
+            element: (
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <BeSafeBeSecureGraphPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+          
+          // Customer-specific routes with customerId
+          {
+            path: 'customer/:customerId/daily-activity-report',
+            element: (
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <DailyActivityReportPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/:customerId/incident-graph',
+            element: (
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <IncidentGraphPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/:customerId/incident-report',
+            element: (
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <CustomerIncidentReportPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/:customerId/satisfaction-report',
+            element: (
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <CustomerSatisfactionReport />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/:customerId/be-safe-be-secure',
+            element: (
+              <ProtectedRoute>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <BeSafeBeSecureGraphPage />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+       
+          {
+            path: 'customer/:customerId/*',
+            element: (
+              <ProtectedRoute>
+                <CustomerDetailPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'crm/dashboard',
+            element: (
+              <ProtectedRoute>
+                <CRMDashboard />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'crm/leads',
+            element: (
+              <ProtectedRoute>
+                <Leads />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'crm/contacts',
+            element: (
+              <ProtectedRoute>
+                <Contacts />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'crm/deals',
+            element: (
+              <ProtectedRoute>
+                <Deals />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'crm/pipeline',
+            element: (
+              <ProtectedRoute>
+                <Pipeline />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'crm/tasks',
+            element: (
+              <ProtectedRoute>
+                <Tasks />
+              </ProtectedRoute>
+            ),
+          },
+          // Compliance routes
+          {
+            path: 'compliance/contract-renewal',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <ContractRenewalPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'compliance/password-register',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <PasswordRegisterPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'compliance/asset-register',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <AssetRegisterPage />
+              </ProtectedRoute>
+            ),
+          },
+          // Recruitment routes
+          {
+            path: 'recruitment/vetting',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <Vetting />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'recruitment/cbt',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <CBT />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'recruitment/take-test',
+            element: (
+              <ProtectedRoute>
+                <TakeTest />
+              </ProtectedRoute>
+            ),
+          },
+          // Customer routes
+          {
+            path: 'customer/views-config',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <React.Suspense fallback={<div>Loading...</div>}>
+                  <CustomerViewsConfig />
+                </React.Suspense>
+              </ProtectedRoute>
+            ),
+          },
+        ]
+      }
+    ]
   }
-}
+]);
 
-// Lazy load page components with error handling and motion
-const Index = withMotion(lazy(() => import('@/pages/Index').catch(err => {
-  console.error('Error loading Index page:', err)
-  return { default: () => <div>Error loading page</div> }
-})))
-
-const ActionCalendar = withMotion(lazy(() => import('./pages/ActionCalendar')))
-const Profile = withMotion(lazy(() => import('./pages/Profile')))
-const Settings = withMotion(lazy(() => import('./pages/Settings')))
-const ConfigureViews = withMotion(lazy(() => import('./pages/ConfigureViews')))
-const ReportsDashboard = withMotion(lazy(() => import('./pages/ReportsDashboard')))
-
-// Administration
-const UserSetup = withMotion(lazy(() => import('./pages/administration/UserSetup')))
-const EmployeeRegistration = withMotion(lazy(() => import('./pages/administration/EmployeeRegistration')))
-const CustomerSetup = withMotion(lazy(() => import('./pages/administration/CustomerSetup')))
-const StockControl = withMotion(lazy(() => import('./pages/administration/StockControl')))
-
-// CRM
-const Contacts = withMotion(lazy(() => import('./pages/crm/Contacts')))
-const Deals = withMotion(lazy(() => import('./pages/crm/Deals')))
-const Pipeline = withMotion(lazy(() => import('./pages/crm/Pipeline')))
-const Tasks = withMotion(lazy(() => import('./pages/crm/Tasks')))
-
-// Recruitment
-const Vetting = withMotion(lazy(() => import('./pages/recruitment/Vetting')))
-const CBT = withMotion(lazy(() => import('./pages/recruitment/CBT')))
-const TakeTest = withMotion(lazy(() => import('./pages/recruitment/TakeTest')))
-const TestSession = withMotion(lazy(() => import('./pages/recruitment/TestSession')))
-
-// Operations
-const IncidentReportPage = withMotion(lazy(() => import('./pages/operations/IncidentReportPage')))
-const MysteryShopperPage = withMotion(lazy(() => import('./pages/operations/MysteryShopperPage')))
-const SiteVisitPage = withMotion(lazy(() => import('./pages/operations/SiteVisitPage')))
-const HolidayRequestPage = withMotion(lazy(() => import('./pages/operations/HolidayRequestPage')))
-const BankHolidayPage = withMotion(lazy(() => import('./pages/operations/BankHolidayPage')))
-const CustomerSatisfactionPage = withMotion(lazy(() => import('./pages/operations/CustomerSatisfactionPage')))
-const PatrolLogPage = withMotion(lazy(() => import('./pages/operations/PatrolLogPage')))
-const SafeDuressWordsPage = withMotion(lazy(() => import('./pages/operations/SafeDuressWordsPage')))
-const OfficerSupportPage = withMotion(lazy(() => import('./pages/operations/OfficerSupportPage')))
-const OfficerExpensesPage = withMotion(lazy(() => import('./pages/operations/OfficerExpensesPage')))
-
-// Employee
-const UniformEquipmentPage = withMotion(lazy(() => import('./pages/employee/UniformEquipmentPage')))
-const DisciplinaryPage = withMotion(lazy(() => import('./pages/employee/DisciplinaryPage')))
-const EmployeeDiaryPage = withMotion(lazy(() => import('./pages/employee/EmployeeDiaryPage')))
-
-// Management
-const CustomerReportingPage = withMotion(lazy(() => import('./pages/management/CustomerReportingPage')))
-const ManagerSupportPage = withMotion(lazy(() => import('./pages/management/ManagerSupportPage')))
-const IncidentsReportPage = withMotion(lazy(() => import('./pages/management/IncidentsReportPage')))
-
-// Compliance
-const ContractRenewalPage = withMotion(lazy(() => import('./pages/compliance/ContractRenewalPage')))
-const PasswordRegisterPage = withMotion(lazy(() => import('./pages/compliance/PasswordRegisterPage')))
-const AssetRegisterPage = withMotion(lazy(() => import('./pages/compliance/AssetRegisterPage')))
-
-const AppRoutes = () => {
-  const location = useLocation()
-
-  return (
-    <Layout>
-      <div className="h-full">
-        <AnimatePresence mode="wait" initial={false}>
-          <Routes location={location} key={location.pathname}>
-            {/* Core Routes */}
-            <Route path="/" element={<Index />} />
-            <Route path="/action-calendar" element={<ActionCalendar />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/configure-views" element={<ConfigureViews />} />
-            <Route path="/reports-dashboard" element={<ReportsDashboard />} />
-
-            {/* Administration Routes */}
-            <Route path="/administration/user-setup" element={<UserSetup />} />
-            <Route path="/administration/employee-registration" element={<EmployeeRegistration />} />
-            <Route path="/administration/customer-setup" element={<CustomerSetup />} />
-            <Route path="/administration/stock-control" element={<StockControl />} />
-
-            {/* CRM Routes */}
-            <Route path="/crm/contacts" element={<Contacts />} />
-            <Route path="/crm/deals" element={<Deals />} />
-            <Route path="/crm/pipeline" element={<Pipeline />} />
-            <Route path="/crm/tasks" element={<Tasks />} />
-
-            {/* Recruitment Routes */}
-            <Route path="/recruitment/vetting" element={<Vetting />} />
-            <Route path="/recruitment/cbt" element={<CBT />} />
-            <Route path="/recruitment/take-test" element={<TakeTest />} />
-            <Route path="/recruitment/test-session/:testId" element={<TestSession />} />
-
-            {/* Operations Routes */}
-            <Route path="/operations/incident-report" element={<IncidentReportPage />} />
-            <Route path="/operations/mystery-shopper" element={<MysteryShopperPage />} />
-            <Route path="/operations/site-visit" element={<SiteVisitPage />} />
-            <Route path="/operations/holiday-requests" element={<HolidayRequestPage />} />
-            <Route path="/operations/bank-holiday" element={<BankHolidayPage />} />
-            <Route path="/operations/customer-satisfaction" element={<CustomerSatisfactionPage />} />
-            <Route path="/operations/patrol-log" element={<PatrolLogPage />} />
-            <Route path="/operations/safe-duress-words" element={<SafeDuressWordsPage />} />
-            <Route path="/operations/officer-support" element={<OfficerSupportPage />} />
-            <Route path="/operations/officer-expenses" element={<OfficerExpensesPage />} />
-
-            {/* Employee Routes */}
-            <Route path="/employee/uniform-equipment" element={<UniformEquipmentPage />} />
-            <Route path="/employee/disciplinary" element={<DisciplinaryPage />} />
-            <Route path="/employee/diary" element={<EmployeeDiaryPage />} />
-
-            {/* Management Routes */}
-            <Route path="/management/customer-reporting" element={<CustomerReportingPage />} />
-            <Route path="/management/manager-support" element={<ManagerSupportPage />} />
-            <Route path="/management/incidents-report" element={<IncidentsReportPage />} />
-
-            {/* Compliance Routes */}
-            <Route path="/compliance/contract-renewal" element={<ContractRenewalPage />} />
-            <Route path="/compliance/password-register" element={<PasswordRegisterPage />} />
-            <Route path="/compliance/asset-register" element={<AssetRegisterPage />} />
-          </Routes>
-        </AnimatePresence>
-      </div>
-    </Layout>
-  )
-}
-
-export default AppRoutes
+export default router;

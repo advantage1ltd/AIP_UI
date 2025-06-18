@@ -46,7 +46,7 @@ interface CustomerStoreData {
   recentIncidents: RecentIncident[]
 }
 
-type CustomerRole = 'customer-site' | 'customer-ho'
+type CustomerRole = 'Administrator' | 'CustomerSiteManager' | 'CustomerHOManager'
 
 interface Metric {
   title: string
@@ -122,7 +122,41 @@ const customerStoreData: Record<string, CustomerStoreData> = {
   'store1': {
     name: 'Store #123',
     metrics: {
-      'customer-site': [
+      'Administrator': [
+        { 
+          title: 'Overall Activity Score',
+          value: '94%',
+          change: '+8%',
+          trend: 'up',
+          icon: Activity,
+          color: 'green'
+        },
+        {
+          title: 'Total Incidents',
+          value: '15',
+          change: '-20%',
+          trend: 'down',
+          icon: AlertCircle,
+          color: 'amber'
+        },
+        {
+          title: 'Active Sites',
+          value: '12',
+          change: '+1',
+          trend: 'up',
+          icon: Building2,
+          color: 'blue'
+        },
+        {
+          title: 'Total Officers',
+          value: '86',
+          change: '+8',
+          trend: 'up',
+          icon: Users,
+          color: 'purple'
+        }
+      ],
+      'CustomerSiteManager': [
         { 
           title: 'Daily Activity Score',
           value: '94%',
@@ -156,7 +190,7 @@ const customerStoreData: Record<string, CustomerStoreData> = {
           color: 'purple'
         }
       ],
-      'customer-ho': [
+      'CustomerHOManager': [
         { 
           title: 'Overall Activity Score',
           value: '91%',
@@ -251,7 +285,41 @@ const customerStoreData: Record<string, CustomerStoreData> = {
   'store2': {
     name: 'Store #456',
     metrics: {
-      'customer-site': [
+      'Administrator': [
+        { 
+          title: 'Overall Activity Score',
+          value: '87%',
+          change: '+3%',
+          trend: 'up',
+          icon: Activity,
+          color: 'green'
+        },
+        {
+          title: 'Total Incidents',
+          value: '22',
+          change: '-8%',
+          trend: 'down',
+          icon: AlertCircle,
+          color: 'amber'
+        },
+        {
+          title: 'Active Sites',
+          value: '18',
+          change: '+2',
+          trend: 'up',
+          icon: Building2,
+          color: 'blue'
+        },
+        {
+          title: 'Total Officers',
+          value: '124',
+          change: '+15',
+          trend: 'up',
+          icon: Users,
+          color: 'purple'
+        }
+      ],
+      'CustomerSiteManager': [
         { 
           title: 'Daily Activity Score',
           value: '87%',
@@ -285,7 +353,7 @@ const customerStoreData: Record<string, CustomerStoreData> = {
           color: 'purple'
         }
       ],
-      'customer-ho': [
+      'CustomerHOManager': [
         { 
           title: 'Overall Activity Score',
           value: '85%',
@@ -380,7 +448,41 @@ const customerStoreData: Record<string, CustomerStoreData> = {
   'store3': {
     name: 'Store #789',
     metrics: {
-      'customer-site': [
+      'Administrator': [
+        { 
+          title: 'Overall Activity Score',
+          value: '96%',
+          change: '+12%',
+          trend: 'up',
+          icon: Activity,
+          color: 'green'
+        },
+        {
+          title: 'Total Incidents',
+          value: '18',
+          change: '-25%',
+          trend: 'down',
+          icon: AlertCircle,
+          color: 'amber'
+        },
+        {
+          title: 'Active Sites',
+          value: '28',
+          change: '+4',
+          trend: 'up',
+          icon: Building2,
+          color: 'blue'
+        },
+        {
+          title: 'Total Officers',
+          value: '196',
+          change: '+22',
+          trend: 'up',
+          icon: Users,
+          color: 'purple'
+        }
+      ],
+      'CustomerSiteManager': [
         { 
           title: 'Daily Activity Score',
           value: '96%',
@@ -414,7 +516,7 @@ const customerStoreData: Record<string, CustomerStoreData> = {
           color: 'purple'
         }
       ],
-      'customer-ho': [
+      'CustomerHOManager': [
         { 
           title: 'Overall Activity Score',
           value: '93%',
@@ -599,7 +701,7 @@ function CustomerDashboard({ userRole, displayName }: CustomerDashboardProps) {
   }, [])
 
   // Memoized data calculations
-  const isSiteManager = userRole === 'customer-site'
+  const isSiteManager = userRole === 'CustomerSiteManager'
   const currentStoreData = React.useMemo(() => 
     customerStoreData[selectedStore as keyof typeof customerStoreData],
     [selectedStore]

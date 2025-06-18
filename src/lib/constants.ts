@@ -1,16 +1,25 @@
 import { CalendarDays, Users, Building2, ClipboardList, BellRing, Settings as SettingsIcon } from "lucide-react"
 
 export const UK_COUNTIES = [
+  "Derbyshire",
+  "Gloucestershire",
   "Greater London",
-  "West Midlands",
   "Greater Manchester",
-  "West Yorkshire",
-  "Kent",
-  "Essex",
   "Hampshire",
+  "Hertfordshire",
+  "Kent",
   "Lancashire",
+  "Leicestershire",
+  "Northamptonshire",
+  "Nottinghamshire",
+  "Oxfordshire",
+  "Somerset",
+  "Staffordshire",
   "Surrey",
-  "Hertfordshire"
+  "Warwickshire",
+  "West Midlands",
+  "West Yorkshire",
+  "Wiltshire"
 ];
 
 export const INDUSTRIES = [
