@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import type { Customer } from "@/types/customer"
@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth"
 
 export default function CustomerSatisfactionReport() {
   const navigate = useNavigate()
+  const { customerId } = useParams<{ customerId: string }>()
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -19,8 +20,17 @@ export default function CustomerSatisfactionReport() {
   useEffect(() => {
     console.log('CustomerSatisfactionReport: useEffect called')
     try {
-      const dummyCustomer = DUMMY_CUSTOMERS[0]
-      console.log('CustomerSatisfactionReport: Dummy customer:', dummyCustomer)
+      // If no customerId in URL, use the first customer (backwards compatibility)
+      const targetCustomerId = customerId || "1"
+      const dummyCustomer = DUMMY_CUSTOMERS.find(c => c.id === targetCustomerId)
+      console.log('CustomerSatisfactionReport: Target customer ID:', targetCustomerId)
+      console.log('CustomerSatisfactionReport: Found customer:', dummyCustomer)
+      
+      if (!dummyCustomer) {
+        setError("Customer not found")
+        return
+      }
+      
       console.log('CustomerSatisfactionReport: Enabled pages:', dummyCustomer?.viewConfig?.enabledPages)
       
       if (!dummyCustomer?.viewConfig?.enabledPages.includes('customer-satisfaction')) {
@@ -37,7 +47,7 @@ export default function CustomerSatisfactionReport() {
       console.log('CustomerSatisfactionReport: Setting loading to false')
       setLoading(false)
     }
-  }, [])
+  }, [customerId])
 
   console.log('CustomerSatisfactionReport: Render state:', { loading, error, customer: !!customer })
 

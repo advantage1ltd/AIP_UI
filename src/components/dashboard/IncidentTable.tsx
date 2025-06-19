@@ -10,6 +10,7 @@ interface IncidentReport {
   officerName: string
   date: string
   amount: number
+  incidentType: string
 }
 
 interface DataTableProps {
@@ -48,7 +49,8 @@ export function IncidentTable({ data }: DataTableProps) {
           item.store.toLowerCase().includes(query) ||
           item.officerName.toLowerCase().includes(query) ||
           new Date(item.date).toLocaleDateString().toLowerCase().includes(query) ||
-          item.amount.toString().includes(query)
+          item.amount.toString().includes(query) ||
+          item.incidentType.toLowerCase().includes(query)
       )
     }
 
@@ -113,7 +115,7 @@ export function IncidentTable({ data }: DataTableProps) {
                 onClick={() => sortData('customerName')}
               >
                 <div className="flex items-center gap-1">
-                  Customer {getSortIcon('customerName')}
+                  Customer Name {getSortIcon('customerName')}
                 </div>
               </th>
               <th 
@@ -121,7 +123,7 @@ export function IncidentTable({ data }: DataTableProps) {
                 onClick={() => sortData('store')}
               >
                 <div className="flex items-center gap-1">
-                  Store {getSortIcon('store')}
+                  Store Name {getSortIcon('store')}
                 </div>
               </th>
               <th 
@@ -129,7 +131,7 @@ export function IncidentTable({ data }: DataTableProps) {
                 onClick={() => sortData('officerName')}
               >
                 <div className="flex items-center gap-1">
-                  Officer {getSortIcon('officerName')}
+                  Officer Name {getSortIcon('officerName')}
                 </div>
               </th>
               <th 
@@ -137,7 +139,7 @@ export function IncidentTable({ data }: DataTableProps) {
                 onClick={() => sortData('date')}
               >
                 <div className="flex items-center gap-1">
-                  Date {getSortIcon('date')}
+                  Incident Date {getSortIcon('date')}
                 </div>
               </th>
               <th 
@@ -145,7 +147,15 @@ export function IncidentTable({ data }: DataTableProps) {
                 onClick={() => sortData('amount')}
               >
                 <div className="flex items-center justify-end gap-1">
-                  Amount {getSortIcon('amount')}
+                  Total Amount {getSortIcon('amount')}
+                </div>
+              </th>
+              <th 
+                className="h-10 px-2 text-left align-middle font-semibold tracking-tight text-muted-foreground cursor-pointer hover:bg-muted/70 md:h-12 md:px-4"
+                onClick={() => sortData('incidentType')}
+              >
+                <div className="flex items-center gap-1">
+                  Incident Type {getSortIcon('incidentType')}
                 </div>
               </th>
             </tr>
@@ -153,7 +163,7 @@ export function IncidentTable({ data }: DataTableProps) {
           <tbody className="tracking-normal">
             {filteredAndSortedData.length === 0 && data.length > 0 && (
               <tr>
-                <td colSpan={5} className="h-12 text-center text-sm text-amber-600">
+                <td colSpan={6} className="h-12 text-center text-sm text-amber-600">
                   Data available but filtered out: {data.length} records found
                 </td>
               </tr>
@@ -174,11 +184,12 @@ export function IncidentTable({ data }: DataTableProps) {
                       maximumFractionDigits: 2
                     })}
                   </td>
+                  <td className="p-2 align-middle text-muted-foreground leading-relaxed md:p-4">{report.incidentType}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={5} className="h-24 text-center text-sm text-muted-foreground">
+                <td colSpan={6} className="h-24 text-center text-sm text-muted-foreground">
                   No results found. Data length: {data.length}
                 </td>
               </tr>

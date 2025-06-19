@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Button } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, format, subDays } from 'date-fns'
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, format, subDays, isWithinInterval } from 'date-fns'
 import { cn } from '@/lib/utils'
 
 // Define types for the data
@@ -16,7 +16,15 @@ interface IncidentData {
   quantityRecovered: number;
   uniformOfficer: number;
   storeDetective: number;
+  uniformQuantity?: number;
+  detectiveQuantity?: number;
   total: number;
+  regionName?: string;
+  officerRole?: string;
+  date?: string;
+  incidentType?: string;
+  incidentCode?: string;
+  severity?: string;
 }
 
 interface FilteredData {
@@ -33,80 +41,23 @@ interface IncidentTypeData {
   description: string;
 }
 
-// Extended mock data with 50 stores and mixed values
-const mockIncidentData: IncidentData[] = [
-  { location: "Store 1 - London Central", valueRecovered: 5840.06, quantityRecovered: 42, uniformOfficer: 3562.04, storeDetective: 2278.02, total: 5840.06 },
-  { location: "Store 2 - Manchester", valueRecovered: 4923.82, quantityRecovered: 38, uniformOfficer: 2868.94, storeDetective: 2054.88, total: 4923.82 },
-  { location: "Store 3 - Birmingham", valueRecovered: 4516.45, quantityRecovered: 35, uniformOfficer: 2502.89, storeDetective: 2013.56, total: 4516.45 },
-  { location: "Store 4 - Liverpool", valueRecovered: 4207.00, quantityRecovered: 33, uniformOfficer: 2458.08, storeDetective: 1748.92, total: 4207.00 },
-  { location: "Store 5 - Leeds", valueRecovered: 3958.85, quantityRecovered: 31, uniformOfficer: 2120.45, storeDetective: 1838.40, total: 3958.85 },
-  { location: "Store 6 - Glasgow", valueRecovered: 3876.32, quantityRecovered: 29, uniformOfficer: 2176.32, storeDetective: 1700.00, total: 3876.32 },
-  { location: "Store 7 - Edinburgh", valueRecovered: 3745.15, quantityRecovered: 28, uniformOfficer: 2145.15, storeDetective: 1600.00, total: 3745.15 },
-  { location: "Store 8 - Bristol", valueRecovered: 3589.99, quantityRecovered: 27, uniformOfficer: 1989.99, storeDetective: 1600.00, total: 3589.99 },
-  { location: "Store 9 - Cardiff", valueRecovered: 3456.45, quantityRecovered: 26, uniformOfficer: 1856.45, storeDetective: 1600.00, total: 3456.45 },
-  { location: "Store 10 - Newcastle", valueRecovered: 3323.78, quantityRecovered: 25, uniformOfficer: 1723.78, storeDetective: 1600.00, total: 3323.78 },
-  { location: "Store 11 - Sheffield", valueRecovered: 3189.92, quantityRecovered: 24, uniformOfficer: 1889.92, storeDetective: 1300.00, total: 3189.92 },
-  { location: "Store 12 - Nottingham", valueRecovered: 3045.63, quantityRecovered: 23, uniformOfficer: 1745.63, storeDetective: 1300.00, total: 3045.63 },
-  { location: "Store 13 - Leicester", valueRecovered: 2912.28, quantityRecovered: 22, uniformOfficer: 1612.28, storeDetective: 1300.00, total: 2912.28 },
-  { location: "Store 14 - Coventry", valueRecovered: 2789.15, quantityRecovered: 21, uniformOfficer: 1489.15, storeDetective: 1300.00, total: 2789.15 },
-  { location: "Store 15 - Brighton", valueRecovered: 2667.82, quantityRecovered: 20, uniformOfficer: 1367.82, storeDetective: 1300.00, total: 2667.82 },
-  { location: "Store 16 - Portsmouth", valueRecovered: 2534.46, quantityRecovered: 19, uniformOfficer: 1234.46, storeDetective: 1300.00, total: 2534.46 },
-  { location: "Store 17 - Plymouth", valueRecovered: 2412.93, quantityRecovered: 18, uniformOfficer: 1112.93, storeDetective: 1300.00, total: 2412.93 },
-  { location: "Store 18 - Southampton", valueRecovered: 2289.75, quantityRecovered: 17, uniformOfficer: 989.75, storeDetective: 1300.00, total: 2289.75 },
-  { location: "Store 19 - Oxford", valueRecovered: 2167.21, quantityRecovered: 16, uniformOfficer: 867.21, storeDetective: 1300.00, total: 2167.21 },
-  { location: "Store 20 - Cambridge", valueRecovered: 2045.88, quantityRecovered: 15, uniformOfficer: 745.88, storeDetective: 1300.00, total: 2045.88 },
-  { location: "Store 21 - Reading", valueRecovered: 1925.88, quantityRecovered: 14, uniformOfficer: 925.88, storeDetective: 1000.00, total: 1925.88 },
-  { location: "Store 22 - Swindon", valueRecovered: 1812.55, quantityRecovered: 13, uniformOfficer: 812.55, storeDetective: 1000.00, total: 1812.55 },
-  { location: "Store 23 - Bath", valueRecovered: 1699.22, quantityRecovered: 12, uniformOfficer: 699.22, storeDetective: 1000.00, total: 1699.22 },
-  { location: "Store 24 - Gloucester", valueRecovered: 1585.89, quantityRecovered: 11, uniformOfficer: 585.89, storeDetective: 1000.00, total: 1585.89 },
-  { location: "Store 25 - Cheltenham", valueRecovered: 1472.56, quantityRecovered: 10, uniformOfficer: 472.56, storeDetective: 1000.00, total: 1472.56 },
-  { location: "Store 26 - York", valueRecovered: 1359.23, quantityRecovered: 9, uniformOfficer: 659.23, storeDetective: 700.00, total: 1359.23 },
-  { location: "Store 27 - Durham", valueRecovered: 1245.90, quantityRecovered: 8, uniformOfficer: 545.90, storeDetective: 700.00, total: 1245.90 },
-  { location: "Store 28 - Chester", valueRecovered: 1132.57, quantityRecovered: 7, uniformOfficer: 432.57, storeDetective: 700.00, total: 1132.57 },
-  { location: "Store 29 - Exeter", valueRecovered: 1019.24, quantityRecovered: 6, uniformOfficer: 319.24, storeDetective: 700.00, total: 1019.24 },
-  { location: "Store 30 - Norwich", valueRecovered: 905.91, quantityRecovered: 5, uniformOfficer: 205.91, storeDetective: 700.00, total: 905.91 },
-  { location: "Store 31 - Ipswich", valueRecovered: 892.58, quantityRecovered: 7, uniformOfficer: 392.58, storeDetective: 500.00, total: 892.58 },
-  { location: "Store 32 - Lincoln", valueRecovered: 879.25, quantityRecovered: 6, uniformOfficer: 379.25, storeDetective: 500.00, total: 879.25 },
-  { location: "Store 33 - Hull", valueRecovered: 865.92, quantityRecovered: 5, uniformOfficer: 365.92, storeDetective: 500.00, total: 865.92 },
-  { location: "Store 34 - Preston", valueRecovered: 852.59, quantityRecovered: 4, uniformOfficer: 352.59, storeDetective: 500.00, total: 852.59 },
-  { location: "Store 35 - Blackpool", valueRecovered: 839.26, quantityRecovered: 5, uniformOfficer: 339.26, storeDetective: 500.00, total: 839.26 },
-  { location: "Store 36 - Lancaster", valueRecovered: 825.93, quantityRecovered: 4, uniformOfficer: 325.93, storeDetective: 500.00, total: 825.93 },
-  { location: "Store 37 - Carlisle", valueRecovered: 812.60, quantityRecovered: 5, uniformOfficer: 312.60, storeDetective: 500.00, total: 812.60 },
-  { location: "Store 38 - Worcester", valueRecovered: 799.27, quantityRecovered: 4, uniformOfficer: 299.27, storeDetective: 500.00, total: 799.27 },
-  { location: "Store 39 - Hereford", valueRecovered: 785.94, quantityRecovered: 3, uniformOfficer: 285.94, storeDetective: 500.00, total: 785.94 },
-  { location: "Store 40 - Shrewsbury", valueRecovered: 772.61, quantityRecovered: 4, uniformOfficer: 272.61, storeDetective: 500.00, total: 772.61 },
-  { location: "Store 41 - Telford", valueRecovered: 759.28, quantityRecovered: 3, uniformOfficer: 459.28, storeDetective: 300.00, total: 759.28 },
-  { location: "Store 42 - Stoke", valueRecovered: 745.95, quantityRecovered: 4, uniformOfficer: 445.95, storeDetective: 300.00, total: 745.95 },
-  { location: "Store 43 - Derby", valueRecovered: 732.62, quantityRecovered: 3, uniformOfficer: 432.62, storeDetective: 300.00, total: 732.62 },
-  { location: "Store 44 - Mansfield", valueRecovered: 719.29, quantityRecovered: 4, uniformOfficer: 419.29, storeDetective: 300.00, total: 719.29 },
-  { location: "Store 45 - Grimsby", valueRecovered: 705.96, quantityRecovered: 3, uniformOfficer: 405.96, storeDetective: 300.00, total: 705.96 },
-  { location: "Store 46 - Scunthorpe", valueRecovered: 692.63, quantityRecovered: 4, uniformOfficer: 392.63, storeDetective: 300.00, total: 692.63 },
-  { location: "Store 47 - Doncaster", valueRecovered: 679.30, quantityRecovered: 3, uniformOfficer: 379.30, storeDetective: 300.00, total: 679.30 },
-  { location: "Store 48 - Rotherham", valueRecovered: 665.97, quantityRecovered: 4, uniformOfficer: 365.97, storeDetective: 300.00, total: 665.97 },
-  { location: "Store 49 - Barnsley", valueRecovered: 652.64, quantityRecovered: 3, uniformOfficer: 352.64, storeDetective: 300.00, total: 652.64 },
-  { location: "Store 50 - Wakefield", valueRecovered: 639.31, quantityRecovered: 4, uniformOfficer: 339.31, storeDetective: 300.00, total: 639.31 }
-];
+// Add type for graph type
+type GraphType = 'value' | 'quantity' | 'type';
 
-const incidentTypeData: IncidentTypeData[] = [
-  { code: 'A', type: 'Arrest', count: 15, description: 'Arrests made' },
-  { code: 'B', type: 'Deter', count: 87, description: 'Deterrent actions' },
-  { code: 'C', type: 'Theft', count: 28, description: 'Theft incidents' },
-  { code: 'D', type: 'Criminal Damage', count: 12, description: 'Property damage incidents' },
-  { code: 'E', type: 'Credit Card Fraud', count: 8, description: 'Credit card fraud cases' },
-  { code: 'F', type: 'Suspicious Behaviour', count: 7, description: 'Suspicious behavior reports' },
-  { code: 'G', type: 'Underage Purchase', count: 2, description: 'Underage purchase attempts' },
-  { code: 'H', type: 'Anti-Social Behaviour', count: 3, description: 'Anti-social behavior incidents' },
-  { code: 'I', type: 'Other', count: 2, description: 'Other incidents' },
-  { code: 'J', type: 'Self Scan Till', count: 35, description: 'Self-scan till incidents' },
-  { code: 'K', type: 'Abusive Behaviour', count: 23, description: 'Abusive behavior incidents' },
-  { code: 'L', type: 'Threats And Intimidation', count: 20, description: 'Threats and intimidation cases' },
-  { code: 'M', type: 'Spitting', count: 5, description: 'Spitting incidents' },
-  { code: 'N', type: 'Ban From Store', count: 109, description: 'Store bans issued' },
-  { code: 'O', type: 'Violent Behaviour', count: 22, description: 'Violent behavior incidents' },
-  { code: 'P', type: 'Scan And Go', count: 8, description: 'Scan and go incidents' },
-  { code: 'Q', type: 'Police Involvement', count: 39, description: 'Cases requiring police involvement' },
-  { code: 'R', type: 'Police Failed to Attend', count: 3, description: 'Police non-attendance cases' }
-];
+import { 
+  getIncidentsByCustomer, 
+  getIncidentStatsByCustomer, 
+  getIncidentTrendData,
+  mockIncidents,
+  MOCK_INCIDENTS,
+  type IncidentRecord,
+  type MockIncident
+} from '@/data/mockIncidents';
+
+interface IncidentGraphProps {
+  customerId?: string;
+  customerName?: string;
+}
 
 // Update color palette for better 3D effect with more vibrant colors
 const colorPalette = [
@@ -122,44 +73,30 @@ const colorPalette = [
   '#14b8a6', // Teal
 ];
 
-// Update action code colors for better distinction and vibrancy
+// Comprehensive incident code colors for all application incident types
 const actionCodeColors: Record<string, string> = {
-  'A': '#ef4444', // Red for Arrests
-  'B': '#3b82f6', // Blue for Deterrent
-  'C': '#8b5cf6', // Purple for Theft
-  'D': '#f97316', // Orange for Criminal Damage
-  'E': '#10b981', // Green for Fraud
-  'F': '#f59e0b', // Amber for Suspicious
-  'G': '#14b8a6', // Teal for Underage
-  'H': '#6366f1', // Indigo for Anti-Social
-  'I': '#f43f5e', // Rose for Other
-  'J': '#7c3aed', // Violet for Self Scan
-  'K': '#dc2626', // Red for Abusive
-  'L': '#ec4899', // Pink for Threats
-  'M': '#06b6d4', // Cyan for Spitting
-  'N': '#7c3aed', // Violet for Bans
-  'O': '#b91c1c', // Dark Red for Violent
-  'P': '#0d9488', // Teal for Scan and Go
-  'Q': '#4f46e5', // Indigo for Police
-  'R': '#db2777'  // Pink for Failed Police
+  // Primary incident types
+  'TH01': '#ef4444', // Red for Theft
+  'SB02': '#8b5cf6', // Purple for Suspicious Behaviour
+  'ASB03': '#6366f1', // Indigo for Anti-Social Behaviour
+  'DT04': '#10b981', // Green for Deter
+  'AR05': '#dc2626', // Dark Red for Arrest
+  'SST06': '#06b6d4', // Cyan for Self Scan Tills
+  'UP07': '#f59e0b', // Amber for Underage Purchase
+  'CD08': '#f97316', // Orange for Criminal Damage
+  'CCF09': '#ec4899', // Pink for Credit Card Fraud
+  'VB10': '#b91c1c', // Dark Red for Violent Behaviour
+  'AB11': '#f43f5e', // Rose for Abusive Behaviour
+  'SG12': '#14b8a6', // Teal for Scan and Go
+  'TI13': '#7c3aed', // Violet for Threats and Intimidation
+  'BFS14': '#4f46e5', // Indigo for Ban from Store
+  'PI15': '#0d9488', // Teal for Police Involvement
+  'SP16': '#db2777', // Pink for Spitting
+  'PFA17': '#059669', // Emerald for Police Failed to Attend
+  'OT18': '#64748b', // Slate for Others
 };
 
-// Define regions and their stores
-const regionDefinitions = {
-  north: ['Manchester', 'Leeds', 'Newcastle', 'Sheffield', 'York', 'Durham', 'Hull', 'Preston', 'Blackpool', 'Lancaster', 'Carlisle', 'Grimsby', 'Scunthorpe', 'Doncaster', 'Rotherham', 'Barnsley', 'Wakefield'],
-  south: ['London', 'Brighton', 'Portsmouth', 'Plymouth', 'Southampton', 'Oxford', 'Reading', 'Swindon', 'Bath'],
-  east: ['Norwich', 'Ipswich', 'Cambridge', 'Lincoln', 'Leicester', 'Coventry', 'Derby', 'Mansfield'],
-  west: ['Liverpool', 'Bristol', 'Cardiff', 'Gloucester', 'Cheltenham', 'Chester', 'Worcester', 'Hereford', 'Shrewsbury', 'Telford', 'Stoke'],
-  midlands: ['Birmingham', 'Nottingham', 'Leicester', 'Coventry', 'Derby', 'Stoke', 'Wolverhampton']
-};
-
-// Add type for graph type
-type GraphType = 'value' | 'quantity' | 'type';
-
-interface IncidentGraphProps {
-  customerId?: string;
-  customerName?: string;
-}
+// Customer-specific regions are now loaded dynamically from incident data
 
 const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName }) => {
   console.log('Component rendering with customer:', customerId);
@@ -170,68 +107,306 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
   const [graphType, setGraphType] = useState<GraphType>('value')
   const [officerType, setOfficerType] = useState('all')
   const [timeFilter, setTimeFilter] = useState('ytd')
-  const [data, setData] = useState<IncidentData[]>(mockIncidentData)
+  const [data, setData] = useState<IncidentData[]>([])
   const [totalSaved, setTotalSaved] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const [storesPerPage, setStoresPerPage] = useState(20)
   const [filteredTotal, setFilteredTotal] = useState(0)
+  const [customerIncidents, setCustomerIncidents] = useState<IncidentRecord[]>([])
+  const [customerStats, setCustomerStats] = useState<any>(null)
+  const [incidentTypeData, setIncidentTypeData] = useState<IncidentTypeData[]>([])
+  const [customerRegions, setCustomerRegions] = useState<Array<{id: string, name: string}>>([])
 
-  // Add logging for initial mount
-  useEffect(() => {
-    console.log('Component mounted');
-    // Calculate total saved
-    const total = mockIncidentData.reduce((acc, curr) => acc + curr.valueRecovered, 0)
-    setTotalSaved(total)
+  // Smart pagination state
+  const [adaptiveStoresPerPage, setAdaptiveStoresPerPage] = useState(20);
+
+  // Helper function to get comprehensive incidents for customer
+  const getComprehensiveIncidentsForCustomer = useCallback((customerId: string): IncidentRecord[] => {
+    // Use MOCK_INCIDENTS which has proper region structure
+    return MOCK_INCIDENTS.filter(incident => incident.customerId === customerId);
+  }, []);
+
+  // Helper function to get customer-specific regions from MOCK_INCIDENTS data  
+  const getCustomerRegionsFromIncidents = useCallback((customerId: string): Array<{id: string, name: string}> => {
+    const customerIncidents = getIncidentsByCustomer(customerId);
     
-    // Set responsive storesPerPage based on screen size
-    const handleResize = () => {
-      if (window.innerWidth < 640) { // Mobile
-        setStoresPerPage(5);
-      } else if (window.innerWidth < 1024) { // Tablet/iPad
-        setStoresPerPage(10);
-      } else { // Desktop
-        setStoresPerPage(20);
+    // Extract unique regions for this customer
+    const uniqueRegions = customerIncidents.reduce((acc, incident) => {
+      const regionKey = incident.regionId;
+      if (!acc.some(r => r.id === regionKey)) {
+        acc.push({
+          id: regionKey,
+          name: incident.regionName
+        });
       }
-    };
+      return acc;
+    }, [] as Array<{id: string, name: string}>);
     
-    // Initial call
-    handleResize();
+    return uniqueRegions.sort((a, b) => a.name.localeCompare(b.name));
+  }, []);
+
+  // Helper function to convert IncidentRecord to IncidentData format
+  const convertIncidentRecordToChartData = useCallback((incidents: IncidentRecord[]): IncidentData[] => {
+    // Group incidents by site/location to aggregate data
+    const groupedBySite = incidents.reduce((acc, incident) => {
+      const key = incident.siteName;
+      if (!acc[key]) {
+        acc[key] = {
+          location: incident.siteName,
+          valueRecovered: 0,
+          quantityRecovered: 0,
+          uniformOfficer: 0,
+          storeDetective: 0,
+          uniformQuantity: 0,
+          detectiveQuantity: 0,
+          total: 0,
+          regionName: incident.regionName,
+          incidents: []
+        };
+      }
+      
+      acc[key].valueRecovered += incident.valueRecovered || 0;
+      acc[key].quantityRecovered += incident.quantityRecovered || 0;
+      
+      // Categorize officer types based on actual officer role
+      if (incident.officerRole === 'Security Officer' || incident.officerRole === 'Senior Security Officer') {
+        acc[key].uniformOfficer += incident.valueRecovered || 0;
+        acc[key].uniformQuantity += incident.quantityRecovered || 0;
+      } else if (incident.officerRole === 'Store Detective' || incident.officerRole === 'Senior Store Detective') {
+        acc[key].storeDetective += incident.valueRecovered || 0;
+        acc[key].detectiveQuantity += incident.quantityRecovered || 0;
+      } else {
+        // For other roles, use consistent distribution based on incident ID + site
+        const incidentNumber = parseInt(incident.id.replace(/\D/g, '')) || 0;
+        const siteHash = incident.siteName.length;
+        const combinedHash = (incidentNumber + siteHash) % 3;
+        const isUniformOfficer = combinedHash === 0 || combinedHash === 1;
+        
+        if (isUniformOfficer) {
+          acc[key].uniformOfficer += incident.valueRecovered || 0;
+          acc[key].uniformQuantity += incident.quantityRecovered || 0;
+        } else {
+          acc[key].storeDetective += incident.valueRecovered || 0;
+          acc[key].detectiveQuantity += incident.quantityRecovered || 0;
+        }
+      }
+      
+      acc[key].total = acc[key].valueRecovered;
+      acc[key].incidents.push(incident);
+      
+      return acc;
+    }, {} as Record<string, any>);
+
+    return Object.values(groupedBySite);
+  }, []);
+
+  // Legacy function for IncidentRecord format (keeping for compatibility)
+  const convertIncidentToChartData = useCallback((incidents: IncidentRecord[]): IncidentData[] => {
+    // Group incidents by site/location to aggregate data
+    const groupedBySite = incidents.reduce((acc, incident) => {
+      const key = incident.siteName;
+      if (!acc[key]) {
+        acc[key] = {
+          location: incident.siteName,
+          valueRecovered: 0,
+          quantityRecovered: 0,
+          uniformOfficer: 0,
+          storeDetective: 0,
+          uniformQuantity: 0,
+          detectiveQuantity: 0,
+          total: 0,
+          regionName: incident.regionName,
+          incidents: []
+        };
+      }
+      
+      acc[key].valueRecovered += incident.valueRecovered || 0;
+      acc[key].quantityRecovered += incident.quantityRecovered || 0;
+      
+      // Categorize officer types based on role
+      if (incident.officerRole === 'Security Officer' || incident.officerRole === 'Senior Security Officer') {
+        acc[key].uniformOfficer += incident.valueRecovered || 0;
+        // Add quantity breakdown for uniform officers
+        if (!acc[key].uniformQuantity) acc[key].uniformQuantity = 0;
+        acc[key].uniformQuantity += incident.quantityRecovered || 0;
+      } else if (incident.officerRole === 'Store Detective' || incident.officerRole === 'Senior Store Detective') {
+        acc[key].storeDetective += incident.valueRecovered || 0;
+        // Add quantity breakdown for store detectives
+        if (!acc[key].detectiveQuantity) acc[key].detectiveQuantity = 0;
+        acc[key].detectiveQuantity += incident.quantityRecovered || 0;
+      }
+      
+      acc[key].total = acc[key].valueRecovered;
+      acc[key].incidents.push(incident);
+      
+      return acc;
+    }, {} as Record<string, any>);
+
+    return Object.values(groupedBySite);
+  }, []);
+
+  // Helper function to generate incident type data from IncidentRecord
+  const generateIncidentRecordTypeData = useCallback((incidents: IncidentRecord[]): IncidentTypeData[] => {
+    const typeCount = incidents.reduce((acc, incident) => {
+      const type = incident.incidentType;
+      const code = incident.incidentCode;
+      
+      if (!acc[code]) {
+        acc[code] = {
+          code,
+          type,
+          count: 0,
+          description: `${type} incidents`
+        };
+      }
+      acc[code].count += 1;
+      return acc;
+    }, {} as Record<string, IncidentTypeData>);
+
+    return Object.values(typeCount).sort((a, b) => b.count - a.count);
+  }, []);
+
+  // Legacy function for IncidentRecord format (keeping for compatibility)
+  const generateIncidentTypeData = useCallback((incidents: IncidentRecord[]): IncidentTypeData[] => {
+    const typeCount = incidents.reduce((acc, incident) => {
+      const type = incident.incidentType;
+      const code = incident.incidentCode;
+      
+      if (!acc[code]) {
+        acc[code] = {
+          code,
+          type,
+          count: 0,
+          description: `${type} incidents`
+        };
+      }
+      acc[code].count += 1;
+      return acc;
+    }, {} as Record<string, IncidentTypeData>);
+
+    return Object.values(typeCount).sort((a, b) => b.count - a.count);
+  }, []);
+
+  // Load customer-specific incident data
+  useEffect(() => {
+    console.log('Component mounted, loading data for customer:', customerId);
+    console.log('Customer ID type:', typeof customerId);
     
-    // Add event listener for window resize
-    window.addEventListener('resize', handleResize);
-    
-    // Cleanup
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [])
+    if (customerId) {
+      // Get comprehensive customer-specific incidents from mockIncidents dataset
+      const comprehensiveIncidents = getComprehensiveIncidentsForCustomer(customerId);
+      
+      console.log('=== COMPREHENSIVE INCIDENT GRAPH DEBUG ===');
+      console.log('Customer ID passed:', customerId);
+      console.log('Comprehensive incidents loaded:', comprehensiveIncidents.length);
+      console.log('Sample comprehensive incident:', comprehensiveIncidents[0]);
+      console.log('All comprehensive incidents:', comprehensiveIncidents.map(i => ({ 
+        id: i.id, 
+        customerName: i.customerName,
+        siteName: i.siteName,
+        dateReported: i.dateReported,
+        valueRecovered: i.valueRecovered,
+        incidentType: i.incidentType
+      })));
+      
+      // Calculate comprehensive stats
+      const comprehensiveStats = {
+        totalIncidents: comprehensiveIncidents.length,
+        totalValueRecovered: comprehensiveIncidents.reduce((sum, inc) => sum + (inc.valueRecovered || 0), 0),
+        totalQuantityRecovered: comprehensiveIncidents.reduce((sum, inc) => sum + (inc.quantityRecovered || 0), 0),
+        uniqueStores: [...new Set(comprehensiveIncidents.map(inc => inc.siteName))].length
+      };
+      
+      // Debug the chart data conversion
+      const debugChartData = convertIncidentRecordToChartData(comprehensiveIncidents);
+      console.log('Chart data after conversion:', debugChartData.length, 'items');
+      console.log('Chart data sample:', debugChartData[0]);
+      
+      // Debug the incident type data
+      const debugTypeData = generateIncidentRecordTypeData(comprehensiveIncidents);
+      console.log('Incident type data:', debugTypeData);
+      console.log('=== END COMPREHENSIVE DEBUG ===');
+      
+      // Store the comprehensive data (IncidentRecord format is already compatible)
+      setCustomerIncidents(comprehensiveIncidents);
+      setCustomerStats(comprehensiveStats);
+      setTotalSaved(comprehensiveStats.totalValueRecovered);
+      
+      // Load customer-specific regions from MOCK_INCIDENTS data
+      const regions = getCustomerRegionsFromIncidents(customerId);
+      setCustomerRegions(regions);
+      console.log('Customer regions loaded:', regions);
+      
+      // Convert incidents to chart data format
+      const chartData = convertIncidentRecordToChartData(comprehensiveIncidents);
+      setData(chartData);
+      
+      // Generate incident type data
+      const typeData = generateIncidentRecordTypeData(comprehensiveIncidents);
+      setIncidentTypeData(typeData);
+      
+      // Set default date range to show all data initially if not already set
+      if (!startDate) {
+        // Don't filter by date initially - show all data
+        const oldestDate = new Date('2025-01-01');
+        const newestDate = new Date('2025-12-31');
+        setStartDate(oldestDate);
+        setEndDate(newestDate);
+        console.log('Set default date range:', oldestDate, 'to', newestDate);
+      }
+      
+      console.log('Chart data generated:', chartData.length, 'sites');
+      console.log('Incident types:', typeData.length);
+    } else {
+      // If no customer ID, show empty state or default message
+      setData([]);
+      setIncidentTypeData([]);
+      setTotalSaved(0);
+      console.log('No customer ID provided');
+    }
+
+  }, [customerId, getComprehensiveIncidentsForCustomer, convertIncidentRecordToChartData, generateIncidentRecordTypeData])
 
   const getTimeFilteredData = useCallback((inputData: IncidentData[]): IncidentData[] => {
-    console.log('getTimeFilteredData called with dates:', { startDate, endDate });
-    if (!startDate || !endDate) return inputData;
+    console.log('getTimeFilteredData called with:', { 
+      startDate, 
+      endDate, 
+      inputDataLength: inputData.length,
+      sampleInputData: inputData[0] 
+    });
     
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    if (!startDate || !endDate) {
+      console.log('No date range set, returning all data');
+      return inputData;
+    }
     
-    return inputData.map(item => {
-      const mockDate = new Date();
-      const dayOffset = Math.floor(Math.random() * 365);
-      mockDate.setDate(mockDate.getDate() - dayOffset);
+    // Filter based on actual incident dates from customer data
+    return inputData.filter(item => {
+      // Find incidents for this location and check their dates
+      const siteIncidents = customerIncidents.filter(inc => inc.siteName === item.location);
       
-      if (mockDate >= start && mockDate <= end) {
-        return item;
-      }
+      return siteIncidents.some(incident => {
+        const incidentDate = new Date(incident.dateReported);
+        return isWithinInterval(incidentDate, { start: startDate, end: endDate });
+      });
+    }).map(item => {
+      // Recalculate values for the filtered time period
+      const siteIncidents = customerIncidents.filter(inc => {
+        if (inc.siteName !== item.location) return false;
+        const incidentDate = new Date(inc.dateReported);
+        return isWithinInterval(incidentDate, { start: startDate, end: endDate });
+      });
+      
+      const filteredValueRecovered = siteIncidents.reduce((sum, inc) => sum + (inc.valueRecovered || 0), 0);
+      const filteredQuantityRecovered = siteIncidents.reduce((sum, inc) => sum + (inc.quantityRecovered || 0), 0);
       
       return {
         ...item,
-        valueRecovered: 0,
-        quantityRecovered: 0,
-        uniformOfficer: 0,
-        storeDetective: 0,
-        total: 0
+        valueRecovered: filteredValueRecovered,
+        quantityRecovered: filteredQuantityRecovered,
+        total: filteredValueRecovered
       };
     }).filter(item => item.total > 0);
-  }, [startDate, endDate]);
+  }, [startDate, endDate, customerIncidents]);
 
   // Memoize the filtered data calculation
   const filteredData = useMemo(() => {
@@ -241,10 +416,9 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
     let regionFilteredData = timeFilteredData;
     if (selectedRegion !== 'all') {
       regionFilteredData = timeFilteredData.filter(item => {
-        const locationName = item.location.toLowerCase();
-        return regionDefinitions[selectedRegion as keyof typeof regionDefinitions].some(
-          city => locationName.includes(city.toLowerCase())
-        );
+        // Find incidents for this location and check their region IDs
+        const siteIncidents = customerIncidents.filter(inc => inc.siteName === item.location);
+        return siteIncidents.some(incident => incident.regionId === selectedRegion);
       });
     }
 
@@ -254,16 +428,16 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
         location: item.location,
         value: officerType === 'uniform' ? item.uniformOfficer :
                officerType === 'detective' ? item.storeDetective :
-               item.valueRecovered,
+               (item.uniformOfficer + item.storeDetective), // Sum both for "all"
         quantity: item.quantityRecovered
       }));
     } else {
       result = regionFilteredData.map(item => ({
         location: item.location,
         value: item.valueRecovered,
-        quantity: officerType === 'uniform' ? Math.floor(item.quantityRecovered * 0.6) :
-                 officerType === 'detective' ? Math.floor(item.quantityRecovered * 0.4) :
-                 item.quantityRecovered
+        quantity: officerType === 'uniform' ? (item.uniformQuantity || 0) :
+                 officerType === 'detective' ? (item.detectiveQuantity || 0) :
+                 ((item.uniformQuantity || 0) + (item.detectiveQuantity || 0)) // Fix: sum both for "all"
       }));
     }
 
@@ -274,12 +448,83 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
     );
   }, [data, selectedRegion, officerType, getTimeFilteredData, graphType]);
 
+  // Enhanced pagination logic for cleaner charts
+  const getOptimalItemsPerPage = useCallback((dataLength: number) => {
+    const screenWidth = window.innerWidth;
+    
+    // For incident types, show all on larger screens, limit on mobile
+    if (graphType === 'type') {
+      if (screenWidth < 640) return Math.min(6, dataLength); // Mobile: max 6 types
+      if (screenWidth < 1024) return Math.min(10, dataLength); // Tablet: max 10 types
+      return dataLength; // Desktop: show all types
+    }
+    
+    // For location-based charts, be much less aggressive on larger screens
+    let optimalCount;
+    
+    if (screenWidth < 640) {
+      // Mobile: Keep conservative for readability
+      optimalCount = dataLength > 6 ? 3 : dataLength;
+    } else if (screenWidth < 768) {
+      // Small tablet
+      optimalCount = dataLength > 10 ? 5 : dataLength;
+    } else if (screenWidth < 1024) {
+      // Tablet: Show more data
+      optimalCount = dataLength > 16 ? 8 : dataLength;
+    } else if (screenWidth < 1280) {
+      // Small desktop: Show most data
+      optimalCount = dataLength > 24 ? 12 : dataLength;
+    } else if (screenWidth < 1920) {
+      // Desktop: Show almost all data (up to 18 bars)
+      optimalCount = dataLength > 36 ? 18 : dataLength;
+    } else {
+      // Large desktop: Show all data (up to 24+ bars)
+      optimalCount = dataLength > 48 ? 24 : dataLength;
+    }
+    
+    // For small datasets (like single customer = 16 sites), show all on desktop
+    if (dataLength <= 16 && screenWidth >= 1024) {
+      return dataLength;
+    }
+    
+    // For medium datasets (like 48 sites total), show most on large screens
+    if (dataLength <= 48 && screenWidth >= 1280) {
+      return dataLength;
+    }
+    
+    return Math.min(optimalCount, dataLength);
+  }, [graphType]);
+
+  // Update stores per page when screen size or data changes
+  useEffect(() => {
+    const updatePagination = () => {
+      const optimal = getOptimalItemsPerPage(filteredData.length);
+      setAdaptiveStoresPerPage(optimal);
+      
+      // Reset to first page if current page would be empty
+      const maxPage = Math.ceil(filteredData.length / optimal);
+      if (currentPage > maxPage && maxPage > 0) {
+        setCurrentPage(1);
+      }
+    };
+    
+    updatePagination();
+    
+    // Add resize listener for responsive updates
+    const handleResize = () => {
+      updatePagination();
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [filteredData.length, graphType, currentPage, getOptimalItemsPerPage]);
+
   // Memoize the paginated data
   const paginatedData = useMemo(() => {
-    const startIndex = (currentPage - 1) * storesPerPage;
-    const endIndex = startIndex + storesPerPage;
+    const startIndex = (currentPage - 1) * adaptiveStoresPerPage;
+    const endIndex = startIndex + adaptiveStoresPerPage;
     return filteredData.slice(startIndex, endIndex);
-  }, [filteredData, currentPage, storesPerPage]);
+  }, [filteredData, currentPage, adaptiveStoresPerPage]);
 
   // Consolidate time filter and date range updates
   const handleTimeFilterChange = useCallback((filter: string) => {
@@ -318,57 +563,131 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
 
   // Calculate total whenever filtered data changes
   useEffect(() => {
+    console.log('=== FILTERED TOTAL CALCULATION DEBUG ===');
+    console.log('useEffect triggered with graphType:', graphType);
+    console.log('filteredData length:', filteredData.length);
+    console.log('filteredData sample:', filteredData.slice(0, 2));
+    
     if (graphType === 'type') {
-      // For incident types, sum up all incident counts
-      const total = incidentTypeData.reduce((acc, item) => acc + item.count, 0);
+      // For incident types, filter and sum up incident counts based on current filters
+      let filteredIncidentTypes = [...incidentTypeData];
+      
+      // Apply time filtering to incident types if dates are set
+      if (startDate && endDate) {
+        const timeFilteredIncidents = customerIncidents.filter(incident => {
+          const incidentDate = new Date(incident.dateReported);
+          return isWithinInterval(incidentDate, { start: startDate, end: endDate });
+        });
+        
+        // Recalculate type counts for filtered incidents
+        const typeCount = timeFilteredIncidents.reduce((acc, incident) => {
+          const code = incident.incidentCode;
+          acc[code] = (acc[code] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        filteredIncidentTypes = incidentTypeData.map(item => ({
+          ...item,
+          count: typeCount[item.code] || 0
+        })).filter(item => item.count > 0);
+      }
+      
+      const total = filteredIncidentTypes.reduce((acc, item) => acc + item.count, 0);
+      console.log('Type total calculated:', total);
       setFilteredTotal(total);
     } else {
-      // For value/quantity, use the existing calculation
-      const total = filteredData.reduce((acc, item) => acc + item.value, 0);
+      // For value/quantity, use the appropriate calculation based on graph type
+      console.log('Calculating filteredTotal for graphType:', graphType);
+      console.log('FilteredData length:', filteredData.length);
+      console.log('FilteredData sample:', filteredData.slice(0, 3));
+      
+      const total = graphType === 'quantity' 
+        ? filteredData.reduce((acc, item) => {
+            console.log('Adding quantity:', item.quantity, 'from location:', item.location);
+            return acc + item.quantity;
+          }, 0)
+        : filteredData.reduce((acc, item) => {
+            console.log('Adding value:', item.value, 'from location:', item.location);
+            return acc + item.value;
+          }, 0);
+        
+      console.log('Calculated total:', total);
       setFilteredTotal(total);
     }
-  }, [filteredData, graphType, incidentTypeData]);
+    console.log('=== END FILTERED TOTAL CALCULATION ===');
+  }, [filteredData, graphType, incidentTypeData, customerIncidents, startDate, endDate]);
 
-  const totalPages = Math.ceil(data.length / storesPerPage);
+  const totalPages = Math.ceil(filteredData.length / adaptiveStoresPerPage);
 
   const renderGraph = () => {
     let chartData;
     let barName;
     
+    // Return empty state if no customer data is available
+    if (!customerId || customerIncidents.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-96 bg-slate-800/50 rounded-lg border border-slate-700/50">
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-slate-300 mb-2">No Data Available</h3>
+            <p className="text-slate-400">
+              {!customerId ? 'Please select a customer to view incident data.' : 'No incidents found for this customer.'}
+            </p>
+          </div>
+        </div>
+      );
+    }
+    
     if (graphType === 'type') {
-      // Filter incident data based on time period
-      let filteredIncidents = [...incidentTypeData];
+      // Filter incident data based on actual filters applied to real data
+      let filteredIncidents = customerIncidents;
       
-      // Apply mock time filtering (in real app, this would use actual dates)
-      if (timeFilter !== 'all') {
-        const filterFactor = timeFilter === 'week' ? 0.8 : 
-                           timeFilter === 'month' ? 0.5 : 0.8;
-        
-        filteredIncidents = incidentTypeData.map(item => ({
-          ...item,
-          count: Math.max(1, Math.floor(item.count * filterFactor)) // Ensure at least 1 incident is shown
-        }));
+      // Apply time filtering using actual incident dates
+      if (startDate && endDate) {
+        filteredIncidents = filteredIncidents.filter(incident => {
+          const incidentDate = new Date(incident.dateReported);
+          return isWithinInterval(incidentDate, { start: startDate, end: endDate });
+        });
       }
 
-      // Apply region filtering (mock implementation)
+      // Apply region filtering using actual region IDs
       if (selectedRegion !== 'all') {
-        const regionFactor = 0.5; // Increased from 0.3 to 0.5 to show more data
-        filteredIncidents = filteredIncidents.map(item => ({
-          ...item,
-          count: Math.max(1, Math.floor(item.count * regionFactor)) // Ensure at least 1 incident is shown
-        }));
+        filteredIncidents = filteredIncidents.filter(incident => {
+          return incident.regionId === selectedRegion;
+        });
       }
 
-      // Apply officer type filtering (mock implementation)
+      // Apply officer type filtering using actual officer role data
       if (officerType !== 'all') {
-        const officerFactor = officerType === 'uniform' ? 0.7 : 0.5; // Adjusted factors
-        filteredIncidents = filteredIncidents.map(item => ({
-          ...item,
-          count: Math.max(1, Math.floor(item.count * officerFactor)) // Ensure at least 1 incident is shown
-        }));
+        filteredIncidents = filteredIncidents.filter(incident => {
+          if (officerType === 'uniform') {
+            return incident.officerRole === 'Security Officer' || incident.officerRole === 'Senior Security Officer';
+          } else if (officerType === 'detective') {
+            return incident.officerRole === 'Store Detective' || incident.officerRole === 'Senior Store Detective';
+          }
+          return true;
+        });
       }
 
-      chartData = filteredIncidents.map(item => ({
+      // Generate type counts from filtered incidents
+      const typeCount = filteredIncidents.reduce((acc, incident) => {
+        const type = incident.incidentType;
+        const code = incident.incidentCode;
+        
+        if (!acc[code]) {
+          acc[code] = {
+            code,
+            type,
+            count: 0,
+            description: `${type} incidents`
+          };
+        }
+        acc[code].count += 1;
+        return acc;
+      }, {} as Record<string, IncidentTypeData>);
+
+      const filteredTypeData = Object.values(typeCount).sort((a, b) => b.count - a.count);
+
+      chartData = filteredTypeData.map(item => ({
         name: item.type.length > 12 ? item.type.substring(0, 10) + '...' : item.type, // Truncate long names for better display
         code: item.code,
         count: item.count,
@@ -386,9 +705,18 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
         quantity: item.quantity,
         fullLocation: item.location // Keep the full location for tooltips
       }));
-      barName = officerType === 'uniform' ? 'Uniform Officer' :
-                officerType === 'detective' ? 'Store Detective' :
-                'Total Value';
+      // Set appropriate bar name based on graph type and officer filter
+      if (graphType === 'value') {
+        barName = officerType === 'uniform' ? 'Uniform Officer Value' :
+                  officerType === 'detective' ? 'Store Detective Value' :
+                  'Total Value Recovered';
+      } else {
+        barName = officerType === 'uniform' ? 'Items by Uniform Officers' :
+                  officerType === 'detective' ? 'Items by Store Detectives' :
+                  'Total Items Recovered';
+      }
+      
+
     }
 
     // Improve responsive calculations for container width
@@ -406,7 +734,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
     
     // Calculate maxBarsInView based on chart type and screen size
     const maxBarsInView = graphType === 'type' ? 
-                         (window.innerWidth < 640 ? Math.min(8, incidentTypeData.length) : incidentTypeData.length) : 
+                         (window.innerWidth < 640 ? Math.min(8, chartData.length) : chartData.length) : 
                          paginatedData.length;
     
     // Adjust bar size calculations for mobile
@@ -442,7 +770,8 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
 
     const getBarFill = (entry: any, index: number) => {
       if (graphType === 'type' && entry.originalCode) {
-        return actionCodeColors[entry.originalCode];
+        const color = actionCodeColors[entry.originalCode];
+        return color || colorPalette[index % colorPalette.length]; // Fallback to palette if no color found
       }
       return colorPalette[index % colorPalette.length];
     };
@@ -457,6 +786,12 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
           return `£${Number(value).toFixed(0)}`;
         }
         return `£${Number(value).toFixed(0)}`;
+      } else if (graphType === 'quantity') {
+        // Format item quantities as plain numbers
+        return `${Math.round(value)} items`;
+      } else if (graphType === 'type') {
+        // Format incident counts as plain numbers  
+        return value.toString();
       }
       return value.toString();
     };
@@ -776,102 +1111,214 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
           </div>
         </div>
 
-        {/* Action Codes Legend - Enhanced with better styling */}
-        {graphType === 'type' && (
+        {/* Action Codes Legend - Compact Version */}
+        {graphType === 'type' && chartData.length > 0 && (
           <Card className="relative overflow-hidden bg-slate-800/80 border-slate-700/50">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10" />
-            <CardContent className="relative p-3 sm:p-6">
-              <h3 className="text-base sm:text-lg font-medium text-slate-100 mb-2 sm:mb-4 text-center">
-                Action Codes Reference
+            <CardContent className="relative p-2 sm:p-4">
+              <h3 className="text-sm sm:text-base font-medium text-slate-100 mb-2 text-center">
+                Incident Type Reference
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-9 gap-2 sm:gap-3 bg-slate-700/50 rounded-lg p-2 sm:p-4 border border-slate-600/50 overflow-x-auto">
-                {incidentTypeData.map((item) => (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1 sm:gap-2 bg-slate-700/50 rounded-lg p-2 border border-slate-600/50">
+                {/* Comprehensive incident types for the application */}
+                {[
+                  { code: 'TH01', type: 'Theft' },
+                  { code: 'SB02', type: 'Suspicious Behaviour' },
+                  { code: 'ASB03', type: 'Anti-Social Behaviour' },
+                  { code: 'DT04', type: 'Deter' },
+                  { code: 'AR05', type: 'Arrest' },
+                  { code: 'SST06', type: 'Self Scan Tills' },
+                  { code: 'UP07', type: 'Underage Purchase' },
+                  { code: 'CD08', type: 'Criminal Damage' },
+                  { code: 'CCF09', type: 'Credit Card Fraud' },
+                  { code: 'VB10', type: 'Violent Behaviour' },
+                  { code: 'AB11', type: 'Abusive Behaviour' },
+                  { code: 'SG12', type: 'Scan and Go' },
+                  { code: 'TI13', type: 'Threats and Intimidation' },
+                  { code: 'BFS14', type: 'Ban from Store' },
+                  { code: 'PI15', type: 'Police Involvement' },
+                  { code: 'SP16', type: 'Spitting' },
+                  { code: 'PFA17', type: 'Police Failed to Attend' },
+                  { code: 'OT18', type: 'Others' }
+                ].map((item) => (
                   <div 
                     key={item.code}
-                    className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2 rounded-md bg-slate-800/60 border border-slate-600/30 hover:bg-slate-700/60 transition-colors"
+                    className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2 rounded-md bg-slate-800/60 border border-slate-600/30 hover:bg-slate-700/60 transition-colors min-w-0"
+                    title={item.type} // Show full name on hover
                   >
                     <div 
                       className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm shadow-sm flex-shrink-0"
                       style={{ backgroundColor: actionCodeColors[item.code] }}
                     />
-                    <div className="min-w-0">
-                      <span className="text-[10px] sm:text-xs font-medium text-slate-100">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] sm:text-xs font-bold text-slate-100 block">
                         {item.code}
                       </span>
-                      <span className="text-[8px] sm:text-[10px] text-slate-300 block truncate max-w-[80px] sm:max-w-[100px]">
+                      {/* Mobile/Small screens: Show truncated version */}
+                      <span className="text-[8px] sm:text-[10px] text-slate-300 block truncate md:hidden">
+                        {item.type.length > 10 ? item.type.substring(0, 8) + '...' : item.type}
+                      </span>
+                      {/* Medium screens: Show slightly longer version */}
+                      <span className="text-[10px] text-slate-300 block truncate hidden md:block lg:hidden">
+                        {item.type.length > 14 ? item.type.substring(0, 12) + '...' : item.type}
+                      </span>
+                      {/* Large screens and up: Show full names */}
+                      <span className="text-[10px] text-slate-300 block hidden lg:block">
                         {item.type}
                       </span>
                     </div>
                   </div>
                 ))}
               </div>
+                             <div className="mt-2 text-center">
+                 <p className="text-[10px] sm:text-xs text-slate-400">
+                   All available incident types • Hover for full names • Colors match chart
+                 </p>
+               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Pagination - Make more responsive */}
-        {graphType !== 'type' && (
-          <div className="flex flex-col sm:flex-row justify-between items-center px-2 sm:px-4 text-slate-300 gap-2 sm:gap-0">
-            <div className="text-xs sm:text-sm text-center sm:text-left">
-              Showing stores {((currentPage - 1) * storesPerPage) + 1} to {Math.min(currentPage * storesPerPage, data.length)} of {data.length}
-              {window.innerWidth < 768 && <span className="ml-1">(10 per page on mobile)</span>}
-            </div>
-            <div className="flex gap-1 sm:gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="text-xs sm:text-sm border-slate-700 hover:bg-slate-800 text-slate-300 h-8 px-2 sm:px-3"
-              >
-                Previous
-              </Button>
-              <div className="flex items-center gap-1 sm:gap-2">
-                {Array.from({ length: Math.min(window.innerWidth < 640 ? 3 : 5, totalPages) }, (_, i) => {
-                  const pageNum = i + 1;
-                  return (
+        {/* Enhanced Smart Pagination - Always show when there's data */}
+        {filteredData.length > 0 && (
+          <Card className="bg-slate-800/50 border-slate-700/50">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row justify-between items-center text-slate-300 gap-3 sm:gap-0">
+                <div className="text-xs sm:text-sm text-center sm:text-left">
+                  <div className="font-medium">
+                    {graphType === 'type' ? (
+                      `Showing ${incidentTypeData.length} incident types`
+                    ) : (
+                      `Showing stores ${((currentPage - 1) * adaptiveStoresPerPage) + 1} to ${Math.min(currentPage * adaptiveStoresPerPage, filteredData.length)} of ${filteredData.length}`
+                    )}
+                  </div>
+                  <div className="text-slate-400 mt-1">
+                    {graphType === 'type' ? (
+                      'All incident types displayed'
+                    ) : (
+                      `${adaptiveStoresPerPage} stores per page (${totalPages} total pages) - optimized for screen size`
+                    )}
+                  </div>
+                  {/* Screen size info for user reference */}
+                  <div className="text-slate-500 text-xs mt-1">
+                    Optimized for {typeof window !== 'undefined' && window.innerWidth >= 1920 ? 'large desktop' :
+                      typeof window !== 'undefined' && window.innerWidth >= 1280 ? 'desktop' :
+                      typeof window !== 'undefined' && window.innerWidth >= 1024 ? 'laptop' :
+                      typeof window !== 'undefined' && window.innerWidth >= 768 ? 'tablet' : 'mobile'} display
+                  </div>
+                </div>
+                
+                {/* Show pagination controls for location-based charts with multiple pages */}
+                {graphType !== 'type' && totalPages > 1 && (
+                  <div className="flex gap-1 sm:gap-2">
                     <Button
-                      key={pageNum}
-                      variant={currentPage === pageNum ? "default" : "outline"}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={cn(
-                        "w-6 h-6 sm:w-8 sm:h-8 p-0 text-xs sm:text-sm",
-                        currentPage === pageNum 
-                          ? "bg-indigo-500 hover:bg-indigo-600 text-white" 
-                          : "border-slate-700 hover:bg-slate-800 text-slate-300"
-                      )}
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="text-xs sm:text-sm border-slate-700 hover:bg-slate-800 text-slate-300 h-8 px-2 sm:px-3"
                     >
-                      {pageNum}
+                      Previous
                     </Button>
-                  );
-                })}
-                {totalPages > (window.innerWidth < 640 ? 3 : 5) && (
-                  <>
-                    <span className="text-slate-500">...</span>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      {Array.from({ length: Math.min(window.innerWidth < 640 ? 3 : 5, totalPages) }, (_, i) => {
+                        const pageNum = i + 1;
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={cn(
+                              "w-6 h-6 sm:w-8 sm:h-8 p-0 text-xs sm:text-sm",
+                              currentPage === pageNum 
+                                ? "bg-indigo-500 hover:bg-indigo-600 text-white" 
+                                : "border-slate-700 hover:bg-slate-800 text-slate-300"
+                            )}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                      {totalPages > (window.innerWidth < 640 ? 3 : 5) && (
+                        <>
+                          <span className="text-slate-500">...</span>
+                          <Button
+                            variant={currentPage === totalPages ? "default" : "outline"}
+                            onClick={() => setCurrentPage(totalPages)}
+                            className={cn(
+                              "w-6 h-6 sm:w-8 sm:h-8 p-0 text-xs sm:text-sm",
+                              currentPage === totalPages 
+                                ? "bg-indigo-500 hover:bg-indigo-600 text-white" 
+                                : "border-slate-700 hover:bg-slate-800 text-slate-300"
+                            )}
+                          >
+                            {totalPages}
+                          </Button>
+                        </>
+                      )}
+                    </div>
                     <Button
-                      variant={currentPage === totalPages ? "default" : "outline"}
-                      onClick={() => setCurrentPage(totalPages)}
-                      className={cn(
-                        "w-6 h-6 sm:w-8 sm:h-8 p-0 text-xs sm:text-sm",
-                        currentPage === totalPages 
-                          ? "bg-indigo-500 hover:bg-indigo-600 text-white" 
-                          : "border-slate-700 hover:bg-slate-800 text-slate-300"
-                      )}
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="text-xs sm:text-sm border-slate-700 hover:bg-slate-800 text-slate-300 h-8 px-2 sm:px-3"
                     >
-                      {totalPages}
+                      Next
                     </Button>
-                  </>
+                  </div>
+                )}
+                
+                {/* Show simple navigation for single page or incident types */}
+                {(graphType === 'type' || totalPages <= 1) && (
+                  <div className="flex gap-1 sm:gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        // Force show more data by reducing adaptiveStoresPerPage
+                        if (graphType !== 'type') {
+                          setAdaptiveStoresPerPage(Math.max(2, Math.floor(adaptiveStoresPerPage / 2)));
+                        }
+                      }}
+                      className="text-xs sm:text-sm border-slate-700 hover:bg-slate-800 text-slate-300 h-8 px-2 sm:px-3"
+                      disabled={graphType === 'type' || adaptiveStoresPerPage <= 2}
+                    >
+                      Show Less Per Page
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        // Show all data on one page
+                        if (graphType !== 'type') {
+                          setAdaptiveStoresPerPage(filteredData.length);
+                        }
+                      }}
+                      className="text-xs sm:text-sm border-slate-700 hover:bg-slate-800 text-slate-300 h-8 px-2 sm:px-3"
+                    >
+                      {graphType === 'type' ? 'All Types Shown' : 'Show All Stores'}
+                    </Button>
+                    {/* Manual pagination controls for single page scenarios */}
+                    {graphType !== 'type' && filteredData.length > 3 && (
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={() => setAdaptiveStoresPerPage(3)}
+                          className="text-xs sm:text-sm border-slate-700 hover:bg-slate-800 text-slate-300 h-8 px-2 sm:px-3"
+                        >
+                          3 per page
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setAdaptiveStoresPerPage(5)}
+                          className="text-xs sm:text-sm border-slate-700 hover:bg-slate-800 text-slate-300 h-8 px-2 sm:px-3"
+                        >
+                          5 per page
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
-              <Button
-                variant="outline"
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="text-xs sm:text-sm border-slate-700 hover:bg-slate-800 text-slate-300 h-8 px-2 sm:px-3"
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     );
@@ -894,7 +1341,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
 
     const regionText = selectedRegion === 'all'
       ? 'All Regions'
-      : `${selectedRegion.charAt(0).toUpperCase() + selectedRegion.slice(1)} Region`;
+      : customerRegions.find(r => r.id === selectedRegion)?.name || 'Selected Region';
 
     if (graphType === 'type') {
       return `Total Incidents by ${officerTypeText} (${regionText}) - ${periodText}`;
@@ -922,7 +1369,9 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
                 {getTotalSavedTitle()}
               </h2>
               <p className="text-xl sm:text-2xl md:text-4xl font-bold bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent mt-1 sm:mt-2">
-                {graphType === 'type' ? `${filteredTotal} Incidents` : `£${filteredTotal.toFixed(2)}`}
+                {graphType === 'type' ? `${filteredTotal} Incidents` :
+                 graphType === 'quantity' ? `${Math.round(filteredTotal)} Items` :
+                 `£${filteredTotal.toFixed(2)}`}
               </p>
             </div>
           </div>
@@ -947,11 +1396,11 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
                       </SelectTrigger>
                       <SelectContent className="bg-slate-800 border-slate-700 text-xs sm:text-sm">
                         <SelectItem value="all">All Regions</SelectItem>
-                        <SelectItem value="north">North Region</SelectItem>
-                        <SelectItem value="south">South Region</SelectItem>
-                        <SelectItem value="east">East Region</SelectItem>
-                        <SelectItem value="west">West Region</SelectItem>
-                        <SelectItem value="midlands">Midlands Region</SelectItem>
+                        {customerRegions.map(region => (
+                          <SelectItem key={region.id} value={region.id}>
+                            {region.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1069,9 +1518,9 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId, customerName 
           <CardHeader className="py-2 px-3 sm:px-4">
             <CardTitle className="text-base sm:text-lg md:text-xl font-semibold text-slate-200">
               {graphType === 'type' ? (
-                `${selectedRegion === 'all' ? 'All Regions' : `${selectedRegion.charAt(0).toUpperCase() + selectedRegion.slice(1)} Region`} - Incident Types Distribution`
+                `${selectedRegion === 'all' ? 'All Regions' : customerRegions.find(r => r.id === selectedRegion)?.name || 'Selected Region'} - Incident Types Distribution`
               ) : (
-                `${selectedRegion === 'all' ? 'All Regions - ' : `${selectedRegion.charAt(0).toUpperCase() + selectedRegion.slice(1)} Region - `}
+                `${selectedRegion === 'all' ? 'All Regions - ' : `${customerRegions.find(r => r.id === selectedRegion)?.name || 'Selected Region'} - `}
                 ${officerType === 'all' ? 'Total Incidents by Location' :
                  officerType === 'uniform' ? 'Uniform Officer Incidents' :
                  'Store Detective Incidents'}`

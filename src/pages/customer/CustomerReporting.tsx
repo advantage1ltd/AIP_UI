@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CUSTOMER_PAGES } from "@/config/customerPages"
 import type { Customer } from "@/types/customer"
-import { DUMMY_CUSTOMERS } from "@/data/customers"
+import { customerService } from "@/services/customerService"
 import useAuth from "@/hooks/useAuth"
 
 export default function CustomerReporting() {
@@ -14,6 +14,10 @@ export default function CustomerReporting() {
   const [availablePages, setAvailablePages] = useState<string[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
+  // Refresh data when needed
+  const refreshData = () => setRefreshTrigger(prev => prev + 1)
 
   useEffect(() => {
     const loadCustomers = async () => {
@@ -22,12 +26,14 @@ export default function CustomerReporting() {
         const isAdmin = user?.role?.toLowerCase() === 'administrator' || 
                        user?.pageAccessRole?.toLowerCase() === 'administrator'
 
+        const allCustomers = customerService.getAllCustomers()
+        
         if (isAdmin) {
-          setCustomers(DUMMY_CUSTOMERS)
+          setCustomers(allCustomers)
         } else {
           // Get assigned customers from user data
           const assignedCustomerIds = (user as any)?.assignedCustomers?.map((c: any) => c.id) || []
-          const filteredCustomers = DUMMY_CUSTOMERS.filter(c => 
+          const filteredCustomers = allCustomers.filter(c => 
             assignedCustomerIds.includes(c.id)
           )
           setCustomers(filteredCustomers)
@@ -40,7 +46,7 @@ export default function CustomerReporting() {
     }
 
     loadCustomers()
-  }, [user])
+  }, [user, refreshTrigger])
 
   useEffect(() => {
     if (!selectedCustomer) {
@@ -49,8 +55,18 @@ export default function CustomerReporting() {
     }
 
     const customer = customers.find(c => c.id === selectedCustomer)
-    if (customer?.viewConfig) {
-      setAvailablePages(customer.viewConfig.enabledPages)
+    if (customer) {
+      // Get enabled pages from pageAssignments if available, fallback to viewConfig
+      if (customer.pageAssignments) {
+        const enabledPages = Object.entries(customer.pageAssignments)
+          .filter(([_, assignment]) => assignment.enabled)
+          .map(([pageId]) => pageId)
+        setAvailablePages(enabledPages)
+      } else if (customer.viewConfig) {
+        setAvailablePages(customer.viewConfig.enabledPages)
+      } else {
+        setAvailablePages([])
+      }
     }
   }, [selectedCustomer, customers])
 

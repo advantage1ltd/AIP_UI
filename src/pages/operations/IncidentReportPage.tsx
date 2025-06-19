@@ -78,11 +78,12 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
 
   // Fetch incidents using the API service
   const { data: incidentsResponse = { data: [], pagination: { currentPage: 1, totalPages: 1 } }, isLoading, error } = useQuery({
-    queryKey: ['incidents', currentPage, searchTerm],
+    queryKey: ['incidents', currentPage, searchTerm, customerId],
     queryFn: () => incidentsApi.getIncidents({
       page: currentPage,
       pageSize: itemsPerPage,
-      search: searchTerm
+      search: searchTerm,
+      ...(isCustomerView && customerId && { customerId })
     })
   })
 
@@ -385,21 +386,17 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50 hover:bg-gray-50">
-                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">Customer Name</TableHead>
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">Store Name</TableHead>
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden sm:table-cell">Officer Name</TableHead>
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden md:table-cell">
                       <div className="flex items-center gap-1 sm:gap-2 xl:gap-3">
                         <Calendar className="w-3 h-3 sm:w-4 sm:h-4 xl:w-5 xl:h-5 text-gray-500" />
-                        <span>Date</span>
+                        <span>Incident Date</span>
                       </div>
                     </TableHead>
-                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden sm:table-cell">
-                      <div className="flex items-center gap-1 sm:gap-2 xl:gap-3">
-                        <Building2 className="w-3 h-3 sm:w-4 sm:h-4 xl:w-5 xl:h-5 text-gray-500" />
-                        <span>Site Name</span>
-                      </div>
-                    </TableHead>
-                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden md:table-cell">Incident Type</TableHead>
-                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 hidden lg:table-cell">Description</TableHead>
-                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">Value</TableHead>
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">Total Amount</TableHead>
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden lg:table-cell">Incident Type</TableHead>
                     <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -410,15 +407,14 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                       className="hover:bg-gray-50 transition-colors text-xs sm:text-sm lg:text-base xl:text-lg"
                     >
                       <TableCell className="py-2 md:py-3 xl:py-4 font-medium whitespace-nowrap">
-                        {new Date(incident.dateInputted).toLocaleDateString()}
-                        <div className="sm:hidden text-xs xl:text-sm text-gray-500 mt-1">
-                          {incident.siteName}
-                        </div>
+                        {incident.customerName || 'N/A'}
                       </TableCell>
-                      <TableCell className="py-2 md:py-3 xl:py-4 hidden sm:table-cell whitespace-nowrap">{incident.siteName}</TableCell>
-                      <TableCell className="py-2 md:py-3 xl:py-4 hidden md:table-cell whitespace-nowrap">{incident.incidentType}</TableCell>
-                      <TableCell className="py-2 md:py-3 xl:py-4 max-w-[200px] lg:max-w-[300px] xl:max-w-[400px] 2xl:max-w-[500px] hidden lg:table-cell">
-                        <div className="truncate">{incident.description}</div>
+                      <TableCell className="py-2 md:py-3 xl:py-4 font-medium whitespace-nowrap">
+                        {incident.siteName}
+                      </TableCell>
+                      <TableCell className="py-2 md:py-3 xl:py-4 hidden sm:table-cell whitespace-nowrap">{incident.officerName || 'N/A'}</TableCell>
+                      <TableCell className="py-2 md:py-3 xl:py-4 hidden md:table-cell whitespace-nowrap">
+                        {incident.dateOfIncident ? new Date(incident.dateOfIncident).toLocaleDateString() : 'N/A'}
                       </TableCell>
                       <TableCell className="py-2 md:py-3 xl:py-4 whitespace-nowrap">
                         £{(() => {
@@ -436,6 +432,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                           return '0.00'
                         })()}
                       </TableCell>
+                      <TableCell className="py-2 md:py-3 xl:py-4 hidden lg:table-cell whitespace-nowrap">{incident.incidentType}</TableCell>
                       <TableCell className="py-2 md:py-3 xl:py-4">
                         <div className="flex items-center justify-end gap-1 sm:gap-2 xl:gap-3">
                           <Button
@@ -471,7 +468,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                   ))}
                   {incidentsResponse.data.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 xl:py-12">
+                      <TableCell colSpan={7} className="text-center py-8 xl:py-12">
                         <p className="text-gray-500 text-sm xl:text-base">No incidents found</p>
                         <Button
                           variant="link"

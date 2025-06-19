@@ -2,6 +2,7 @@ import { http, HttpResponse, delay } from 'msw'
 import { BASE_API_URL } from '@/config/api'
 import { mockRegions, mockSites } from '@/data/mockCustomers'
 import { CUSTOMER_PAGES } from '@/config/customerPages'
+import { DUMMY_CUSTOMERS } from '@/data/customers'
 import type { Customer, CustomerWithRelations, Region, Site } from '@/types/customer'
 
 // Helper function to validate request
@@ -25,112 +26,9 @@ const createErrorResponse = (status: number, message: string) => {
   )
 }
 
-// Mock customer data with proper page assignments
-const localMockCustomers = [
-  {
-    id: 'COOP001',
-    companyName: 'Central England COOP',
-    companyNumber: 'IP00141R',
-    vatNumber: 'GB123456789',
-    status: 'active' as const,
-    customerType: 'retail' as const,
-    regions: 3,
-    sites: 12,
-    lastActivity: '2024-03-21T14:30:00.000Z',
-    assignedOfficers: ['2'], // Officer with ID 2 is assigned
-    pageAssignments: {
-      'daily-activity': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'incident-report': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'customer-satisfaction': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'be-safe-be-secure': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'site-visit-reports': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'officer-support': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'incident-graph': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' }
-    }
-  },
-  {
-    id: 'COOP002',
-    companyName: 'Midcounties COOP',
-    companyNumber: 'IP00141S',
-    vatNumber: 'GB987654321',
-    status: 'active' as const,
-    customerType: 'retail' as const,
-    regions: 3,
-    sites: 8,
-    lastActivity: '2024-03-20T16:45:00.000Z',
-    assignedOfficers: ['2'], // Officer with ID 2 is assigned
-    pageAssignments: {
-      'daily-activity': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'incident-report': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'customer-satisfaction': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'be-safe-be-secure': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'site-visit-reports': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'officer-support': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'incident-graph': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' }
-    }
-  },
-  {
-    id: 'COOP003',
-    companyName: 'Heart of England COOP',
-    companyNumber: 'IP00141T',
-    vatNumber: 'GB456789123',
-    status: 'active' as const,
-    customerType: 'retail' as const,
-    regions: 3,
-    sites: 6,
-    lastActivity: '2024-03-22T09:15:00.000Z',
-    assignedOfficers: [], // No officers assigned
-    pageAssignments: {
-      'daily-activity': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'incident-report': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'customer-satisfaction': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'be-safe-be-secure': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'site-visit-reports': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'officer-support': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' },
-      'incident-graph': { enabled: true, customized: false, lastModified: '2024-03-21T18:30:00.000Z', modifiedBy: 'system' }
-    }
-  }
-]
-
-// In-memory data store
-let customers: any[] = [...localMockCustomers]
+// In-memory data store for regions and sites (using DUMMY_CUSTOMERS for customer data)
 let regions = [...mockRegions]
 let sites = [...mockSites]
-
-// Save to db.json
-const saveToDb = async () => {
-  const dbResponse = await fetch('/db.json')
-  const db = await dbResponse.json()
-  
-  db.customers = customers
-  db.regions = regions
-  db.sites = sites
-
-  await fetch('/db.json', {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(db),
-  })
-}
-
-// Load from db.json
-const loadFromDb = async () => {
-  try {
-    const dbResponse = await fetch('/db.json')
-    const db = await dbResponse.json()
-    
-    if (db.customers) customers = db.customers
-    if (db.regions) regions = db.regions
-    if (db.sites) sites = db.sites
-  } catch (error) {
-    console.error('Error loading from db.json:', error)
-  }
-}
-
-// Initialize data from db.json
-loadFromDb()
 
 // Mock data for Be Safe Be Secure Graph
 const beSafeBeSecureData = {
@@ -291,12 +189,12 @@ export const customerHandlers = [
     const userId = url.searchParams.get('userId')
     const assignedCustomerIds = url.searchParams.get('assignedCustomerIds')
 
-    let filteredCustomers = localMockCustomers
+    let filteredCustomers = DUMMY_CUSTOMERS
 
     // Role-based filtering
     if (role === 'AdvantageOneOfficer' && assignedCustomerIds) {
       const assignedIds = assignedCustomerIds.split(',')
-      filteredCustomers = localMockCustomers.filter(customer => 
+      filteredCustomers = DUMMY_CUSTOMERS.filter(customer => 
         assignedIds.includes(customer.id)
       )
     }
@@ -339,7 +237,7 @@ export const customerHandlers = [
 
   // Get customer details by ID
   http.get('/api/customers/:id', ({ params }) => {
-    const customer = localMockCustomers.find(c => c.id === params.id)
+    const customer = DUMMY_CUSTOMERS.find(c => c.id === params.id)
     
     if (!customer) {
       return HttpResponse.json({
@@ -383,7 +281,7 @@ export const customerHandlers = [
     const customerId = params.id as string
     const updates = await request.json() as { pageAssignments: Record<string, any> }
     
-    const customerIndex = localMockCustomers.findIndex(c => c.id === customerId)
+    const customerIndex = DUMMY_CUSTOMERS.findIndex(c => c.id === customerId)
     if (customerIndex === -1) {
       return HttpResponse.json({
         success: false,
@@ -392,14 +290,14 @@ export const customerHandlers = [
     }
 
     // Update the customer's page assignments
-    (localMockCustomers[customerIndex] as any).pageAssignments = {
-      ...(localMockCustomers[customerIndex] as any).pageAssignments,
+    (DUMMY_CUSTOMERS[customerIndex] as any).pageAssignments = {
+      ...(DUMMY_CUSTOMERS[customerIndex] as any).pageAssignments,
       ...updates.pageAssignments
     }
 
     return HttpResponse.json({
       success: true,
-      data: localMockCustomers[customerIndex]
+      data: DUMMY_CUSTOMERS[customerIndex]
     })
   }),
 
@@ -407,137 +305,19 @@ export const customerHandlers = [
   http.get('/api/customers', () => {
     return HttpResponse.json({
       success: true,
-      data: localMockCustomers.map(customer => ({
+      data: DUMMY_CUSTOMERS.map(customer => ({
         ...customer,
         statistics: {
           incidents: Math.floor(Math.random() * 50) + 10,
           reports: Math.floor(Math.random() * 200) + 50,
-          regions: customer.regions,
-          sites: customer.sites
+          regions: 3, // Default since DUMMY_CUSTOMERS doesn't have this field
+          sites: 6   // Default since DUMMY_CUSTOMERS doesn't have this field
         }
       }))
     })
   }),
 
-  // GET /api/customers - Get all customers
-  http.get(`${BASE_API_URL}/customers`, async ({ request }) => {
-    await delay(200)
-    
-    const url = new URL(request.url)
-    const userId = url.searchParams.get('userId')
-    
-    let filteredCustomers = customers
-    
-    if (userId) {
-      // In a real scenario, filter based on user assignments
-      // For now, return all customers
-      filteredCustomers = customers
-    }
-
-    // Add relations to customers
-    const customersWithRelations = filteredCustomers.map(customer => {
-      const customerSites = sites.filter(s => s.customerId === customer.id)
-      const customerRegions = regions.filter(r => r.customerId === customer.id)
-      
-      return {
-        ...customer,
-        regions: customerRegions,
-        sites: customerSites
-      }
-    })
-
-    return HttpResponse.json({
-      success: true,
-      data: customersWithRelations
-    })
-  }),
-
-  // GET /api/customers/:id - Get customer by ID with relations
-  http.get(`${BASE_API_URL}/customers/:id`, async ({ params }) => {
-    await delay(200)
-    
-    const customer = customers.find(c => c.id === params.id)
-    if (!customer) {
-      return createErrorResponse(404, 'Customer not found')
-    }
-
-    const customerRegions = regions.filter(r => r.customerId === customer.id)
-    const customerSites = sites.filter(s => s.customerId === customer.id)
-
-    const customerWithRelations: CustomerWithRelations = {
-      ...customer,
-      regions: customerRegions,
-      sites: customerSites
-    }
-
-    return HttpResponse.json({
-      success: true,
-      data: customerWithRelations
-    })
-  }),
-
-  // POST /api/customers - Create new customer
-  http.post(`${BASE_API_URL}/customers`, async ({ request }) => {
-    try {
-      const newCustomer = await validateRequest(request) as Customer
-      customers.push(newCustomer as any)
-      await saveToDb()
-      
-      return HttpResponse.json({
-        success: true,
-        data: newCustomer,
-        message: 'Customer created successfully'
-      }, { status: 201 })
-    } catch (error) {
-      return createErrorResponse(400, error instanceof Error ? error.message : 'Failed to create customer')
-    }
-  }),
-
-  // PUT /api/customers/:id - Update customer
-  http.put(`${BASE_API_URL}/customers/:id`, async ({ params, request }) => {
-    try {
-      const updatedCustomer = await validateRequest(request) as Customer
-      const index = customers.findIndex(c => c.id === params.id)
-      
-      if (index === -1) {
-        return createErrorResponse(404, 'Customer not found')
-      }
-
-      customers[index] = updatedCustomer as any
-      await saveToDb()
-
-      return HttpResponse.json({
-        success: true,
-        data: updatedCustomer,
-        message: 'Customer updated successfully'
-      })
-    } catch (error) {
-      return createErrorResponse(400, error instanceof Error ? error.message : 'Failed to update customer')
-    }
-  }),
-
-  // DELETE /api/customers/:id - Delete customer
-  http.delete(`${BASE_API_URL}/customers/:id`, async ({ params }) => {
-    const index = customers.findIndex(c => c.id === params.id)
-    if (index === -1) {
-      return createErrorResponse(404, 'Customer not found')
-    }
-
-    const deletedCustomer = customers[index]
-    customers.splice(index, 1)
-    
-    // Also delete related regions and sites
-    regions = regions.filter(r => r.customerId !== params.id)
-    sites = sites.filter(s => s.customerId !== params.id)
-    
-    await saveToDb()
-
-    return HttpResponse.json({
-      success: true,
-      data: deletedCustomer,
-      message: 'Customer and related data deleted successfully'
-    })
-  }),
+  // Note: Legacy CRUD endpoints removed - now using DUMMY_CUSTOMERS directly
 
   // GET /api/customers/:id/regions - Get customer regions
   http.get(`${BASE_API_URL}/customers/:id/regions`, async ({ params }) => {

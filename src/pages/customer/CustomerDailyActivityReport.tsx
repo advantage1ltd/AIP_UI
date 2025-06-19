@@ -62,10 +62,10 @@ export default function CustomerDailyActivityReport() {
         <Button
           variant="ghost"
           className="mb-4"
-          onClick={() => navigate('/management/customer-reporting')}
+          onClick={() => navigate(-1)}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Customer Reporting
+          Back
         </Button>
         <Card className="p-4">
           <p className="text-red-600">{error}</p>
@@ -79,10 +79,10 @@ export default function CustomerDailyActivityReport() {
       <div className="flex items-center justify-between">
         <Button
           variant="ghost"
-          onClick={() => navigate('/management/customer-reporting')}
+          onClick={() => navigate(-1)}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Customer Reporting
+          Back
         </Button>
         <h2 className="text-xl font-semibold">{customer?.companyName}</h2>
       </div>

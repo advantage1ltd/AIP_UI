@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import type { Customer } from "@/types/customer"
@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth"
 
 export default function CustomerIncidentReport() {
   const navigate = useNavigate()
+  const { customerId } = useParams<{ customerId: string }>()
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -16,7 +17,15 @@ export default function CustomerIncidentReport() {
 
   useEffect(() => {
     try {
-      const dummyCustomer = DUMMY_CUSTOMERS[0]
+      // If no customerId in URL, use the first customer (backwards compatibility)
+      const targetCustomerId = customerId || "1"
+      const dummyCustomer = DUMMY_CUSTOMERS.find(c => c.id === targetCustomerId)
+      
+      if (!dummyCustomer) {
+        setError("Customer not found")
+        return
+      }
+      
       if (!dummyCustomer?.viewConfig?.enabledPages.includes('incident-report')) {
         setError("You don't have access to this page")
         return
@@ -27,7 +36,7 @@ export default function CustomerIncidentReport() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [customerId])
 
   if (loading) {
     return (
@@ -40,7 +49,14 @@ export default function CustomerIncidentReport() {
   if (error) {
     return (
       <div className="container mx-auto p-4">
-       
+        <Button
+          variant="ghost"
+          className="mb-4"
+          onClick={() => navigate(-1)}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-600">{error}</p>
         </div>
@@ -53,10 +69,10 @@ export default function CustomerIncidentReport() {
       <div className="flex items-center justify-between p-4">
         <Button
           variant="ghost"
-          onClick={() => navigate('/customer/reporting')}
+          onClick={() => navigate(-1)}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Customer Reporting
+          Back
         </Button>
         <h2 className="text-xl font-semibold">{customer?.companyName}</h2>
       </div>

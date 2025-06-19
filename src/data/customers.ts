@@ -11,7 +11,8 @@ const baseCustomer = {
   updatedAt: now
 }
 
-export const DUMMY_CUSTOMERS: Customer[] = [
+// Making DUMMY_CUSTOMERS mutable so it can be updated by the customerService
+export let DUMMY_CUSTOMERS: Customer[] = [
   {
     ...baseCustomer,
     id: "1",
@@ -40,13 +41,31 @@ export const DUMMY_CUSTOMERS: Customer[] = [
       customerType: "retail",
       enabledPages: [
         "daily-activity",
-        "incident-graph",
         "incident-report",
-        "customer-satisfaction",
-        "be-safe-be-secure"
+        "customer-satisfaction"
       ],
       createdAt: now,
       updatedAt: now
+    },
+    pageAssignments: {
+      "daily-activity": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      "incident-report": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      "customer-satisfaction": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      }
     }
   },
   {
@@ -83,6 +102,38 @@ export const DUMMY_CUSTOMERS: Customer[] = [
       ],
       createdAt: now,
       updatedAt: now
+    },
+    pageAssignments: {
+      "daily-activity": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      "incident-graph": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      "incident-report": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      "customer-satisfaction": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      "be-safe-be-secure": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      }
     }
   },
   {
@@ -119,6 +170,38 @@ export const DUMMY_CUSTOMERS: Customer[] = [
       ],
       createdAt: now,
       updatedAt: now
+    },
+    pageAssignments: {
+      "daily-activity": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      "incident-graph": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      "incident-report": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      "customer-satisfaction": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      "be-safe-be-secure": {
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      }
     }
   }
 ]

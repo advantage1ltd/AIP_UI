@@ -13,6 +13,8 @@ import { holidayRequestHandlers } from './holidayRequestHandlers'
 import { customerSatisfactionHandlers } from './customerSatisfactionHandlers'
 import { bankHolidayHandlers } from './bankHolidayHandlers'
 import { customerHandlers } from './customerHandlers'
+import { regionsHandlers } from './regionsHandlers'
+import { sitesHandlers } from './sitesHandlers'
 import { mockUsers, mockCustomers, mockEmployees } from '@/data/mockData'
 import { User, Customer, Employee, AuthResponse, UserResponse, UsersResponse, UserRole, AdvantageOneUser, CustomerUser } from '@/types/user'
 
@@ -510,13 +512,31 @@ export const handlers = [
       const page = Number(url.searchParams.get('page')) || 1
       const pageSize = Number(url.searchParams.get('pageSize')) || 10
       const search = url.searchParams.get('search') || ''
+      const customerId = url.searchParams.get('customerId')
 
-      // Filter incidents based on search term
+      // Filter incidents based on search term and customer
       let filteredIncidents = incidents
+      
+      // Filter by customer if specified
+      if (customerId) {
+        filteredIncidents = filteredIncidents.filter(incident => {
+          // Map customer names to customer IDs
+          const customerIdMap: Record<string, string> = {
+            "Central England COOP": "1",
+            "Midcounties COOP": "2", 
+            "Heart of England COOP": "3"
+          }
+          return customerIdMap[incident.customerName] === customerId
+        })
+      }
+      
+      // Filter by search term
       if (search) {
-        filteredIncidents = incidents.filter(incident =>
+        filteredIncidents = filteredIncidents.filter(incident =>
           incident.siteName.toLowerCase().includes(search.toLowerCase()) ||
-          incident.description.toLowerCase().includes(search.toLowerCase())
+          incident.description.toLowerCase().includes(search.toLowerCase()) ||
+          incident.customerName.toLowerCase().includes(search.toLowerCase()) ||
+          (incident.officerName && incident.officerName.toLowerCase().includes(search.toLowerCase()))
         )
       }
 
@@ -669,6 +689,8 @@ export const handlers = [
   ...holidayRequestHandlers,
   ...customerSatisfactionHandlers,
   ...bankHolidayHandlers,
+  ...regionsHandlers,
+  ...sitesHandlers,
 
   // Page Access handler should be last
   http.get(`${BASE_API_URL}/page-access`, async () => {

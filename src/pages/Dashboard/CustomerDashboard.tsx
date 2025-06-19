@@ -73,6 +73,7 @@ interface RecentIncident {
   officerName: string
   date: string
   amount: number
+  incidentType: string
 }
 
 interface RegionData {
@@ -270,7 +271,8 @@ const customerStoreData: Record<string, CustomerStoreData> = {
         store: 'Electronics Section',
         officerName: 'John Smith',
         date: '2024-03-15',
-        amount: 1250.00
+        amount: 1250.00,
+        incidentType: 'Theft - Loss?'
       },
       {
         id: '2',
@@ -278,7 +280,8 @@ const customerStoreData: Record<string, CustomerStoreData> = {
         store: 'Main Entrance',
         officerName: 'Sarah Wilson',
         date: '2024-03-14',
-        amount: 850.00
+        amount: 850.00,
+        incidentType: 'Suspicious Behaviour?'
       }
     ]
   },
@@ -433,7 +436,8 @@ const customerStoreData: Record<string, CustomerStoreData> = {
         store: 'Clothing Department',
         officerName: 'Mike Johnson',
         date: '2024-03-15',
-        amount: 950.00
+        amount: 950.00,
+        incidentType: 'Theft - Loss?'
       },
       {
         id: '2',
@@ -441,7 +445,8 @@ const customerStoreData: Record<string, CustomerStoreData> = {
         store: 'Customer Service',
         officerName: 'Lisa Chen',
         date: '2024-03-14',
-        amount: 1200.00
+        amount: 1200.00,
+        incidentType: 'Credit Card Fraud?'
       }
     ]
   },
@@ -596,7 +601,8 @@ const customerStoreData: Record<string, CustomerStoreData> = {
         store: 'Parking Lot',
         officerName: 'David Lee',
         date: '2024-03-15',
-        amount: 2100.00
+        amount: 2100.00,
+        incidentType: 'Theft - Loss?'
       },
       {
         id: '2',
@@ -604,7 +610,8 @@ const customerStoreData: Record<string, CustomerStoreData> = {
         store: 'Food Court',
         officerName: 'Emma White',
         date: '2024-03-13',
-        amount: 750.00
+        amount: 750.00,
+        incidentType: 'Deter - Saved?'
       }
     ]
   }

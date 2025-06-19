@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CustomersTable } from "@/components/customer-setup/CustomersTable"
 import { RegionsTable } from "@/components/customer-setup/RegionsTable"
@@ -8,6 +8,17 @@ import { CustomerStats } from "@/components/customer-setup/CustomerStats"
 export default function CustomerSetup() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("customers")
+  const [statsUpdateTrigger, setStatsUpdateTrigger] = useState(0)
+
+  // Function to trigger stats update
+  const updateStats = useCallback(() => {
+    setStatsUpdateTrigger(prev => prev + 1)
+  }, [])
+
+  const handleCustomerSelect = useCallback((customerId: string | null) => {
+    setSelectedCustomerId(customerId)
+    updateStats() // Update stats when customer selection changes
+  }, [updateStats])
 
   return (
     <div className="space-y-4">
@@ -15,7 +26,10 @@ export default function CustomerSetup() {
         <h1 className="text-2xl font-semibold">Customer Setup</h1>
       </div>
 
-      <CustomerStats selectedCustomerId={selectedCustomerId} />
+      <CustomerStats 
+        selectedCustomerId={selectedCustomerId} 
+        updateTrigger={statsUpdateTrigger}
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full grid grid-cols-3">
@@ -31,7 +45,8 @@ export default function CustomerSetup() {
         <TabsContent value="customers">
           <CustomersTable
             selectedCustomerId={selectedCustomerId}
-            onCustomerSelect={setSelectedCustomerId}
+            onCustomerSelect={handleCustomerSelect}
+            onDataChange={updateStats}
           />
         </TabsContent>
 
