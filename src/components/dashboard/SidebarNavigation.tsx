@@ -163,12 +163,14 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
   ];
   
   const customerPaths = [
-    '/customer/dar',
+    '/customer/daily-activity-report',
     '/customer/incident-graph',
     '/customer/incident-report',
-            '/customer/satisfaction-report',
+    '/customer/satisfaction-report',
     '/customer/be-safe-be-secure',
-    '/customer/reporting'
+    '/customer/reporting',
+    '/customer/officer-support',
+    '/customer/views-config'
   ];
   
   const compliancePaths = [
@@ -636,9 +638,9 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-1 pt-1">
-                  {hasAccess('/customer/dar') && (
+                  {hasAccess('/customer/daily-activity-report') && (
                     <NavItem
-                      to="/customer/dar"
+                      to="/customer/daily-activity-report"
                       icon={<FileText className="h-4 w-4" />}
                       label="Daily Activity Report"
                       onClick={onNavigate}

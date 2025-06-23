@@ -41,13 +41,83 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const navigate = useNavigate();
   const location = useLocation();
 
+  const hasAccess = (path: string): boolean => {
+    try {
+      // If in test mode, check access based on test role
+      const roleToCheck = isTestMode && testRole ? testRole : currentRole;
+      
+      if (!roleToCheck) return false;
+      
+      // Always allow access to settings for administrators, even in test mode
+      if (roleToCheck === 'Administrator' || (currentRole === 'Administrator' && path === '/settings')) {
+        return true;
+      }
+      
+      // Get the allowed page IDs for the role
+      const allowedPageIds = pageAccessByRole[roleToCheck];
+      if (!allowedPageIds) {
+        console.warn(`No page access defined for role: ${roleToCheck}`);
+        return false;
+      }
+
+      // Fix for take-test path - ensure it's properly matched
+      const requestedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+      
+      // Look for matching page, handle special cases for dynamic routes
+      const page = availablePages.find(p => {
+        // Handle 'take-test' path aliases
+        if (p.id === 'take-test') {
+          return requestedPath === '/take-test' || requestedPath === '/recruitment/take-test';
+        }
+        
+        // Handle test-session dynamic routes
+        if (p.id === 'test-session' && requestedPath.startsWith('/recruitment/test-session/')) {
+          return true;
+        }
+        
+        // Handle dynamic customer routes
+        if (p.path.includes(':customerId') && requestedPath.match(/\/customer\/\d+/)) {
+          return true;
+        }
+        
+        return p.path === requestedPath;
+      });
+      
+      if (!page) {
+        console.warn(`No page found for path: ${requestedPath}`);
+        return false;
+      }
+      
+      const hasAccess = allowedPageIds.includes(page.id);
+      console.debug(`Access check for ${roleToCheck} to ${page.id}: ${hasAccess}`);
+      return hasAccess;
+    } catch (error) {
+      console.error('Error checking access:', error);
+      return false;
+    }
+  };
+
   // Initialize role from localStorage
   useEffect(() => {
     try {
       const storedRole = localStorage.getItem('userRole');
       if (storedRole) {
         console.log('🔄 Initializing currentRole from localStorage:', storedRole);
-        setCurrentRole(storedRole);
+        // Ensure role matches one of our valid roles
+        const validRoles = [
+          'Administrator',
+          'AdvantageOneOfficer',
+          'AdvantageOneHOOfficer',
+          'CustomerSiteManager',
+          'CustomerHOManager'
+        ];
+        
+        if (validRoles.includes(storedRole)) {
+          setCurrentRole(storedRole);
+        } else {
+          console.warn(`Invalid role found in localStorage: ${storedRole}`);
+          localStorage.removeItem('userRole');
+        }
       }
     } catch (error) {
       console.error('Error initializing role:', error);
@@ -79,73 +149,33 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [currentRole]);
 
-  const hasAccess = (path: string): boolean => {
-    try {
-      // If in test mode, check access based on test role
-      const roleToCheck = isTestMode && testRole ? testRole : currentRole;
-      
-      if (!roleToCheck) return false;
-      
-      // Always allow access to settings for administrators, even in test mode
-      if (roleToCheck === 'Administrator' || (currentRole === 'Administrator' && path === '/settings')) {
-        return true;
-      }
-      
-      // Fix for take-test path - ensure it's properly matched
-      const requestedPath = path.endsWith('/') ? path.slice(0, -1) : path;
-      
-      const allowedPageIds = pageAccessByRole[roleToCheck];
-      if (!allowedPageIds) return false;
-
-      // Look for matching page, handle special cases for dynamic routes
-      const page = availablePages.find(p => {
-        // Handle 'take-test' path aliases
-        if (p.id === 'take-test') {
-          return requestedPath === '/take-test' || requestedPath === '/recruitment/take-test';
-        }
-        
-        // Handle test-session dynamic routes
-        if (p.id === 'test-session' && requestedPath.startsWith('/recruitment/test-session/')) {
-          return true;
-        }
-        
-        return p.path === requestedPath;
-      });
-      
-      if (!page) return false;
-      
-      return allowedPageIds.includes(page.id);
-    } catch (error) {
-      console.error('Error checking access:', error);
-      return false;
-    }
-  };
-
   // Effect to redirect if user doesn't have access to current page
   useEffect(() => {
     try {
-      if (currentRole && !isLoading) {
-        const currentPath = window.location.pathname;
-        
-        // Skip redirect for login page and initial login redirection
-        if (currentPath === '/login' || currentPath === '/dashboard') {
-          return;
-        }
-        
-        // Skip redirect for administrators viewing settings page
-        if (currentRole === 'Administrator' && currentPath === '/settings') {
-          return;
-        }
-        
-        // Always allow access to the home page (index) and dashboard routes
-        if (currentPath === '/' || currentPath.includes('dashboard')) {
-          return;
-        }
-        
-        if (!hasAccess(currentPath)) {
-          // Redirect all users to the home page if they don't have access to the current page
-          navigate('/');
-        }
+      if (!currentRole || isLoading) return;
+
+      const currentPath = window.location.pathname;
+      
+      // Skip redirect for these paths
+      const skipPaths = [
+        '/login',
+        '/dashboard',
+        '/',
+        '/profile'
+      ];
+      
+      if (skipPaths.includes(currentPath)) {
+        return;
+      }
+      
+      // Skip redirect for administrators viewing settings page
+      if (currentRole === 'Administrator' && currentPath === '/settings') {
+        return;
+      }
+      
+      if (!hasAccess(currentPath)) {
+        console.warn(`User with role ${currentRole} does not have access to ${currentPath}, redirecting to dashboard`);
+        navigate('/dashboard');
       }
     } catch (error) {
       console.error('Error in redirect effect:', error);

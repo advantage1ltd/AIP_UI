@@ -103,7 +103,14 @@ const defaultPageAccess: Record<string, string[]> = {
     'vetting',
     'cbt',
     'take-test',
-    'test-session'
+    'test-session',
+    // CRM pages
+    'crm-dashboard',
+    'crm-contacts',
+    'crm-leads',
+    'crm-deals',
+    'crm-pipeline',
+    'crm-tasks'
   ],
   'Administrator': [
     'dashboard',
@@ -138,7 +145,14 @@ const defaultPageAccess: Record<string, string[]> = {
     'cbt',
     'take-test',
     'test-session',
-    'customer-views-config'
+    'customer-views-config',
+    // CRM pages
+    'crm-dashboard',
+    'crm-contacts',
+    'crm-leads',
+    'crm-deals',
+    'crm-pipeline',
+    'crm-tasks'
   ],
   'CustomerSiteManager': [
     'dashboard', 
@@ -157,14 +171,14 @@ const defaultPageAccess: Record<string, string[]> = {
     'dashboard',
     'profile',
     // Customer pages
+    'customer-reporting',
     'daily-activity-report',
     'incident-graph',
     'customer-incident-report',
     'satisfaction-reports',
     'be-safe-be-secure-graph',
     'customer-officer-support',
-    // Management pages
-    'customer-reporting'
+    'customer-views-config'
   ]
 }
 
@@ -190,6 +204,31 @@ const availablePages: PageAccess[] = [
   { id: 'bank-holiday', title: 'Bank Holiday', path: '/operations/bank-holiday' },
   { id: 'customer-satisfaction', title: 'Customer Satisfaction', path: '/operations/customer-satisfaction' },
   { id: 'patrol-log', title: 'Patrol Log', path: '/operations/patrol-log' },
+  { id: 'safe-duress-words', title: 'Safe & Duress Words', path: '/operations/safe-duress-words' },
+  { id: 'officer-support', title: 'Officer Support', path: '/operations/officer-support' },
+  { id: 'officer-expenses', title: 'Officer Expenses', path: '/operations/officer-expenses' },
+
+  // Management
+  { id: 'customer-reporting', title: 'Customer Reporting', path: '/management/customer-reporting' },
+  { id: 'manager-support', title: 'Manager Support', path: '/management/manager-support' },
+  { id: 'incidents-report', title: 'Incidents Report', path: '/management/incidents-report' },
+  { id: 'officer-performance', title: 'Officer Performance', path: '/management/officer-performance' },
+
+  // Customer
+  { id: 'customer-reporting', title: 'Customer Reporting', path: '/customer/reporting' },
+  { id: 'daily-activity-report', title: 'Daily Activity Report', path: '/customer/daily-activity-report' },
+  { id: 'incident-graph', title: 'Incident Graph', path: '/customer/incident-graph' },
+  { id: 'customer-incident-report', title: 'Incident Report', path: '/customer/incident-report' },
+  { id: 'satisfaction-reports', title: 'Satisfaction Reports', path: '/customer/satisfaction-report' },
+  { id: 'be-safe-be-secure-graph', title: 'Be Safe Be Secure Graph', path: '/customer/be-safe-be-secure' },
+  { id: 'customer-officer-support', title: 'Officer Support', path: '/customer/officer-support' },
+  { id: 'customer-views-config', title: 'Views Configuration', path: '/customer/views-config' },
+  { id: 'mystery-shopper', title: 'Mystery Shopper', path: '/operations/mystery-shopper' },
+  { id: 'site-visit', title: 'Site Visit', path: '/operations/site-visit' },
+  { id: 'holiday-requests', title: 'Holiday Requests', path: '/operations/holiday-requests' },
+  { id: 'bank-holiday', title: 'Bank Holiday', path: '/operations/bank-holiday' },
+  { id: 'customer-satisfaction', title: 'Customer Satisfaction', path: '/operations/customer-satisfaction' },
+  { id: 'patrol-log', title: 'Patrol Log', path: '/operations/patrol-log' },
   { id: 'safe-duress-words', title: 'Safe/Duress Words', path: '/operations/safe-duress-words' },
   { id: 'officer-support', title: 'Officer Support', path: '/operations/officer-support' },
   { id: 'officer-expenses', title: 'Officer Expenses', path: '/operations/officer-expenses' },
@@ -199,19 +238,22 @@ const availablePages: PageAccess[] = [
   { id: 'disciplinary', title: 'Disciplinary', path: '/employee/disciplinary' },
   { id: 'diary', title: 'Diary', path: '/employee/diary' },
   
-  // Management
-  { id: 'customer-reporting', title: 'Customer Reporting', path: '/management/customer-reporting' },
-  { id: 'manager-support', title: 'Manager Support', path: '/management/manager-support' },
-  { id: 'incidents-report', title: 'Incidents Report', path: '/management/incidents-report' },
-  { id: 'officer-performance', title: 'Officer Performance', path: '/management/officer-performance' },
+  // CRM
+  { id: 'crm-dashboard', title: 'CRM Dashboard', path: '/crm/dashboard' },
+  { id: 'crm-contacts', title: 'Contacts', path: '/crm/contacts' },
+  { id: 'crm-leads', title: 'Leads', path: '/crm/leads' },
+  { id: 'crm-deals', title: 'Deals', path: '/crm/deals' },
+  { id: 'crm-pipeline', title: 'Pipeline', path: '/crm/pipeline' },
+  { id: 'crm-tasks', title: 'Tasks', path: '/crm/tasks' },
   
   // Customer
-  { id: 'daily-activity-report', title: 'Daily Activity Report', path: '/customer/daily-activity-report' },
+  { id: 'customer-reporting', title: 'Customer Reporting', path: '/customer/reporting' },
+  { id: 'daily-activity-report', title: 'Daily Activity Report', path: '/customer/dar' },
   { id: 'incident-graph', title: 'Incident Graph', path: '/customer/incident-graph' },
-  { id: 'customer-incident-report', title: 'Incident Report', path: '/customer/incident-report' },
-  { id: 'satisfaction-reports', title: 'Satisfaction Reports', path: '/customer/satisfaction-report' },
-  { id: 'be-safe-be-secure-graph', title: 'Be Safe Be Secure Graph', path: '/customer/be-safe-be-secure' },
-  { id: 'customer-officer-support', title: 'Officer Support', path: '/customer/officer-support' },
+  { id: 'customer-incident-report', title: 'Customer Incident Report', path: '/customer/incident-report' },
+  { id: 'satisfaction-reports', title: 'Satisfaction Reports', path: '/customer/satisfaction-reports' },
+  { id: 'be-safe-be-secure-graph', title: 'Be Safe Be Secure Graph', path: '/customer/be-safe-be-secure-graph' },
+  { id: 'customer-officer-support', title: 'Customer Officer Support', path: '/customer/officer-support' },
   { id: 'customer-views-config', title: 'Customer Views Config', path: '/customer/views-config' },
   
   // Compliance

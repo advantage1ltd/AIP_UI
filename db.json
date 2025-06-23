@@ -376,29 +376,34 @@
   },
   "pageAccess": {
     "pageAccessByRole": {
-      "administrator": [
-        "incident-report",
-        "daily-activity",
-        "customer-satisfaction",
-        "be-safe-be-secure"
+      "Administrator": ["*"],
+      "AdvantageOneOfficer": [
+        "dashboard",
+        "incidents",
+        "holiday-requests",
+        "officer-expenses",
+        "profile"
       ],
-      "advantage-officer": [
-        "incident-report",
-        "daily-activity"
+      "AdvantageOneHOOfficer": [
+        "dashboard",
+        "incidents",
+        "holiday-requests",
+        "officer-expenses",
+        "profile",
+        "reports"
       ],
-      "advantage-ho": [
-        "incident-report",
-        "daily-activity",
-        "customer-satisfaction"
+      "CustomerSiteManager": [
+        "dashboard",
+        "incidents",
+        "reports",
+        "profile"
       ],
-      "customer-ho": [
-        "incident-report",
-        "daily-activity",
-        "customer-satisfaction"
-      ],
-      "customer-site": [
-        "incident-report",
-        "daily-activity"
+      "CustomerHOManager": [
+        "dashboard",
+        "incidents",
+        "reports",
+        "profile",
+        "analytics"
       ]
     }
   },
@@ -658,7 +663,7 @@
       "id": "REG001",
       "name": "East Midlands",
       "customerId": "COOP001",
-      "manager": "Peter Smith",
+      "code": "EM",
       "status": "active",
       "createdAt": "2024-03-21T18:30:00.000Z",
       "updatedAt": "2024-03-21T18:30:00.000Z"
@@ -667,7 +672,7 @@
       "id": "REG002",
       "name": "West Midlands",
       "customerId": "COOP001",
-      "manager": "Emma Davis",
+      "code": "WM",
       "status": "active",
       "createdAt": "2024-03-21T18:30:00.000Z",
       "updatedAt": "2024-03-21T18:30:00.000Z"
@@ -676,7 +681,7 @@
       "id": "REG003",
       "name": "Yorkshire",
       "customerId": "COOP001",
-      "manager": "Michael Johnson",
+      "code": "YK",
       "status": "active",
       "createdAt": "2024-03-21T18:30:00.000Z",
       "updatedAt": "2024-03-21T18:30:00.000Z"
@@ -739,17 +744,17 @@
   "sites": [
     {
       "id": "SITE001",
-      "locationName": "Leicester Superstore",
+      "locationName": "Leicester Central",
       "regionId": "REG001",
       "customerId": "COOP001",
-      "buildingName": "Central Retail Park",
-      "street": "Vaughan Way",
-      "town": "Leicester",
+      "buildingName": "Central House",
+      "street": "Herrick Way",
+      "town": "Enderby",
       "county": "Leicestershire",
-      "postcode": "LE1 4SL",
+      "postcode": "LE19 1LS",
       "isCoreSite": true,
       "sinNumber": "SIN001",
-      "telephone": "0116 255 1234",
+      "telephone": "0116 123 4567",
       "status": "active",
       "createdAt": "2024-03-21T18:30:00.000Z",
       "updatedAt": "2024-03-21T18:30:00.000Z"
@@ -759,14 +764,14 @@
       "locationName": "Birmingham Store",
       "regionId": "REG002",
       "customerId": "COOP001",
-      "buildingName": "The Forum",
-      "street": "Corporation Street",
+      "buildingName": "Retail Park",
+      "street": "High Street",
       "town": "Birmingham",
       "county": "West Midlands",
-      "postcode": "B4 6DH",
+      "postcode": "B1 1AA",
       "isCoreSite": true,
       "sinNumber": "SIN002",
-      "telephone": "0121 236 4567",
+      "telephone": "0121 123 4567",
       "status": "active",
       "createdAt": "2024-03-21T18:30:00.000Z",
       "updatedAt": "2024-03-21T18:30:00.000Z"
@@ -1007,5 +1012,591 @@
       "createdAt": "2024-03-20T00:00:00.000Z",
       "updatedAt": "2024-03-20T00:00:00.000Z"
     }
-  ]
+  ],
+  "pageAccessSettings": {
+    "pageAccessByRole": {
+      "administrator": [],
+      "advantage-officer": [],
+      "advantage-ho": [],
+      "customer-site": [],
+      "customer-ho": []
+    }
+  },
+  "dashboard": {
+    "officer": {
+      "name": "John Smith",
+      "badgeNumber": "ADV-001",
+      "role": "AdvantageOneOfficer",
+      "avatar": "/api/placeholder/40/40",
+      "shiftStatus": "On Duty",
+      "shiftStart": "08:00",
+      "shiftEnd": "20:00",
+      "location": "Central Manchester Store",
+      "stats": {
+        "incidentsThisMonth": 24,
+        "incidentsLastMonth": 18,
+        "totalValueSaved": 45600,
+        "expensesYTD": 1250.75,
+        "completionRate": 92,
+        "holidayBooked": 5,
+        "hoursWorked": 156,
+        "sitesVisited": 12
+      },
+      "monthlyTarget": {
+        "incidents": 30,
+        "valueSaved": 50000,
+        "current": {
+          "incidents": 24,
+          "valueSaved": 45600
+        }
+      },
+      "recentActivities": [
+        {
+          "id": "ACT-001",
+          "type": "incident",
+          "title": "Theft Prevention",
+          "location": "Electronics Section",
+          "time": "2 hours ago",
+          "value": 299.99,
+          "status": "resolved"
+        },
+        {
+          "id": "ACT-002",
+          "type": "report",
+          "title": "Incident Report Submitted",
+          "location": "Customer Service",
+          "time": "1 day ago",
+          "value": 150.00,
+          "status": "submitted"
+        }
+      ],
+      "upcomingTasks": [
+        {
+          "id": "TASK-001",
+          "type": "Site Visit",
+          "title": "Site Visit",
+          "dueDate": "Tomorrow",
+          "priority": "high"
+        },
+        {
+          "id": "TASK-002",
+          "type": "inspection",
+          "title": "Customer Satisfaction Survey",
+          "dueDate": "2 days",
+          "priority": "medium"
+        }
+      ]
+    },
+    "incidents": [
+      {
+        "id": "INC001",
+        "customerId": "COOP001",
+        "date": "2024-03-21",
+        "regionId": "REG001",
+        "regionName": "East Midlands",
+        "siteId": "SITE001",
+        "siteName": "Leicester Central",
+        "type": "Theft Prevention",
+        "value": 299.99,
+        "assignedTo": "John Smith",
+        "customerName": "Central England COOP",
+        "store": "Leicester Central",
+        "officerName": "John Smith",
+        "amount": 299.99,
+        "incidentType": "Theft Prevention"
+      },
+      {
+        "id": "INC002",
+        "customerId": "COOP001",
+        "date": "2024-03-20",
+        "regionId": "REG002",
+        "regionName": "West Midlands",
+        "siteId": "SITE002",
+        "siteName": "Birmingham Store",
+        "type": "Suspicious Activity",
+        "value": 0,
+        "assignedTo": "Jane Doe",
+        "customerName": "Central England COOP",
+        "store": "Birmingham Store",
+        "officerName": "Jane Doe",
+        "amount": 0,
+        "incidentType": "Suspicious Activity"
+      }
+    ]
+  },
+  "stores": [
+    {
+      "id": "store1",
+      "name": "Central England Store #123",
+      "customerId": "COOP001",
+      "metrics": {
+        "CustomerHOManager": [
+          { 
+            "title": "Overall Activity Score",
+            "value": "94%",
+            "change": "+8%",
+            "trend": "up",
+            "icon": "Activity",
+            "color": "green"
+          },
+          {
+            "title": "Total Incidents",
+            "value": "15",
+            "change": "-20%",
+            "trend": "down",
+            "icon": "AlertCircle",
+            "color": "amber"
+          },
+          {
+            "title": "Active Sites",
+            "value": "12",
+            "change": "+1",
+            "trend": "up",
+            "icon": "Building2",
+            "color": "blue"
+          },
+          {
+            "title": "Total Officers",
+            "value": "86",
+            "change": "+8",
+            "trend": "up",
+            "icon": "Users",
+            "color": "purple"
+          }
+        ],
+        "CustomerSiteManager": [
+          { 
+            "title": "Daily Activity Score",
+            "value": "94%",
+            "change": "+8%",
+            "trend": "up",
+            "icon": "Activity",
+            "color": "green"
+          },
+          {
+            "title": "Incidents Today",
+            "value": "2",
+            "change": "-33%",
+            "trend": "down",
+            "icon": "AlertCircle",
+            "color": "amber"
+          },
+          {
+            "title": "Customer Satisfaction",
+            "value": "4.9/5",
+            "change": "+0.1",
+            "trend": "up",
+            "icon": "Star",
+            "color": "blue"
+          },
+          {
+            "title": "Active Officers",
+            "value": "8",
+            "change": "+1",
+            "trend": "up",
+            "icon": "Users",
+            "color": "purple"
+          }
+        ]
+      }
+    }
+  ],
+  "satisfactionData": [
+    {
+      "id": "SAT001",
+      "customerId": "COOP001",
+      "month": "Apr 2023",
+      "score": 4.2
+    },
+    {
+      "id": "SAT002",
+      "customerId": "COOP001",
+      "month": "May 2023",
+      "score": 4.3
+    },
+    {
+      "id": "SAT003",
+      "customerId": "COOP001",
+      "month": "Jun 2023",
+      "score": 4.3
+    },
+    {
+      "id": "SAT004",
+      "customerId": "COOP001",
+      "month": "Jul 2023",
+      "score": 4.4
+    },
+    {
+      "id": "SAT005",
+      "customerId": "COOP001",
+      "month": "Aug 2023",
+      "score": 4.4
+    },
+    {
+      "id": "SAT006",
+      "customerId": "COOP001",
+      "month": "Sep 2023",
+      "score": 4.5
+    },
+    {
+      "id": "SAT007",
+      "customerId": "COOP001",
+      "month": "Oct 2023",
+      "score": 4.5
+    },
+    {
+      "id": "SAT008",
+      "customerId": "COOP001",
+      "month": "Nov 2023",
+      "score": 4.6
+    },
+    {
+      "id": "SAT009",
+      "customerId": "COOP001",
+      "month": "Dec 2023",
+      "score": 4.6
+    },
+    {
+      "id": "SAT010",
+      "customerId": "COOP001",
+      "month": "Jan 2024",
+      "score": 4.7
+    },
+    {
+      "id": "SAT011",
+      "customerId": "COOP001",
+      "month": "Feb 2024",
+      "score": 4.8
+    },
+    {
+      "id": "SAT012",
+      "customerId": "COOP001",
+      "month": "Mar 2024",
+      "score": 4.9
+    }
+  ],
+  "beSafeData": [
+    {
+      "id": "BSB001",
+      "customerId": "COOP001",
+      "month": "Apr 2023",
+      "insecureAreas": 82,
+      "compliance": 88,
+      "systems": 85
+    },
+    {
+      "id": "BSB002",
+      "customerId": "COOP001",
+      "month": "May 2023",
+      "insecureAreas": 83,
+      "compliance": 89,
+      "systems": 86
+    },
+    {
+      "id": "BSB003",
+      "customerId": "COOP001",
+      "month": "Jun 2023",
+      "insecureAreas": 84,
+      "compliance": 89,
+      "systems": 86
+    },
+    {
+      "id": "BSB004",
+      "customerId": "COOP001",
+      "month": "Jul 2023",
+      "insecureAreas": 85,
+      "compliance": 90,
+      "systems": 87
+    },
+    {
+      "id": "BSB005",
+      "customerId": "COOP001",
+      "month": "Aug 2023",
+      "insecureAreas": 85,
+      "compliance": 90,
+      "systems": 88
+    },
+    {
+      "id": "BSB006",
+      "customerId": "COOP001",
+      "month": "Sep 2023",
+      "insecureAreas": 86,
+      "compliance": 91,
+      "systems": 88
+    },
+    {
+      "id": "BSB007",
+      "customerId": "COOP001",
+      "month": "Oct 2023",
+      "insecureAreas": 87,
+      "compliance": 91,
+      "systems": 89
+    },
+    {
+      "id": "BSB008",
+      "customerId": "COOP001",
+      "month": "Nov 2023",
+      "insecureAreas": 88,
+      "compliance": 92,
+      "systems": 89
+    },
+    {
+      "id": "BSB009",
+      "customerId": "COOP001",
+      "month": "Dec 2023",
+      "insecureAreas": 88,
+      "compliance": 93,
+      "systems": 90
+    },
+    {
+      "id": "BSB010",
+      "customerId": "COOP001",
+      "month": "Jan 2024",
+      "insecureAreas": 89,
+      "compliance": 94,
+      "systems": 91
+    },
+    {
+      "id": "BSB011",
+      "customerId": "COOP001",
+      "month": "Feb 2024",
+      "insecureAreas": 90,
+      "compliance": 95,
+      "systems": 92
+    },
+    {
+      "id": "BSB012",
+      "customerId": "COOP001",
+      "month": "Mar 2024",
+      "insecureAreas": 91,
+      "compliance": 96,
+      "systems": 93
+    }
+  ],
+  "dailyActivities": [
+    {
+      "id": "ACT001",
+      "customerId": "COOP001",
+      "type": "Site Inspection",
+      "location": "Leicester Central",
+      "time": "09:00 AM",
+      "officer": "John Smith",
+      "status": "completed"
+    },
+    {
+      "id": "ACT002",
+      "customerId": "COOP001",
+      "type": "Security Check",
+      "location": "Birmingham Store",
+      "time": "10:30 AM",
+      "officer": "Jane Doe",
+      "status": "in_progress"
+    }
+  ],
+  "incidentData": {
+    "daily": [
+      {
+        "date": "2024-03-15",
+        "regionId": "REG001",
+        "siteId": "SITE001",
+        "uniformOfficers": 6,
+        "storeDetectives": 4
+      },
+      {
+        "date": "2024-03-16",
+        "regionId": "REG001",
+        "siteId": "SITE001",
+        "uniformOfficers": 5,
+        "storeDetectives": 3
+      },
+      {
+        "date": "2024-03-17",
+        "regionId": "REG002",
+        "siteId": "SITE002",
+        "uniformOfficers": 4,
+        "storeDetectives": 4
+      },
+      {
+        "date": "2024-03-18",
+        "regionId": "REG002",
+        "siteId": "SITE002",
+        "uniformOfficers": 7,
+        "storeDetectives": 5
+      },
+      {
+        "date": "2024-03-19",
+        "regionId": "REG003",
+        "siteId": "SITE003",
+        "uniformOfficers": 5,
+        "storeDetectives": 3
+      },
+      {
+        "date": "2024-03-20",
+        "regionId": "REG003",
+        "siteId": "SITE003",
+        "uniformOfficers": 6,
+        "storeDetectives": 4
+      },
+      {
+        "date": "2024-03-21",
+        "regionId": "REG001",
+        "siteId": "SITE001",
+        "uniformOfficers": 5,
+        "storeDetectives": 3
+      }
+    ],
+    "weekly": [
+      {
+        "week": "Week 1",
+        "regionId": "REG001",
+        "siteId": "SITE001",
+        "uniformOfficers": 32,
+        "storeDetectives": 24
+      },
+      {
+        "week": "Week 2",
+        "regionId": "REG002",
+        "siteId": "SITE002",
+        "uniformOfficers": 35,
+        "storeDetectives": 26
+      },
+      {
+        "week": "Week 3",
+        "regionId": "REG003",
+        "siteId": "SITE003",
+        "uniformOfficers": 30,
+        "storeDetectives": 22
+      },
+      {
+        "week": "Week 4",
+        "regionId": "REG001",
+        "siteId": "SITE001",
+        "uniformOfficers": 33,
+        "storeDetectives": 25
+      }
+    ],
+    "monthly": [
+      {
+        "month": "Apr 2023",
+        "regionId": "REG001",
+        "siteId": "SITE001",
+        "uniformOfficers": 125,
+        "storeDetectives": 95
+      },
+      {
+        "month": "May 2023",
+        "regionId": "REG002",
+        "siteId": "SITE002",
+        "uniformOfficers": 118,
+        "storeDetectives": 88
+      },
+      {
+        "month": "Jun 2023",
+        "regionId": "REG003",
+        "siteId": "SITE003",
+        "uniformOfficers": 110,
+        "storeDetectives": 82
+      },
+      {
+        "month": "Jul 2023",
+        "regionId": "REG001",
+        "siteId": "SITE001",
+        "uniformOfficers": 105,
+        "storeDetectives": 78
+      },
+      {
+        "month": "Aug 2023",
+        "regionId": "REG002",
+        "siteId": "SITE002",
+        "uniformOfficers": 98,
+        "storeDetectives": 72
+      },
+      {
+        "month": "Sep 2023",
+        "regionId": "REG003",
+        "siteId": "SITE003",
+        "uniformOfficers": 92,
+        "storeDetectives": 68
+      },
+      {
+        "month": "Oct 2023",
+        "regionId": "REG001",
+        "siteId": "SITE001",
+        "uniformOfficers": 88,
+        "storeDetectives": 65
+      },
+      {
+        "month": "Nov 2023",
+        "regionId": "REG002",
+        "siteId": "SITE002",
+        "uniformOfficers": 85,
+        "storeDetectives": 63
+      },
+      {
+        "month": "Dec 2023",
+        "regionId": "REG003",
+        "siteId": "SITE003",
+        "uniformOfficers": 95,
+        "storeDetectives": 70
+      },
+      {
+        "month": "Jan 2024",
+        "regionId": "REG001",
+        "siteId": "SITE001",
+        "uniformOfficers": 90,
+        "storeDetectives": 67
+      },
+      {
+        "month": "Feb 2024",
+        "regionId": "REG002",
+        "siteId": "SITE002",
+        "uniformOfficers": 88,
+        "storeDetectives": 65
+      },
+      {
+        "month": "Mar 2024",
+        "regionId": "REG003",
+        "siteId": "SITE003",
+        "uniformOfficers": 85,
+        "storeDetectives": 62
+      }
+    ],
+    "yearly": [
+      {
+        "year": "2020",
+        "regionId": "REG001",
+        "siteId": "SITE001",
+        "uniformOfficers": 1450,
+        "storeDetectives": 1080
+      },
+      {
+        "year": "2021",
+        "regionId": "REG002",
+        "siteId": "SITE002",
+        "uniformOfficers": 1380,
+        "storeDetectives": 1020
+      },
+      {
+        "year": "2022",
+        "regionId": "REG003",
+        "siteId": "SITE003",
+        "uniformOfficers": 1250,
+        "storeDetectives": 920
+      },
+      {
+        "year": "2023",
+        "regionId": "REG001",
+        "siteId": "SITE001",
+        "uniformOfficers": 1150,
+        "storeDetectives": 850
+      },
+      {
+        "year": "2024",
+        "regionId": "REG002",
+        "siteId": "SITE002",
+        "uniformOfficers": 280,
+        "storeDetectives": 190
+      }
+    ]
+  }
 }

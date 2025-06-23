@@ -77,7 +77,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
   const itemsPerPage = 10
 
   // Fetch incidents using the API service
-  const { data: incidentsResponse = { data: [], pagination: { currentPage: 1, totalPages: 1 } }, isLoading, error } = useQuery({
+  const { data: incidentsResponse = { data: [], pagination: { currentPage: 1, totalPages: 1, pageSize: 10, totalCount: 0, hasPrevious: false, hasNext: false } }, isLoading, error } = useQuery({
     queryKey: ['incidents', currentPage, searchTerm, customerId],
     queryFn: () => incidentsApi.getIncidents({
       page: currentPage,
@@ -138,16 +138,32 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
     }
   })
 
+  // Fetch all incidents for stats calculation (separate query to get complete data)
+  const { data: allIncidentsResponse } = useQuery({
+    queryKey: ['incidents-stats', searchTerm, customerId],
+    queryFn: () => incidentsApi.getIncidents({
+      page: 1,
+      pageSize: 1000, // Large page size to get all incidents for stats
+      search: searchTerm,
+      ...(isCustomerView && customerId && { customerId })
+    })
+  })
+
   // Calculate statistics using useMemo with null checks
-  const stats = useMemo(() => ({
-    totalAmountSaved: Array.prototype.reduce.call(
-      incidentsResponse.data,
-      (acc: number, incident: Incident) => acc + (incident.totalValueRecovered || 0),
-      0
-    ),
-    uniqueStores: new Set(incidentsResponse.data.map(incident => incident?.siteName).filter(Boolean)).size,
-    totalIncidents: incidentsResponse.data.length
-  }), [incidentsResponse.data])
+  const stats = useMemo(() => {
+    // Use all incidents for stats calculation, fall back to current page if not available
+    const statsData = allIncidentsResponse?.data || incidentsResponse.data
+    
+    return {
+      totalAmountSaved: Array.prototype.reduce.call(
+        statsData,
+        (acc: number, incident: Incident) => acc + (incident.totalValueRecovered || 0),
+        0
+      ),
+      uniqueStores: new Set(statsData.map(incident => incident?.siteName).filter(Boolean)).size,
+      totalIncidents: allIncidentsResponse?.pagination?.totalCount || incidentsResponse.pagination?.totalCount || statsData.length
+    }
+  }, [allIncidentsResponse?.data, allIncidentsResponse?.pagination?.totalCount, incidentsResponse.data, incidentsResponse.pagination?.totalCount])
 
   const handleSubmit = useCallback((incident: Incident) => {
     mutation.mutate(incident)

@@ -1,9 +1,15 @@
+import { UserRole } from './user';
+
+export type { UserRole };
+
+export type CustomerRole = 'Administrator' | 'CustomerSiteManager' | 'CustomerHOManager';
+
 export interface Metric {
   title: string;
   value: string;
   change: string;
   trend: 'up' | 'down';
-  icon: React.ComponentType<{ className?: string }>;
+  icon: 'Activity' | 'AlertCircle' | 'Star' | 'Users' | 'Building2';
   color: 'green' | 'amber' | 'blue' | 'purple';
 }
 
@@ -16,23 +22,42 @@ export interface IncidentDataPoint {
   storeDetectives: number;
 }
 
-export interface BeSafeDataPoint {
-  month: string;
-  insecureAreas: number | null;
-  compliance: number | null;
-  systems: number | null;
-}
-
-export interface DailyActivity {
+export interface RecentIncident {
   id: string;
+  customerId: string;
+  date: string;
+  regionId: string;
+  regionName: string;
+  siteId: string;
+  siteName: string;
   type: string;
-  location: string;
-  officer: string;
-  time: string;
-  status: 'completed' | 'in-progress';
+  value: number;
+  assignedTo: string;
+  customerName: string;
+  store: string;
+  officerName: string;
+  amount: number;
+  incidentType: string;
 }
 
-export interface Store {
+export interface CustomerStoreData {
+  id: string;
+  name: string;
+  customerId: string;
+  metrics: {
+    CustomerHOManager: Metric[];
+    CustomerSiteManager: Metric[];
+  };
+  recentIncidents: RecentIncident[];
+  incidentData: {
+    daily: any[];
+    weekly: any[];
+    monthly: any[];
+    yearly: any[];
+  };
+}
+
+export interface StoreData {
   id: string;
   name: string;
 }
@@ -40,6 +65,37 @@ export interface Store {
 export interface Region {
   id: string;
   name: string;
+  customerId: string;
+  code: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DailyActivity {
+  id: string;
+  customerId: string;
+  type: string;
+  location: string;
+  time: string;
+  officer: string;
+  status: 'completed' | 'in_progress';
+}
+
+export interface SatisfactionDataPoint {
+  id: string;
+  customerId: string;
+  month: string;
+  score: number;
+}
+
+export interface BeSafeDataPoint {
+  id: string;
+  customerId: string;
+  month: string;
+  insecureAreas: number;
+  compliance: number;
+  systems: number;
 }
 
 export interface Incident {
@@ -70,10 +126,80 @@ export interface RegionalData {
   name: string;
 }
 
-export interface SatisfactionDataPoint {
-  month: string;
-  score: number;
+export type Period = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface OfficerDashboardData {
+  name: string
+  badgeNumber: string
+  role: string
+  avatar: string
+  shiftStatus: 'On Duty' | 'Off Duty'
+  shiftStart: string
+  shiftEnd: string
+  location: string
+  stats: {
+    incidentsThisMonth: number
+    incidentsLastMonth: number
+    totalValueSaved: number
+    expensesYTD: number
+    completionRate: number
+    holidayBooked: number
+    hoursWorked: number
+    sitesVisited: number
+  }
+  monthlyTarget: {
+    incidents: number
+    valueSaved: number
+    current: {
+      incidents: number
+      valueSaved: number
+    }
+  }
+  recentActivities: Activity[]
+  upcomingTasks: Task[]
 }
 
-export type Period = 'daily' | 'weekly' | 'monthly' | 'yearly';
-export type UserRole = 'customer-site' | 'customer-ho'; 
+export interface Activity {
+  id: string
+  type: 'incident' | 'patrol' | 'report'
+  title: string
+  location: string
+  time: string
+  value?: number
+  status: 'resolved' | 'submitted' | 'in-progress'
+}
+
+export interface Task {
+  id: string
+  type: string
+  title: string
+  dueDate: string
+  priority: 'high' | 'medium' | 'low'
+}
+
+export interface Incident {
+  id: string
+  date: string
+  siteName: string
+  type: string
+  value: number
+  assignedTo: string
+}
+
+export interface Site {
+  id: string;
+  locationName: string;
+  regionId: string;
+  customerId: string;
+  buildingName: string;
+  street: string;
+  town: string;
+  county: string;
+  postcode: string;
+  isCoreSite: boolean;
+  sinNumber: string;
+  telephone: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+} 

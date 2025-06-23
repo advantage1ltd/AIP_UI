@@ -19,11 +19,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check for existing session
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('user');
     
     if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+      } catch (err) {
+        console.error('Failed to parse stored user:', err);
+      }
     }
     
     setIsLoading(false);
@@ -48,14 +53,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(data.message || 'Login failed');
       }
 
-      localStorage.setItem('token', data.data.token);
+      localStorage.setItem('auth_token', data.data.token);
       localStorage.setItem('user', JSON.stringify(data.data.user));
+      
       const userData = data.data.user;
       const isAdvantageOneRole = ['AdvantageOneOfficer', 'AdvantageOneHOOfficer', 'Administrator'].includes(userData.role);
-      setUser(isAdvantageOneRole 
-        ? { ...userData, role: userData.role as 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator', assignedCustomerIds: [] } 
-        : { ...userData, role: userData.role as 'CustomerSiteManager' | 'CustomerHOManager', companyId: userData.id }
-      );
+      
+      // Type-safe user assignment
+      if (isAdvantageOneRole) {
+        setUser({
+          ...userData,
+          role: userData.role as 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator',
+          assignedCustomerIds: (userData as any).assignedCustomerIds || []
+        });
+      } else {
+        setUser({
+          ...userData,
+          role: userData.role as 'CustomerSiteManager' | 'CustomerHOManager',
+          companyId: (userData as any).companyId || userData.id
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       throw err;
@@ -65,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
     setUser(null);
   };

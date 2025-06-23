@@ -1,12 +1,8 @@
 import { http, HttpResponse, delay } from 'msw'
 import type { PageAccessSettings } from '@/api/pageAccess'
-import type { Incident } from '@/types/incidents'
-import type { IncidentsResponse, IncidentResponse, UpsertIncidentRequest } from '@/types/api'
 import { defaultPageAccess, getPageAccess } from '@/api/pageAccess'
 import { BASE_API_URL } from '@/config/api'
-import { mockIncidents } from '@/data/mockIncidents'
 import { v4 as uuidv4 } from 'uuid'
-import { GetIncidentsParams } from '@/types/api'
 import { siteVisitHandlers } from './siteVisitHandlers'
 import { safeDuressWordsHandlers } from './safeDuressWordsHandlers'
 import { holidayRequestHandlers } from './holidayRequestHandlers'
@@ -15,8 +11,15 @@ import { bankHolidayHandlers } from './bankHolidayHandlers'
 import { customerHandlers } from './customerHandlers'
 import { regionsHandlers } from './regionsHandlers'
 import { sitesHandlers } from './sitesHandlers'
+import { incidentHandlers } from './incidentHandlers'
 import { mockUsers, mockCustomers, mockEmployees } from '@/data/mockData'
 import { User, Customer, Employee, AuthResponse, UserResponse, UsersResponse, UserRole, AdvantageOneUser, CustomerUser } from '@/types/user'
+import { userHandlers } from './userHandlers'
+import { settingsHandlers } from './settingsHandlers'
+import { headerHandlers } from './headerHandlers'
+import { PageAccessSettings as PageAccessSettingsService } from '@/services/settingsService'
+import { dashboardHandlers } from './dashboardHandlers'
+import { mysteryShopperHandlers } from './mysteryShopperHandlers'
 
 // Mock users data
 const users: (
@@ -76,8 +79,7 @@ const users: (
   },
 ]
 
-// Helper to simulate database operations
-let incidents = [...mockIncidents]
+// Helper to simulate database operations (incidents handled by incidentHandlers.ts)
 let dbUsers: (
   | (AdvantageOneUser & { password: string })
   | (CustomerUser & { password: string })
@@ -257,20 +259,55 @@ const createErrorResponse = (status: number, message: string) => {
   )
 }
 
+// Helper function to ensure Administrator has all pages
+const ensureAdminAccess = (settings: PageAccessSettings): PageAccessSettings => {
+  const allPageIds = defaultPageAccess.Administrator;
+  const currentAdminAccess = settings.pageAccessByRole.Administrator || [];
+
+  // If admin doesn't have all pages, give them full access
+  if (!allPageIds.every(id => currentAdminAccess.includes(id))) {
+    return {
+      ...settings,
+      pageAccessByRole: {
+        ...settings.pageAccessByRole,
+        Administrator: allPageIds
+      }
+    };
+  }
+
+  return settings;
+};
+
 // Page Access Settings state
 let pageAccessSettings: PageAccessSettings = {
   pageAccessByRole: defaultPageAccess
-}
+};
 
 // Load initial settings from db.json
 fetch('/db.json')
   .then(response => response.json())
   .then(data => {
     if (data.pageAccess) {
-      pageAccessSettings = data.pageAccess
+      // Ensure role names are correct and admin has full access
+      const correctedAccess = Object.entries(data.pageAccess.pageAccessByRole).reduce((acc, [role, pages]) => {
+        // Convert kebab-case to PascalCase for role names
+        const correctedRole = role
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join('');
+        acc[correctedRole] = pages;
+        return acc;
+      }, {});
+      
+      pageAccessSettings = ensureAdminAccess({
+        pageAccessByRole: {
+          ...defaultPageAccess,  // Keep default access as fallback
+          ...correctedAccess     // Override with stored settings
+        }
+      });
     }
   })
-  .catch(error => console.error('Error loading page access settings:', error))
+  .catch(error => console.error('Error loading page access settings:', error));
 
 // Helper function to filter customers based on user role and access
 const filterCustomersByUserAccess = (user: User): Customer[] => {
@@ -293,56 +330,51 @@ const filterCustomersByUserAccess = (user: User): Customer[] => {
   return []
 }
 
+interface LoginRequest {
+  username: string;
+  password: string;
+}
+
 export const handlers = [
+  ...dashboardHandlers,
+  ...headerHandlers,
+  ...settingsHandlers,
   // Customer handlers must come first to avoid route conflicts
   ...customerHandlers,
+  ...userHandlers,
 
-  // Login and user management handlers
-  // POST /api/login - Handle user login
-  http.post(`${BASE_API_URL}/login`, async ({ request }) => {
+  // Login handler
+  http.post('/api/login', async ({ request }) => {
     try {
-      const { username, password } = await validateRequest(request)
-      
-      if (!username || !password) {
-        return new HttpResponse(
-          JSON.stringify({ 
-            success: false,
-            message: 'Username and password are required' 
-          }),
-          { status: 400 }
-        )
-      }
-      
-      const user = dbUsers.find(u => u.username === username && u.password === password)
-      
-      if (!user) {
-        return new HttpResponse(
-          JSON.stringify({ 
-            success: false,
-            message: 'Invalid username or password' 
-          }),
-          { status: 401 }
-        )
-      }
-      
-      // Don't send password in response
-      const { password: _, ...userInfo } = user
-      
+      const body = await request.json() as LoginRequest;
+      const { username } = body;
+
+      // Simulate successful login
+      const mockUser = {
+        id: 'user123',
+        username,
+        name: 'John Doe',
+        email: 'john.doe@example.com',
+        role: username.includes('customer') ? 'CustomerHOManager' : 'AdvantageOneOfficer',
+        // For CustomerHOManager, associate with Central England COOP
+        ...(username.includes('customer') ? {
+          companyId: 'COOP001',
+          companyName: 'Central England COOP'
+        } : {
+          assignedCustomerIds: ['COOP001', 'COOP002']
+        })
+      };
+
       return HttpResponse.json({
         success: true,
+        message: 'Login successful',
         data: {
-          user: userInfo,
-          token: 'mock-jwt-token'
+          token: 'mock-jwt-token',
+          user: mockUser
         }
-      })
+      });
     } catch (error) {
-      return new HttpResponse(
-        JSON.stringify({ 
-          success: false,
-          message: 'Internal server error' 
-        }),
-        { status: 500 }
-      )
+      return new HttpResponse(null, { status: 400 });
     }
   }),
 
@@ -503,160 +535,6 @@ export const handlers = [
     })
   }),
 
-  // GET /api/incidents - Get paginated incidents
-  http.get(`${BASE_API_URL}/incidents`, async ({ request }) => {
-    try {
-      await delay(500) // Simulate network latency
-
-      const url = new URL(request.url)
-      const page = Number(url.searchParams.get('page')) || 1
-      const pageSize = Number(url.searchParams.get('pageSize')) || 10
-      const search = url.searchParams.get('search') || ''
-      const customerId = url.searchParams.get('customerId')
-
-      // Filter incidents based on search term and customer
-      let filteredIncidents = incidents
-      
-      // Filter by customer if specified
-      if (customerId) {
-        filteredIncidents = filteredIncidents.filter(incident => {
-          // Map customer names to customer IDs
-          const customerIdMap: Record<string, string> = {
-            "Central England COOP": "1",
-            "Midcounties COOP": "2", 
-            "Heart of England COOP": "3"
-          }
-          return customerIdMap[incident.customerName] === customerId
-        })
-      }
-      
-      // Filter by search term
-      if (search) {
-        filteredIncidents = filteredIncidents.filter(incident =>
-          incident.siteName.toLowerCase().includes(search.toLowerCase()) ||
-          incident.description.toLowerCase().includes(search.toLowerCase()) ||
-          incident.customerName.toLowerCase().includes(search.toLowerCase()) ||
-          (incident.officerName && incident.officerName.toLowerCase().includes(search.toLowerCase()))
-        )
-      }
-
-      const totalCount = filteredIncidents.length
-      const totalPages = Math.ceil(totalCount / pageSize)
-      const startIndex = (page - 1) * pageSize
-      const endIndex = startIndex + pageSize
-
-      const paginatedIncidents = filteredIncidents.slice(startIndex, endIndex)
-
-      const response: IncidentsResponse = {
-        success: true,
-        data: paginatedIncidents,
-        pagination: {
-          currentPage: page,
-          totalPages,
-          pageSize,
-          totalCount,
-          hasPrevious: page > 1,
-          hasNext: page < totalPages
-        }
-      }
-
-      return HttpResponse.json(response)
-    } catch (error) {
-      return createErrorResponse(500, 'Failed to fetch incidents')
-    }
-  }),
-
-  // GET /api/incidents/:id - Get single incident
-  http.get(`${BASE_API_URL}/incidents/:id`, async ({ params }) => {
-    try {
-      await delay(200)
-
-      const incident = incidents.find(inc => inc.id === params.id)
-      if (!incident) {
-        return createErrorResponse(404, 'Incident not found')
-      }
-
-      const response: IncidentResponse = {
-        success: true,
-        data: incident
-      }
-
-      return HttpResponse.json(response)
-    } catch (error) {
-      return createErrorResponse(500, 'Failed to fetch incident')
-    }
-  }),
-
-  // POST /api/incidents - Create new incident
-  http.post(`${BASE_API_URL}/incidents`, async ({ request }) => {
-    try {
-      const { incident: newIncident } = await validateRequest(request) as UpsertIncidentRequest
-
-      const incident: Incident = {
-        ...newIncident,
-        id: Math.random().toString(36).substr(2, 9),
-        dateInputted: new Date().toISOString()
-      }
-
-      incidents.unshift(incident)
-
-      return HttpResponse.json({
-        success: true,
-        data: incident,
-        message: 'Incident created successfully'
-      }, { status: 201 })
-    } catch (error) {
-      return createErrorResponse(400, error instanceof Error ? error.message : 'Failed to create incident')
-    }
-  }),
-
-  // PUT /api/incidents/:id - Update incident
-  http.put(`${BASE_API_URL}/incidents/:id`, async ({ params, request }) => {
-    try {
-      const { incident: updatedIncident } = await validateRequest(request) as UpsertIncidentRequest
-
-      const index = incidents.findIndex(inc => inc.id === params.id)
-      if (index === -1) {
-        return createErrorResponse(404, 'Incident not found')
-      }
-
-      incidents[index] = {
-        ...updatedIncident,
-        id: params.id as string,
-        dateInputted: incidents[index].dateInputted
-      }
-
-      return HttpResponse.json({
-        success: true,
-        data: incidents[index],
-        message: 'Incident updated successfully'
-      })
-    } catch (error) {
-      return createErrorResponse(400, error instanceof Error ? error.message : 'Failed to update incident')
-    }
-  }),
-
-  // DELETE /api/incidents/:id - Delete incident
-  http.delete(`${BASE_API_URL}/incidents/:id`, async ({ params }) => {
-    try {
-      const index = incidents.findIndex(inc => inc.id === params.id)
-      if (index === -1) {
-        return createErrorResponse(404, 'Incident not found')
-      }
-
-      const deletedIncident = incidents[index]
-      incidents.splice(index, 1)
-
-      return HttpResponse.json({
-        success: true,
-        data: deletedIncident,
-        message: 'Incident deleted successfully'
-      })
-    } catch (error) {
-      return createErrorResponse(500, 'Failed to delete incident')
-    }
-  }),
-
   // GET /api/page-access
   http.get(`${BASE_API_URL}/page-access`, () => {
     return HttpResponse.json(pageAccessSettings)
@@ -664,13 +542,29 @@ export const handlers = [
 
   // PUT /api/page-access
   http.put(`${BASE_API_URL}/page-access`, async ({ request }) => {
-    const newSettings = await request.json() as PageAccessSettings
-    pageAccessSettings = newSettings
-
+    const data = await request.json() as PageAccessSettings;
+    
+    // Ensure role names are in correct format
+    const correctedAccess = Object.entries(data.pageAccessByRole).reduce((acc, [role, pages]) => {
+      // Convert kebab-case to PascalCase for role names if needed
+      const correctedRole = role.includes('-') 
+        ? role.split('-')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join('')
+        : role;
+      acc[correctedRole] = pages;
+      return acc;
+    }, {});
+    
+    // Ensure admin access is preserved
+    pageAccessSettings = ensureAdminAccess({
+      pageAccessByRole: correctedAccess
+    });
+    
     // Save to db.json
     const dbResponse = await fetch('/db.json')
     const db = await dbResponse.json()
-    db.pageAccess = newSettings
+    db.pageAccess = pageAccessSettings
 
     await fetch('/db.json', {
       method: 'PUT',
@@ -680,7 +574,7 @@ export const handlers = [
       body: JSON.stringify(db),
     })
 
-    return HttpResponse.json({ success: true })
+    return HttpResponse.json(pageAccessSettings)
   }),
 
   // Other feature handlers
@@ -691,6 +585,8 @@ export const handlers = [
   ...bankHolidayHandlers,
   ...regionsHandlers,
   ...sitesHandlers,
+  ...incidentHandlers,
+  ...mysteryShopperHandlers,
 
   // Page Access handler should be last
   http.get(`${BASE_API_URL}/page-access`, async () => {

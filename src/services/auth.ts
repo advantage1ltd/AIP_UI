@@ -1,8 +1,24 @@
 import { User, AuthResponse, AdvantageOneUser, CustomerUser } from '@/types/user';
+import { BASE_API_URL } from '@/config/api';
 
-export const login = async (username: string, password: string): Promise<User> => {
+const TOKEN_KEY = 'auth_token';
+const USER_KEY = 'user';
+
+interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+class AuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
+export const login = async ({ username, password }: LoginCredentials): Promise<User> => {
   try {
-    const response = await fetch('/api/login', {
+    const response = await fetch(`${BASE_API_URL}/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -10,55 +26,87 @@ export const login = async (username: string, password: string): Promise<User> =
       body: JSON.stringify({ username, password }),
     });
 
-    // First try to parse the response
-    let data: AuthResponse;
-    try {
-      data = await response.json();
-    } catch (e) {
-      console.error('Failed to parse response:', e);
-      throw new Error('Server returned an invalid response');
-    }
+    const data: AuthResponse = await response.json();
 
-    // Check if the response was not ok
     if (!response.ok) {
-      throw new Error(data?.message || 'Login failed');
+      throw new AuthError(data.message || 'Login failed');
     }
 
-    // Validate the response format
-    if (!data.success || !data.data) {
-      throw new Error('Invalid response format');
+    if (!data.data?.token || !data.data?.user) {
+      throw new AuthError('Invalid response from server');
     }
 
     // Store auth data
-    localStorage.setItem('auth_token', data.data.token);
-    localStorage.setItem('user', JSON.stringify(data.data.user));
-    
+    localStorage.setItem(TOKEN_KEY, data.data.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.data.user));
+
     const userData = data.data.user;
     const isAdvantageOneRole = ['AdvantageOneOfficer', 'AdvantageOneHOOfficer', 'Administrator'].includes(userData.role);
     return isAdvantageOneRole 
       ? { ...userData, assignedCustomerIds: (userData as any).assignedCustomerIds || [] } as AdvantageOneUser
       : { ...userData, companyId: (userData as any).companyId || userData.id } as CustomerUser;
   } catch (error) {
+    if (error instanceof AuthError) {
+      throw error;
+    }
     console.error('Login error:', error);
-    throw error;
+    throw new AuthError('Failed to login. Please try again.');
   }
 };
 
-export const logout = () => {
-  localStorage.removeItem('auth_token');
-  localStorage.removeItem('user');
+export const logout = (): void => {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  } catch (error) {
+    console.error('Logout error:', error);
+    throw new AuthError('Failed to logout');
+  }
+};
+
+export const getToken = (): string | null => {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch (error) {
+    console.error('Error getting token:', error);
+    return null;
+  }
 };
 
 export const getUser = (): User | null => {
-  const userStr = localStorage.getItem('user');
-  if (!userStr) return null;
   try {
-    return JSON.parse(userStr);
-  } catch {
+    const userStr = localStorage.getItem(USER_KEY);
+    if (!userStr) return null;
+    
+    const userData = JSON.parse(userStr);
+    const isAdvantageOneRole = ['AdvantageOneOfficer', 'AdvantageOneHOOfficer', 'Administrator'].includes(userData.role);
+    
+    return isAdvantageOneRole 
+      ? { ...userData, assignedCustomerIds: userData.assignedCustomerIds || [] } as AdvantageOneUser
+      : { ...userData, companyId: userData.companyId || userData.id } as CustomerUser;
+  } catch (error) {
+    console.error('Error getting user:', error);
     return null;
   }
 };
 
 export const isAuthenticated = (): boolean => {
-  return !!localStorage.getItem('auth_token') && !!getUser();
+  try {
+    const token = getToken();
+    const user = getUser();
+    return !!(token && user);
+  } catch (error) {
+    console.error('Error checking auth:', error);
+    return false;
+  }
+};
+
+export const getAuthHeaders = (): HeadersInit => {
+  const token = getToken();
+  return token ? {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  } : {
+    'Content-Type': 'application/json',
+  };
 }; 

@@ -24,8 +24,11 @@ export enum IncidentInvolved {
 export type OffenderSex = 'Male' | 'Female' | 'N/A or N/K'
 
 export interface OffenderAddress {
+  houseName?: string;
   numberAndStreet?: string;
+  villageOrSuburb?: string;
   town?: string;
+  county?: string;
   postCode?: string;
 }
 
@@ -43,6 +46,9 @@ export interface Incident {
   id: string;
   customerId?: string;
   customerName?: string;
+  regionId?: string;
+  regionName?: string;
+  siteId?: string;
   siteName?: string;
   officerName?: string;
   officerRole?: string;
@@ -52,15 +58,31 @@ export interface Incident {
   timeOfIncident?: string;
   incidentType?: string;
   description?: string;
+  incidentDetails?: string;
   storeComments?: string;
   totalValueRecovered?: number;
   policeInvolvement?: boolean;
   urnNumber?: string;
   crimeRefNumber?: string;
+  
+  status?: 'pending' | 'resolved' | 'in-progress';
+  priority?: 'low' | 'medium' | 'high';
+  actionTaken?: string;
+  evidenceAttached?: boolean;
+  witnessStatements?: string[];
+  involvedParties?: string[];
+  reportNumber?: string;
+  
   offenderName?: string;
   offenderSex?: string;
   offenderDOB?: string | Date;
+  offenderPlaceOfBirth?: string;
   offenderAddress?: OffenderAddress;
+  gender?: 'Male' | 'Female' | 'N/A or N/K';
+  
+  policeID?: string;
+  arrestSaveComment?: string;
+  
   incidentInvolved?: string[];
   stolenItems?: StolenItem[];
   viewConfig?: {

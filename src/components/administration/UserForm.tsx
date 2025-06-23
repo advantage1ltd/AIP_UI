@@ -14,9 +14,9 @@ import {
   CreateUserInput,
   UpdateUserInput,
   User,
-  UserStatus,
-  OfficerType,
-  Customer,
+  UserRole,
+  CustomerUser,
+  AdvantageOneUser,
   AVAILABLE_CUSTOMERS,
 } from '@/types/user';
 import { Users, Eye, EyeOff, Building2, Lock } from 'lucide-react';
@@ -28,55 +28,55 @@ interface UserFormProps {
   onCancel: () => void;
 }
 
-const USER_STATUS_OPTIONS: UserStatus[] = [
-  'Advantage One Officer',
-  'Advantage one HO Editor',
-  'Advantage One HO Manager',
+const USER_ROLES: UserRole[] = [
+  'AdvantageOneOfficer',
+  'AdvantageOneHOOfficer',
   'Administrator',
-  'Customer - Site Manager',
-  'Customer - Head Office Manager',
+  'CustomerSiteManager',
+  'CustomerHOManager',
 ];
 
-const OFFICER_TYPE_OPTIONS: OfficerType[] = [
-  'Retail Officer',
-  'Static Officer',
-  'Both',
-];
-
-const CUSTOMER_COMPANIES = [
-  'Central England COOP',
-  'Midcounties COOP',
-  'Heart Of England COOP',
-  'Eastbrook Tewksbury'
-] as const;
-
-type CustomerCompany = typeof CUSTOMER_COMPANIES[number];
+type FormState = {
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  password?: string;
+  role: UserRole;
+  pageAccessRole: UserRole;
+} & (
+  | { role: 'CustomerSiteManager' | 'CustomerHOManager'; companyId: string }
+  | { role: 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator'; assignedCustomerIds: string[] }
+);
 
 export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => {
-  const [formData, setFormData] = useState<Partial<User>>({
-    firstName: initialData?.firstName || '',
-    lastName: initialData?.lastName || '',
-    username: initialData?.username || '',
-    email: initialData?.email || '',
-    password: '',
-    status: initialData?.status || USER_STATUS_OPTIONS[0],
-    signature: initialData?.signature || '',
-    signatureCode: initialData?.signatureCode || '',
-    jobTitle: initialData?.jobTitle || '',
-    userCompany: initialData?.userCompany || CUSTOMER_COMPANIES[0],
-    officerType: initialData?.officerType || OFFICER_TYPE_OPTIONS[0],
-    assignedCustomers: initialData?.assignedCustomers || [],
+  const [formData, setFormData] = useState<FormState>(() => {
+    const baseData = {
+      firstName: initialData?.firstName || '',
+      lastName: initialData?.lastName || '',
+      username: initialData?.username || '',
+      email: initialData?.email || '',
+      password: '',
+      role: initialData?.role || USER_ROLES[0],
+      pageAccessRole: initialData?.pageAccessRole || USER_ROLES[0],
+    };
+
+    if (initialData?.role === 'CustomerSiteManager' || initialData?.role === 'CustomerHOManager') {
+      return {
+        ...baseData,
+        role: initialData.role,
+        companyId: ('companyId' in initialData ? initialData.companyId : ''),
+      } as FormState;
+    } else {
+      return {
+        ...baseData,
+        role: (initialData?.role as 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator') || 'AdvantageOneOfficer',
+        assignedCustomerIds: ('assignedCustomerIds' in initialData ? initialData.assignedCustomerIds || [] : []),
+      } as FormState;
+    }
   });
 
   const [showPassword, setShowPassword] = useState(false);
-
-  const [availableCustomers, setAvailableCustomers] = useState<Customer[]>(() => 
-    AVAILABLE_CUSTOMERS.filter(
-      customer => !formData.assignedCustomers?.some(
-        assigned => assigned.id === customer.id
-      )
-    )
-  );
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement>
@@ -85,59 +85,49 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSelectChange = (name: string, value: UserStatus | OfficerType | CustomerCompany | string) => {
-    if (name === 'status') {
-      const updates: Partial<User> = { status: value as UserStatus };
+  const handleSelectChange = (name: string, value: string) => {
+    if (name === 'role') {
+      const role = value as UserRole;
+      const isCustomerRole = role === 'CustomerSiteManager' || role === 'CustomerHOManager';
       
-      // Clear assigned customers when switching to a non-officer role
-      if (value !== 'Advantage One Officer') {
-        updates.assignedCustomers = [];
+      if (isCustomerRole) {
+        setFormData({
+          ...formData,
+          role,
+          pageAccessRole: role,
+          companyId: '',
+        } as FormState);
+      } else {
+        setFormData({
+          ...formData,
+          role,
+          pageAccessRole: role,
+          assignedCustomerIds: [],
+        } as FormState);
       }
-      
-      // Clear company when switching to a non-customer role
-      if (!isCustomerRole(value)) {
-        updates.userCompany = '';
-      }
-
-      setFormData(prev => ({ ...prev, ...updates }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+    } else if (name === 'companyId' && (formData.role === 'CustomerSiteManager' || formData.role === 'CustomerHOManager')) {
+      setFormData({
+        ...formData,
+        companyId: value,
+      } as FormState);
     }
   };
 
-  const handleAddCustomer = (customer: Customer) => {
-    setFormData(prev => ({
-      ...prev,
-      assignedCustomers: [...(prev.assignedCustomers || []), customer],
-    }));
-    setAvailableCustomers(prev => prev.filter(c => c.id !== customer.id));
-  };
-
-  const handleRemoveCustomer = (customer: Customer) => {
-    setFormData(prev => ({
-      ...prev,
-      assignedCustomers: prev.assignedCustomers?.filter(c => c.id !== customer.id) || [],
-    }));
-    setAvailableCustomers(prev => [...prev, customer]);
-  };
+  const isCustomerRole = formData.role === 'CustomerSiteManager' || formData.role === 'CustomerHOManager';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const { password, ...restData } = formData;
+    
     if (initialData) {
       onSubmit({
         id: initialData.id,
-        ...formData,
+        ...(password ? { password } : {}),
+        ...restData,
       } as UpdateUserInput);
     } else {
       onSubmit(formData as CreateUserInput);
     }
-  };
-
-  const isAdvantageOfficer = formData.status === 'Advantage One Officer';
-  
-  const isCustomerRole = (status: string) => {
-    return status === 'Customer - Site Manager' || 
-           status === 'Customer - Head Office Manager';
   };
 
   return (
@@ -193,155 +183,139 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
             />
           </div>
           <div className="relative">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">
+              Password {initialData && '(leave blank to keep unchanged)'}
+            </Label>
             <div className="relative">
               <Input
                 id="password"
                 name="password"
-                type={showPassword ? "text" : "password"}
-                value={formData.password}
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password || ''}
                 onChange={handleInputChange}
                 required={!initialData}
-                placeholder={initialData ? "Leave blank to keep current password" : "Enter password"}
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-1/2 -translate-y-1/2"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" />
                 ) : (
                   <Eye className="h-4 w-4" />
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Role and Company Information */}
+      {/* Role Information Section */}
       <Card>
         <CardHeader className="pb-4">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-primary" />
-            Role & Company Information
+            <Lock className="h-5 w-5 text-primary" />
+            Role Information
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="status">User Status</Label>
+            <Label htmlFor="role">Role</Label>
             <Select
-              value={formData.status}
-              onValueChange={(value) => handleSelectChange('status', value)}
+              value={formData.role}
+              onValueChange={(value) => handleSelectChange('role', value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select status" />
+                <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
-                {USER_STATUS_OPTIONS.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status}
+                {USER_ROLES.map((role) => (
+                  <SelectItem key={role} value={role}>
+                    {role}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label htmlFor="signature">Signature</Label>
-            <Input
-              id="signature"
-              name="signature"
-              value={formData.signature}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="signatureCode">Signature Code</Label>
-            <Input
-              id="signatureCode"
-              name="signatureCode"
-              value={formData.signatureCode}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="jobTitle">Job Title</Label>
-            <Input
-              id="jobTitle"
-              name="jobTitle"
-              value={formData.jobTitle}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-          {isCustomerRole(formData.status) && (
+
+          {isCustomerRole ? (
             <div>
-              <Label htmlFor="userCompany">User Company</Label>
+              <Label htmlFor="companyId">Company</Label>
               <Select
-                value={formData.userCompany}
-                onValueChange={(value) => handleSelectChange('userCompany', value)}
+                value={'companyId' in formData ? formData.companyId : ''}
+                onValueChange={(value) => handleSelectChange('companyId', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CUSTOMER_COMPANIES.map((company) => (
-                    <SelectItem key={company} value={company}>
-                      {company}
+                  {AVAILABLE_CUSTOMERS.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+          ) : (
+            <div>
+              <Label>Assigned Customers</Label>
+              <Select
+                value=""
+                onValueChange={(value) => {
+                  if ('assignedCustomerIds' in formData) {
+                    setFormData({
+                      ...formData,
+                      assignedCustomerIds: [...formData.assignedCustomerIds, value],
+                    } as FormState);
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Add customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AVAILABLE_CUSTOMERS
+                    .filter(customer => !('assignedCustomerIds' in formData) || !formData.assignedCustomerIds.includes(customer.id))
+                    .map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <div className="mt-2 space-y-2">
+                {'assignedCustomerIds' in formData && formData.assignedCustomerIds.map((customerId) => {
+                  const customer = AVAILABLE_CUSTOMERS.find(c => c.id === customerId);
+                  return customer ? (
+                    <div key={customer.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <span>{customer.name}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            assignedCustomerIds: formData.assignedCustomerIds.filter(id => id !== customer.id),
+                          } as FormState);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ) : null;
+                })}
+              </div>
+            </div>
           )}
-          <div>
-            <Label htmlFor="officerType">Officer Type</Label>
-            <Select
-              value={formData.officerType}
-              onValueChange={(value) => handleSelectChange('officerType', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select officer type" />
-              </SelectTrigger>
-              <SelectContent>
-                {OFFICER_TYPE_OPTIONS.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         </CardContent>
       </Card>
 
-      {/* Customer Assignment - Only show for Advantage One Officers */}
-      {isAdvantageOfficer && (
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <Lock className="h-5 w-5 text-primary" />
-              Customer Assignment
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <DualListBox
-                available={availableCustomers}
-                selected={formData.assignedCustomers || []}
-                onAdd={handleAddCustomer}
-                onRemove={handleRemoveCustomer}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Form Actions */}
-      <div className="flex justify-end gap-2 pt-4">
+      <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
