@@ -26,6 +26,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const userData = JSON.parse(storedUser);
         setUser(userData);
+        // Ensure role is set in localStorage
+        if (userData.role) {
+          localStorage.setItem('userRole', userData.role);
+        }
       } catch (err) {
         console.error('Failed to parse stored user:', err);
       }
@@ -55,6 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       localStorage.setItem('auth_token', data.data.token);
       localStorage.setItem('user', JSON.stringify(data.data.user));
+      // Set userRole in localStorage
+      localStorage.setItem('userRole', data.data.user.role);
       
       const userData = data.data.user;
       const isAdvantageOneRole = ['AdvantageOneOfficer', 'AdvantageOneHOOfficer', 'Administrator'].includes(userData.role);
@@ -67,10 +73,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           assignedCustomerIds: (userData as any).assignedCustomerIds || []
         });
       } else {
+        // For customer users, prioritize customerId from the response, fallback to companyId
+        const customerId = (userData as any).customerId || (userData as any).companyId;
+        const companyId = (userData as any).companyId || customerId;
         setUser({
           ...userData,
           role: userData.role as 'CustomerSiteManager' | 'CustomerHOManager',
-          companyId: (userData as any).companyId || userData.id
+          customerId: customerId,
+          companyId: companyId // For backward compatibility
         });
       }
     } catch (err) {
@@ -84,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
+    localStorage.removeItem('userRole'); // Also remove userRole on logout
     setUser(null);
   };
 

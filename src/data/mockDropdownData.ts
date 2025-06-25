@@ -124,7 +124,7 @@ export const MOCK_OFFICERS: Officer[] = [
   { id: '22', name: 'David Clark', role: 'Security Officer', badge: 'SO022' },
   { id: '23', name: 'Alice Thompson', role: 'Security Supervisor', badge: 'SO023' },
   { id: '24', name: 'Mark Wilson', role: 'Security Officer', badge: 'SO024' },
-  // Add all officer names from mockIncidents.ts
+  // Add all officer names from various data sources - update this as needed
   { id: '25', name: 'Sarah Johnson', role: 'Security Officer', badge: 'SO025' },
   { id: '26', name: 'Mike Davies', role: 'Senior Security Officer', badge: 'SO026' },
   { id: '27', name: 'Lisa Brown', role: 'Store Detective', badge: 'SO027' },

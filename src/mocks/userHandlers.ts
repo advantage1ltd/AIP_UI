@@ -91,7 +91,181 @@ const updateTypedUser = (existingUser: User, data: UpdateUserInput): User => {
   }
 };
 
+// Mock users data
+const mockUsers = {
+  // Central England Coop users (Customer ID: 21)
+  'centralsite': {
+    id: '1',
+    username: 'centralsite',
+    role: 'CustomerSiteManager',
+    companyId: 21,
+    customerId: 21,
+    customerName: 'Central England COOP',
+    name: 'Central Site Manager',
+    firstName: 'Central',
+    lastName: 'Site Manager',
+    email: 'central.site@example.com',
+    lastLogin: '2024-06-25T12:46:00Z'
+  },
+  'centralho': {
+    id: '2',
+    username: 'centralho',
+    role: 'CustomerHOManager',
+    companyId: 21,
+    customerId: 21,
+    customerName: 'Central England COOP',
+    name: 'Central HO Manager',
+    firstName: 'Central',
+    lastName: 'HO Manager',
+    email: 'central.ho@example.com',
+    lastLogin: '2024-06-25T12:46:00Z'
+  },
+  // Heart of England users (Customer ID: 22)
+  'heartsite': {
+    id: '5',
+    username: 'heartsite',
+    role: 'CustomerSiteManager',
+    companyId: 22,
+    customerId: 22,
+    customerName: 'Heart of England',
+    name: 'Heart Site Manager',
+    firstName: 'Heart',
+    lastName: 'Site Manager',
+    email: 'heart.site@example.com',
+    lastLogin: '2024-06-25T12:46:00Z'
+  },
+  'heartho': {
+    id: '6',
+    username: 'heartho',
+    role: 'CustomerHOManager',
+    companyId: 22,
+    customerId: 22,
+    customerName: 'Heart of England',
+    name: 'Heart HO Manager',
+    firstName: 'Heart',
+    lastName: 'HO Manager',
+    email: 'heart.ho@example.com',
+    lastLogin: '2024-06-25T12:46:00Z'
+  },
+  // Midcounties COOP users (Customer ID: 23)
+  'midsite': {
+    id: '3',
+    username: 'midsite',
+    role: 'CustomerSiteManager',
+    companyId: 23,
+    customerId: 23,
+    customerName: 'Midcounties COOP',
+    name: 'Midcounties Site Manager',
+    firstName: 'Midcounties',
+    lastName: 'Site Manager',
+    email: 'mid.site@example.com',
+    lastLogin: '2024-06-25T12:46:00Z'
+  },
+  'midho': {
+    id: '4',
+    username: 'midho',
+    role: 'CustomerHOManager',
+    companyId: 23,
+    customerId: 23,
+    customerName: 'Midcounties COOP',
+    name: 'Midcounties HO Manager',
+    firstName: 'Midcounties',
+    lastName: 'HO Manager',
+    email: 'mid.ho@example.com',
+    lastLogin: '2024-06-25T12:46:00Z'
+  },
+  // Advantage One users
+  'admin': {
+    id: '7',
+    username: 'admin',
+    role: 'Administrator',
+    name: 'System Admin',
+    firstName: 'System',
+    lastName: 'Admin',
+    email: 'admin@advantageone.com',
+    lastLogin: '2024-06-25T12:46:00Z'
+  },
+  'officer': {
+    id: '8',
+    username: 'officer',
+    role: 'AdvantageOneOfficer',
+    name: 'Security Officer',
+    firstName: 'Security',
+    lastName: 'Officer',
+    email: 'officer@advantageone.com',
+    lastLogin: '2024-06-25T12:46:00Z'
+  },
+  'hoofficer': {
+    id: '9',
+    username: 'hoofficer',
+    role: 'AdvantageOneHOOfficer',
+    name: 'Head Office Officer',
+    firstName: 'Head Office',
+    lastName: 'Officer',
+    email: 'ho.officer@advantageone.com',
+    lastLogin: '2024-06-25T12:46:00Z'
+  }
+};
+
+interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+// Login handler
+const loginHandler = http.post<any, LoginRequest>(`${BASE_API_URL}/login`, async ({ request }) => {
+  const body = await request.json() as LoginRequest;
+  const { username, password } = body;
+  
+  // Simple password validation - username + "123"
+  const expectedPassword = `${username}123`;
+  const user = mockUsers[username];
+  
+  if (!user || password !== expectedPassword) {
+    return HttpResponse.json({
+      success: false,
+      message: 'Invalid username or password'
+    }, { status: 401 });
+  }
+  
+  // Generate a proper JWT token structure
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payload = btoa(JSON.stringify({
+    sub: user.id,
+    username: user.username,
+    role: user.role,
+    ...(user.companyId ? { companyId: user.companyId } : {}),
+    exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+  }));
+  const signature = btoa('mock-signature'); // In a real app, this would be a proper signature
+  
+  const token = `${header}.${payload}.${signature}`;
+  
+  // Return the response in the format expected by AuthContext
+  return HttpResponse.json({
+    success: true,
+    message: 'Login successful',
+    data: {
+      token,
+      user: {
+        ...user,
+        // Add pageAccessRole which is the same as role
+        pageAccessRole: user.role,
+        // Add any additional fields required by the frontend
+        ...(user.role === 'CustomerSiteManager' || user.role === 'CustomerHOManager'
+          ? { 
+              companyId: user.companyId,
+              customerId: user.companyId // Set customerId to same value as companyId for compatibility
+            }
+          : { assignedCustomerIds: [] }
+        )
+      }
+    }
+  }, { status: 200 });
+});
+
 export const userHandlers = [
+  loginHandler,
   // GET /api/users - Get all users
   http.get(`${BASE_API_URL}/users`, async () => {
     try {
@@ -222,4 +396,4 @@ export const userHandlers = [
       );
     }
   }),
-]; 
+];

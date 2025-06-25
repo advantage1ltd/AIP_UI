@@ -2,6 +2,8 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
+import { AVAILABLE_CUSTOMERS } from '@/types/user';
 import { 
   BarChart, 
   Bar, 
@@ -85,6 +87,7 @@ const SafeComponent: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 };
 
 const BeSafeBeSecureGraph: React.FC = () => {
+  const { user } = useAuth();
   const [startDate, setStartDate] = React.useState<Date | null>(null);
   const [endDate, setEndDate] = React.useState<Date | null>(null);
   const [selectedSite, setSelectedSite] = React.useState<string>('all');
@@ -93,17 +96,35 @@ const BeSafeBeSecureGraph: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState('sites');
   const [isLoading, setIsLoading] = React.useState(false);
 
-  // Mock customer region data
-  const customerRegion = "Central England Sites";
+  // Get customer region data based on authenticated user
+  const customer = AVAILABLE_CUSTOMERS.find(c => c.id === user?.customerId);
+  const customerRegion = customer ? `${customer.name} Sites` : "Customer Sites";
+
+  // Dynamic mock data based on customer
+  const getMockDataForCustomer = () => {
+    const customerSiteData: Record<number, any[]> = {
+      21: [ // Central England COOP
+        { site: 'Leicester Central', insecureAreas: 70, compliance: 263, systems: 112 },
+        { site: 'Nottingham East', insecureAreas: 49, compliance: 235, systems: 67 },
+        { site: 'Derby North', insecureAreas: 67, compliance: 155, systems: 86 },
+      ],
+      22: [ // Heart of England
+        { site: 'Coventry Central', insecureAreas: 88, compliance: 198, systems: 95 },
+        { site: 'Nuneaton High Street', insecureAreas: 65, compliance: 220, systems: 78 },
+        { site: 'Rugby Town', insecureAreas: 72, compliance: 185, systems: 89 },
+      ],
+      23: [ // Midcounties COOP
+        { site: 'Oxford Street', insecureAreas: 112, compliance: 94, systems: 49 },
+        { site: 'Gloucester Park', insecureAreas: 86, compliance: 156, systems: 70 },
+        { site: 'Swindon Central', insecureAreas: 78, compliance: 189, systems: 63 },
+      ]
+    };
+
+    return customerSiteData[user?.customerId || 21] || [];
+  };
 
   const mockData = {
-    'Breakdown Of Checks By Site': [
-      { site: 'Anson Road', insecureAreas: 70, compliance: 263, systems: 112 },
-      { site: 'Cropston Drive', insecureAreas: 49, compliance: 235, systems: 67 },
-      { site: 'Ilkstock', insecureAreas: 67, compliance: 155, systems: 86 },
-      { site: 'Marston', insecureAreas: 112, compliance: 94, systems: 49 },
-      { site: 'Peterborough', insecureAreas: 86, compliance: 56, systems: 70 },
-    ],
+    'Breakdown Of Checks By Site': getMockDataForCustomer(),
     'Breakdown of Checks By Type': [
       { type: 'Compliance', value: 17 },
       { type: 'Insecure Areas', value: 22 },

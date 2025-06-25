@@ -17,6 +17,9 @@ import { format } from 'date-fns';
 import { cn } from "@/lib/utils";
 import { customerSatisfactionService } from '@/services/customerSatisfactionService';
 import { toast } from 'react-toastify';
+import type { Region, Site } from '@/types/dashboard';
+import { customerDashboardService } from '@/services/dashboardService';
+import { useAuth } from '@/contexts/AuthContext';
 import { DashboardMetrics } from '@/pages/operations/components/DashboardMetrics';
 import { MobileSurveyCard } from '@/pages/operations/components/MobileSurveyCard';
 import { PageHeader } from '@/pages/operations/components/PageHeader';
@@ -35,63 +38,6 @@ interface CustomerSatisfactionPageProps {
   isCustomerView?: boolean;
   customerId?: string;
 }
-
-// Generate mock data with more variety
-export const generateMockSurveys = (count = 25): CustomerSurvey[] => {
-  const customers = ['Shoprite Holdings', 'Pick n Pay', 'Woolworths', 'Spar Group', 'Game Stores'];
-  const regions = ['Western Cape', 'Eastern Cape', 'Gauteng', 'KwaZulu-Natal', 'Free State'];
-  const locations = [
-    'Cape Town CBD', 'Sandton City', 'Durban North', 'Bloemfontein Mall', 
-    'Port Elizabeth Central', 'Stellenbosch', 'Pretoria East', 'Umhlanga Rocks'
-  ];
-  const managerNames = [
-    'Jane Smith', 'Robert Johnson', 'Emily Williams', 'Michael Brown',
-    'Sarah Davis', 'James Wilson', 'Lisa Taylor', 'David Martinez'
-  ];
-  const actions = [
-    'Improve security measures', 'Staff training', 'Update protocols',
-    'Enhance customer service approach', 'Implement new technology', 'Review procedures',
-    'Conduct follow-up assessment', 'Update documentation'
-  ];
-  const officerNames = [
-    'John Doe', 'Mary Johnson', 'Peter Smith', 'Susan Brown',
-    'David Wilson', 'Linda Davis', 'Michael Taylor', 'Sarah Martinez'
-  ];
-
-  return Array.from({ length: count }, (_, i) => {
-    const numActions = Math.floor(Math.random() * 3) + 1;
-    const followUpActions = Array.from({ length: numActions }, () => 
-      actions[Math.floor(Math.random() * actions.length)]
-    );
-    const datesToBeCompleted = Array.from({ length: numActions }, () => {
-      const date = new Date();
-      date.setDate(date.getDate() + Math.floor(Math.random() * 30));
-      return date.toISOString().split('T')[0];
-    });
-
-    return {
-      id: (i + 1).toString(),
-      officerName: officerNames[Math.floor(Math.random() * officerNames.length)],
-      date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      customer: customers[Math.floor(Math.random() * customers.length)],
-      region: regions[Math.floor(Math.random() * regions.length)],
-      location: locations[Math.floor(Math.random() * locations.length)],
-      ratings: {
-        uniformAndAppearance: Math.floor(Math.random() * 5) + 5,
-        professionalism: Math.floor(Math.random() * 5) + 5,
-        customerServiceApproach: Math.floor(Math.random() * 5) + 5,
-        improvedFeelingOfSecurityWhenOfficerOnSite: Math.floor(Math.random() * 5) + 5,
-        relationsWithStoreColleagues: Math.floor(Math.random() * 5) + 5,
-        punctualityBreaks: Math.floor(Math.random() * 5) + 5,
-        proactivity: Math.floor(Math.random() * 5) + 5
-      },
-      storeManagerName: managerNames[Math.floor(Math.random() * managerNames.length)],
-      areaManagerName: managerNames[Math.floor(Math.random() * managerNames.length)],
-      followUpActions,
-      datesToBeCompleted
-    };
-  });
-};
 
 // Helper function to generate CSV data
 const generateCsvData = (data: CustomerSurvey[]): string => {
@@ -147,11 +93,15 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
   isCustomerView = false,
   customerId
 }) => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Administrator';
   // State management
   const [showForm, setShowForm] = useState(false);
   const [editingSurvey, setEditingSurvey] = useState<CustomerSurvey | null>(null);
   const [viewingSurvey, setViewingSurvey] = useState<CustomerSurvey | null>(null);
   const [surveys, setSurveys] = useState<CustomerSurvey[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [sites, setSites] = useState<Site[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -160,9 +110,9 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
   });
   const [filters, setFilters] = useState<CustomerSurveyFilters>({
     search: '',
-    customer: '',
-    region: '',
-    location: '',
+    customerId: '',
+    regionId: '',
+    siteId: '',
     dateRange: undefined
   });
   const [downloadStartDate, setDownloadStartDate] = useState<Date | undefined>();
@@ -191,6 +141,25 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
       setIsLoading(false);
     }
   }, [pagination.currentPage, pagination.pageSize, filters]);
+
+  // Fetch regions and sites
+  useEffect(() => {
+    const fetchRegionsAndSites = async () => {
+      try {
+        const [regionsData, sitesData] = await Promise.all([
+          customerDashboardService.getRegions(),
+          customerDashboardService.getSites()
+        ]);
+        setRegions(regionsData);
+        setSites(sitesData);
+      } catch (error) {
+        console.error('Failed to fetch regions and sites:', error);
+        toast.error('Failed to load regions and sites. Please try again.');
+      }
+    };
+
+    fetchRegionsAndSites();
+  }, []);
 
   // Initial load
   useEffect(() => {
@@ -339,49 +308,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
     }
   }, [surveys, downloadStartDate, downloadEndDate]);
 
-  // Memoized filter logic
-  const filteredSurveys = useMemo(() => {
-    return surveys.filter(survey => {
-      // Text search across multiple fields
-      const searchTerm = filters.search.toLowerCase();
-      const matchesSearch = !searchTerm || 
-        survey.officerName.toLowerCase().includes(searchTerm) ||
-        survey.customer.toLowerCase().includes(searchTerm) ||
-        survey.location.toLowerCase().includes(searchTerm);
-
-      // Exact matches for dropdowns
-      const matchesCustomer = !filters.customer || survey.customer === filters.customer;
-      const matchesRegion = !filters.region || survey.region === filters.region;
-      const matchesLocation = !filters.location || survey.location === filters.location;
-
-      // Date range filtering
-      const surveyDate = new Date(survey.date);
-      const matchesDateRange = !filters.dateRange ||
-        (!filters.dateRange.from || surveyDate >= new Date(filters.dateRange.from)) &&
-        (!filters.dateRange.to || surveyDate <= new Date(filters.dateRange.to));
-
-      return matchesSearch && matchesCustomer && matchesRegion && matchesLocation && matchesDateRange;
-    });
-  }, [surveys, filters]);
-
-  // Memoized pagination
-  const paginatedSurveys = useMemo(() => {
-    const start = (pagination.currentPage - 1) * pagination.pageSize;
-    const end = start + pagination.pageSize;
-    return filteredSurveys.slice(start, end);
-  }, [filteredSurveys, pagination.currentPage, pagination.pageSize]);
-
-  // Update pagination when filtered results change
-  useEffect(() => {
-    const totalPages = Math.ceil(filteredSurveys.length / pagination.pageSize);
-    const newCurrentPage = Math.min(pagination.currentPage, Math.max(1, totalPages));
-    
-    setPagination(prev => ({
-      ...prev,
-      total: filteredSurveys.length,
-      currentPage: newCurrentPage
-    }));
-  }, [filteredSurveys, pagination.pageSize, pagination.currentPage]);
+  // Remove client-side filtering - let server handle it
 
   // Animation properties
   const motionProps = {
@@ -394,7 +321,14 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="container mx-auto max-w-[1280px] py-4 md:py-6 lg:py-8 px-2 md:px-4 lg:px-6">
-        <PageHeader showForm={showForm} editingSurvey={editingSurvey} />
+        <PageHeader 
+          pageId="customer-satisfaction"
+          title="Customer Satisfaction Surveys"
+          description="Manage and track customer satisfaction surveys and feedback"
+          showForm={showForm} 
+          isEditing={!!editingSurvey}
+          formType="Customer Survey"
+        />
 
         <AnimatePresence mode="wait">
           <motion.div
@@ -621,6 +555,8 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
                         surveys={surveys}
                         pagination={pagination}
                         filters={filters}
+                        regions={regions}
+                        sites={sites}
                         onNewSurvey={handleNewSurvey}
                         onEditSurvey={handleEditSurvey}
                         onViewSurvey={handleViewSurvey}
@@ -628,6 +564,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
                         onPageChange={handlePageChange}
                         onFiltersChange={handleFiltersChange}
                         isLoading={isLoading}
+                        isAdmin={isAdmin}
                       />
                     </div>
                   </div>

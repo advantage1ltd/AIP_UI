@@ -18,7 +18,7 @@ import { usePageAccess } from '@/contexts/PageAccessContext'
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { settingsService } from '@/services/settingsService'
-import { PageAccess } from '@/contexts/PageAccessContext'
+import { PageAccess } from '@/api/pageAccess'
 import { LoadingSpinner } from "@/components/ui/loading-state"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 

@@ -202,10 +202,9 @@ export const customerHandlers = [
 
     // Add statistics and available pages to each customer
     const customersWithDetails = filteredCustomers.map(customer => {
-      // Get enabled page assignments
-      const enabledPages = Object.entries(customer.pageAssignments)
-        .filter(([_, assignment]) => assignment.enabled)
-        .map(([pageId]) => {
+      // Get enabled page assignments from viewConfig
+      const enabledPages = customer.viewConfig.enabledPages
+        .map(pageId => {
           const pageConfig = Object.values(CUSTOMER_PAGES).find(p => p.id === pageId)
           return pageConfig ? {
             id: pageId,
@@ -246,10 +245,9 @@ export const customerHandlers = [
       }, { status: 404 })
     }
 
-    // Get enabled page assignments
-    const enabledPages = Object.entries(customer.pageAssignments)
-      .filter(([_, assignment]) => assignment.enabled)
-      .map(([pageId]) => {
+    // Get enabled page assignments from viewConfig
+    const enabledPages = customer.viewConfig.enabledPages
+      .map(pageId => {
         const pageConfig = Object.values(CUSTOMER_PAGES).find(p => p.id === pageId)
         return pageConfig ? {
           id: pageId,
@@ -295,6 +293,13 @@ export const customerHandlers = [
       ...updates.pageAssignments
     }
 
+    // Update the viewConfig.enabledPages to match the enabled page assignments
+    const enabledPageIds = Object.entries(updates.pageAssignments)
+      .filter(([_, assignment]) => (assignment as any).enabled)
+      .map(([pageId]) => pageId)
+
+    DUMMY_CUSTOMERS[customerIndex].viewConfig.enabledPages = enabledPageIds
+
     return HttpResponse.json({
       success: true,
       data: DUMMY_CUSTOMERS[customerIndex]
@@ -316,8 +321,6 @@ export const customerHandlers = [
       }))
     })
   }),
-
-  // Note: Legacy CRUD endpoints removed - now using DUMMY_CUSTOMERS directly
 
   // GET /api/customers/:id/regions - Get customer regions
   http.get(`${BASE_API_URL}/customers/:id/regions`, async ({ params }) => {

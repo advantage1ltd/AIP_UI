@@ -10,6 +10,7 @@ export interface CustomerSurveyRatings {
 
 export interface CustomerSurvey {
   id: string;
+  customerId: number;
   officerName: string;
   date: string;
   customer: string;
@@ -20,18 +21,19 @@ export interface CustomerSurvey {
   areaManagerName: string;
   followUpActions: string[];
   datesToBeCompleted: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CustomerSurveyFilters {
   search: string;
-  customer: string;
-  region: string;
-  location: string;
+  customerId: string; // For admin users to filter by customer
+  regionId: string;
+  siteId: string;
   dateRange?: {
     from?: Date;
     to?: Date;
   };
-  customerId?: string;
 }
 
 export interface CustomerSurveyResponse {
@@ -43,7 +45,7 @@ export interface CustomerSurveyResponse {
   };
 }
 
-export interface CustomerSurveyRequest extends Omit<CustomerSurvey, 'id'> {}
+export interface CustomerSurveyRequest extends Omit<CustomerSurvey, 'id' | 'customerId' | 'createdAt' | 'updatedAt'> {}
 
 export interface CustomerSurveyUpdateRequest extends Partial<CustomerSurveyRequest> {
   id: string;

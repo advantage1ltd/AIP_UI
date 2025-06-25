@@ -1,8 +1,8 @@
 import type { CustomerPage } from "@/types/customer"
 
 export const CUSTOMER_PAGES: Record<string, CustomerPage> = {
-  'daily-activity': {
-    id: 'daily-activity',
+  'daily-activity-report': {
+    id: 'customer-daily-activity-report',
     title: 'Daily Activity Report',
     description: 'View and manage daily activity reports for this customer',
     enabled: true,
@@ -13,107 +13,81 @@ export const CUSTOMER_PAGES: Record<string, CustomerPage> = {
     icon: 'Calendar'
   },
   'incident-graph': {
-    id: 'incident-graph',
+    id: 'customer-incident-graph',
     title: 'Incident Graph',
     description: 'Visual representation of incident trends and patterns',
     enabled: true,
     requiredForTypes: ['event', 'static', 'retail', 'gatehouse'],
     path: '/customer/incident-graph',
     readOnly: true,
-    sourceOperationPath: '/operations/incident-report',
-    category: 'reporting',
-    icon: 'BarChart3'
+    category: 'incidents',
+    icon: 'BarChart2'
   },
   'incident-report': {
-    id: 'incident-report',
+    id: 'customer-incident-report',
     title: 'Incident Report',
     description: 'View and manage incident reports for this customer',
     enabled: true,
-    requiredForTypes: ['event', 'static', 'retail', 'mobile-patrol', 'keyholding-alarm-response', 'gatehouse'],
+    requiredForTypes: ['event', 'static', 'retail', 'gatehouse'],
     path: '/customer/incident-report',
     readOnly: false,
-    category: 'reporting',
-    icon: 'AlertTriangle'
+    category: 'incidents',
+    icon: 'FileWarning'
   },
-  'customer-satisfaction': {
-    id: 'customer-satisfaction',
+  'satisfaction-report': {
+    id: 'customer-satisfaction-report',
     title: 'Satisfaction Reports',
     description: 'View customer satisfaction survey results and feedback',
     enabled: true,
     requiredForTypes: ['event', 'static', 'retail', 'gatehouse'],
     path: '/customer/satisfaction-report',
     readOnly: true,
-    sourceOperationPath: '/operations/customer-satisfaction',
-    category: 'reporting',
-    icon: 'MessageSquare'
+    category: 'satisfaction',
+    icon: 'FileText'
   },
   'be-safe-be-secure': {
-    id: 'be-safe-be-secure',
-    title: 'Be Safe Be Secure Graph',
-    description: 'Security metrics and performance indicators',
+    id: 'customer-be-safe-be-secure',
+    title: 'Be Safe Be Secure',
+    description: 'View and manage security awareness and safety information',
     enabled: true,
-    requiredForTypes: ['static', 'retail', 'gatehouse'],
+    requiredForTypes: ['event', 'static', 'retail', 'gatehouse'],
     path: '/customer/be-safe-be-secure',
-    readOnly: true,
-    category: 'security',
-    icon: 'Shield'
+    readOnly: false,
+    category: 'safety',
+    icon: 'ShieldCheck'
   },
   'officer-support': {
-    id: 'officer-support',
+    id: 'customer-officer-support',
     title: 'Officer Support',
-    description: 'View and manage officer support requests',
+    description: 'Access support resources and information for security officers',
     enabled: true,
-    requiredForTypes: ['static', 'retail', 'gatehouse', 'mobile-patrol'],
+    requiredForTypes: ['event', 'static', 'retail', 'gatehouse'],
     path: '/customer/officer-support',
     readOnly: false,
     category: 'support',
-    icon: 'UserCheck'
+    icon: 'HelpCircle'
   },
-  'patrol-log': {
-    id: 'patrol-log',
-    title: 'Patrol Log Reports',
-    description: 'View patrol log entries and route tracking',
+  'reporting': {
+    id: 'customer-reporting',
+    title: 'Reporting',
+    description: 'Access all reports and analytics for this customer',
     enabled: true,
-    requiredForTypes: ['mobile-patrol', 'keyholding-alarm-response'],
-    path: '/customer/patrol-log',
+    requiredForTypes: ['event', 'static', 'retail', 'gatehouse'],
+    path: '/customer/reporting',
     readOnly: true,
-    sourceOperationPath: '/operations/patrol-log',
-    category: 'activity',
-    icon: 'Footprints'
+    category: 'reports',
+    icon: 'FileText'
   },
-  'site-visit-reports': {
-    id: 'site-visit-reports',
-    title: 'Site Visit Reports',
-    description: 'Detailed site visit reports and assessments',
+  'views-config': {
+    id: 'customer-views-config',
+    title: 'Views Configuration',
+    description: 'Configure custom views and dashboards for this customer',
     enabled: true,
-    requiredForTypes: ['static', 'retail', 'gatehouse'],
-    path: '/customer/site-visit-reports',
-    readOnly: true,
-    sourceOperationPath: '/operations/site-visit',
-    category: 'reporting',
-    icon: 'Building'
-  },
-  'keyholding-logs': {
-    id: 'keyholding-logs',
-    title: 'Keyholding & Alarm Response',
-    description: 'Keyholding services and alarm response logs',
-    enabled: true,
-    requiredForTypes: ['keyholding-alarm-response'],
-    path: '/customer/keyholding-logs',
-    readOnly: true,
-    category: 'security',
-    icon: 'Key'
-  },
-  'event-briefings': {
-    id: 'event-briefings',
-    title: 'Event Briefings & Reports',
-    description: 'Event security briefings and post-event reports',
-    enabled: true,
-    requiredForTypes: ['event'],
-    path: '/customer/event-briefings',
+    requiredForTypes: ['event', 'static', 'retail', 'gatehouse'],
+    path: '/customer/views-config',
     readOnly: false,
-    category: 'activity',
-    icon: 'Users'
+    category: 'settings',
+    icon: 'Settings'
   }
 }
 

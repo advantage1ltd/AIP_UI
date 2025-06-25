@@ -83,12 +83,11 @@ export interface CustomerPage {
   title: string
   description: string
   enabled: boolean
-  requiredForTypes: CustomerType[]
+  requiredForTypes: string[]
   path: string
   readOnly: boolean
-  sourceOperationPath?: string
-  category: 'reporting' | 'activity' | 'security' | 'support'
-  icon?: string
+  category: 'activity' | 'incidents' | 'satisfaction' | 'safety' | 'support' | 'reports' | 'settings'
+  icon: string
 }
 
 export type CustomerPageId = 

@@ -9,6 +9,7 @@ type UIUser = User & {
     theme: 'light' | 'dark' | 'system';
     notifications: boolean;
   };
+  customerId?: number;
 }
 
 interface AuthState {

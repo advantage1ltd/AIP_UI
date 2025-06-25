@@ -173,7 +173,7 @@ const customerData = {
     incidentReports: [
       {
         id: '1',
-        customerName: 'HOE COOP',
+        customerName: 'Heart of England',
         store: 'Store #5678',
         officerName: 'Sarah Wilson',
         date: '2025-01-30',
@@ -182,7 +182,7 @@ const customerData = {
       },
       {
         id: '2',
-        customerName: 'HOE COOP',
+        customerName: 'Heart of England',
         store: 'Store #5679',
         officerName: 'Tom Brown',
         date: '2025-01-29',
@@ -191,7 +191,7 @@ const customerData = {
       },
       {
         id: '3',
-        customerName: 'HOE COOP',
+        customerName: 'Heart of England',
         store: 'Store #5680',
         officerName: 'Lisa Chen',
         date: '2025-01-28',
@@ -333,7 +333,7 @@ const equipmentData = [
 
 const customers = [
   { id: 'customer1', name: 'Central England COOP' },
-  { id: 'customer2', name: 'HOE COOP' },
+  { id: 'customer2', name: 'Heart of England' },
   { id: 'customer3', name: 'Midcounties COOP' }
 ] as const;
 

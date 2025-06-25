@@ -1,42 +1,46 @@
 import { useEffect, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
-import type { Customer } from "@/types/customer"
-import { DUMMY_CUSTOMERS } from "@/data/customers"
 import IncidentReportPage from "@/pages/operations/IncidentReportPage"
 import { useAuth } from "@/hooks/useAuth"
+import { AVAILABLE_CUSTOMERS } from "@/types/user"
 
 export default function CustomerIncidentReport() {
   const navigate = useNavigate()
-  const { customerId } = useParams<{ customerId: string }>()
-  const { user } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [customer, setCustomer] = useState<Customer | null>(null)
+  const [customer, setCustomer] = useState<typeof AVAILABLE_CUSTOMERS[0] | null>(null)
 
   useEffect(() => {
     try {
-      // If no customerId in URL, use the first customer (backwards compatibility)
-      const targetCustomerId = customerId || "1"
-      const dummyCustomer = DUMMY_CUSTOMERS.find(c => c.id === targetCustomerId)
+
       
-      if (!dummyCustomer) {
+      // Wait for auth to finish loading
+      if (authLoading) {
+        return;
+      }
+      
+      if (!user?.customerId) {
+        setError("No customer ID found for user")
+        return
+      }
+
+      const customerData = AVAILABLE_CUSTOMERS.find(c => c.id === user.customerId)
+      
+      if (!customerData) {
         setError("Customer not found")
         return
       }
       
-      if (!dummyCustomer?.viewConfig?.enabledPages.includes('incident-report')) {
-        setError("You don't have access to this page")
-        return
-      }
-      setCustomer(dummyCustomer)
+      setCustomer(customerData)
     } catch (err) {
       setError("Failed to load customer data")
     } finally {
       setLoading(false)
     }
-  }, [customerId])
+  }, [user?.customerId, authLoading])
 
   if (loading) {
     return (
@@ -74,12 +78,12 @@ export default function CustomerIncidentReport() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <h2 className="text-xl font-semibold">{customer?.companyName}</h2>
+        <h2 className="text-xl font-semibold">{customer?.name}</h2>
       </div>
 
       <IncidentReportPage 
         isCustomerView={true}
-        customerId={customer?.id}
+        customerId={customer?.id.toString()}
       />
     </div>
   )

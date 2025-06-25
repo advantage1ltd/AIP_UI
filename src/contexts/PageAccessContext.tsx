@@ -1,12 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getPageAccess } from '@/api/pageAccess';
-
-export interface PageAccess {
-  id: string;
-  title: string;
-  path: string;
-}
+import { PageAccess, pageAccessApi } from '@/api/pageAccess';
 
 interface PageAccessContextType {
   hasAccess: (path: string) => boolean;
@@ -19,6 +13,7 @@ interface PageAccessContextType {
   setIsTestMode: (mode: boolean) => void;
   testRole: string | null;
   setTestRole: (role: string | null) => void;
+  isLoading: boolean;
 }
 
 const PageAccessContext = createContext<PageAccessContextType | undefined>(undefined);
@@ -48,16 +43,16 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       
       if (!roleToCheck) return false;
       
-      // Always allow access to settings for administrators, even in test mode
-      if (roleToCheck === 'Administrator' || (currentRole === 'Administrator' && path === '/settings')) {
-        return true;
-      }
-      
       // Get the allowed page IDs for the role
       const allowedPageIds = pageAccessByRole[roleToCheck];
       if (!allowedPageIds) {
         console.warn(`No page access defined for role: ${roleToCheck}`);
         return false;
+      }
+
+      // Check for wildcard access
+      if (allowedPageIds.includes('*')) {
+        return true;
       }
 
       // Fix for take-test path - ensure it's properly matched
@@ -97,49 +92,49 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Initialize role from localStorage
+  // Initialize role and fetch page access
   useEffect(() => {
-    try {
-      const storedRole = localStorage.getItem('userRole');
-      if (storedRole) {
-        console.log('🔄 Initializing currentRole from localStorage:', storedRole);
-        // Ensure role matches one of our valid roles
-        const validRoles = [
-          'Administrator',
-          'AdvantageOneOfficer',
-          'AdvantageOneHOOfficer',
-          'CustomerSiteManager',
-          'CustomerHOManager'
-        ];
-        
-        if (validRoles.includes(storedRole)) {
-          setCurrentRole(storedRole);
-        } else {
-          console.warn(`Invalid role found in localStorage: ${storedRole}`);
-          localStorage.removeItem('userRole');
-        }
-      }
-    } catch (error) {
-      console.error('Error initializing role:', error);
-    }
-  }, []);
-
-  // Fetch page access data
-  useEffect(() => {
-    const fetchPageAccess = async () => {
+    const initializeAccess = async () => {
       try {
         setIsLoading(true);
-        const data = await getPageAccess();
-        setPageAccessByRole(data.pageAccessByRole);
-        setAvailablePages(data.availablePages);
+        
+        // Get stored role
+        const storedRole = localStorage.getItem('userRole');
+        let validatedRole: string | null = null;
+        
+        if (storedRole) {
+          console.log('🔄 Initializing currentRole from localStorage:', storedRole);
+          
+          // Fetch page access data first to get valid roles
+          const data = await pageAccessApi.getSettings();
+          const validRoles = Object.keys(data.pageAccessByRole);
+          
+          const matchingRole = validRoles.find(
+            role => role.toLowerCase() === storedRole.toLowerCase()
+          );
+          
+          if (matchingRole) {
+            validatedRole = matchingRole;
+            if (matchingRole !== storedRole) {
+              localStorage.setItem('userRole', matchingRole);
+            }
+          } else {
+            console.warn(`Invalid role found in localStorage: ${storedRole}`);
+            localStorage.removeItem('userRole');
+          }
+          
+          setPageAccessByRole(data.pageAccessByRole);
+          setAvailablePages(data.availablePages);
+          setCurrentRole(validatedRole);
+        }
       } catch (error) {
-        console.error('Error fetching page access:', error);
+        console.error('Error initializing access:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchPageAccess();
+    initializeAccess();
   }, []);
 
   // Update localStorage when role changes
@@ -168,11 +163,6 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return;
       }
       
-      // Skip redirect for administrators viewing settings page
-      if (currentRole === 'Administrator' && currentPath === '/settings') {
-        return;
-      }
-      
       if (!hasAccess(currentPath)) {
         console.warn(`User with role ${currentRole} does not have access to ${currentPath}, redirecting to dashboard`);
         navigate('/dashboard');
@@ -198,10 +188,6 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [location, pageAccessByRole]);
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
   return (
     <PageAccessContext.Provider value={{
       hasAccess,
@@ -213,7 +199,8 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       isTestMode,
       setIsTestMode,
       testRole,
-      setTestRole
+      setTestRole,
+      isLoading
     }}>
       {children}
     </PageAccessContext.Provider>

@@ -29,7 +29,14 @@ import {
   ChevronRight
 } from "lucide-react";
 import { CustomerSurvey, CustomerSurveyFilters } from '@/types/customerSatisfaction';
-import { MOCK_CUSTOMERS, MOCK_REGIONS, MOCK_LOCATIONS } from '@/constants/customerSatisfaction';
+import type { Region, Site } from '@/types/dashboard';
+
+// Customer data for admin filtering
+const CUSTOMERS = [
+  { id: '21', name: 'Central England COOP' },
+  { id: '22', name: 'Heart of England' },
+  { id: '23', name: 'Midcounties COOP' }
+];
 import { format } from 'date-fns';
 
 interface SurveyTableProps {
@@ -40,6 +47,8 @@ interface SurveyTableProps {
     total: number;
   };
   filters: CustomerSurveyFilters;
+  regions: Region[];
+  sites: Site[];
   onNewSurvey?: () => void;
   onEditSurvey?: (survey: CustomerSurvey) => void;
   onViewSurvey: (survey: CustomerSurvey) => void;
@@ -48,12 +57,15 @@ interface SurveyTableProps {
   onFiltersChange: (filters: CustomerSurveyFilters) => void;
   isLoading: boolean;
   isCustomerView?: boolean;
+  isAdmin?: boolean;
 }
 
 export const SurveyTable: React.FC<SurveyTableProps> = ({
   surveys,
   pagination,
   filters,
+  regions,
+  sites,
   onNewSurvey,
   onEditSurvey,
   onViewSurvey,
@@ -61,7 +73,8 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
   onPageChange,
   onFiltersChange,
   isLoading,
-  isCustomerView = false
+  isCustomerView = false,
+  isAdmin = false
 }) => {
   // Calculate average rating for a survey
   const getAverageRating = (survey: CustomerSurvey) => {
@@ -84,24 +97,31 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
               disabled={isLoading}
             />
           </div>
+          {isAdmin && (
+            <Select
+              value={filters.customerId || 'all'}
+              onValueChange={(value) => onFiltersChange({ 
+                ...filters, 
+                customerId: value === 'all' ? '' : value,
+                regionId: '', // Clear region when customer changes
+                siteId: '' // Clear site when customer changes
+              })}
+              disabled={isLoading}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by customer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Customers</SelectItem>
+                {CUSTOMERS.map(customer => (
+                  <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Select
-            value={filters.customer || 'all'}
-            onValueChange={(value) => onFiltersChange({ ...filters, customer: value === 'all' ? '' : value })}
-            disabled={isLoading}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by customer" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Customers</SelectItem>
-              {MOCK_CUSTOMERS.map(customer => (
-                <SelectItem key={customer} value={customer}>{customer}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.region || 'all'}
-            onValueChange={(value) => onFiltersChange({ ...filters, region: value === 'all' ? '' : value })}
+            value={filters.regionId || 'all'}
+            onValueChange={(value) => onFiltersChange({ ...filters, regionId: value === 'all' ? '' : value, siteId: '' })}
             disabled={isLoading}
           >
             <SelectTrigger className="w-[180px]">
@@ -109,9 +129,34 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Regions</SelectItem>
-              {MOCK_REGIONS.map(region => (
-                <SelectItem key={region} value={region}>{region}</SelectItem>
-              ))}
+              {regions
+                .filter(region => !isAdmin || !filters.customerId || region.customerId === parseInt(filters.customerId, 10))
+                .map(region => (
+                  <SelectItem key={region.id} value={region.id}>{region.name}</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={filters.siteId || 'all'}
+            onValueChange={(value) => onFiltersChange({ ...filters, siteId: value === 'all' ? '' : value })}
+            disabled={isLoading}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by site" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sites</SelectItem>
+              {sites
+                .filter(site => {
+                  // Filter by customer if admin and customer is selected
+                  const customerMatch = !isAdmin || !filters.customerId || site.customerId === parseInt(filters.customerId, 10);
+                  // Filter by region if region is selected
+                  const regionMatch = !filters.regionId || site.regionId === filters.regionId;
+                  return customerMatch && regionMatch;
+                })
+                .map(site => (
+                  <SelectItem key={site.id} value={site.id}>{site.locationName}</SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>
@@ -130,7 +175,7 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
               <TableHead>Officer Name</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Customer</TableHead>
-              <TableHead>Location</TableHead>
+              <TableHead>Site</TableHead>
               <TableHead>Region</TableHead>
               <TableHead>Average Rating</TableHead>
               <TableHead>Actions</TableHead>

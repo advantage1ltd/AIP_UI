@@ -82,14 +82,14 @@ export default function LoginPage() {
       console.log('✅ Login successful:', {
         username: user.username,
         role: user.role,
-        pageAccessRole: user.pageAccessRole,
         timestamp: new Date().toISOString()
       })
 
-      // Set the page access role
-      console.log('🔑 Setting page access role:', user.pageAccessRole)
+      // Set the page access role - use role if pageAccessRole is not available
+      const roleToSet = user.role
+      console.log('🔑 Setting role for page access:', roleToSet)
       console.log('🔍 Full user object from login:', user)
-      setCurrentRole(user.pageAccessRole)
+      setCurrentRole(roleToSet)
 
       // All users now go to /dashboard
       const redirectPath = '/dashboard'
@@ -179,6 +179,27 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+          
+          {/* Development Helper - Test Credentials */}
+          {import.meta.env.DEV && (
+            <div className="mt-6 p-4 bg-slate-50 rounded-lg border">
+              <h3 className="text-sm font-semibold text-slate-700 mb-2">Test Credentials (Dev Only)</h3>
+              <div className="text-xs text-slate-600 space-y-1">
+                <div><strong>Central England COOP (ID: 21):</strong></div>
+                <div>• centralsite / centralsite123</div>
+                <div>• centralho / centralho123</div>
+                <div className="mt-2"><strong>Heart of England (ID: 22):</strong></div>
+                <div>• heartsite / heartsite123</div>
+                <div>• heartho / heartho123</div>
+                <div className="mt-2"><strong>Midcounties COOP (ID: 23):</strong></div>
+                <div>• midsite / midsite123</div>
+                <div>• midho / midho123</div>
+                <div className="mt-2"><strong>Advantage One:</strong></div>
+                <div>• admin / admin123</div>
+                <div>• officer / officer123</div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

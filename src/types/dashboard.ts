@@ -24,7 +24,7 @@ export interface IncidentDataPoint {
 
 export interface RecentIncident {
   id: string;
-  customerId: string;
+  customerId: number;
   date: string;
   regionId: string;
   regionName: string;
@@ -43,7 +43,7 @@ export interface RecentIncident {
 export interface CustomerStoreData {
   id: string;
   name: string;
-  customerId: string;
+  customerId: number;
   metrics: {
     CustomerHOManager: Metric[];
     CustomerSiteManager: Metric[];
@@ -60,12 +60,24 @@ export interface CustomerStoreData {
 export interface StoreData {
   id: string;
   name: string;
+  customerId: number;
+  metrics: {
+    'customer-site': Metric[];
+    'customer-ho': Metric[];
+  };
+  incidentData: {
+    daily: IncidentDataPoint[];
+    weekly: IncidentDataPoint[];
+    monthly: IncidentDataPoint[];
+    yearly: IncidentDataPoint[];
+  };
+  recentIncidents: Incident[];
 }
 
 export interface Region {
   id: string;
   name: string;
-  customerId: string;
+  customerId: number;
   code: string;
   status: string;
   createdAt: string;
@@ -74,7 +86,7 @@ export interface Region {
 
 export interface DailyActivity {
   id: string;
-  customerId: string;
+  customerId: number;
   type: string;
   location: string;
   time: string;
@@ -84,14 +96,14 @@ export interface DailyActivity {
 
 export interface SatisfactionDataPoint {
   id: string;
-  customerId: string;
+  customerId: number;
   month: string;
   score: number;
 }
 
 export interface BeSafeDataPoint {
   id: string;
-  customerId: string;
+  customerId: number;
   month: string;
   insecureAreas: number;
   compliance: number;
@@ -105,21 +117,6 @@ export interface Incident {
   officerName: string;
   date: string;
   amount: number;
-}
-
-export interface StoreData {
-  name: string;
-  metrics: {
-    'customer-site': Metric[];
-    'customer-ho': Metric[];
-  };
-  incidentData: {
-    daily: IncidentDataPoint[];
-    weekly: IncidentDataPoint[];
-    monthly: IncidentDataPoint[];
-    yearly: IncidentDataPoint[];
-  };
-  recentIncidents: Incident[];
 }
 
 export interface RegionalData {
@@ -177,20 +174,11 @@ export interface Task {
   priority: 'high' | 'medium' | 'low'
 }
 
-export interface Incident {
-  id: string
-  date: string
-  siteName: string
-  type: string
-  value: number
-  assignedTo: string
-}
-
 export interface Site {
   id: string;
   locationName: string;
   regionId: string;
-  customerId: string;
+  customerId: number;
   buildingName: string;
   street: string;
   town: string;

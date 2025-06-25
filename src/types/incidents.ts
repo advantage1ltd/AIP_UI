@@ -1,24 +1,37 @@
 export enum IncidentType {
-  ARREST = 'Arrest - Saved?',
-  DETER = 'Deter - Saved?',
-  THEFT = 'Theft - Loss?',
-  CRIMINAL_DAMAGE = 'Criminal Damage?',
-  CREDIT_CARD_FRAUD = 'Credit Card Fraud?',
-  SUSPICIOUS_BEHAVIOUR = 'Suspicious Behaviour?',
-  UNDERAGE_PURCHASE = 'Underage Purchase?',
-  ANTI_SOCIAL = 'Anti-Social Behaviour?',
-  OTHER = 'Other?'
+  THEFT = 'Theft',
+  THEFT_PREVENTION = 'Theft Prevention',
+  SUSPICIOUS_ACTIVITY = 'Suspicious Activity',
+  ANTI_SOCIAL = 'Anti-Social Behaviour',
+  ARREST = 'Arrest',
+  DETER = 'Deter',
+  UNDERAGE_PURCHASE = 'Underage Purchase',
+  CRIMINAL_DAMAGE = 'Criminal Damage',
+  CREDIT_CARD_FRAUD = 'Credit Card Fraud',
+  VIOLENT_BEHAVIOUR = 'Violent Behaviour',
+  ABUSIVE_BEHAVIOUR = 'Abusive Behaviour',
+  SHOPLIFTING = 'Shoplifting',
+  CUSTOMER_COMPLAINT = 'Customer Complaint',
+  SUSPICIOUS_BEHAVIOUR = 'Suspicious Behaviour',
+  SELF_SCAN_TILLS = 'Self Scan Tills',
+  SCAN_AND_GO = 'Scan and Go',
+  THREATS_AND_INTIMIDATION = 'Threats and Intimidation',
+  BAN_FROM_STORE = 'Ban from Store',
+  POLICE_INVOLVEMENT = 'Police Involvement',
+  SPITTING = 'Spitting',
+  POLICE_FAILED_TO_ATTEND = 'Police Failed to Attend',
+  OTHERS = 'Others'
 }
 
 export enum IncidentInvolved {
-  SELF_SCAN_TILLS = 'Self Scan Tills?',
-  ABUSIVE_BEHAVIOUR = 'Abusive behaviour?',
-  THREATS_AND_INTIMIDATION = 'Threats And Intimidation?',
-  SPITTING = 'Spitting?',
-  BAN_FROM_STORE = 'Ban From Store?',
-  VIOLENT_BEHAVIOR = 'Violent Behavior (Physical)?',
-  SCAN_AND_GO = 'Scan And Go?',
-  POLICE_FAILED_TO_ATTEND = 'Police Failed to Attend?'
+  SELF_SCAN_TILLS = 'Self Scan Tills',
+  SCAN_AND_GO = 'Scan and Go',
+  BAN_FROM_STORE = 'Ban from Store',
+  ABUSIVE_BEHAVIOUR = 'Abusive Behaviour',
+  THREATS_AND_INTIMIDATION = 'Threats and Intimidation',
+  SPITTING = 'Spitting',
+  VIOLENT_BEHAVIOR = 'Violent Behavior',
+  POLICE_FAILED_TO_ATTEND = 'Police Failed to Attend'
 }
 
 export type OffenderSex = 'Male' | 'Female' | 'N/A or N/K'
@@ -43,28 +56,63 @@ export interface StolenItem {
 }
 
 export interface Incident {
+  // Core identification
   id: string;
-  customerId?: string;
-  customerName?: string;
+  customerId: number;
+  customerName: string;
+
+  // Location information
+  siteName: string;
+  siteId?: string;
   regionId?: string;
   regionName?: string;
-  siteId?: string;
-  siteName?: string;
-  officerName?: string;
+  location?: string; // For graph display compatibility
+  store?: string; // Legacy field for backward compatibility
+
+  // Personnel information
+  officerName: string;
   officerRole?: string;
+  officerType?: string; // 'uniform', 'detective', etc.
   dutyManagerName?: string;
-  dateInputted: string | Date;
-  dateOfIncident: string | Date;
+  assignedTo?: string;
+
+  // Time information
+  dateOfIncident: string; // Primary date field
+  date?: string; // Legacy field for backward compatibility
   timeOfIncident?: string;
-  incidentType?: string;
+  dateInputted?: string;
+
+  // Incident classification
+  incidentType: string;
+  type?: string; // For graph compatibility
+  actionCode?: string;
+  incidentInvolved?: string[];
+
+  // Description and details
   description?: string;
   incidentDetails?: string;
   storeComments?: string;
+
+  // Financial information
   totalValueRecovered?: number;
+  value?: number; // Legacy field for graph compatibility
+  valueRecovered?: number; // Legacy field for graph compatibility
+  quantityRecovered?: number;
+  uniformOfficer?: number; // Value recovered by uniform officer
+  storeDetective?: number; // Value recovered by store detective
+  amount?: number; // Legacy field
+  total?: number; // Legacy field
+
+  // Stolen items
+  stolenItems?: StolenItem[];
+
+  // Police involvement
   policeInvolvement?: boolean;
   urnNumber?: string;
   crimeRefNumber?: string;
-  
+  policeID?: string;
+
+  // Status tracking
   status?: 'pending' | 'resolved' | 'in-progress';
   priority?: 'low' | 'medium' | 'high';
   actionTaken?: string;
@@ -72,20 +120,34 @@ export interface Incident {
   witnessStatements?: string[];
   involvedParties?: string[];
   reportNumber?: string;
-  
+
+  // Offender information
   offenderName?: string;
   offenderSex?: string;
+  gender?: 'Male' | 'Female' | 'N/A or N/K';
   offenderDOB?: string | Date;
   offenderPlaceOfBirth?: string;
   offenderAddress?: OffenderAddress;
-  gender?: 'Male' | 'Female' | 'N/A or N/K';
-  
-  policeID?: string;
+
+  // Special fields
   arrestSaveComment?: string;
-  
-  incidentInvolved?: string[];
-  stolenItems?: StolenItem[];
+
+  // View configuration (for role-based access)
   viewConfig?: {
     enabledPages: string[];
   };
+}
+
+export interface IncidentStats {
+  totalIncidents: number;
+  totalValue: number;
+  openIncidents: number;
+  resolvedIncidents: number;
+  incidentTypes: Record<string, number>;
+}
+
+export interface IncidentTrendData {
+  month: string;
+  incidents: number;
+  valueRecovered: number;
 }

@@ -43,7 +43,6 @@ interface CustomerDashboardProps {
 
 const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
   const { user } = useAuth();
-  // Add mounted ref
   const mountedRef = useRef(true);
   
   // State
@@ -64,14 +63,13 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
   const isSiteManager = userRole === 'CustomerSiteManager';
 
   const customerName = useMemo(() => {
-    if (user?.role === 'CustomerHOManager' || user?.role === 'CustomerSiteManager') {
-      const customer = AVAILABLE_CUSTOMERS.find(c => c.id === (user as any).companyId);
+    if (user?.customerId) {
+      const customer = AVAILABLE_CUSTOMERS.find(c => c.id === user.customerId);
       return customer?.name || 'Customer';
     }
     return 'Customer';
   }, [user]);
 
-  // Cleanup effect
   useEffect(() => {
     return () => {
       mountedRef.current = false;
@@ -94,7 +92,6 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
     }
   };
 
-  // Update dropdowns to include 'All Sites'
   const filteredSites = useMemo(() => {
     if (!selectedRegion || selectedRegion === 'all') {
       return sites;
@@ -102,7 +99,7 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
     return sites.filter(site => site.regionId === selectedRegion);
   }, [selectedRegion, sites]);
 
-  // Load initial data
+  // Load initial data, filtered by customerId
   useEffect(() => {
     const abortController = new AbortController();
     let isActive = true;
@@ -110,56 +107,31 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
     const loadInitialData = async () => {
       try {
         if (!isActive) return;
-        console.log('🔄 Starting initial data load...');
         setLoading(true);
         setError(null);
 
-        console.log('🔄 Loading initial data...');
-
-        // Load stores, regions, and sites individually for better debugging
-        console.log('🔄 Loading stores...');
+        // Load all data
         const storesData = await customerDashboardService.getStores(abortController.signal);
-        console.log('✅ Stores loaded:', storesData);
-
-        console.log('🔄 Loading regions...');
         const regionsData = await customerDashboardService.getRegions(abortController.signal);
-        console.log('✅ Regions loaded:', regionsData);
-
-        console.log('🔄 Loading sites...');
         const sitesData = await customerDashboardService.getSites(abortController.signal);
-        console.log('✅ Sites loaded:', sitesData);
 
-        console.log('📦 Initial data loaded:', { storesData, regionsData, sitesData });
+        // Filter by user.customerId
+        const filteredStores = storesData.filter(s => s.customerId === user.customerId);
+        const filteredRegions = regionsData.filter(r => r.customerId === user.customerId);
+        const filteredSites = sitesData.filter(s => s.customerId === user.customerId);
 
-        // Set data immediately without checking mounted state
-        setRegions(regionsData);
-        setSites(sitesData);
+        setRegions(filteredRegions);
+        setSites(filteredSites);
 
         // Set initial selections
-        if (regions.length > 0) {
-          setSelectedRegion('all'); // Default to "All" regions
+        if (filteredRegions.length > 0) {
+          setSelectedRegion('all');
         }
-        if (sitesData.length > 0 && !isSiteManager) {
-          setSelectedSite('all'); // For HO manager, default to "All Sites"
-        } else if (sitesData.length > 0 && isSiteManager) {
-          setSelectedSite(sitesData[0].id);
+        if (filteredSites.length > 0) {
+          setSelectedSite('all');
         }
-        // Set initial store if available and user is site manager
-        if (storesData.length > 0 && isSiteManager) {
-          console.log('🎯 Setting initial store:', storesData[0].id);
-          setSelectedSite(storesData[0].id);
-        }
-
-        // For HO Managers, we need to load aggregated data initially
-        if (!isSiteManager) {
-          console.log('✅ Setting loading to false for HO Manager');
-          setLoading(false);
-        } else {
-          console.log('⏳ Keeping loading true for Site Manager (waiting for store data)');
-        }
+        setLoading(false);
       } catch (err) {
-        console.error('❌ Error loading initial data:', err);
-        // Don't set error state if the error was due to abort
         if (!(err instanceof Error && err.name === 'AbortError')) {
           setError('Failed to load initial data');
         }
@@ -170,26 +142,35 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
     loadInitialData();
 
     return () => {
-      console.log('🧹 Cleaning up initial data load...');
       isActive = false;
       abortController.abort();
     };
-  }, [isSiteManager]);
+  }, [user?.customerId]);
 
   // Reset site selection when region changes
   useEffect(() => {
-    if (!isSiteManager) {
-      // For HO Manager, changing a region should clear the selected site
-      // to force a new selection.
-      setSelectedSite('');
+    // When region changes, reset site selection to "all" by default
+    if (selectedRegion === 'all') {
+      setSelectedSite('all'); // Show all sites when all regions selected
+    } else {
+      // When a specific region is selected, show all sites in that region
+      setSelectedSite('all');
     }
-    // For Site Manager, there's no region selector, so this is not a concern.
-  }, [selectedRegion, isSiteManager]);
+  }, [selectedRegion]);
 
   // Load site or aggregate data when selection changes
   useEffect(() => {
     const siteIds = getSiteIdsToAggregate();
-    if (!siteIds.length) return;
+    console.log('🔍 CustomerDashboard - Loading data for siteIds:', siteIds);
+    console.log('🔍 CustomerDashboard - Selected region:', selectedRegion);
+    console.log('🔍 CustomerDashboard - Selected site:', selectedSite);
+    console.log('🔍 CustomerDashboard - Available sites:', sites.map(s => ({ id: s.id, name: s.locationName })));
+    console.log('🔍 CustomerDashboard - Customer ID:', user?.customerId);
+    
+    if (!siteIds.length) {
+      console.log('❌ CustomerDashboard - No site IDs to load');
+      return;
+    }
 
     let isActive = true;
     const abortController = new AbortController();
@@ -203,11 +184,17 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
         let data;
         if (siteIds.length === 1) {
           // Single site
+          console.log('🔍 CustomerDashboard - Loading single site data for:', siteIds[0]);
           data = await customerDashboardService.getSiteData(siteIds[0], abortController.signal);
         } else {
           // Aggregate multiple sites
+          console.log('🔍 CustomerDashboard - Loading aggregated data for sites:', siteIds);
           data = await customerDashboardService.getAggregatedSitesData(siteIds, abortController.signal);
         }
+        
+        console.log('🔍 CustomerDashboard - Received site data:', data);
+        console.log('🔍 CustomerDashboard - Recent incidents count:', data?.recentIncidents?.length || 0);
+        
         const [satisfaction, beSafe, activities] = await Promise.all([
           customerDashboardService.getSatisfactionData(abortController.signal),
           customerDashboardService.getBeSafeData(abortController.signal),
@@ -219,6 +206,7 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
         setBeSafeData(beSafe || []);
         setDailyActivities(activities || []);
       } catch (err) {
+        console.error('❌ CustomerDashboard - Error loading data:', err);
         if (isActive) {
           setError('Failed to load dashboard data');
           setSiteData(null);
@@ -272,29 +260,7 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
     );
   }
 
-  // For site managers, we need store data to proceed
-  if (isSiteManager && !selectedSite) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" role="alert">
-        <div className="text-center p-4 rounded-lg bg-white shadow-lg">
-          <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" aria-hidden="true" />
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">No Site Selected</h2>
-          <p className="text-gray-600 mb-4">Please select a site to view its dashboard.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // For site managers, wait for store data to be loaded
-  if (isSiteManager && !siteData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" role="status">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
-  // Wait for store data to be loaded for both roles
+  // Wait for store data to be loaded
   if (!siteData) {
     return (
       <div className="min-h-screen flex items-center justify-center" role="status">
@@ -307,72 +273,67 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
   // For Site Managers, we need store data
   const metrics = siteData?.metrics?.[userRole] || [];
 
-  const iconMap = {
-    'Activity': Activity,
-    'AlertCircle': AlertCircle,
-    'Star': Star,
-    'Users': Users,
-    'Building2': Building2
-  } as const;
-
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-[90rem] py-4 sm:py-6 lg:py-8">
         <header className="mb-6 sm:mb-8">
           <DashboardGreeting className="mb-6" />
 
+          {/* Development Debug Info */}
+          {import.meta.env.DEV && user && (
+            <Card className="mb-4 border-blue-200 bg-blue-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-blue-700">Debug Info (Dev Only)</CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs text-blue-600">
+                <div>Customer ID: {user.customerId || 'Not found'}</div>
+                <div>Customer Name: {customerName}</div>
+                <div>User Role: {userRole}</div>
+                <div>Username: {user.username}</div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Dashboard Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold">
-                {isSiteManager ? `${siteData?.name} Overview` : `${customerName} Overview`}
+                {customerName} Overview
               </h1>
-              {isSiteManager ? (
-                <Store className="h-6 w-6 sm:h-7 sm:w-7 text-gray-500" aria-hidden="true" />
-              ) : (
-                <Building2 className="h-6 w-6 sm:h-7 sm:w-7 text-gray-500" aria-hidden="true" />
-              )}
+              <Building2 className="h-6 w-6 sm:h-7 sm:w-7 text-gray-500" aria-hidden="true" />
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              {!isSiteManager && (
-                <>
-                  <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                    <SelectTrigger className="w-full sm:w-[200px] h-11">
-                      <SelectValue placeholder="Select Region" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Regions</SelectItem>
-                      {regions.map((region) => (
-                        <SelectItem key={region.id} value={region.id}>
-                          {region.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                <SelectTrigger className="w-full sm:w-[200px] h-11">
+                  <SelectValue placeholder="Select Region" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Regions</SelectItem>
+                  {regions.map((region) => (
+                    <SelectItem key={region.id} value={region.id}>
+                      {region.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-                  <Select 
-                    value={selectedSite} 
-                    onValueChange={setSelectedSite}
-                    disabled={!selectedRegion || selectedRegion === 'all'}
-                  >
-                    <SelectTrigger className="w-full sm:w-[250px] h-11">
-                      <SelectValue placeholder="Select Site" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Sites</SelectItem>
-                      {filteredSites.map((site) => (
-                        <SelectItem key={site.id} value={site.id}>
-                          {site.locationName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </>
-              )}
-              {isSiteManager && (
-                <div className="text-lg font-medium text-gray-700">{siteData?.name}</div>
-              )}
+              <Select 
+                value={selectedSite} 
+                onValueChange={setSelectedSite}
+              >
+                <SelectTrigger className="w-full sm:w-[250px] h-11">
+                  <SelectValue placeholder="Select Site" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sites</SelectItem>
+                  {filteredSites.map((site) => (
+                    <SelectItem key={site.id} value={site.id}>
+                      {site.locationName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </header>
@@ -397,10 +358,6 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
                     <CardTitle className="text-base sm:text-lg text-white/90 font-medium">
                       {metric.title}
                     </CardTitle>
-                    {React.createElement(
-                      iconMap[metric.icon as keyof typeof iconMap] || Activity,
-                      { className: "h-5 w-5 sm:h-6 sm:w-6 text-white/90", "aria-hidden": "true" }
-                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-2">
@@ -634,7 +591,7 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
                     <div className="min-w-full p-4">
-                      <IncidentTable data={siteData.recentIncidents} />
+                      <IncidentTable data={siteData?.recentIncidents || []} />
                     </div>
                   </div>
                 </CardContent>

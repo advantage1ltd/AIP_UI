@@ -127,7 +127,7 @@ const BASE_URL = '/api/dashboard';
 // Helper function to get customer ID from auth context
 const getCustomerIdFromAuth = () => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  return user.companyId || 'COOP001'; // Default to COOP001 for testing
+  return user.customerId || 21; // Default to Central England COOP if no customerId found
 };
 
 // Helper function to add customer ID to headers
@@ -171,13 +171,19 @@ const getRegions = async (signal?: AbortSignal): Promise<Region[]> => {
 class CustomerDashboardService {
   private baseUrl = '/api/dashboard';
 
+  private getHeaders() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    return {
+      'Content-Type': 'application/json',
+      'X-Customer-Id': user.customerId?.toString() || '21'
+    };
+  }
+
   private async fetchWithSignal<T>(endpoint: string, signal?: AbortSignal): Promise<T> {
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         signal,
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        headers: this.getHeaders()
       });
 
       if (!response.ok) {

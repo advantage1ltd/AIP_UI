@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { mockIncidents } from "@/data/mockIncidents"
+// Removed mockIncidents import - now using API service
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   PlusCircle, 
@@ -189,8 +189,8 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
     }
   }, [deletingIncident, deleteMutation])
 
-  // Update pagination to use the API response
-  const { totalPages } = incidentsResponse.pagination
+  // Update pagination to use the API response (with safe fallback)
+  const { totalPages = 1 } = incidentsResponse.pagination || {}
 
   // Update the filtered and paginated incidents
   const paginatedIncidents = incidentsResponse.data
@@ -430,7 +430,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                       </TableCell>
                       <TableCell className="py-2 md:py-3 xl:py-4 hidden sm:table-cell whitespace-nowrap">{incident.officerName || 'N/A'}</TableCell>
                       <TableCell className="py-2 md:py-3 xl:py-4 hidden md:table-cell whitespace-nowrap">
-                        {incident.dateOfIncident ? new Date(incident.dateOfIncident).toLocaleDateString() : 'N/A'}
+                        {incident.date ? new Date(incident.date).toLocaleDateString() : 'N/A'}
                       </TableCell>
                       <TableCell className="py-2 md:py-3 xl:py-4 whitespace-nowrap">
                         £{(() => {
@@ -639,17 +639,17 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                         <p className="mt-1 text-sm text-gray-900">{viewingIncident.officerName || 'N/A'}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Officer Role</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.officerRole || 'N/A'}</p>
+                        <label className="text-sm font-medium text-gray-500">Assigned To</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.assignedTo || 'N/A'}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Duty Manager</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.dutyManagerName || 'N/A'}</p>
+                        <label className="text-sm font-medium text-gray-500">Status</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.status || 'N/A'}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Date Inputted</label>
+                        <label className="text-sm font-medium text-gray-500">Date</label>
                         <p className="mt-1 text-sm text-gray-900">
-                          {viewingIncident.dateInputted ? new Date(viewingIncident.dateInputted).toLocaleDateString() : 'N/A'}
+                          {viewingIncident.date ? new Date(viewingIncident.date).toLocaleDateString() : 'N/A'}
                         </p>
                       </div>
                     </div>
@@ -665,12 +665,12 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                       <div>
                         <label className="text-sm font-medium text-gray-500">Date of Incident</label>
                         <p className="mt-1 text-sm text-gray-900">
-                          {viewingIncident.dateOfIncident ? new Date(viewingIncident.dateOfIncident).toLocaleDateString() : 'N/A'}
+                          {viewingIncident.date ? new Date(viewingIncident.date).toLocaleDateString() : 'N/A'}
                         </p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Time of Incident</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.timeOfIncident || 'N/A'}</p>
+                        <label className="text-sm font-medium text-gray-500">Priority</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.priority || 'N/A'}</p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-500">Incident Type</label>

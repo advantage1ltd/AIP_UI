@@ -1,39 +1,37 @@
 import { useEffect, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
+import { AVAILABLE_CUSTOMERS } from "@/types/user"
 import type { CustomerWithRelations } from "@/types/customer"
-import { BASE_API_URL } from "@/config/api"
 
 export default function CustomerDailyActivityReport() {
   const navigate = useNavigate()
-  const { customerId } = useParams<{ customerId: string }>()
+  const { user, isLoading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [customer, setCustomer] = useState<CustomerWithRelations | null>(null)
+  const [customer, setCustomer] = useState<typeof AVAILABLE_CUSTOMERS[0] | null>(null)
 
   useEffect(() => {
-    const fetchCustomer = async () => {
-      if (!customerId) {
-        setError("Customer ID is required")
+    const loadCustomer = () => {
+      // Wait for auth to finish loading
+      if (authLoading) {
+        return;
+      }
+
+      if (!user?.customerId) {
+        setError("No customer ID found for user")
         setLoading(false)
         return
       }
 
       try {
-        const response = await fetch(`${BASE_API_URL}/customers/${customerId}`)
-        const data = await response.json()
-
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to fetch customer')
-        }
-
-        const customerData = data.data
+        const customerData = AVAILABLE_CUSTOMERS.find(c => c.id === user.customerId)
         
-        // Check if customer has access to this page
-        if (!customerData.pageAssignments?.['daily-activity']?.enabled) {
-          setError("You don't have access to this page for this customer")
+        if (!customerData) {
+          setError("Customer not found")
           return
         }
         
@@ -45,8 +43,8 @@ export default function CustomerDailyActivityReport() {
       }
     }
 
-    fetchCustomer()
-  }, [customerId])
+    loadCustomer()
+  }, [user?.customerId, authLoading])
 
   if (loading) {
     return (
@@ -84,7 +82,7 @@ export default function CustomerDailyActivityReport() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <h2 className="text-xl font-semibold">{customer?.companyName}</h2>
+        <h2 className="text-xl font-semibold">{customer?.name}</h2>
       </div>
 
       <Card className="p-6">
@@ -93,15 +91,15 @@ export default function CustomerDailyActivityReport() {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h3 className="font-medium text-blue-900 mb-2">Customer Information</h3>
             <div className="text-sm text-blue-800 space-y-1">
-              <p><strong>Company:</strong> {customer?.companyName}</p>
-              <p><strong>Customer ID:</strong> {customerId}</p>
-              <p><strong>Type:</strong> {Array.isArray(customer?.customerType) ? customer?.customerType.join(', ') : customer?.customerType}</p>
-              <p><strong>Sites:</strong> {customer?.sites?.length || 0}</p>
+              <p><strong>Company:</strong> {customer?.name}</p>
+              <p><strong>Customer ID:</strong> {customer?.id}</p>
+              <p><strong>Type:</strong> Security Services</p>
+              <p><strong>Status:</strong> Active</p>
             </div>
           </div>
           
           <p className="text-muted-foreground">
-            This is the daily activity report for <strong>{customer?.companyName}</strong>.
+            This is the daily activity report for <strong>{customer?.name}</strong>.
             In a real application, this would show the daily activity logs,
             security checks, patrol reports, and other relevant information specific to this customer.
           </p>

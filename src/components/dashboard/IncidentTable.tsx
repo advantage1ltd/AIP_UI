@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react'
-import { Search } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 
 interface IncidentReport {
   id: string
   customerName: string
-  store: string
+  store?: string
+  siteName?: string // Add siteName as alternative to store
   officerName: string
   date: string
   amount: number
@@ -17,8 +18,11 @@ interface DataTableProps {
   data: IncidentReport[]
 }
 
+const ITEMS_PER_PAGE = 5
+
 export function IncidentTable({ data }: DataTableProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const [sortConfig, setSortConfig] = useState<{
     key: keyof IncidentReport | null
     direction: 'asc' | 'desc'
@@ -27,16 +31,21 @@ export function IncidentTable({ data }: DataTableProps) {
   const sortData = (key: keyof IncidentReport) => {
     const direction = sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc'
     setSortConfig({ key, direction })
+    // Reset to first page when sorting
+    setCurrentPage(1)
   }
 
   const filteredAndSortedData = useMemo(() => {
     let processed = [...data]
 
     // Debug logging
-    console.log('Data received in IncidentTable:', data)
+    console.log('🔍 IncidentTable - Data received:', data)
+    console.log('🔍 IncidentTable - Data length:', data?.length || 0)
+    console.log('🔍 IncidentTable - First item structure:', data?.[0])
 
     // If data is empty, return empty array
     if (!data || data.length === 0) {
+      console.log('❌ IncidentTable - No data provided')
       return [];
     }
 
@@ -46,12 +55,16 @@ export function IncidentTable({ data }: DataTableProps) {
       processed = processed.filter(
         item =>
           item.customerName.toLowerCase().includes(query) ||
-          item.store.toLowerCase().includes(query) ||
+          item.store?.toLowerCase().includes(query) ||
+          item.siteName?.toLowerCase().includes(query) ||
           item.officerName.toLowerCase().includes(query) ||
           new Date(item.date).toLocaleDateString().toLowerCase().includes(query) ||
           item.amount.toString().includes(query) ||
           item.incidentType.toLowerCase().includes(query)
       )
+      console.log('🔍 IncidentTable - After filtering:', processed.length)
+      // Reset to first page when filtering
+      setCurrentPage(1)
     }
 
     // Sort
@@ -85,8 +98,25 @@ export function IncidentTable({ data }: DataTableProps) {
       })
     }
 
+    console.log('🔍 IncidentTable - Final processed data:', processed.length)
     return processed
   }, [data, searchQuery, sortConfig])
+
+  // Reset current page when search changes
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value)
+    setCurrentPage(1)
+  }
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredAndSortedData.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const currentPageData = filteredAndSortedData.slice(startIndex, endIndex)
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+  }
 
   const getSortIcon = (key: keyof IncidentReport) => {
     if (sortConfig.key !== key) return '↕'
@@ -101,11 +131,17 @@ export function IncidentTable({ data }: DataTableProps) {
           <Input
             placeholder="Search incidents..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleSearchChange}
             className="h-8 w-[150px] text-xs md:text-sm lg:w-[250px]"
           />
         </div>
+        {filteredAndSortedData.length > 0 && (
+          <div className="text-xs md:text-sm text-muted-foreground">
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredAndSortedData.length)} of {filteredAndSortedData.length} incidents
+          </div>
+        )}
       </div>
+      
       <div className="rounded-md border">
         <table className="w-full caption-bottom text-[13px] md:text-sm">
           <thead>
@@ -169,11 +205,11 @@ export function IncidentTable({ data }: DataTableProps) {
               </tr>
             )}
             
-            {filteredAndSortedData.length > 0 ? (
-              filteredAndSortedData.map((report) => (
+            {currentPageData.length > 0 ? (
+              currentPageData.map((report) => (
                 <tr key={report.id} className="border-b transition-colors hover:bg-muted/50">
                   <td className="p-2 align-middle font-medium leading-relaxed md:p-4">{report.customerName}</td>
-                  <td className="p-2 align-middle text-muted-foreground leading-relaxed md:p-4">{report.store}</td>
+                  <td className="p-2 align-middle text-muted-foreground leading-relaxed md:p-4">{report.store || report.siteName}</td>
                   <td className="p-2 align-middle text-muted-foreground leading-relaxed md:p-4">{report.officerName}</td>
                   <td className="p-2 align-middle text-muted-foreground tabular-nums leading-relaxed md:p-4">
                     {new Date(report.date).toLocaleDateString()}
@@ -197,6 +233,70 @@ export function IncidentTable({ data }: DataTableProps) {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
+          <div className="text-xs md:text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="h-8 w-8 p-0"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            {/* Page numbers */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                let pageNumber: number;
+                
+                if (totalPages <= 5) {
+                  pageNumber = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNumber = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNumber = totalPages - 4 + i;
+                } else {
+                  pageNumber = currentPage - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNumber}
+                    variant={currentPage === pageNumber ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => goToPage(pageNumber)}
+                    className="h-8 w-8 p-0 text-xs"
+                    aria-label={`Go to page ${pageNumber}`}
+                    aria-current={currentPage === pageNumber ? "page" : undefined}
+                  >
+                    {pageNumber}
+                  </Button>
+                );
+              })}
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="h-8 w-8 p-0"
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

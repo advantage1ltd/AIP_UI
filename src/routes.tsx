@@ -54,7 +54,7 @@ import TakeTest from '@/pages/recruitment/TakeTest';
 
 // Import customer pages with lazy loading
 const DailyActivityReportPage = lazy(() => import('./pages/customer/CustomerDailyActivityReport'));
-const IncidentGraphPage = lazy(() => import('./pages/customer/CustomerIncidentGraph'));
+const IncidentGraphPage = lazy(() => import('./pages/customer/IncidentGraph').then(module => ({ default: module.default })));
 const CustomerIncidentReportPage = lazy(() => import('./pages/customer/CustomerIncidentReport'));
 const CustomerSatisfactionReport = lazy(() => import('./pages/customer/CustomerSatisfactionReport'));
 const BeSafeBeSecureGraphPage = lazy(() => import('./pages/customer/BeSafeBeSecureGraphPage'));

@@ -72,7 +72,8 @@ export interface BaseUser {
 
 export interface CustomerUser extends BaseUser {
   role: Extract<UserRole, 'CustomerSiteManager' | 'CustomerHOManager'>;
-  companyId: string;
+  customerId: number;
+  companyId?: number; // For backward compatibility
 }
 
 export interface AdvantageOneUser extends BaseUser {
@@ -122,9 +123,9 @@ export interface UsersResponse {
 }
 
 export const AVAILABLE_CUSTOMERS = [
-  { id: "COOP001", name: "Central England COOP" },
-  { id: "COOP002", name: "Midcounties COOP" },
-  { id: "COOP003", name: "Heart of England COOP" }
+  { id: 21, name: "Central England COOP" },
+  { id: 22, name: "Heart of England" },
+  { id: 23, name: "Midcounties COOP" }
 ];
 
 export interface CreateUserInput extends Omit<User, 'id' | 'createdAt' | 'updatedAt'> {}
