@@ -57,7 +57,7 @@ const DailyActivityReportPage = lazy(() => import('./pages/customer/CustomerDail
 const IncidentGraphPage = lazy(() => import('./pages/customer/IncidentGraph').then(module => ({ default: module.default })));
 const CustomerIncidentReportPage = lazy(() => import('./pages/customer/CustomerIncidentReport'));
 const CustomerSatisfactionReport = lazy(() => import('./pages/customer/CustomerSatisfactionReport'));
-const BeSafeBeSecureGraphPage = lazy(() => import('./pages/customer/BeSafeBeSecureGraphPage'));
+const DailyActivityReportGraphs = lazy(() => import('./pages/customer/DailyActivityReportGraphs'));
 const CustomerOfficerSupportPage = lazy(() => import('./pages/customer/CustomerOfficerSupportPage'));
 const CustomerReporting = lazy(() => import('./pages/customer/CustomerReporting'));
 const CustomerViewsConfig = lazy(() => import('./pages/customer/CustomerViewsConfig'));
@@ -304,7 +304,7 @@ const router = createBrowserRouter([
             path: 'customer/be-safe-be-secure',
             element: (
               <ProtectedRoute allowedRoles={['CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
-                <BeSafeBeSecureGraphPage />
+                <DailyActivityReportGraphs />
               </ProtectedRoute>
             ),
           },

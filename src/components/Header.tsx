@@ -534,7 +534,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           roles: ['administrator', 'advantage-ho', 'customer-ho'],
         },
         {
-          title: "Be Safe Be Secure Graph",
+          title: "Daily Activity Graphs",
           href: "/customer/be-safe-be-secure-graph",
           icon: <ShieldCheck className="h-4 w-4" />,
           roles: ['administrator', 'advantage-ho', 'customer-ho'],

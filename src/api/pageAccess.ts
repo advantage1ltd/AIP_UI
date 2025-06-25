@@ -188,7 +188,7 @@ const availablePages: PageAccess[] = [
   { id: 'customer-views-config', title: 'Views Configuration', path: '/customer/views-config' },
   { id: 'customer-incident-report', title: 'Incident Report', path: '/customer/incident-report' },
   { id: 'customer-satisfaction-report', title: 'Satisfaction Report', path: '/customer/satisfaction-report' },
-  { id: 'customer-be-safe-be-secure', title: 'Be Safe Be Secure', path: '/customer/be-safe-be-secure' },
+  { id: 'customer-be-safe-be-secure', title: 'Daily Activity Graphs', path: '/customer/be-safe-be-secure' },
   { id: 'customer-daily-activity-report', title: 'Daily Activity Report', path: '/customer/daily-activity-report' },
   { id: 'customer-incident-graph', title: 'Incident Graph', path: '/customer/incident-graph' },
   { id: 'customer-officer-support', title: 'Officer Support', path: '/customer/officer-support' },

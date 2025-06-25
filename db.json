@@ -601,7 +601,7 @@
       { "id": "incident-graph", "title": "Incident Graph", "path": "/customer/incident-graph" },
       { "id": "customer-incident-report", "title": "Customer Incident Report", "path": "/customer/incident-report" },
       { "id": "satisfaction-reports", "title": "Satisfaction Reports", "path": "/customer/satisfaction-report" },
-      { "id": "be-safe-be-secure-graph", "title": "Be Safe Be Secure Graph", "path": "/customer/be-safe-be-secure" },
+      { "id": "be-safe-be-secure-graph", "title": "Daily Activity Graphs", "path": "/customer/be-safe-be-secure" },
       { "id": "customer-officer-support", "title": "Customer Officer Support", "path": "/customer/officer-support" },
       { "id": "customer-views-config", "title": "Customer Views Config", "path": "/customer/views-config" },
       

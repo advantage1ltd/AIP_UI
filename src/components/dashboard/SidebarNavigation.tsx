@@ -675,7 +675,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                     <NavItem
                     to="/customer/be-safe-be-secure"
                       icon={<ShieldCheck className="h-4 w-4" />}
-                    label="Be Safe Be Secure"
+                    label="Daily Activity Graphs"
                       onClick={onNavigate}
                     />
                   )}

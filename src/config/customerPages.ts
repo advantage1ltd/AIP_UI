@@ -47,7 +47,7 @@ export const CUSTOMER_PAGES: Record<string, CustomerPage> = {
   },
   'be-safe-be-secure': {
     id: 'customer-be-safe-be-secure',
-    title: 'Be Safe Be Secure',
+    title: 'Daily Activity Graphs',
     description: 'View and manage security awareness and safety information',
     enabled: true,
     requiredForTypes: ['event', 'static', 'retail', 'gatehouse'],
