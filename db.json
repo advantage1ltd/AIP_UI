@@ -3766,5 +3766,1235 @@
       "createdAt": "2024-12-06T14:55:00.000Z",
       "updatedAt": "2024-12-06T14:55:00.000Z"
     }
+  ],
+  "dailyActivityReports": [
+    {
+      "id": "DAR001",
+      "customerId": 21,
+      "customerName": "Central England COOP",
+      "siteId": "s1",
+      "siteName": "Birmingham Central Store",
+      "reportDate": "2024-12-15",
+      "officerName": "David Wilson",
+      "shiftStart": "06:00",
+      "shiftEnd": "14:00",
+      "activities": [
+        {
+          "id": "act1",
+          "time": "06:00",
+          "activity": "Shift Handover",
+          "location": "Security Office",
+          "description": "Received briefing from night officer, reviewed overnight incidents",
+          "status": "completed"
+        },
+        {
+          "id": "act2",
+          "time": "06:30",
+          "activity": "Perimeter Check",
+          "location": "External Perimeter",
+          "description": "Complete perimeter walk, checked all access points and fencing",
+          "status": "completed"
+        },
+        {
+          "id": "act3",
+          "time": "09:00",
+          "activity": "Customer Service Patrol",
+          "location": "Sales Floor",
+          "description": "Visible patrol on sales floor, assisted customers and staff",
+          "status": "completed"
+        },
+        {
+          "id": "act4",
+          "time": "12:00",
+          "activity": "Lunch Break Coverage",
+          "location": "Staff Area",
+          "description": "Monitored staff areas during lunch breaks",
+          "status": "completed"
+        }
+      ],
+      "incidents": [
+        {
+          "id": "inc1",
+          "time": "10:30",
+          "type": "security",
+          "severity": "low",
+          "description": "Customer dispute over return policy",
+          "actionTaken": "Mediated discussion between customer and staff, resolved amicably",
+          "resolved": true
+        }
+      ],
+      "securityChecks": [
+        {
+          "id": "sc1",
+          "time": "07:00",
+          "area": "Fire Exits",
+          "checkType": "fire-safety",
+          "status": "all-clear",
+          "notes": "All fire exits clear and accessible"
+        },
+        {
+          "id": "sc2",
+          "time": "11:00",
+          "area": "CCTV System",
+          "checkType": "equipment",
+          "status": "all-clear",
+          "notes": "All cameras operational, no blind spots"
+        }
+      ],
+      "visitorLog": [
+        {
+          "id": "v1",
+          "time": "08:30",
+          "visitorName": "John Smith",
+          "company": "ABC Maintenance",
+          "purpose": "HVAC system maintenance",
+          "escortedBy": "Store Manager",
+          "exitTime": "10:30",
+          "badgeNumber": "V001"
+        }
+      ],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "Poster clearly displayed in main entrance" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "yes", "description": "NOT INSTORED" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Quiet day overall. Staff were cooperative and customers were generally well-behaved. Recommend continued visible presence during peak hours.",
+      "weatherConditions": "Clear, 15°C",
+      "createdAt": "2024-12-15T14:15:00.000Z",
+      "updatedAt": "2024-12-15T14:15:00.000Z"
+    },
+    {
+      "id": "DAR002",
+      "customerId": 22,
+      "customerName": "Heart of England",
+      "siteId": "s13",
+      "siteName": "Stratford Store",
+      "reportDate": "2024-12-14",
+      "officerName": "Emily Roberts",
+      "shiftStart": "14:00",
+      "shiftEnd": "22:00",
+      "activities": [
+        {
+          "id": "act5",
+          "time": "14:00",
+          "activity": "Shift Handover",
+          "location": "Security Office",
+          "description": "Received handover from day officer, reviewed daily briefing",
+          "status": "completed"
+        },
+        {
+          "id": "act6",
+          "time": "15:00",
+          "activity": "Access Control Check",
+          "location": "Main Entrance",
+          "description": "Verified access card readers and visitor management system",
+          "status": "completed"
+        },
+        {
+          "id": "act7",
+          "time": "18:00",
+          "activity": "Evening Security Sweep",
+          "location": "Entire Building",
+          "description": "Complete building sweep before evening closure preparations",
+          "status": "completed"
+        },
+        {
+          "id": "act8",
+          "time": "21:30",
+          "activity": "Final Security Check",
+          "location": "All Areas",
+          "description": "Final walkthrough before handover to night security",
+          "status": "completed"
+        }
+      ],
+      "incidents": [
+        {
+          "id": "inc2",
+          "time": "16:45",
+          "type": "safety",
+          "severity": "medium",
+          "description": "Wet floor in main corridor causing slip hazard",
+          "actionTaken": "Placed warning signs, contacted cleaning team, area cordoned off",
+          "resolved": true
+        }
+      ],
+      "securityChecks": [
+        {
+          "id": "sc3",
+          "time": "16:00",
+          "area": "Emergency Exits",
+          "checkType": "fire-safety",
+          "status": "all-clear",
+          "notes": "All emergency exits clear and properly lit"
+        },
+        {
+          "id": "sc4",
+          "time": "20:00",
+          "area": "Cash Office",
+          "checkType": "access-control",
+          "status": "all-clear",
+          "notes": "Secure, no unauthorized access attempts"
+        }
+      ],
+      "visitorLog": [
+        {
+          "id": "v2",
+          "time": "15:30",
+          "visitorName": "Sarah Johnson",
+          "company": "Regional Manager",
+          "purpose": "Store inspection",
+          "escortedBy": "Store Manager",
+          "exitTime": "17:00"
+        }
+      ],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "yes", "description": "COMFIRM FROM TL" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "no", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Busy afternoon with increased customer traffic. Minor safety issue resolved quickly. Staff training session conducted during quiet period.",
+      "weatherConditions": "Overcast, 12°C",
+      "createdAt": "2024-12-14T22:10:00.000Z",
+      "updatedAt": "2024-12-14T22:10:00.000Z"
+    },
+    {
+      "id": "DAR003",
+      "customerId": 23,
+      "customerName": "Midcounties COOP",
+      "siteId": "s7",
+      "siteName": "Leicester Store",
+      "reportDate": "2024-12-13",
+      "officerName": "Sophie Clarke",
+      "shiftStart": "22:00",
+      "shiftEnd": "06:00",
+      "activities": [
+        {
+          "id": "act9",
+          "time": "22:00",
+          "activity": "Night Shift Handover",
+          "location": "Security Office",
+          "description": "Received handover from evening officer, reviewed security status",
+          "status": "completed"
+        },
+        {
+          "id": "act10",
+          "time": "23:00",
+          "activity": "Building Lockdown",
+          "location": "All Entrances",
+          "description": "Secured all entrances and activated night security systems",
+          "status": "completed"
+        },
+        {
+          "id": "act11",
+          "time": "02:00",
+          "activity": "Hourly Patrol",
+          "location": "Store Interior",
+          "description": "Regular patrol of sales floor and storage areas",
+          "status": "completed"
+        },
+        {
+          "id": "act12",
+          "time": "05:30",
+          "activity": "Opening Preparation",
+          "location": "Main Entrance",
+          "description": "Prepared for morning opening, deactivated night systems",
+          "status": "completed"
+        }
+      ],
+      "incidents": [
+        {
+          "id": "inc3",
+          "time": "01:30",
+          "type": "security",
+          "severity": "medium",
+          "description": "Motion detector activation in stock room",
+          "actionTaken": "Investigated immediately, found to be caused by settling merchandise, reset system",
+          "resolved": true
+        }
+      ],
+      "securityChecks": [
+        {
+          "id": "sc5",
+          "time": "00:00",
+          "area": "Perimeter",
+          "checkType": "perimeter",
+          "status": "all-clear",
+          "notes": "External perimeter secure, no signs of attempted entry"
+        },
+        {
+          "id": "sc6",
+          "time": "03:00",
+          "area": "Alarm System",
+          "checkType": "equipment",
+          "status": "all-clear",
+          "notes": "All alarm sensors operational and responsive"
+        }
+      ],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Quiet night shift with one minor alarm activation. All systems functioning normally. Early morning delivery preparations completed smoothly.",
+      "weatherConditions": "Light rain, 8°C",
+      "createdAt": "2024-12-13T06:15:00.000Z",
+      "updatedAt": "2024-12-13T06:15:00.000Z"
+    },
+    {
+      "id": "DAR004",
+      "customerId": 21,
+      "customerName": "Central England COOP",
+      "siteId": "s2",
+      "siteName": "Coventry Store",
+      "reportDate": "2024-12-12",
+      "officerName": "James Miller",
+      "shiftStart": "06:00",
+      "shiftEnd": "14:00",
+      "activities": [
+        {
+          "id": "act13",
+          "time": "06:00",
+          "activity": "Morning Briefing",
+          "location": "Security Office",
+          "description": "Reviewed overnight reports and daily security objectives",
+          "status": "completed"
+        },
+        {
+          "id": "act14",
+          "time": "08:00",
+          "activity": "Customer Assistance",
+          "location": "Car Park",
+          "description": "Assisted elderly customer with heavy shopping to vehicle",
+          "status": "completed"
+        },
+        {
+          "id": "act15",
+          "time": "11:00",
+          "activity": "Delivery Supervision",
+          "location": "Loading Bay",
+          "description": "Supervised food delivery and verified documentation",
+          "status": "completed"
+        }
+      ],
+      "incidents": [],
+      "securityChecks": [
+        {
+          "id": "sc7",
+          "time": "07:00",
+          "area": "Car Park",
+          "checkType": "perimeter",
+          "status": "all-clear",
+          "notes": "Car park clear, adequate lighting, no suspicious activity"
+        }
+      ],
+      "visitorLog": [
+        {
+          "id": "v3",
+          "time": "09:00",
+          "visitorName": "Mike Johnson",
+          "company": "Fresh Foods Ltd",
+          "purpose": "Delivery",
+          "exitTime": "09:30"
+        }
+      ],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Standard day shift with good customer interactions. No security concerns. Staff appreciated assistance with customer service.",
+      "weatherConditions": "Sunny, 18°C",
+      "createdAt": "2024-12-12T14:20:00.000Z",
+      "updatedAt": "2024-12-12T14:20:00.000Z"
+    },
+    {
+      "id": "DAR005",
+      "customerId": 22,
+      "customerName": "Heart of England",
+      "siteId": "s14",
+      "siteName": "Warwick Store",
+      "reportDate": "2024-12-11",
+      "officerName": "Thomas Anderson",
+      "shiftStart": "14:00",
+      "shiftEnd": "22:00",
+      "activities": [
+        {
+          "id": "act16",
+          "time": "14:00",
+          "activity": "Afternoon Handover",
+          "location": "Security Office",
+          "description": "Received briefing on ongoing issues and priorities",
+          "status": "completed"
+        },
+        {
+          "id": "act17",
+          "time": "17:00",
+          "activity": "Peak Hour Patrol",
+          "location": "Sales Floor",
+          "description": "Increased visibility during peak shopping hours",
+          "status": "completed"
+        },
+        {
+          "id": "act18",
+          "time": "21:00",
+          "activity": "Closing Procedures",
+          "location": "Store",
+          "description": "Assisted with store closing and security activation",
+          "status": "completed"
+        }
+      ],
+      "incidents": [
+        {
+          "id": "inc4",
+          "time": "19:30",
+          "type": "security",
+          "severity": "low",
+          "description": "Shoplifting attempt - suspect left store when approached",
+          "actionTaken": "Followed protocol, informed management, reviewed CCTV footage",
+          "resolved": true
+        }
+      ],
+      "securityChecks": [
+        {
+          "id": "sc8",
+          "time": "18:00",
+          "area": "High Value Items",
+          "checkType": "equipment",
+          "status": "all-clear",
+          "notes": "Security tags and displays all secure"
+        }
+      ],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Active afternoon with good deterrent effect. Quick response to potential shoplifting incident prevented any loss.",
+      "weatherConditions": "Cloudy, 14°C",
+      "createdAt": "2024-12-11T22:15:00.000Z",
+      "updatedAt": "2024-12-11T22:15:00.000Z"
+    },
+    {
+      "id": "DAR006",
+      "customerId": 23,
+      "customerName": "Midcounties COOP",
+      "siteId": "s25",
+      "siteName": "Oxford Store",
+      "reportDate": "2024-12-10",
+      "officerName": "Sarah Mitchell",
+      "shiftStart": "06:00",
+      "shiftEnd": "14:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Regular morning shift with routine security checks completed.",
+      "weatherConditions": "Overcast, 12°C",
+      "createdAt": "2024-12-10T14:10:00.000Z",
+      "updatedAt": "2024-12-10T14:10:00.000Z"
+    },
+    {
+      "id": "DAR007",
+      "customerId": 21,
+      "customerName": "Central England COOP",
+      "siteId": "s3",
+      "siteName": "Leicester Store",
+      "reportDate": "2024-12-09",
+      "officerName": "Robert Taylor",
+      "shiftStart": "22:00",
+      "shiftEnd": "06:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Quiet night shift. All security systems operational.",
+      "weatherConditions": "Clear, 5°C",
+      "createdAt": "2024-12-09T06:05:00.000Z",
+      "updatedAt": "2024-12-09T06:05:00.000Z"
+    },
+    {
+      "id": "DAR008",
+      "customerId": 22,
+      "customerName": "Heart of England",
+      "siteId": "s15",
+      "siteName": "Rugby Store",
+      "reportDate": "2024-12-08",
+      "officerName": "Lisa Parker",
+      "shiftStart": "14:00",
+      "shiftEnd": "22:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "yes", "description": "Till 3 had over £200 in small denominations" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "no", "description": "Door found unlocked at 3pm" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "yes", "description": "Camera 5 in car park not functioning" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Several issues noted - manager's office security breach and CCTV camera malfunction reported.",
+      "weatherConditions": "Light rain, 9°C",
+      "createdAt": "2024-12-08T22:10:00.000Z",
+      "updatedAt": "2024-12-08T22:10:00.000Z"
+    },
+    {
+      "id": "DAR009",
+      "customerId": 23,
+      "customerName": "Midcounties COOP",
+      "siteId": "s26",
+      "siteName": "Reading Store",
+      "reportDate": "2024-12-07",
+      "officerName": "Michael Brown",
+      "shiftStart": "06:00",
+      "shiftEnd": "14:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Standard morning shift with all compliance checks passed.",
+      "weatherConditions": "Sunny, 16°C",
+      "createdAt": "2024-12-07T14:15:00.000Z",
+      "updatedAt": "2024-12-07T14:15:00.000Z"
+    },
+    {
+      "id": "DAR010",
+      "customerId": 21,
+      "customerName": "Central England COOP",
+      "siteId": "s1",
+      "siteName": "Birmingham Central Store",
+      "reportDate": "2024-12-06",
+      "officerName": "Jennifer White",
+      "shiftStart": "14:00",
+      "shiftEnd": "22:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Evening shift completed without incidents. Customer flow was steady.",
+      "weatherConditions": "Cloudy, 11°C",
+      "createdAt": "2024-12-06T22:20:00.000Z",
+      "updatedAt": "2024-12-06T22:20:00.000Z"
+    },
+    {
+      "id": "DAR011",
+      "customerId": 22,
+      "customerName": "Heart of England",
+      "siteId": "s13",
+      "siteName": "Stratford Store",
+      "reportDate": "2024-12-05",
+      "officerName": "Paul Davis",
+      "shiftStart": "22:00",
+      "shiftEnd": "06:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "yes", "description": "Delivery boxes blocking rear fire exit" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "no", "description": "Gate lock mechanism faulty" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Fire route obstruction cleared immediately. Service yard gate requires maintenance attention.",
+      "weatherConditions": "Foggy, 4°C",
+      "createdAt": "2024-12-05T06:25:00.000Z",
+      "updatedAt": "2024-12-05T06:25:00.000Z"
+    },
+    {
+      "id": "DAR012",
+      "customerId": 23,
+      "customerName": "Midcounties COOP",
+      "siteId": "s27",
+      "siteName": "Swindon Store",
+      "reportDate": "2024-12-04",
+      "officerName": "Angela Martin",
+      "shiftStart": "06:00",
+      "shiftEnd": "14:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Smooth morning operations with excellent staff cooperation.",
+      "weatherConditions": "Partly cloudy, 13°C",
+      "createdAt": "2024-12-04T14:30:00.000Z",
+      "updatedAt": "2024-12-04T14:30:00.000Z"
+    },
+    {
+      "id": "DAR013",
+      "customerId": 21,
+      "customerName": "Central England COOP",
+      "siteId": "s2",
+      "siteName": "Coventry Store",
+      "reportDate": "2024-12-03",
+      "officerName": "David Wilson",
+      "shiftStart": "14:00",
+      "shiftEnd": "22:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Regular evening shift with routine patrols completed.",
+      "weatherConditions": "Drizzle, 8°C",
+      "createdAt": "2024-12-03T22:05:00.000Z",
+      "updatedAt": "2024-12-03T22:05:00.000Z"
+    },
+    {
+      "id": "DAR014",
+      "customerId": 22,
+      "customerName": "Heart of England",
+      "siteId": "s14",
+      "siteName": "Warwick Store",
+      "reportDate": "2024-12-02",
+      "officerName": "Rachel Green",
+      "shiftStart": "22:00",
+      "shiftEnd": "06:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Peaceful night shift with no security concerns.",
+      "weatherConditions": "Clear, 2°C",
+      "createdAt": "2024-12-02T06:15:00.000Z",
+      "updatedAt": "2024-12-02T06:15:00.000Z"
+    },
+    {
+      "id": "DAR015",
+      "customerId": 23,
+      "customerName": "Midcounties COOP",
+      "siteId": "s25",
+      "siteName": "Oxford Store",
+      "reportDate": "2024-12-01",
+      "officerName": "Kevin Smith",
+      "shiftStart": "06:00",
+      "shiftEnd": "14:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "yes", "description": "Multiple tills exceeded limit during busy morning" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "yes", "description": "Manager's keys left on counter in office" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "no", "description": "Poster missing from main entrance" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "no", "description": "Door not properly closed at 10am" },
+        "managersOffice": { "value": "no", "description": "Key security issue noted above" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Multiple compliance issues identified and reported to management. Immediate action required for security improvements.",
+      "weatherConditions": "Rainy, 10°C",
+      "createdAt": "2024-12-01T14:45:00.000Z",
+      "updatedAt": "2024-12-01T14:45:00.000Z"
+    },
+    {
+      "id": "DAR016",
+      "customerId": 21,
+      "customerName": "Central England COOP",
+      "siteId": "s3",
+      "siteName": "Leicester Store",
+      "reportDate": "2024-11-30",
+      "officerName": "Emma Johnson",
+      "shiftStart": "14:00",
+      "shiftEnd": "22:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Month-end security review completed. All systems operational and compliant.",
+      "weatherConditions": "Windy, 7°C",
+      "createdAt": "2024-11-30T22:30:00.000Z",
+      "updatedAt": "2024-11-30T22:30:00.000Z"
+    },
+    {
+      "id": "DAR017",
+      "customerId": 22,
+      "customerName": "Heart of England",
+      "siteId": "s15",
+      "siteName": "Rugby Store",
+      "reportDate": "2024-11-29",
+      "officerName": "Mark Thompson",
+      "shiftStart": "22:00",
+      "shiftEnd": "06:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Quiet night with regular security rounds completed on schedule.",
+      "weatherConditions": "Frost, -1°C",
+      "createdAt": "2024-11-29T06:20:00.000Z",
+      "updatedAt": "2024-11-29T06:20:00.000Z"
+    },
+    {
+      "id": "DAR018",
+      "customerId": 23,
+      "customerName": "Midcounties COOP",
+      "siteId": "s26",
+      "siteName": "Reading Store",
+      "reportDate": "2024-11-28",
+      "officerName": "Helen Davis",
+      "shiftStart": "06:00",
+      "shiftEnd": "14:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Thursday morning shift with excellent compliance across all areas.",
+      "weatherConditions": "Sunny, 14°C",
+      "createdAt": "2024-11-28T14:25:00.000Z",
+      "updatedAt": "2024-11-28T14:25:00.000Z"
+    },
+    {
+      "id": "DAR019",
+      "customerId": 21,
+      "customerName": "Central England COOP",
+      "siteId": "s1",
+      "siteName": "Birmingham Central Store",
+      "reportDate": "2024-11-27",
+      "officerName": "Chris Wilson",
+      "shiftStart": "14:00",
+      "shiftEnd": "22:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Wednesday evening operations ran smoothly with good customer service interactions.",
+      "weatherConditions": "Overcast, 9°C",
+      "createdAt": "2024-11-27T22:10:00.000Z",
+      "updatedAt": "2024-11-27T22:10:00.000Z"
+    },
+    {
+      "id": "DAR020",
+      "customerId": 22,
+      "customerName": "Heart of England",
+      "siteId": "s13",
+      "siteName": "Stratford Store",
+      "reportDate": "2024-11-26",
+      "officerName": "Sandra Lee",
+      "shiftStart": "22:00",
+      "shiftEnd": "06:00",
+      "activities": [],
+      "incidents": [],
+      "securityChecks": [],
+      "visitorLog": [],
+      "compliance": {
+        "tillsContainedOverCash": { "value": "no", "description": "" },
+        "cashOfficeDoorOpen": { "value": "no", "description": "" },
+        "visibleCashOnDisplay": { "value": "no", "description": "" },
+        "visibleKeysOnDisplay": { "value": "no", "description": "" },
+        "fireRoutesBlocked": { "value": "no", "description": "" },
+        "beSafeBSecurePoster": { "value": "yes", "description": "" },
+        "atmAbuse": { "value": "no", "description": "" }
+      },
+      "insecureAreas": {
+        "kioskSecure": { "value": "yes", "description": "" },
+        "highValueRoom": { "value": "yes", "description": "" },
+        "managersOffice": { "value": "yes", "description": "" },
+        "warehouseToSalesFloor": { "value": "yes", "description": "" },
+        "serviceYard": { "value": "yes", "description": "" },
+        "carParkGrounds": { "value": "yes", "description": "" },
+        "fireDoorsBackOfHouse": { "value": "yes", "description": "" },
+        "fireDoorsShopFloor": { "value": "yes", "description": "" }
+      },
+      "systemsNotWorking": {
+        "watchMeNow": { "value": "no", "description": "" },
+        "cctv": { "value": "no", "description": "" },
+        "intruderAlarm": { "value": "no", "description": "" },
+        "keyholding": { "value": "no", "description": "" },
+        "bodyWornCctv": { "value": "no", "description": "" },
+        "cigaretteTracker": { "value": "no", "description": "" },
+        "crimeReporting": { "value": "no", "description": "" }
+      },
+      "notes": "Tuesday night security duties completed without incident. All systems operational.",
+      "weatherConditions": "Clear, 3°C",
+      "createdAt": "2024-11-26T06:30:00.000Z",
+      "updatedAt": "2024-11-26T06:30:00.000Z"
+    }
   ]
 }

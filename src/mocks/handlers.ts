@@ -14,6 +14,7 @@ import { settingsHandlers } from './settingsHandlers'
 import { headerHandlers } from './headerHandlers'
 import { dashboardHandlers } from './dashboardHandlers'
 import { mysteryShopperHandlers } from './mysteryShopperHandlers'
+import { dailyActivityHandlers } from './dailyActivityHandlers'
 
 export const handlers = [
   ...userHandlers,
@@ -29,5 +30,6 @@ export const handlers = [
   ...sitesHandlers,
   ...incidentHandlers,
   ...mysteryShopperHandlers,
+  ...dailyActivityHandlers,
   ...settingsHandlers
 ]
