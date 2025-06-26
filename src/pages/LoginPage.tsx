@@ -186,17 +186,20 @@ export default function LoginPage() {
               <h3 className="text-sm font-semibold text-slate-700 mb-2">Test Credentials (Dev Only)</h3>
               <div className="text-xs text-slate-600 space-y-1">
                 <div><strong>Central England COOP (ID: 21):</strong></div>
-                <div>• centralsite / centralsite123</div>
-                <div>• centralho / centralho123</div>
+                <div>• customerho / customer123</div>
+                <div>• customersite / site123</div>
+                <div>• central / central123</div>
                 <div className="mt-2"><strong>Heart of England (ID: 22):</strong></div>
+                <div>• heartengland / heart123</div>
                 <div>• heartsite / heartsite123</div>
-                <div>• heartho / heartho123</div>
                 <div className="mt-2"><strong>Midcounties COOP (ID: 23):</strong></div>
+                <div>• midcounties / mid123</div>
                 <div>• midsite / midsite123</div>
-                <div>• midho / midho123</div>
                 <div className="mt-2"><strong>Advantage One:</strong></div>
                 <div>• admin / admin123</div>
-                <div>• officer / officer123</div>
+                <div>• officer1 / officer123 (Customers: 21, 22)</div>
+                <div>• officer2 / officer456 (Customers: 22, 23)</div>
+                <div>• officer3 / officer789 (Customers: 21, 23)</div>
               </div>
             </div>
           )}

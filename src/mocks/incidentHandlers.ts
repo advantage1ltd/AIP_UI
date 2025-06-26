@@ -1,6 +1,14 @@
 import { http, HttpResponse } from 'msw'
 import { BASE_API_URL } from '@/config/api'
 import db from '../../db.json'
+import { 
+	getAuthFromRequest, 
+	logAuthDetails, 
+	createUnauthorizedResponse, 
+	createForbiddenResponse,
+	applyCustomerFilter,
+	checkPermission
+} from './authUtils'
 
 // Mock incident data for 2025
 const mockIncidents = [
@@ -371,23 +379,23 @@ const mockIncidents = [
 
 // Helper function to get customer ID from request
 const getCustomerId = (request: Request): number | null => {
-	// First try to get from auth header
-	const authUser = request.headers.get('Authorization')
-	if (authUser) {
-		try {
-			const userData = JSON.parse(atob(authUser.split(' ')[1].split('.')[1]))
+	// First try to get from localStorage (like other services)
+	try {
+		const storedUser = localStorage.getItem('user')
+		if (storedUser) {
+			const userData = JSON.parse(storedUser)
 			// For customer users, use customerId
 			if (['CustomerSiteManager', 'CustomerHOManager'].includes(userData.role)) {
 				return userData.customerId || userData.companyId
 			}
-			// For Advantage One users, use customerId from query param
+			// For Advantage One users, check query param first, then default to null (show all)
 			if (['AdvantageOneOfficer', 'AdvantageOneHOOfficer', 'Administrator'].includes(userData.role)) {
 				const customerId = new URL(request.url).searchParams.get('customerId')
 				return customerId ? parseInt(customerId) : null
 			}
-		} catch (err) {
-			console.error('Failed to parse auth token:', err)
 		}
+	} catch (err) {
+		console.error('Failed to parse user data from localStorage:', err)
 	}
 	
 	// Fallback to X-Customer-Id header or query param
@@ -395,10 +403,51 @@ const getCustomerId = (request: Request): number | null => {
 	return customerId ? parseInt(customerId) : null
 }
 
+// Helper function to check if user is authorized to access incidents
+const isAuthorizedForIncidents = (request: Request): boolean => {
+	// Try to get user from localStorage (similar to how other services work)
+	try {
+		const storedUser = localStorage.getItem('user')
+		const userRole = localStorage.getItem('userRole')
+		
+		console.log('🔍 [MSW] Stored user:', storedUser ? 'Present' : 'Missing')
+		console.log('🔍 [MSW] User role from localStorage:', userRole)
+		
+		if (!storedUser || !userRole) {
+			console.log('🔍 [MSW] No user data in localStorage')
+			return false
+		}
+		
+		const userData = JSON.parse(storedUser)
+		console.log('🔍 [MSW] Parsed user data:', userData)
+		
+		// Administrator and AdvantageOne users can access all incidents
+		if (['Administrator', 'AdvantageOneHOOfficer', 'AdvantageOneOfficer'].includes(userData.role)) {
+			console.log('🔍 [MSW] User authorized as Administrator/AdvantageOne officer')
+			return true
+		}
+		// Customer users need a valid customer ID
+		if (['CustomerSiteManager', 'CustomerHOManager'].includes(userData.role)) {
+			const hasCustomerId = !!(userData.customerId || userData.companyId)
+			console.log('🔍 [MSW] Customer user, has customer ID:', hasCustomerId)
+			return hasCustomerId
+		}
+		
+		console.log('🔍 [MSW] User role not recognized:', userData.role)
+		return false
+		
+	} catch (err) {
+		console.error('🔍 [MSW] Failed to parse user data from localStorage:', err)
+		return false
+	}
+}
+
 // Enhanced helper function to filter incidents by customer with access control
 const filterIncidentsByCustomer = (incidents: any[], customerId: number | null): any[] => {
-	// If no customer ID, return empty array for security
-	if (!customerId) return []
+	// If no customer ID provided, return all incidents (for Administrator access)
+	if (!customerId) {
+		return incidents.map(incident => standardizeIncident(incident))
+	}
 	
 	// Only return incidents for the specific customer, and standardize them
 	return incidents
@@ -456,68 +505,119 @@ const standardizeIncident = (incident: any) => {
 }
 
 export const incidentHandlers = [
-	// Test handler to verify handlers are working
+	// Test handler to verify handlers are working - UPDATED WITH UNIFIED AUTH
 	http.get(`${BASE_API_URL}/incidents/test`, async ({ request }) => {
-		console.log('🔍 [MSW] === TEST HANDLER CALLED ===')
-		const customerId = getCustomerId(request)
+		console.log('🔍 [MSW] === TEST HANDLER CALLED (UNIFIED AUTH) ===')
 		
-		if (!customerId) {
-			return HttpResponse.json({
-				success: false,
-				message: 'Unauthorized - Customer ID required'
-			}, { status: 401 })
+		// NEW: Use unified auth system
+		const auth = getAuthFromRequest(request)
+		logAuthDetails(request, auth, 'incidents/test')
+		
+		if (!auth.isAuthenticated) {
+			return createUnauthorizedResponse(auth.errorMessage)
 		}
 		
-		// Test database access
+		// NEW: Check permissions using unified system
+		if (!checkPermission(auth, 'incidents', 'read')) {
+			return createForbiddenResponse('Missing permission: incidents:read')
+		}
+		
+		// NEW: Apply unified customer filtering
 		const dbIncidents = db.dashboard?.incidents || []
-		const customerIncidents = filterIncidentsByCustomer(dbIncidents, customerId)
+		const { data: customerIncidents, effectiveCustomerId } = applyCustomerFilter(dbIncidents, auth)
 		
 		return HttpResponse.json({
 			success: true,
-			message: 'Test handler working',
-			customerId,
-			totalIncidents: dbIncidents.length,
-			customerIncidents: customerIncidents.length,
-			sampleIncident: customerIncidents[0] || null
+			message: '✅ Unified auth system working',
+			authDetails: {
+				userRole: auth.user?.role,
+				customerId: auth.customerId,
+				effectiveCustomerId,
+				hasGlobalAccess: auth.hasGlobalAccess,
+				accessibleCustomers: auth.accessibleCustomerIds
+			},
+			dataStats: {
+				totalIncidents: dbIncidents.length,
+				customerIncidents: customerIncidents.length,
+				sampleIncident: customerIncidents[0] || null
+			}
 		})
 	}),
 
 	// Get all incidents with customer filtering
 	http.get(`${BASE_API_URL}/incidents`, async ({ request }) => {
 		console.log('🔍 [MSW] === INCIDENTS LIST HANDLER CALLED ===')
-		const customerId = getCustomerId(request)
 		
-		if (!customerId) {
+		// Check if user is authorized to access incidents
+		if (!isAuthorizedForIncidents(request)) {
 			return HttpResponse.json({
 				success: false,
-				message: 'Unauthorized - Customer ID required'
+				message: 'Unauthorized - Access denied'
 			}, { status: 401 })
 		}
+		
+		const customerId = getCustomerId(request)
 		
 		// Use database incidents instead of mockIncidents
 		const dbIncidents = db.dashboard?.incidents || []
 		const incidents = filterIncidentsByCustomer(dbIncidents, customerId)
 		
-		console.log('🔍 Found incidents for customer', customerId, ':', incidents.length)
+		console.log('🔍 Found incidents for customer', customerId || 'ALL', ':', incidents.length)
+		
+		// Support pagination for the IncidentReportPage component
+		const url = new URL(request.url)
+		const page = parseInt(url.searchParams.get('page') || '1')
+		const pageSize = parseInt(url.searchParams.get('pageSize') || '10')
+		const search = url.searchParams.get('search') || ''
+		
+		// Apply search filter if provided
+		let filteredIncidents = incidents
+		if (search) {
+			const searchLower = search.toLowerCase()
+			filteredIncidents = incidents.filter(incident => 
+				incident.siteName?.toLowerCase().includes(searchLower) ||
+				incident.customerName?.toLowerCase().includes(searchLower) ||
+				incident.officerName?.toLowerCase().includes(searchLower) ||
+				incident.incidentType?.toLowerCase().includes(searchLower) ||
+				incident.description?.toLowerCase().includes(searchLower)
+			)
+		}
+		
+		// Calculate pagination
+		const totalCount = filteredIncidents.length
+		const totalPages = Math.ceil(totalCount / pageSize)
+		const startIndex = (page - 1) * pageSize
+		const endIndex = startIndex + pageSize
+		const paginatedIncidents = filteredIncidents.slice(startIndex, endIndex)
 		
 		return HttpResponse.json({
 			success: true,
-			data: incidents
+			data: paginatedIncidents,
+			pagination: {
+				currentPage: page,
+				totalPages,
+				pageSize,
+				totalCount,
+				hasPrevious: page > 1,
+				hasNext: page < totalPages
+			}
 		})
 	}),
 
 	// Get incident graph data with comprehensive filtering
 	http.get(`${BASE_API_URL}/incidents/graph-data`, async ({ request }) => {
 		console.log('🔍 [MSW] === GRAPH DATA HANDLER CALLED ===')
-		const customerId = getCustomerId(request)
 		
-		if (!customerId) {
-			console.error('🔍 [MSW] No customer ID in graph data request')
+		// Check if user is authorized to access incidents
+		if (!isAuthorizedForIncidents(request)) {
+			console.error('🔍 [MSW] Unauthorized access to graph data')
 			return HttpResponse.json({
 				success: false,
-				message: 'Unauthorized - Customer ID required'
+				message: 'Unauthorized - Access denied'
 			}, { status: 401 })
 		}
+		
+		const customerId = getCustomerId(request)
 		
 		const url = new URL(request.url)
 		const startDate = url.searchParams.get('startDate')
@@ -617,14 +717,15 @@ export const incidentHandlers = [
 
 	// Get incident types summary with customer filtering
 	http.get(`${BASE_API_URL}/incidents/types-summary`, async ({ request }) => {
-		const customerId = getCustomerId(request)
-		
-		if (!customerId) {
+		// Check if user is authorized to access incidents
+		if (!isAuthorizedForIncidents(request)) {
 			return HttpResponse.json({
 				success: false,
-				message: 'Unauthorized - Customer ID required'
+				message: 'Unauthorized - Access denied'
 			}, { status: 401 })
 		}
+		
+		const customerId = getCustomerId(request)
 		
 		const url = new URL(request.url)
 		const startDate = url.searchParams.get('startDate')
@@ -667,17 +768,121 @@ export const incidentHandlers = [
 		})
 	}),
 
+	// Create new incident
+	http.post(`${BASE_API_URL}/incidents`, async ({ request }) => {
+		console.log('🔍 [MSW] === CREATE INCIDENT HANDLER CALLED ===')
+		
+		// Check if user is authorized to access incidents
+		if (!isAuthorizedForIncidents(request)) {
+			return HttpResponse.json({
+				success: false,
+				message: 'Unauthorized - Access denied'
+			}, { status: 401 })
+		}
+		
+		try {
+			const newIncident = await request.json() as any
+			const incidentId = `INC-${Date.now()}`
+			
+			// Add standard fields
+			const incidentToCreate = {
+				...newIncident,
+				id: incidentId,
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString()
+			}
+			
+			// In a real app, this would save to the database
+			console.log('🔍 [MSW] Creating incident:', incidentToCreate)
+			
+			return HttpResponse.json({
+				success: true,
+				data: incidentToCreate,
+				message: 'Incident created successfully'
+			}, { status: 201 })
+		} catch (error) {
+			return HttpResponse.json({
+				success: false,
+				message: 'Failed to create incident'
+			}, { status: 400 })
+		}
+	}),
+
+	// Update existing incident
+	http.put(`${BASE_API_URL}/incidents/:id`, async ({ request, params }) => {
+		console.log('🔍 [MSW] === UPDATE INCIDENT HANDLER CALLED ===')
+		
+		// Check if user is authorized to access incidents
+		if (!isAuthorizedForIncidents(request)) {
+			return HttpResponse.json({
+				success: false,
+				message: 'Unauthorized - Access denied'
+			}, { status: 401 })
+		}
+		
+		try {
+			const { id } = params
+			const updatedIncident = await request.json() as any
+			
+			// Add standard fields
+			const incidentToUpdate = {
+				...updatedIncident,
+				id,
+				updatedAt: new Date().toISOString()
+			}
+			
+			// In a real app, this would update the database
+			console.log('🔍 [MSW] Updating incident:', id, incidentToUpdate)
+			
+			return HttpResponse.json({
+				success: true,
+				data: incidentToUpdate,
+				message: 'Incident updated successfully'
+			})
+		} catch (error) {
+			return HttpResponse.json({
+				success: false,
+				message: 'Failed to update incident'
+			}, { status: 400 })
+		}
+	}),
+
+	// Delete incident
+	http.delete(`${BASE_API_URL}/incidents/:id`, async ({ request, params }) => {
+		console.log('🔍 [MSW] === DELETE INCIDENT HANDLER CALLED ===')
+		
+		// Check if user is authorized to access incidents
+		if (!isAuthorizedForIncidents(request)) {
+			return HttpResponse.json({
+				success: false,
+				message: 'Unauthorized - Access denied'
+			}, { status: 401 })
+		}
+		
+		const { id } = params
+		
+		// In a real app, this would delete from the database
+		console.log('🔍 [MSW] Deleting incident:', id)
+		
+		return HttpResponse.json({
+			success: true,
+			message: 'Incident deleted successfully'
+		})
+	}),
+
 	// Get available regions for a customer
 	http.get(`${BASE_API_URL}/incidents/regions`, async ({ request }) => {
 		console.log('🔍 [MSW] === REGIONS HANDLER CALLED ===')
-		const customerId = getCustomerId(request)
 		
-		if (!customerId) {
+		// Check if user is authorized to access incidents
+		if (!isAuthorizedForIncidents(request)) {
 			return HttpResponse.json({
 				success: false,
-				message: 'Unauthorized - Customer ID required'
+				message: 'Unauthorized - Access denied'
 			}, { status: 401 })
 		}
+		
+		const customerId = getCustomerId(request)
 		
 		// Get regions for this customer only
 		const dbIncidents = db.dashboard?.incidents || []

@@ -1,12 +1,19 @@
 const express = require('express');
 const router = express.Router();
 
+// NOTE: This file is not currently used in the application.
+// The application uses MSW (Mock Service Worker) for API mocking.
+// See src/mocks/userHandlers.ts for the actual authentication logic.
+// This file is kept for potential future backend integration.
+
 // This is a temporary solution. In production, you should:
-// 1. Use a real database
+// 1. Use a real database (or load from db.json dynamically)
 // 2. Hash passwords
 // 3. Use proper session management
 // 4. Implement rate limiting
 const users = [
+  // This hardcoded array should be replaced with dynamic database loading
+  // when this API is actually used. Currently MSW handles all authentication.
   {
     id: '1',
     username: 'admin',
@@ -14,19 +21,13 @@ const users = [
     displayName: 'Alice Admin',
     role: 'Administrator',
     pageAccessRole: 'administrator'
-  },
-  {
-    id: '2',
-    username: 'officer1',
-    password: 'officer123',
-    displayName: 'Oscar Officer',
-    role: 'Advantage One Officer',
-    pageAccessRole: 'advantage-officer'
   }
+  // Additional users should be loaded from db.json dynamically
 ];
 
 router.post('/login', (req, res) => {
   try {
+    // TODO: Replace this with dynamic loading from db.json when this API is used
     const { username, password } = req.body;
 
     if (!username || !password) {

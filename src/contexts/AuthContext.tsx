@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AuthResponse } from '@/types/user';
 import { BASE_API_URL } from '@/config/api';
+import { authService } from '@/services/authService';
 
 interface AuthContextType {
   user: User | null;
@@ -25,6 +26,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token && storedUser) {
       try {
         const userData = JSON.parse(storedUser);
+        
+        // NEW: Update unified auth service with existing session
+        authService.setCurrentUser(userData);
+        
         setUser(userData);
         // Ensure role is set in localStorage
         if (userData.role) {
@@ -65,6 +70,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = data.data.user;
       const isAdvantageOneRole = ['AdvantageOneOfficer', 'AdvantageOneHOOfficer', 'Administrator'].includes(userData.role);
       
+      // NEW: Update unified auth service
+      authService.setCurrentUser(userData);
+      
       // Type-safe user assignment
       if (isAdvantageOneRole) {
         setUser({
@@ -73,14 +81,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           assignedCustomerIds: (userData as any).assignedCustomerIds || []
         });
       } else {
-        // For customer users, prioritize customerId from the response, fallback to companyId
-        const customerId = (userData as any).customerId || (userData as any).companyId;
-        const companyId = (userData as any).companyId || customerId;
+        // For customer users, use customerId only
+        const customerId = (userData as any).customerId;
         setUser({
           ...userData,
           role: userData.role as 'CustomerSiteManager' | 'CustomerHOManager',
-          customerId: customerId,
-          companyId: companyId // For backward compatibility
+          customerId: customerId
         });
       }
     } catch (err) {
@@ -95,6 +101,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
     localStorage.removeItem('userRole'); // Also remove userRole on logout
+    
+    // NEW: Clear unified auth service
+    authService.clearCurrentUser();
+    
     setUser(null);
   };
 

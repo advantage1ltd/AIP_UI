@@ -1137,7 +1137,8 @@
       "email": "officer1@advantageone.com",
       "role": "AdvantageOneOfficer",
       "pageAccessRole": "advantage-officer",
-      "assignedCustomerIds": ["COOP001", "COOP002"],
+      "assignedCustomerIds": [21, 22],
+      "badgeNumber": "ADV-001",
       "createdAt": "2024-01-01T00:00:00.000Z",
       "updatedAt": "2024-01-01T00:00:00.000Z"
     },
@@ -1231,8 +1232,52 @@
       "customerId": 22,
       "createdAt": "2024-01-15T00:00:00.000Z",
       "updatedAt": "2024-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "10",
+      "username": "officer2",
+      "password": "officer456",
+      "firstName": "David",
+      "lastName": "Thompson",
+      "email": "david.thompson@advantageone.com",
+      "role": "AdvantageOneOfficer",
+      "pageAccessRole": "advantage-officer",
+      "assignedCustomerIds": [22, 23],
+      "badgeNumber": "ADV-002",
+      "createdAt": "2024-01-15T00:00:00.000Z",
+      "updatedAt": "2024-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "11",
+      "username": "officer3",
+      "password": "officer789",
+      "firstName": "Emma",
+      "lastName": "Williams",
+      "email": "emma.williams@advantageone.com",
+      "role": "AdvantageOneOfficer",
+      "pageAccessRole": "advantage-officer",
+      "assignedCustomerIds": [21, 23],
+      "badgeNumber": "ADV-003",
+      "createdAt": "2024-01-15T00:00:00.000Z",
+      "updatedAt": "2024-01-15T00:00:00.000Z"
     }
   ],
+  "rolePermissions": {
+    "Administrator": ["*"],
+    "AdvantageOneHOOfficer": ["*"],
+    "AdvantageOneOfficer": [
+      "incidents:read", "incidents:create", "incidents:update",
+      "customers:read", "sites:read", "regions:read", "reports:read"
+    ],
+    "CustomerHOManager": [
+      "incidents:read", "incidents:create", "incidents:update",
+      "customers:read", "sites:read", "regions:read", "reports:read"
+    ],
+    "CustomerSiteManager": [
+      "incidents:read", "incidents:create",
+      "customers:read", "sites:read"
+    ]
+  },
   "legacyPageAccessSettings": {
     "roleAccess": {
       "administrator": [],

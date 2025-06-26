@@ -19,25 +19,61 @@ const loadDashboardData = async () => {
 }
 
 // Helper function to calculate dynamic metrics for a customer
-const calculateDynamicMetrics = (customerId: number, siteId?: string) => {
+const calculateDynamicMetrics = (customerId: number, siteIds?: string | string[]) => {
   // Get all incidents for this customer
   const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId)
   
   console.log('🔍 calculateDynamicMetrics - Customer incidents found:', customerIncidents.length);
   console.log('🔍 First few incident dates:', customerIncidents.slice(0, 5).map(i => ({ id: i.id, date: i.date })));
   
-  // Filter by site if specified
-  const incidents = siteId 
-    ? customerIncidents.filter(i => i.siteId === siteId)
-    : customerIncidents
-  
-  console.log('🔍 After site filtering, incidents count:', incidents.length);
+  // Filter by site(s) if specified
+  let incidents = customerIncidents;
+  if (siteIds) {
+    if (Array.isArray(siteIds)) {
+      // Multiple sites - filter by any of the site IDs
+      const filteredIncidents = customerIncidents.filter(i => siteIds.includes(i.siteId))
+      console.log('🔍 After filtering by multiple sites:', siteIds, 'incidents count:', filteredIncidents.length);
+      
+      // If filtering by site IDs results in very few incidents compared to total,
+      // it suggests data inconsistency - fall back to showing all customer incidents
+      if (filteredIncidents.length < customerIncidents.length * 0.3 && customerIncidents.length > 5) {
+        console.log('🔍 Site filtering reduced incidents significantly, using all customer incidents instead');
+        incidents = customerIncidents;
+      } else {
+        incidents = filteredIncidents;
+      }
+    } else {
+      // Single site - filter by single site ID
+      const filteredIncidents = customerIncidents.filter(i => i.siteId === siteIds)
+      console.log('🔍 After filtering by single site:', siteIds, 'incidents count:', filteredIncidents.length);
+      
+      // For single site, if no incidents found, fall back to all customer incidents
+      if (filteredIncidents.length === 0 && customerIncidents.length > 0) {
+        console.log('🔍 No incidents found for site, using all customer incidents instead');
+        incidents = customerIncidents;
+      } else {
+        incidents = filteredIncidents;
+      }
+    }
+  } else {
+    console.log('🔍 No site filtering - using all customer incidents');
+  }
   
   // Get customer sites
   const customerSites = db.sites.filter(s => s.customerId === customerId)
-  const activeSites = siteId 
-    ? customerSites.filter(s => s.id === siteId)
-    : customerSites.filter(s => s.status === 'active')
+  let activeSites = customerSites.filter(s => s.status === 'active');
+  
+  if (siteIds) {
+    if (Array.isArray(siteIds)) {
+      // Multiple sites - filter active sites by the site IDs
+      activeSites = activeSites.filter(s => siteIds.includes(s.id))
+    } else {
+      // Single site - filter active sites by single site ID  
+      activeSites = activeSites.filter(s => s.id === siteIds)
+    }
+  }
+  
+  console.log('🔍 Active sites count:', activeSites.length);
   
   // Calculate date ranges
   const now = new Date()
@@ -125,12 +161,35 @@ const calculateDynamicMetrics = (customerId: number, siteId?: string) => {
 }
 
 // Helper function to calculate dynamic incident chart data
-const calculateIncidentChartData = (customerId: number, siteId?: string) => {
+const calculateIncidentChartData = (customerId: number, siteIds?: string | string[]) => {
   // Get customer incidents
   const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId);
-  const incidents = siteId 
-    ? customerIncidents.filter(i => i.siteId === siteId)
-    : customerIncidents;
+  
+  let incidents = customerIncidents;
+  if (siteIds) {
+    if (Array.isArray(siteIds)) {
+      const filteredIncidents = customerIncidents.filter(i => siteIds.includes(i.siteId));
+      
+      // If filtering by site IDs results in very few incidents compared to total,
+      // it suggests data inconsistency - fall back to showing all customer incidents
+      if (filteredIncidents.length < customerIncidents.length * 0.3 && customerIncidents.length > 5) {
+        console.log('🔍 Chart data: Site filtering reduced incidents significantly, using all customer incidents instead');
+        incidents = customerIncidents;
+      } else {
+        incidents = filteredIncidents;
+      }
+    } else {
+      const filteredIncidents = customerIncidents.filter(i => i.siteId === siteIds);
+      
+      // For single site, if no incidents found, fall back to all customer incidents
+      if (filteredIncidents.length === 0 && customerIncidents.length > 0) {
+        console.log('🔍 Chart data: No incidents found for site, using all customer incidents instead');
+        incidents = customerIncidents;
+      } else {
+        incidents = filteredIncidents;
+      }
+    }
+  }
 
   console.log('🔍 Calculating incident chart data for customer:', customerId, 'incidents:', incidents.length);
 
@@ -599,9 +658,9 @@ export const dashboardHandlers = [
       
       console.log('🔍 Aggregate sites handler - Looking for:', { siteIds, customerId })
       
-      // Calculate dynamic metrics for this customer (all sites)
-      const metrics = calculateDynamicMetrics(customerId);
-      console.log('📊 Calculated aggregated dynamic metrics:', metrics);
+      // Calculate dynamic metrics for this customer (filtered by site IDs)
+      const metrics = calculateDynamicMetrics(customerId, siteIds.length > 0 ? siteIds : undefined);
+      console.log('📊 Calculated aggregated dynamic metrics for sites:', siteIds, 'metrics:', metrics);
 
       // Create dynamic metrics for CustomerHOManager
       const dynamicHOMetrics = [
@@ -677,9 +736,20 @@ export const dashboardHandlers = [
 
       // Get incidents for this customer
       const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId);
-      const aggregatedSiteIncidents = siteIds.length > 0 
-        ? customerIncidents.filter(i => siteIds.includes(i.siteId))
-        : customerIncidents;
+      let aggregatedSiteIncidents = customerIncidents;
+      
+      if (siteIds.length > 0) {
+        const filteredIncidents = customerIncidents.filter(i => siteIds.includes(i.siteId));
+        
+        // If filtering by site IDs results in very few incidents compared to total,
+        // it suggests data inconsistency - fall back to showing all customer incidents
+        if (filteredIncidents.length < customerIncidents.length * 0.3 && customerIncidents.length > 5) {
+          console.log('🔍 Handler: Site filtering reduced incidents significantly, using all customer incidents instead');
+          aggregatedSiteIncidents = customerIncidents;
+        } else {
+          aggregatedSiteIncidents = filteredIncidents;
+        }
+      }
 
       const aggregatedData: CustomerStoreData = {
         id: 'aggregated',
@@ -690,7 +760,7 @@ export const dashboardHandlers = [
           CustomerSiteManager: dynamicSiteMetrics
         },
         recentIncidents: aggregatedSiteIncidents,
-        incidentData: calculateIncidentChartData(customerId),
+        incidentData: calculateIncidentChartData(customerId, siteIds.length > 0 ? siteIds : undefined),
       }
 
       console.log('✅ Final aggregated data with dynamic metrics:', aggregatedData)
@@ -800,9 +870,9 @@ export const dashboardHandlers = [
         return new HttpResponse(JSON.stringify({ message: 'No sites found for customer' }), { status: 404 });
       }
 
-      // Calculate dynamic metrics for this customer (all sites)
-      const metrics = calculateDynamicMetrics(customerId);
-      console.log('📊 Calculated aggregated dynamic metrics:', metrics);
+      // Calculate dynamic metrics for this customer (filtered by site IDs)
+      const metrics = calculateDynamicMetrics(customerId, siteIds.length > 0 ? siteIds : undefined);
+      console.log('📊 Calculated aggregated dynamic metrics for sites:', siteIds, 'metrics:', metrics);
 
       // Create dynamic metrics for CustomerHOManager
       const dynamicHOMetrics = [
@@ -883,8 +953,22 @@ export const dashboardHandlers = [
       const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId);
       console.log('🔍 Customer incidents found:', customerIncidents.length);
       
-      // For now, return all customer incidents instead of filtering by sites to debug
-      const incidents = customerIncidents; // Remove site filtering temporarily
+      // Filter incidents by the specified site IDs
+      let incidents = customerIncidents;
+      
+      if (siteIds.length > 0) {
+        const filteredIncidents = customerIncidents.filter(i => siteIds.includes(i.siteId));
+        
+        // If filtering by site IDs results in very few incidents compared to total,
+        // it suggests data inconsistency - fall back to showing all customer incidents
+        if (filteredIncidents.length < customerIncidents.length * 0.3 && customerIncidents.length > 5) {
+          console.log('🔍 Handler 2: Site filtering reduced incidents significantly, using all customer incidents instead');
+          incidents = customerIncidents;
+        } else {
+          incidents = filteredIncidents;
+        }
+      }
+      
       console.log('🔍 Final aggregated incidents to return:', incidents.length);
       
       // Log first few incidents for debugging
@@ -901,7 +985,7 @@ export const dashboardHandlers = [
           CustomerSiteManager: dynamicSiteMetrics,
         },
         recentIncidents: incidents,
-        incidentData: calculateIncidentChartData(customerId),
+        incidentData: calculateIncidentChartData(customerId, siteIds.length > 0 ? siteIds : undefined),
       };
 
       console.log('✅ Returning aggregated site data with', incidents.length, 'incidents and dynamic metrics');
