@@ -6,8 +6,8 @@ import { DailyActivityTable } from "@/components/customer/DailyActivityTable"
 import { DailyActivityDialog } from "@/components/customer/DailyActivityDialog"
 import { DailyActivityForm } from "@/components/customer/DailyActivityForm"
 import type { DailyActivityReport } from "@/types/dailyActivity"
-import { useAuth } from "@/hooks/useAuth"
-import { AVAILABLE_CUSTOMERS } from "@/types/user"
+import { useAuth } from "@/contexts/AuthContext"
+import { findCustomerById } from "@/hooks/useAvailableCustomers"
 
 export default function CustomerDailyActivityReport() {
   const navigate = useNavigate()
@@ -20,7 +20,7 @@ export default function CustomerDailyActivityReport() {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [customer, setCustomer] = useState<typeof AVAILABLE_CUSTOMERS[0] | null>(null)
+  const [customer, setCustomer] = useState<{ id: number; name: string } | null>(null)
 
   useEffect(() => {
     try {
@@ -29,12 +29,13 @@ export default function CustomerDailyActivityReport() {
         return;
       }
 
-      // Get customer ID from URL parameter or user's customerId
+      // Get customer ID from URL parameter or user's customerId (for customer users)
       const urlCustomerId = searchParams.get('customerId')
-      const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : user?.customerId
+      const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined
+      const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : userCustomerId
 
       console.log('CustomerDailyActivityReport: URL customerId:', urlCustomerId)
-      console.log('CustomerDailyActivityReport: User customerId:', user?.customerId)
+      console.log('CustomerDailyActivityReport: User customerId:', userCustomerId)
       console.log('CustomerDailyActivityReport: Target customerId:', targetCustomerId)
 
       if (!targetCustomerId) {
@@ -42,7 +43,7 @@ export default function CustomerDailyActivityReport() {
         return
       }
 
-      const customerData = AVAILABLE_CUSTOMERS.find(c => c.id === targetCustomerId)
+      const customerData = findCustomerById(targetCustomerId)
       console.log('CustomerDailyActivityReport: Found customer:', customerData)
       
       if (!customerData) {
@@ -59,7 +60,7 @@ export default function CustomerDailyActivityReport() {
       console.log('CustomerDailyActivityReport: Setting loading to false')
       setLoading(false)
     }
-  }, [user?.customerId, authLoading, searchParams])
+  }, [user, authLoading, searchParams])
 
   const handleViewReport = (report: DailyActivityReport) => {
     setSelectedReport(report)

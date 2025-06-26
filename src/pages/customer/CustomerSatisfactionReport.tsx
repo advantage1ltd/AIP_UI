@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import CustomerSatisfactionPage from "@/pages/operations/CustomerSatisfactionPage"
-import { useAuth } from "@/hooks/useAuth"
-import { AVAILABLE_CUSTOMERS } from "@/types/user"
+import { useAuth } from "@/contexts/AuthContext"
+import { findCustomerById } from "@/hooks/useAvailableCustomers"
 
 export default function CustomerSatisfactionReport() {
   const navigate = useNavigate()
@@ -12,7 +12,7 @@ export default function CustomerSatisfactionReport() {
   const { user, isLoading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [customer, setCustomer] = useState<typeof AVAILABLE_CUSTOMERS[0] | null>(null)
+  const [customer, setCustomer] = useState<{ id: number; name: string } | null>(null)
 
   console.log('CustomerSatisfactionReport: Component rendered')
 
@@ -24,12 +24,13 @@ export default function CustomerSatisfactionReport() {
         return;
       }
 
-      // Get customer ID from URL parameter or user's customerId
+      // Get customer ID from URL parameter or user's customerId (for customer users)
       const urlCustomerId = searchParams.get('customerId')
-      const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : user?.customerId
+      const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined
+      const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : userCustomerId
 
       console.log('CustomerSatisfactionReport: URL customerId:', urlCustomerId)
-      console.log('CustomerSatisfactionReport: User customerId:', user?.customerId)
+      console.log('CustomerSatisfactionReport: User customerId:', userCustomerId)
       console.log('CustomerSatisfactionReport: Target customerId:', targetCustomerId)
 
       if (!targetCustomerId) {
@@ -37,7 +38,7 @@ export default function CustomerSatisfactionReport() {
         return
       }
 
-      const customerData = AVAILABLE_CUSTOMERS.find(c => c.id === targetCustomerId)
+      const customerData = findCustomerById(targetCustomerId)
       console.log('CustomerSatisfactionReport: Found customer:', customerData)
       
       if (!customerData) {
@@ -54,7 +55,7 @@ export default function CustomerSatisfactionReport() {
       console.log('CustomerSatisfactionReport: Setting loading to false')
       setLoading(false)
     }
-  }, [user?.customerId, authLoading, searchParams])
+  }, [user, authLoading, searchParams])
 
   console.log('CustomerSatisfactionReport: Render state:', { loading, error, customer: !!customer })
 

@@ -14,14 +14,14 @@ export const DUMMY_REGIONS: Region[] = [
     ...baseRegion,
     id: "r1",
     name: "East Midlands",
-    customerId: "1",
+    customerId: 21,
     manager: "David Thompson"
   },
   {
     ...baseRegion,
     id: "r2",
     name: "West Midlands",
-    customerId: "1",
+    customerId: 21,
     manager: "Sarah Parker"
   },
 
@@ -30,14 +30,14 @@ export const DUMMY_REGIONS: Region[] = [
     ...baseRegion,
     id: "r3",
     name: "Oxfordshire & Gloucestershire",
-    customerId: "2",
+    customerId: 23,
     manager: "Michael Roberts"
   },
   {
     ...baseRegion,
     id: "r4",
     name: "Wiltshire & Somerset",
-    customerId: "2",
+    customerId: 23,
     manager: "Emma Hughes"
   },
 
@@ -46,14 +46,14 @@ export const DUMMY_REGIONS: Region[] = [
     ...baseRegion,
     id: "r5",
     name: "Coventry & Warwickshire",
-    customerId: "3",
+    customerId: 22,
     manager: "John Davies"
   },
   {
     ...baseRegion,
     id: "r6",
     name: "Leicestershire & Northamptonshire",
-    customerId: "3",
+    customerId: 22,
     manager: "Rachel Wilson"
   }
 ] 

@@ -61,7 +61,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { useTheme } from "@/components/theme-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
 import { USER_DATA, BUTTON_STYLES, COMMON_CLASSES } from "@/constants/header";
 import { NotificationBell } from "./header/NotificationBell";
@@ -649,6 +649,9 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                   className="h-17 w-auto" 
                 />
               </SheetTitle>
+              <SheetDescription className="sr-only">
+                Navigation menu for accessing different sections of the Security Management application
+              </SheetDescription>
             </SheetHeader>
             
             <div className="flex-1 overflow-y-auto">

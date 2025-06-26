@@ -15,7 +15,7 @@ const baseCustomer = {
 export let DUMMY_CUSTOMERS: Customer[] = [
   {
     ...baseCustomer,
-    id: "21",
+    id: 21,
     companyName: "Central England COOP",
     companyNumber: "31278R",
     vatNumber: "GB 915 1416 82",
@@ -37,7 +37,7 @@ export let DUMMY_CUSTOMERS: Customer[] = [
     },
     viewConfig: {
       id: "vc21",
-      customerId: "21",
+      customerId: 21,
       customerType: "retail",
       enabledPages: [
         "daily-activity-report",
@@ -70,7 +70,7 @@ export let DUMMY_CUSTOMERS: Customer[] = [
   },
   {
     ...baseCustomer,
-    id: "22",
+    id: 22,
     companyName: "Heart of England COOP",
     companyNumber: "1399R",
     vatNumber: "GB 712 3091 45",
@@ -91,7 +91,7 @@ export let DUMMY_CUSTOMERS: Customer[] = [
     },
     viewConfig: {
       id: "vc22",
-      customerId: "22",
+      customerId: 22,
       customerType: "retail",
       enabledPages: [
         "daily-activity-report",
@@ -138,7 +138,7 @@ export let DUMMY_CUSTOMERS: Customer[] = [
   },
   {
     ...baseCustomer,
-    id: "23",
+    id: 23,
     companyName: "Midcounties COOP",
     companyNumber: "2582R",
     vatNumber: "GB 476 6063 78",
@@ -159,7 +159,7 @@ export let DUMMY_CUSTOMERS: Customer[] = [
     },
     viewConfig: {
       id: "vc23",
-      customerId: "23",
+      customerId: 23,
       customerType: "retail",
       enabledPages: [
         "daily-activity-report",

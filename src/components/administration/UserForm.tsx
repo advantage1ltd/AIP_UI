@@ -17,8 +17,8 @@ import {
   UserRole,
   CustomerUser,
   AdvantageOneUser,
-  AVAILABLE_CUSTOMERS,
 } from '@/types/user';
+import { useAvailableCustomers } from '@/hooks/useAvailableCustomers';
 import { Users, Eye, EyeOff, Building2, Lock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
@@ -45,11 +45,13 @@ type FormState = {
   role: UserRole;
   pageAccessRole: UserRole;
 } & (
-  | { role: 'CustomerSiteManager' | 'CustomerHOManager'; companyId: string }
-  | { role: 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator'; assignedCustomerIds: string[] }
+  | { role: 'CustomerSiteManager' | 'CustomerHOManager'; customerId: string }
+  | { role: 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator'; assignedCustomerIds: number[] }
 );
 
 export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => {
+  const { availableCustomers } = useAvailableCustomers();
+  
   const [formData, setFormData] = useState<FormState>(() => {
     const baseData = {
       firstName: initialData?.firstName || '',
@@ -65,13 +67,13 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
       return {
         ...baseData,
         role: initialData.role,
-        companyId: ('companyId' in initialData ? initialData.companyId : ''),
+        customerId: (initialData && 'customerId' in initialData ? initialData.customerId.toString() : ''),
       } as FormState;
     } else {
       return {
         ...baseData,
         role: (initialData?.role as 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator') || 'AdvantageOneOfficer',
-        assignedCustomerIds: ('assignedCustomerIds' in initialData ? initialData.assignedCustomerIds || [] : []),
+        assignedCustomerIds: (initialData && 'assignedCustomerIds' in initialData ? initialData.assignedCustomerIds || [] : []),
       } as FormState;
     }
   });
@@ -95,7 +97,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
           ...formData,
           role,
           pageAccessRole: role,
-          companyId: '',
+          customerId: '',
         } as FormState);
       } else {
         setFormData({
@@ -105,10 +107,10 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
           assignedCustomerIds: [],
         } as FormState);
       }
-    } else if (name === 'companyId' && (formData.role === 'CustomerSiteManager' || formData.role === 'CustomerHOManager')) {
+    } else if (name === 'customerId' && (formData.role === 'CustomerSiteManager' || formData.role === 'CustomerHOManager')) {
       setFormData({
         ...formData,
-        companyId: value,
+        customerId: value,
       } as FormState);
     }
   };
@@ -243,20 +245,20 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
 
           {isCustomerRole ? (
             <div>
-              <Label htmlFor="companyId">Company</Label>
+              <Label htmlFor="customerId">Customer</Label>
               <Select
-                value={'companyId' in formData ? formData.companyId : ''}
-                onValueChange={(value) => handleSelectChange('companyId', value)}
+                value={'customerId' in formData ? formData.customerId : ''}
+                onValueChange={(value) => handleSelectChange('customerId', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
-                  {AVAILABLE_CUSTOMERS.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </SelectItem>
-                  ))}
+                                  {availableCustomers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id.toString()}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
                 </SelectContent>
               </Select>
             </div>
@@ -269,7 +271,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
                   if ('assignedCustomerIds' in formData) {
                     setFormData({
                       ...formData,
-                      assignedCustomerIds: [...formData.assignedCustomerIds, value],
+                      assignedCustomerIds: [...formData.assignedCustomerIds, parseInt(value)],
                     } as FormState);
                   }
                 }}
@@ -278,18 +280,18 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
                   <SelectValue placeholder="Add customer" />
                 </SelectTrigger>
                 <SelectContent>
-                  {AVAILABLE_CUSTOMERS
-                    .filter(customer => !('assignedCustomerIds' in formData) || !formData.assignedCustomerIds.includes(customer.id))
-                    .map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <div className="mt-2 space-y-2">
-                {'assignedCustomerIds' in formData && formData.assignedCustomerIds.map((customerId) => {
-                  const customer = AVAILABLE_CUSTOMERS.find(c => c.id === customerId);
+                                  {availableCustomers
+                  .filter(customer => !('assignedCustomerIds' in formData) || !formData.assignedCustomerIds.includes(customer.id))
+                  .map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id.toString()}>
+                      {customer.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <div className="mt-2 space-y-2">
+              {'assignedCustomerIds' in formData && formData.assignedCustomerIds.map((customerId) => {
+                const customer = availableCustomers.find(c => c.id === customerId);
                   return customer ? (
                     <div key={customer.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                       <span>{customer.name}</span>

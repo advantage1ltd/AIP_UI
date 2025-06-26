@@ -18,7 +18,7 @@ export interface Contact {
 
 export interface ViewConfig {
   id: string
-  customerId: string
+  customerId: number
   customerType: CustomerType
   enabledPages: string[]
   createdAt: string
@@ -35,7 +35,7 @@ export interface CustomerPageAssignment {
 }
 
 export interface Customer {
-  id: string
+  id: number
   companyName: string
   companyNumber: string
   vatNumber: string
@@ -53,7 +53,7 @@ export interface Customer {
 export interface Region {
   id: string
   name: string
-  customerId: string
+  customerId: number
   manager: string
   status: 'active' | 'inactive'
   createdAt: string
@@ -64,7 +64,7 @@ export interface Site {
   id: string
   locationName: string
   regionId: string
-  customerId: string
+  customerId: number
   buildingName: string
   street: string
   town: string
@@ -86,7 +86,7 @@ export interface CustomerPage {
   requiredForTypes: string[]
   path: string
   readOnly: boolean
-  category: 'activity' | 'incidents' | 'satisfaction' | 'safety' | 'support' | 'reports' | 'settings'
+  category: 'activity' | 'reporting' | 'security' | 'support' | 'settings' | 'incidents' | 'satisfaction' | 'safety' | 'reports'
   icon: string
 }
 
@@ -96,7 +96,6 @@ export type CustomerPageId =
   | 'incident-report'
   | 'customer-satisfaction'
   | 'be-safe-be-secure'
-  | 'officer-support'
   | 'patrol-log'
   | 'site-visit-reports'
   | 'keyholding-logs'
@@ -104,7 +103,7 @@ export type CustomerPageId =
 
 export interface CustomerViewConfig {
   id: string
-  customerId: string
+  customerId: number
   customerType: CustomerType
   enabledPages: string[]
   createdAt: string
@@ -112,7 +111,7 @@ export interface CustomerViewConfig {
 }
 
 export interface CustomerReportingAccess {
-  customerId: string
+  customerId: number
   customerName: string
   customerType: CustomerType
   assignedOfficers: string[]

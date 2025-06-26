@@ -73,12 +73,11 @@ export interface BaseUser {
 export interface CustomerUser extends BaseUser {
   role: Extract<UserRole, 'CustomerSiteManager' | 'CustomerHOManager'>;
   customerId: number;
-  companyId?: number; // For backward compatibility
 }
 
 export interface AdvantageOneUser extends BaseUser {
   role: Extract<UserRole, 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator'>;
-  assignedCustomerIds?: string[];
+  assignedCustomerIds?: number[];
 }
 
 export type User = CustomerUser | AdvantageOneUser;

@@ -44,8 +44,16 @@ export default function CustomerDetailPage() {
 
   const getAvailablePages = (customer: CustomerWithRelations): CustomerPage[] => {
     console.log('🔍 [CustomerDetailPage] getAvailablePages called with customer:', customer);
+    console.log('🔍 [CustomerDetailPage] User role:', user?.role);
+    console.log('🔍 [CustomerDetailPage] Available CUSTOMER_PAGES:', Object.keys(CUSTOMER_PAGES));
     
-    // Always prefer using pageAssignments for filtering
+    // Administrator should have access to ALL customer pages regardless of customer configuration
+    if (user?.role === 'Administrator') {
+      console.log('🔍 [CustomerDetailPage] Administrator access - returning all pages');
+      return Object.values(CUSTOMER_PAGES);
+    }
+    
+    // For other roles, use customer's page assignments
     if (customer.pageAssignments) {
       const enabledPageIds = Object.entries(customer.pageAssignments)
         .filter(([_, assignment]) => assignment.enabled)

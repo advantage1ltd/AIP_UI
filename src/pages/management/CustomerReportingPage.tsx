@@ -32,7 +32,8 @@ import {
   UserCheck,
   Footprints,
   Key,
-  Info
+  Info,
+  RefreshCw
 } from 'lucide-react';
 
 const iconMap = {
@@ -61,76 +62,99 @@ export default function CustomerReportingPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const fetchCustomerReportingData = async () => {
+    try {
+      if (!user) return;
+      
+      setIsLoading(true);
+      setError(null);
+
+      // Build API URL with proper parameters
+      const params = new URLSearchParams({
+        userId: user.id,
+        role: user.role
+      });
+
+      // Add assigned customer IDs for officers
+      if (user.role === 'AdvantageOneOfficer' && 'assignedCustomerIds' in user && user.assignedCustomerIds) {
+        params.append('assignedCustomerIds', user.assignedCustomerIds.join(','));
+      }
+
+      // Fetch customers based on user role and assignments
+      const response = await fetch(`${BASE_API_URL}/customers/reporting?${params.toString()}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch customer reporting data');
+      }
+
+      setCustomers(data.data || []);
+      
+      // Fetch regions and sites counts for each customer
+      await fetchCustomerStats(data.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchCustomerStats = async (customersData: CustomerWithRelations[]) => {
+    setIsLoadingStats(true);
+    try {
+      const [regionsResult, sitesResult] = await Promise.all([
+        regionsService.getRegions(),
+        sitesService.getSites()
+      ]);
+
+      const stats: Record<string, {regions: number, sites: number}> = {};
+      
+      customersData.forEach(customer => {
+        const customerRegions = regionsResult.success ? 
+          regionsResult.data.filter(region => region.customerId === customer.id).length : 0;
+        const customerSites = sitesResult.success ? 
+          sitesResult.data.filter(site => site.customerId === customer.id).length : 0;
+        
+        stats[customer.id] = {
+          regions: customerRegions,
+          sites: customerSites
+        };
+      });
+
+      setCustomerStats(stats);
+    } catch (error) {
+      console.error('Failed to fetch customer stats:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchCustomerReportingData = async () => {
-      try {
-        if (!user) return;
-
-        // Build API URL with proper parameters
-        const params = new URLSearchParams({
-          userId: user.id,
-          role: user.role
-        });
-
-        // Add assigned customer IDs for officers
-        if (user.role === 'AdvantageOneOfficer' && 'assignedCustomerIds' in user && user.assignedCustomerIds) {
-          params.append('assignedCustomerIds', user.assignedCustomerIds.join(','));
-        }
-
-        // Fetch customers based on user role and assignments
-        const response = await fetch(`${BASE_API_URL}/customers/reporting?${params.toString()}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to fetch customer reporting data');
-        }
-
-        setCustomers(data.data || []);
-        
-        // Fetch regions and sites counts for each customer
-        await fetchCustomerStats(data.data || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    const fetchCustomerStats = async (customersData: CustomerWithRelations[]) => {
-      setIsLoadingStats(true);
-      try {
-        const [regionsResult, sitesResult] = await Promise.all([
-          regionsService.getRegions(),
-          sitesService.getSites()
-        ]);
-
-        const stats: Record<string, {regions: number, sites: number}> = {};
-        
-        customersData.forEach(customer => {
-          const customerRegions = regionsResult.success ? 
-            regionsResult.data.filter(region => region.customerId === customer.id).length : 0;
-          const customerSites = sitesResult.success ? 
-            sitesResult.data.filter(site => site.customerId === customer.id).length : 0;
-          
-          stats[customer.id] = {
-            regions: customerRegions,
-            sites: customerSites
-          };
-        });
-
-        setCustomerStats(stats);
-      } catch (error) {
-        console.error('Failed to fetch customer stats:', error);
-      } finally {
-        setIsLoadingStats(false);
-      }
-    };
-
     fetchCustomerReportingData();
   }, [user]);
 
+  // Listen for customer configuration updates
+  useEffect(() => {
+    const handleConfigUpdate = () => {
+      console.log('🔄 Customer configuration updated, refreshing data...');
+      fetchCustomerReportingData();
+    };
+
+    window.addEventListener('customer-config-updated', handleConfigUpdate);
+    return () => window.removeEventListener('customer-config-updated', handleConfigUpdate);
+  }, []);
+
   const getAvailablePages = (customer: CustomerWithRelations): CustomerPage[] => {
-    // Always prefer using pageAssignments for filtering
+    console.log('🔍 [CustomerReportingPage] getAvailablePages called with user role:', user?.role);
+    console.log('🔍 [CustomerReportingPage] Available CUSTOMER_PAGES:', Object.keys(CUSTOMER_PAGES));
+    
+    // Administrator should have access to ALL customer pages regardless of customer configuration
+    if (user?.role === 'Administrator') {
+      console.log('🔍 [CustomerReportingPage] Administrator access - returning all pages');
+      return Object.values(CUSTOMER_PAGES);
+    }
+    
+    // For other roles, use customer's page assignments
     if (customer.pageAssignments) {
       const enabledPageIds = Object.entries(customer.pageAssignments)
         .filter(([_, assignment]) => assignment.enabled)
@@ -347,6 +371,16 @@ export default function CustomerReportingPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchCustomerReportingData}
+            disabled={isLoading}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? 'Refreshing...' : 'Refresh'}
+          </Button>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input

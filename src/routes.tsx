@@ -58,7 +58,7 @@ const IncidentGraphPage = lazy(() => import('./pages/customer/IncidentGraph').th
 const CustomerIncidentReportPage = lazy(() => import('./pages/customer/CustomerIncidentReport'));
 const CustomerSatisfactionReport = lazy(() => import('./pages/customer/CustomerSatisfactionReport'));
 const DailyActivityReportGraphs = lazy(() => import('./pages/customer/DailyActivityReportGraphs'));
-const CustomerOfficerSupportPage = lazy(() => import('./pages/customer/CustomerOfficerSupportPage'));
+
 const CustomerViewsConfig = lazy(() => import('./pages/customer/CustomerViewsConfig'));
 
 const router = createBrowserRouter([
@@ -294,7 +294,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/satisfaction-report',
             element: (
-              <ProtectedRoute allowedRoles={['AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
                 <CustomerSatisfactionReport />
               </ProtectedRoute>
             ),
@@ -302,7 +302,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/be-safe-be-secure',
             element: (
-              <ProtectedRoute allowedRoles={['AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
                 <DailyActivityReportGraphs />
               </ProtectedRoute>
             ),
@@ -310,7 +310,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/daily-activity-report',
             element: (
-              <ProtectedRoute allowedRoles={['AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
                 <DailyActivityReportPage />
               </ProtectedRoute>
             ),
@@ -318,7 +318,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/incident-graph',
             element: (
-              <ProtectedRoute allowedRoles={['AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
                 <IncidentGraphPage />
               </ProtectedRoute>
             ),
@@ -326,23 +326,16 @@ const router = createBrowserRouter([
           {
             path: 'customer/incident-report',
             element: (
-              <ProtectedRoute allowedRoles={['AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
                 <CustomerIncidentReportPage />
               </ProtectedRoute>
             ),
           },
-          {
-            path: 'customer/officer-support',
-            element: (
-              <ProtectedRoute allowedRoles={['AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
-                <CustomerOfficerSupportPage />
-              </ProtectedRoute>
-            ),
-          },
+
           {
             path: 'customer/views-config',
             element: (
-              <ProtectedRoute allowedRoles={['AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
                 <CustomerViewsConfig />
               </ProtectedRoute>
             ),
