@@ -193,10 +193,18 @@ export const customerHandlers = [
 
     // Role-based filtering
     if (role === 'AdvantageOneOfficer' && assignedCustomerIds) {
-      const assignedIds = assignedCustomerIds.split(',')
+      const assignedIds = assignedCustomerIds.split(',').map(id => id.trim())
       filteredCustomers = DUMMY_CUSTOMERS.filter(customer => 
-        assignedIds.includes(customer.id)
+        assignedIds.includes(customer.id.toString())
       )
+      
+      console.log('🔍 [Customer Reporting] Officer access filter:', {
+        role,
+        assignedCustomerIds,
+        assignedIds,
+        customerIds: DUMMY_CUSTOMERS.map(c => c.id),
+        filteredCount: filteredCustomers.length
+      })
     }
     // Admin and HO Officers see all customers (no filtering needed)
 

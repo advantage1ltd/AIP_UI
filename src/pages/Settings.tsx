@@ -33,6 +33,11 @@ interface UserRole {
 
 const Settings = () => {
   const queryClient = useQueryClient();
+  
+  // State for officer customer reporting setting
+  const [officerCustomerReportingEnabled, setOfficerCustomerReportingEnabled] = useState(() => {
+    return localStorage.getItem('officer_customer_reporting_enabled') === 'true';
+  });
 
   // Define user roles
   const userRoles: UserRole[] = [
@@ -71,7 +76,8 @@ const Settings = () => {
     isTestMode,
     testRole,
     setIsTestMode: setTestMode,
-    setTestRole
+    setTestRole,
+    refreshSettings
   } = usePageAccess();
   
   // State for search filter
@@ -141,7 +147,10 @@ const Settings = () => {
   // Mutation for saving settings
   const { mutate: saveSettings, isPending: isSaving } = useMutation({
     mutationFn: settingsService.savePageAccessSettings,
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Refresh the page access context to use the new saved settings
+      await refreshSettings();
+      
       toast({
         title: adminAccessModified ? "Warning: Admin Access Modified" : "Settings Saved",
         description: adminAccessModified 
@@ -163,8 +172,12 @@ const Settings = () => {
   // Mutation for resetting admin access
   const { mutate: resetAdmin, isPending: isResetting } = useMutation({
     mutationFn: () => settingsService.resetAdminAccess(availablePages),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setPageAccessByRole(data.pageAccessByRole);
+      
+      // Refresh the page access context
+      await refreshSettings();
+      
       toast({
         title: "Admin Access Reset",
         description: "Administrator access has been restored to full access.",
@@ -336,6 +349,16 @@ const Settings = () => {
   };
 
   // Handle save changes
+  // Handler for officer customer reporting toggle
+  const handleOfficerReportingToggle = (enabled: boolean) => {
+    setOfficerCustomerReportingEnabled(enabled);
+    localStorage.setItem('officer_customer_reporting_enabled', enabled.toString());
+    toast({
+      title: "Setting Updated",
+      description: `Officer Customer Reporting access has been ${enabled ? 'enabled' : 'disabled'}.`,
+    });
+  };
+
   const handleSave = () => {
     saveSettings({ pageAccessByRole });
   };
@@ -435,6 +458,34 @@ const Settings = () => {
               </AlertDescription>
             </Alert>
           )}
+
+          {/* Officer Customer Reporting Setting */}
+          <Card className="mb-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <UserCog className="h-4 w-4 text-primary" />
+                Officer Settings
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Configure additional access permissions for officers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Customer Reporting Access</p>
+                  <p className="text-xs text-muted-foreground">
+                    Allow AdvantageOne officers to access the Customer Reporting page
+                  </p>
+                </div>
+                <Switch
+                  checked={officerCustomerReportingEnabled}
+                  onCheckedChange={handleOfficerReportingToggle}
+                  className="data-[state=checked]:bg-primary"
+                />
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Search and Filter */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 sm:gap-3 mb-2 sm:mb-3 md:mb-4">

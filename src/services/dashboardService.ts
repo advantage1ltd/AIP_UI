@@ -1,4 +1,4 @@
-import { StoreData, RegionalData, Period, UserRole, OfficerDashboardData, Incident, CustomerStoreData, Region, SatisfactionDataPoint, BeSafeDataPoint, DailyActivity, Site } from '@/types/dashboard';
+import { StoreData, RegionalData, Period, UserRole, OfficerDashboardData, RecentIncident, CustomerStoreData, Region, SatisfactionDataPoint, BeSafeDataPoint, DailyActivity, Site } from '@/types/dashboard';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
@@ -23,7 +23,7 @@ class DashboardService {
     return response.json()
   }
 
-  async getRecentIncidents(): Promise<Incident[]> {
+  async getRecentIncidents(): Promise<RecentIncident[]> {
     const response = await fetch('/api/dashboard/incidents')
     if (!response.ok) {
       throw new Error('Failed to fetch recent incidents')

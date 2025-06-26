@@ -1,7 +1,8 @@
-import { PageAccess } from '@/contexts/PageAccessContext';
+import { PageAccess } from '@/api/pageAccess';
 
 export interface PageAccessSettings {
   pageAccessByRole: Record<string, string[]>;
+  availablePages: PageAccess[];
 }
 
 const BASE_URL = '/api/settings';
@@ -20,7 +21,7 @@ export const settingsService = {
   },
 
   // Save page access settings
-  savePageAccessSettings: async (settings: PageAccessSettings): Promise<PageAccessSettings> => {
+  savePageAccessSettings: async (settings: { pageAccessByRole: Record<string, string[]> }): Promise<PageAccessSettings> => {
     try {
       const response = await fetch(`${BASE_URL}/page-access`, {
         method: 'PUT',
@@ -40,15 +41,20 @@ export const settingsService = {
   // Reset admin access
   resetAdminAccess: async (availablePages: PageAccess[]): Promise<PageAccessSettings> => {
     try {
-      const response = await fetch(`${BASE_URL}/reset-admin`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ availablePages }),
-      });
-      if (!response.ok) throw new Error('Failed to reset admin access');
-      return response.json();
+      // Get current settings first
+      const currentSettings = await settingsService.getPageAccessSettings();
+      
+      // Reset administrator access to all available pages
+      const allPageIds = availablePages.map(page => page.id);
+      const updatedSettings = {
+        pageAccessByRole: {
+          ...currentSettings.pageAccessByRole,
+          Administrator: allPageIds
+        }
+      };
+      
+      // Save the updated settings
+      return await settingsService.savePageAccessSettings(updatedSettings);
     } catch (error) {
       console.error('Error resetting admin access:', error);
       throw error;

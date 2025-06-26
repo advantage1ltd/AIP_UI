@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import IncidentReportPage from "@/pages/operations/IncidentReportPage"
@@ -8,6 +8,7 @@ import { AVAILABLE_CUSTOMERS } from "@/types/user"
 
 export default function CustomerIncidentReport() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user, isLoading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -15,32 +16,41 @@ export default function CustomerIncidentReport() {
 
   useEffect(() => {
     try {
-
-      
       // Wait for auth to finish loading
       if (authLoading) {
         return;
       }
-      
-      if (!user?.customerId) {
-        setError("No customer ID found for user")
+
+      // Get customer ID from URL parameter or user's customerId
+      const urlCustomerId = searchParams.get('customerId')
+      const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : user?.customerId
+
+      console.log('CustomerIncidentReport: URL customerId:', urlCustomerId)
+      console.log('CustomerIncidentReport: User customerId:', user?.customerId)
+      console.log('CustomerIncidentReport: Target customerId:', targetCustomerId)
+
+      if (!targetCustomerId) {
+        setError("No customer ID found")
         return
       }
 
-      const customerData = AVAILABLE_CUSTOMERS.find(c => c.id === user.customerId)
+      const customerData = AVAILABLE_CUSTOMERS.find(c => c.id === targetCustomerId)
+      console.log('CustomerIncidentReport: Found customer:', customerData)
       
       if (!customerData) {
         setError("Customer not found")
         return
       }
       
+      console.log('CustomerIncidentReport: Access granted - setting customer')
       setCustomer(customerData)
     } catch (err) {
+      console.error('CustomerIncidentReport: Error loading customer:', err)
       setError("Failed to load customer data")
     } finally {
       setLoading(false)
     }
-  }, [user?.customerId, authLoading])
+  }, [user?.customerId, authLoading, searchParams])
 
   if (loading) {
     return (

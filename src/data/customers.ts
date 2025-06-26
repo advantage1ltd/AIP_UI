@@ -40,27 +40,27 @@ export let DUMMY_CUSTOMERS: Customer[] = [
       customerId: "21",
       customerType: "retail",
       enabledPages: [
-        "customer-daily-activity-report",
-        "customer-incident-report",
-        "customer-satisfaction-report"
+        "daily-activity-report",
+        "incident-report",
+        "satisfaction-report"
       ],
       createdAt: now,
       updatedAt: now
     },
     pageAssignments: {
-      "customer-daily-activity-report": {
+      "daily-activity-report": {
         enabled: true,
         customized: false,
         lastModified: now,
         modifiedBy: "system"
       },
-      "customer-incident-report": {
+      "incident-report": {
         enabled: true,
         customized: false,
         lastModified: now,
         modifiedBy: "system"
       },
-      "customer-satisfaction-report": {
+      "satisfaction-report": {
         enabled: true,
         customized: false,
         lastModified: now,
@@ -94,41 +94,41 @@ export let DUMMY_CUSTOMERS: Customer[] = [
       customerId: "22",
       customerType: "retail",
       enabledPages: [
-        "customer-daily-activity-report",
-        "customer-incident-graph",
-        "customer-incident-report",
-        "customer-satisfaction-report",
-        "customer-be-safe-be-secure"
+        "daily-activity-report",
+        "incident-graph",
+        "incident-report",
+        "satisfaction-report",
+        "be-safe-be-secure"
       ],
       createdAt: now,
       updatedAt: now
     },
     pageAssignments: {
-      "customer-daily-activity-report": {
+      "daily-activity-report": {
         enabled: true,
         customized: false,
         lastModified: now,
         modifiedBy: "system"
       },
-      "customer-incident-graph": {
+      "incident-graph": {
         enabled: true,
         customized: false,
         lastModified: now,
         modifiedBy: "system"
       },
-      "customer-incident-report": {
+      "incident-report": {
         enabled: true,
         customized: false,
         lastModified: now,
         modifiedBy: "system"
       },
-      "customer-satisfaction-report": {
+      "satisfaction-report": {
         enabled: true,
         customized: false,
         lastModified: now,
         modifiedBy: "system"
       },
-      "customer-be-safe-be-secure": {
+      "be-safe-be-secure": {
         enabled: true,
         customized: false,
         lastModified: now,
@@ -162,41 +162,41 @@ export let DUMMY_CUSTOMERS: Customer[] = [
       customerId: "23",
       customerType: "retail",
       enabledPages: [
-        "customer-daily-activity-report",
-        "customer-incident-graph",
-        "customer-incident-report",
-        "customer-satisfaction-report",
-        "customer-be-safe-be-secure"
+        "daily-activity-report",
+        "incident-graph",
+        "incident-report",
+        "satisfaction-report",
+        "be-safe-be-secure"
       ],
       createdAt: now,
       updatedAt: now
     },
     pageAssignments: {
-      "customer-daily-activity-report": {
+      "daily-activity-report": {
         enabled: true,
         customized: false,
         lastModified: now,
         modifiedBy: "system"
       },
-      "customer-incident-graph": {
+      "incident-graph": {
         enabled: true,
         customized: false,
         lastModified: now,
         modifiedBy: "system"
       },
-      "customer-incident-report": {
+      "incident-report": {
         enabled: true,
         customized: false,
         lastModified: now,
         modifiedBy: "system"
       },
-      "customer-satisfaction-report": {
+      "satisfaction-report": {
         enabled: true,
         customized: false,
         lastModified: now,
         modifiedBy: "system"
       },
-      "customer-be-safe-be-secure": {
+      "be-safe-be-secure": {
         enabled: true,
         customized: false,
         lastModified: now,

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { getUser } from '@/services/auth'
 import { dashboardService } from '@/services/dashboardService'
-import { OfficerDashboardData, Activity, Task, Incident } from '@/types/dashboard'
+import { OfficerDashboardData, Activity, Task, RecentIncident } from '@/types/dashboard'
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 import {
   FileWarning, FileSearch, Building, Calendar, CalendarRange,
@@ -179,7 +179,7 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ title, current, target, uni
   )
 }
 
-const IncidentTable: React.FC<{ incidents: Incident[] }> = ({ incidents }) => {
+const IncidentTable: React.FC<{ incidents: RecentIncident[] }> = ({ incidents }) => {
   const [page, setPage] = React.useState(1)
   const pageSize = 5
   const totalPages = Math.ceil(incidents.length / pageSize)
@@ -207,7 +207,7 @@ const IncidentTable: React.FC<{ incidents: Incident[] }> = ({ incidents }) => {
               <TableBody>
                 {paginatedIncidents.map((incident) => (
                   <TableRow key={incident.id}>
-                    <TableCell className="font-medium text-xs sm:text-sm">{incident.assignedTo}</TableCell>
+                    <TableCell className="font-medium text-xs sm:text-sm">{incident.officerName}</TableCell>
                     <TableCell className="text-xs sm:text-sm">{new Date(incident.date).toLocaleDateString()}</TableCell>
                     <TableCell className="max-w-[160px] sm:max-w-[200px] truncate text-xs sm:text-sm">{incident.siteName}</TableCell>
                     <TableCell className="text-xs sm:text-sm">{incident.type}</TableCell>

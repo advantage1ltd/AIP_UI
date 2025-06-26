@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import CustomerSatisfactionPage from "@/pages/operations/CustomerSatisfactionPage"
@@ -8,6 +8,7 @@ import { AVAILABLE_CUSTOMERS } from "@/types/user"
 
 export default function CustomerSatisfactionReport() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user, isLoading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -23,14 +24,20 @@ export default function CustomerSatisfactionReport() {
         return;
       }
 
-      // Use authenticated user's customer ID
-      if (!user?.customerId) {
-        setError("No customer ID found for user")
+      // Get customer ID from URL parameter or user's customerId
+      const urlCustomerId = searchParams.get('customerId')
+      const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : user?.customerId
+
+      console.log('CustomerSatisfactionReport: URL customerId:', urlCustomerId)
+      console.log('CustomerSatisfactionReport: User customerId:', user?.customerId)
+      console.log('CustomerSatisfactionReport: Target customerId:', targetCustomerId)
+
+      if (!targetCustomerId) {
+        setError("No customer ID found")
         return
       }
 
-      const customerData = AVAILABLE_CUSTOMERS.find(c => c.id === user.customerId)
-      console.log('CustomerSatisfactionReport: Target customer ID:', user.customerId)
+      const customerData = AVAILABLE_CUSTOMERS.find(c => c.id === targetCustomerId)
       console.log('CustomerSatisfactionReport: Found customer:', customerData)
       
       if (!customerData) {
@@ -47,7 +54,7 @@ export default function CustomerSatisfactionReport() {
       console.log('CustomerSatisfactionReport: Setting loading to false')
       setLoading(false)
     }
-  }, [user?.customerId, authLoading])
+  }, [user?.customerId, authLoading, searchParams])
 
   console.log('CustomerSatisfactionReport: Render state:', { loading, error, customer: !!customer })
 

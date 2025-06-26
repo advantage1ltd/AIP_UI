@@ -61,61 +61,6 @@ interface PageAccessResponse {
 // Get all customer page IDs
 const customerPageIds = Object.values(CUSTOMER_PAGES).map(page => page.id);
 
-export const defaultPageAccess: Record<string, string[]> = {
-  'CustomerSiteManager': [
-    'dashboard', 
-    'profile',
-    'settings',
-    'customer-daily-activity-report',
-    'customer-incident-graph',
-    'customer-incident-report',
-    'customer-satisfaction-report',
-    'customer-be-safe-be-secure',
-    'customer-officer-support',
-    'customer-reporting',
-    'customer-views-config'
-  ],
-  'CustomerHOManager': [
-    'dashboard', 
-    'profile',
-    'settings',
-    'customer-daily-activity-report',
-    'customer-incident-graph',
-    'customer-incident-report',
-    'customer-satisfaction-report',
-    'customer-be-safe-be-secure',
-    'customer-officer-support',
-    'customer-reporting',
-    'customer-views-config'
-  ],
-  'Administrator': ['*'],
-  'AdvantageOneOfficer': [
-    'dashboard',
-    'profile',
-    'settings',
-    'incident-report',
-    'site-visit',
-    'patrol-log',
-    'officer-support',
-    'officer-expenses'
-  ],
-  'AdvantageOneHOOfficer': [
-    'dashboard',
-    'profile',
-    'settings',
-    'incident-report',
-    'mystery-shopper',
-    'site-visit',
-    'holiday-requests',
-    'bank-holiday',
-    'customer-satisfaction',
-    'patrol-log',
-    'safe-duress-words',
-    'officer-support',
-    'officer-expenses'
-  ]
-};
-
 export interface PageAccessSettings {
   pageAccessByRole: Record<string, string[]>;
   availablePages: Array<{
@@ -126,16 +71,10 @@ export interface PageAccessSettings {
 }
 
 // Helper function to check if a user has access to a specific page
+// Note: This function is deprecated - use the Settings page or API instead for dynamic access control
 export const hasPageAccess = (userRole: string, pageId: string): boolean => {
-  if (!userRole) return false;
-  
-  const roleAccess = defaultPageAccess[userRole];
-  if (!roleAccess) return false;
-  
-  // Administrator has access to everything
-  if (userRole === 'Administrator' || roleAccess.includes('*')) return true;
-  
-  return roleAccess.includes(pageId);
+  console.warn('hasPageAccess() is deprecated. Use the dynamic settings API instead.');
+  return false; // Always return false to force using the dynamic system
 };
 
 const availablePages: PageAccess[] = [
@@ -203,43 +142,8 @@ const availablePages: PageAccess[] = [
   { id: 'crm-tasks', title: 'Tasks', path: '/crm/tasks' }
 ];
 
+// This function is now deprecated - use pageAccessApi.getSettings() instead
 export async function getPageAccess(): Promise<PageAccessResponse> {
-  try {
-    // Get user role from localStorage
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const userRole = user.role;
-    console.log('🔑 [PageAccess] User role:', userRole);
-    
-    if (!userRole) {
-      console.warn('⚠️ [PageAccess] No user role found in localStorage');
-      return {
-        pageAccessByRole: {},
-        availablePages: []
-      };
-    }
-    
-    // Get page access for the user's role
-    const roleAccess = defaultPageAccess[userRole];
-    console.log('📝 [PageAccess] Role access:', roleAccess);
-    
-    if (!roleAccess) {
-      console.warn(`⚠️ [PageAccess] No access defined for role: ${userRole}`);
-      return {
-        pageAccessByRole: {},
-        availablePages: []
-      };
-    }
-    
-    // Return only the pages that the user has access to
-    const accessiblePages = availablePages.filter(page => roleAccess.includes(page.id));
-    console.log('📋 [PageAccess] Accessible pages:', accessiblePages);
-    
-    return {
-      pageAccessByRole: { [userRole]: roleAccess },
-      availablePages: accessiblePages
-      };
-  } catch (error) {
-    console.error('❌ [PageAccess] Error getting page access:', error);
-    throw error;
-  }
+  console.warn('getPageAccess() is deprecated. Use pageAccessApi.getSettings() instead.');
+  return pageAccessApi.getSettings();
 } 

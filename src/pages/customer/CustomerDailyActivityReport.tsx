@@ -1,19 +1,65 @@
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useState, useEffect } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { DailyActivityTable } from "@/components/customer/DailyActivityTable"
 import { DailyActivityDialog } from "@/components/customer/DailyActivityDialog"
 import { DailyActivityForm } from "@/components/customer/DailyActivityForm"
 import type { DailyActivityReport } from "@/types/dailyActivity"
+import { useAuth } from "@/hooks/useAuth"
+import { AVAILABLE_CUSTOMERS } from "@/types/user"
 
 export default function CustomerDailyActivityReport() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const { user, isLoading: authLoading } = useAuth()
   const [selectedReport, setSelectedReport] = useState<DailyActivityReport | null>(null)
   const [showDialog, setShowDialog] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingReport, setEditingReport] = useState<DailyActivityReport | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [customer, setCustomer] = useState<typeof AVAILABLE_CUSTOMERS[0] | null>(null)
+
+  useEffect(() => {
+    try {
+      // Wait for auth to finish loading
+      if (authLoading) {
+        return;
+      }
+
+      // Get customer ID from URL parameter or user's customerId
+      const urlCustomerId = searchParams.get('customerId')
+      const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : user?.customerId
+
+      console.log('CustomerDailyActivityReport: URL customerId:', urlCustomerId)
+      console.log('CustomerDailyActivityReport: User customerId:', user?.customerId)
+      console.log('CustomerDailyActivityReport: Target customerId:', targetCustomerId)
+
+      if (!targetCustomerId) {
+        setError("No customer ID found")
+        return
+      }
+
+      const customerData = AVAILABLE_CUSTOMERS.find(c => c.id === targetCustomerId)
+      console.log('CustomerDailyActivityReport: Found customer:', customerData)
+      
+      if (!customerData) {
+        setError("Customer not found")
+        return
+      }
+      
+      console.log('CustomerDailyActivityReport: Access granted - setting customer')
+      setCustomer(customerData)
+    } catch (error) {
+      console.error('CustomerDailyActivityReport: Error loading customer:', error)
+      setError('Failed to load customer data')
+    } finally {
+      console.log('CustomerDailyActivityReport: Setting loading to false')
+      setLoading(false)
+    }
+  }, [user?.customerId, authLoading, searchParams])
 
   const handleViewReport = (report: DailyActivityReport) => {
     setSelectedReport(report)
@@ -45,6 +91,26 @@ export default function CustomerDailyActivityReport() {
     handleFormClose()
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-4">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <div className="text-red-500">{error}</div>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto p-4 space-y-6">
       <div className="flex items-center gap-4">
@@ -55,6 +121,9 @@ export default function CustomerDailyActivityReport() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
+        {customer && (
+          <h2 className="text-xl font-semibold">{customer.name} - Daily Activity Reports</h2>
+        )}
       </div>
 
       <DailyActivityTable
@@ -62,6 +131,7 @@ export default function CustomerDailyActivityReport() {
         onEdit={handleEditReport}
         onNew={handleNewReport}
         refreshTrigger={refreshTrigger}
+        customerId={customer?.id.toString()}
       />
 
       <DailyActivityDialog
@@ -78,4 +148,4 @@ export default function CustomerDailyActivityReport() {
       />
     </div>
   )
-} 
+}

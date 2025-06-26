@@ -119,6 +119,14 @@ const NavItem = ({ to, icon, label, onClick, className }: NavItemProps) => {
   )
 }
 
+// Helper function to check if officer has customer reporting access
+const getOfficerCustomerReportingAccess = (): boolean => {
+  // Check localStorage for officer customer reporting setting
+  // This can be configured in the Settings page
+  const officerReportingEnabled = localStorage.getItem('officer_customer_reporting_enabled');
+  return officerReportingEnabled === 'true';
+};
+
 export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate, onMobileClose }) => {
   const { hasAccess, currentRole, isLoading } = usePageAccess();
   const navigate = useNavigate();
@@ -195,7 +203,6 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
     '/customer/satisfaction-report',
     '/customer/be-safe-be-secure',
     '/customer/officer-support',
-    '/customer/reporting',
     '/customer/views-config'
   ];
   
@@ -221,6 +228,8 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
   ];
   
   const isCustomerRole = currentRole === 'CustomerSiteManager' || currentRole === 'CustomerHOManager';
+  const isAdministrator = currentRole === 'Administrator';
+  const isOfficerRole = currentRole === 'AdvantageOneOfficer' || currentRole === 'AdvantageOneHOOfficer';
   
   const showAdminSection = !isCustomerRole && hasSectionAccess(adminPaths);
   const showOperationsSection = hasSectionAccess(operationsPaths);
@@ -272,6 +281,16 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
               </a>
             </Button>
           </div>
+        )}
+
+        {/* Customer Reporting as top-level navigation */}
+        {(hasAccess('/management/customer-reporting') || (isOfficerRole && getOfficerCustomerReportingAccess())) && (
+          <NavItem
+            to="/management/customer-reporting"
+            icon={<BarChart3 className="h-4 w-4" />}
+            label="Customer Reporting"
+            onClick={onNavigate}
+          />
         )}
 
         <Accordion type="multiple" className="space-y-2">
@@ -520,14 +539,6 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-1 pt-1">
-                  {hasAccess('/management/customer-reporting') && (
-                    <NavItem
-                      to="/management/customer-reporting"
-                      icon={<FileText className="h-4 w-4" />}
-                      label="Customer Reporting"
-                      onClick={onNavigate}
-                    />
-                  )}
                   {hasAccess('/management/manager-support') && (
                     <NavItem
                       to="/management/manager-support"
@@ -684,7 +695,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           )}
         </Accordion>
 
-        {!isCustomerRole && hasAccess('/settings') && (
+        {isAdministrator && hasAccess('/settings') && (
           <NavItem
             to="/settings"
             icon={<SettingsIcon className="h-4 w-4" />}

@@ -136,9 +136,10 @@ export default function CustomerReportingPage() {
         .filter(([_, assignment]) => assignment.enabled)
         .map(([pageId]) => pageId);
       
-      return Object.values(CUSTOMER_PAGES).filter(page => 
-        enabledPageIds.includes(page.id)
-      );
+      // Match against the keys of CUSTOMER_PAGES, not the IDs
+      return Object.entries(CUSTOMER_PAGES)
+        .filter(([key, page]) => enabledPageIds.includes(key))
+        .map(([key, page]) => page);
     }
     
     // Fallback to availablePages if pageAssignments is not available
@@ -159,10 +160,10 @@ export default function CustomerReportingPage() {
   };
 
   const handlePageNavigation = (customer: CustomerWithRelations, page: CustomerPage) => {
-    // Navigate to the customer-specific page
-    const pathWithoutCustomer = page.path.replace('/customer/', '');
-    const customerSpecificPath = `/customer/${customer.id}/${pathWithoutCustomer}`;
-    navigate(customerSpecificPath);
+    // Navigate to the static customer page routes with customer ID as query parameter
+    // This way the customer pages know which customer to display
+    const url = `${page.path}?customerId=${customer.id}`;
+    navigate(url);
   };
 
   const filteredCustomers = customers.filter(customer => {

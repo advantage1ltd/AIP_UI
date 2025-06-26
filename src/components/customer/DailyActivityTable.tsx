@@ -21,9 +21,10 @@ interface DailyActivityTableProps {
   onView: (report: DailyActivityReport) => void;
   onNew: () => void;
   refreshTrigger?: number;
+  customerId?: string;
 }
 
-export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger }: DailyActivityTableProps) => {
+export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, customerId }: DailyActivityTableProps) => {
   const { user } = useAuth();
   const [reports, setReports] = useState<DailyActivityReport[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
@@ -42,7 +43,7 @@ export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger }: Da
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<DailyActivityFilters>({
     search: '',
-    customerId: '',
+    customerId: customerId || '',
     siteId: '',
     officerName: '',
     reportDate: undefined
@@ -51,6 +52,13 @@ export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger }: Da
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
 
   const isAdmin = user?.role === 'Administrator';
+
+  // Update filters when customerId prop changes
+  useEffect(() => {
+    if (customerId) {
+      setFilters(prev => ({ ...prev, customerId: customerId }));
+    }
+  }, [customerId]);
 
   // Load initial data
   useEffect(() => {

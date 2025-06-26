@@ -14,6 +14,8 @@ interface PageAccessContextType {
   testRole: string | null;
   setTestRole: (role: string | null) => void;
   isLoading: boolean;
+  refreshSettings: () => Promise<void>;
+  clearCacheAndReload: () => Promise<void>;
 }
 
 const PageAccessContext = createContext<PageAccessContextType | undefined>(undefined);
@@ -48,11 +50,6 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (!allowedPageIds) {
         console.warn(`No page access defined for role: ${roleToCheck}`);
         return false;
-      }
-
-      // Check for wildcard access
-      if (allowedPageIds.includes('*')) {
-        return true;
       }
 
       // Fix for take-test path - ensure it's properly matched
@@ -92,6 +89,67 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  /**
+   * Refresh settings from localStorage or API
+   */
+  const refreshSettings = async (): Promise<void> => {
+    try {
+      setIsLoading(true);
+      
+      // Check if there are saved settings in localStorage first
+      const savedSettings = localStorage.getItem('db_pageAccess_settings');
+      let data;
+      
+      if (savedSettings) {
+        console.log('📖 [PageAccess] Refreshing with saved settings from localStorage');
+        const parsedSettings = JSON.parse(savedSettings);
+        
+        // Still need to get availablePages from the API
+        const apiData = await pageAccessApi.getSettings();
+        data = {
+          pageAccessByRole: parsedSettings.pageAccessByRole,
+          availablePages: apiData.availablePages
+        };
+      } else {
+        // Fetch page access data from API
+        data = await pageAccessApi.getSettings();
+      }
+      
+      setPageAccessByRole(data.pageAccessByRole);
+      setAvailablePages(data.availablePages);
+      
+      console.log('✅ [PageAccess] Settings refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing settings:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Clear cached settings and reload fresh from db.json
+   */
+  const clearCacheAndReload = async (): Promise<void> => {
+    try {
+      setIsLoading(true);
+      
+      // Clear any cached settings
+      localStorage.removeItem('db_pageAccess_settings');
+      console.log('🗑️ [PageAccess] Cleared cached settings');
+      
+      // Force reload fresh settings from db.json
+      const data = await pageAccessApi.getSettings();
+      setPageAccessByRole(data.pageAccessByRole);
+      setAvailablePages(data.availablePages);
+      
+      console.log('🔄 [PageAccess] Reloaded fresh settings from db.json');
+    } catch (error) {
+      console.error('Error clearing cache and reloading:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Initialize role and fetch page access
   useEffect(() => {
     const initializeAccess = async () => {
@@ -105,8 +163,25 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (storedRole) {
           console.log('🔄 Initializing currentRole from localStorage:', storedRole);
           
-          // Fetch page access data first to get valid roles
-          const data = await pageAccessApi.getSettings();
+          // Check if there are saved settings in localStorage first
+          const savedSettings = localStorage.getItem('db_pageAccess_settings');
+          let data;
+          
+          if (savedSettings) {
+            console.log('📖 [PageAccess] Using saved settings from localStorage');
+            const parsedSettings = JSON.parse(savedSettings);
+            
+            // Still need to get availablePages from the API
+            const apiData = await pageAccessApi.getSettings();
+            data = {
+              pageAccessByRole: parsedSettings.pageAccessByRole,
+              availablePages: apiData.availablePages
+            };
+          } else {
+            // Fetch page access data from API
+            data = await pageAccessApi.getSettings();
+          }
+          
           const validRoles = Object.keys(data.pageAccessByRole);
           
           const matchingRole = validRoles.find(
@@ -200,7 +275,9 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setIsTestMode,
       testRole,
       setTestRole,
-      isLoading
+      isLoading,
+      refreshSettings,
+      clearCacheAndReload
     }}>
       {children}
     </PageAccessContext.Provider>

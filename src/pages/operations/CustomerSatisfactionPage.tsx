@@ -110,7 +110,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
   });
   const [filters, setFilters] = useState<CustomerSurveyFilters>({
     search: '',
-    customerId: '',
+    customerId: customerId || '',
     regionId: '',
     siteId: '',
     dateRange: undefined
@@ -160,6 +160,13 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
 
     fetchRegionsAndSites();
   }, []);
+
+  // Update filters when customerId prop changes
+  useEffect(() => {
+    if (customerId) {
+      setFilters(prev => ({ ...prev, customerId: customerId }));
+    }
+  }, [customerId]);
 
   // Initial load
   useEffect(() => {
