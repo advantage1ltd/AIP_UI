@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useSelector } from "react-redux"
 import { 
   BarChart, 
@@ -72,8 +72,8 @@ import type { DateRange } from "react-day-picker"
 import { cn } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 
-// Mock incident data (would normally be fetched from Redux or an API)
-import { mockIncidents } from "@/data/mockIncidents"
+// Import incident service to fetch data from API
+import { incidentService } from '@/services/incidentService'
 import {
   Incident,
   IncidentType, 
@@ -102,7 +102,7 @@ const incidentTypeColors: Record<string, string> = {
   [IncidentType.SUSPICIOUS_BEHAVIOUR]: '#10b981', // Emerald 
   [IncidentType.UNDERAGE_PURCHASE]: '#06b6d4', // Cyan
   [IncidentType.ANTI_SOCIAL]: '#6366f1', // Indigo
-  [IncidentType.OTHER]: '#94a3b8', // Slate
+  [IncidentType.OTHERS]: '#94a3b8', // Slate
   [IncidentInvolved.SELF_SCAN_TILLS]: '#3b82f6', // Blue
   [IncidentInvolved.ABUSIVE_BEHAVIOUR]: '#f43f5e', // Rose
   [IncidentInvolved.THREATS_AND_INTIMIDATION]: '#f97316', // Orange
@@ -170,9 +170,34 @@ const ReportsDashboard = () => {
   const [incidentTypeFilter, setIncidentTypeFilter] = useState<string>("all")
   const [incidentInvolvedFilter, setIncidentInvolvedFilter] = useState<string>("all")
 
-  // Derive data for analysis from incidents
-  // In a real app, you'd use useSelector to get this data from Redux
-  const incidents = mockIncidents
+  // State for incidents data
+  const [incidents, setIncidents] = useState<Incident[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Load incidents data
+  useEffect(() => {
+    const loadIncidents = async () => {
+      try {
+        const data = await incidentService.getIncidents()
+        setIncidents(data)
+      } catch (error) {
+        console.error('Error loading incidents:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadIncidents()
+  }, [])
+
+  // Show loading state while data is being fetched
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+      </div>
+    )
+  }
 
   // Calculate previous period incidents for comparison
   const previousPeriodIncidents = useMemo(() => {
@@ -187,7 +212,7 @@ const ReportsDashboard = () => {
     previousPeriodStart.setDate(previousPeriodStart.getDate() - currentPeriodDays);
     
     return incidents.filter(incident => {
-      const date = new Date(incident.dateInputted);
+      const date = new Date(incident.date);
       return date >= previousPeriodStart && date <= previousPeriodEnd;
     }).length;
   }, [incidents, dateRange]);
@@ -196,7 +221,7 @@ const ReportsDashboard = () => {
   const filteredIncidents = useMemo(() => {
     return incidents.filter(incident => {
       // Date range filter
-      const incidentDate = new Date(incident.dateInputted)
+      const incidentDate = new Date(incident.date)
       const isInDateRange = dateRange?.from && dateRange?.to 
         ? (incidentDate >= dateRange.from && incidentDate <= dateRange.to)
         : true
@@ -210,9 +235,9 @@ const ReportsDashboard = () => {
       // Incident type filter
       const matchesType = incidentTypeFilter === "all" || incident.incidentType === incidentTypeFilter
       
-      // Incident involved filter (if incident has an involvedType property)
+      // Incident involved filter (using incidentInvolved array if available)
       const matchesInvolved = incidentInvolvedFilter === "all" || 
-        (incident.involvedType && incident.involvedType === incidentInvolvedFilter)
+        (incident.incidentInvolved && incident.incidentInvolved.includes(incidentInvolvedFilter))
       
       return isInDateRange && matchesCustomer && matchesStore && matchesType && matchesInvolved
     })
@@ -278,7 +303,7 @@ const ReportsDashboard = () => {
     filteredIncidents
       .filter(incident => incident.incidentType === IncidentType.THEFT)
       .forEach(incident => {
-        const date = new Date(incident.dateInputted)
+        const date = new Date(incident.date)
         const monthYear = format(date, 'MMM yyyy')
         
         months[monthYear] = (months[monthYear] || 0) + 1
@@ -301,7 +326,7 @@ const ReportsDashboard = () => {
   const totalIncidents = filteredIncidents.length
   const totalThefts = filteredIncidents.filter(i => i.incidentType === IncidentType.THEFT).length
   const totalRecovered = filteredIncidents.reduce((sum, incident) => 
-    sum + (incident.totalValueRecovered || 0), 0)
+    sum + (incident.value || 0), 0)
 
   const theftPercentage = totalIncidents > 0 
     ? Math.round((totalThefts / totalIncidents) * 100) 
@@ -317,8 +342,10 @@ const ReportsDashboard = () => {
     })
     
     filteredIncidents.forEach(incident => {
-      if (incident.involvedType) {
-        counts[incident.involvedType] = (counts[incident.involvedType] || 0) + 1
+      if (incident.incidentInvolved && incident.incidentInvolved.length > 0) {
+        incident.incidentInvolved.forEach(involved => {
+          counts[involved] = (counts[involved] || 0) + 1
+        })
       }
     })
     
@@ -342,19 +369,23 @@ const ReportsDashboard = () => {
             <Button
               id="date-range"
               variant="outline"
-              className="w-full justify-start text-left font-normal bg-white"
+              className={cn(
+                "w-full justify-start text-left font-normal",
+                !dateRange && "text-muted-foreground"
+              )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {dateRange?.from ? (
                 dateRange.to ? (
                   <>
-                    {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
+                    {format(dateRange.from, "LLL dd, y")} -{" "}
+                    {format(dateRange.to, "LLL dd, y")}
                   </>
                 ) : (
                   format(dateRange.from, "LLL dd, y")
                 )
               ) : (
-                <span>Pick a date</span>
+                <span>Pick a date range</span>
               )}
             </Button>
           </PopoverTrigger>
@@ -463,7 +494,7 @@ const ReportsDashboard = () => {
           icon={FileText}
           change={`${totalIncidents > previousPeriodIncidents ? '+' : ''}${totalIncidents - previousPeriodIncidents} vs. previous period`}
           changeType={totalIncidents > previousPeriodIncidents ? "negative" : "positive"}
-          backgroundClass="from-blue-600 to-indigo-700" // Specific background
+          backgroundClass="from-green-600 to-emerald-700" // Changed to green background
         />
         <StatsCard 
           title="Theft Rate" 
@@ -477,17 +508,17 @@ const ReportsDashboard = () => {
           title="Value Recovered" 
           value={`£${totalRecovered.toLocaleString()}`} 
           icon={ShieldCheck}
-          change={`Recovery rate: ${Math.round((totalRecovered / (filteredIncidents.reduce((sum, incident) => sum + (incident.totalValue || 0), 0) || 1)) * 100)}%`}
+          change={`Recovery rate: ${Math.round((totalRecovered / (filteredIncidents.reduce((sum, incident) => sum + (incident.value || 0), 0) || 1)) * 100)}%`}
           changeType="positive"
           backgroundClass="from-emerald-600 to-green-700" // Specific background
         />
         <StatsCard 
-          title="Security Alerts" 
-          value={filteredIncidents.filter(i => i.incidentType === IncidentType.SUSPICIOUS_BEHAVIOUR).length} 
+          title="Total Incidents" 
+          value={totalIncidents} 
           icon={Shield}
-          change="Last 30 days"
-          changeType="neutral"
-          backgroundClass="from-amber-500 to-orange-600" // Specific background
+          change={`${totalIncidents > previousPeriodIncidents ? '+' : ''}${totalIncidents - previousPeriodIncidents} vs. previous period`}
+          changeType={totalIncidents > previousPeriodIncidents ? "negative" : "positive"}
+          backgroundClass="from-green-600 to-emerald-700" // Changed to green background
         />
       </div>
       
@@ -652,7 +683,7 @@ const ReportsDashboard = () => {
                   <BarChart
                     data={Object.values(IncidentType).map(type => {
                       const typeIncidents = filteredIncidents.filter(i => i.incidentType === type);
-                      const policeCount = typeIncidents.filter(i => i.policeInvolved).length;
+                      const policeCount = typeIncidents.filter(i => i.policeInvolvement).length;
                       const percentage = typeIncidents.length > 0 
                         ? Math.round((policeCount / typeIncidents.length) * 100) 
                         : 0;
@@ -698,11 +729,11 @@ const ReportsDashboard = () => {
                       <div className="text-xs text-indigo-700 mt-1">Percentage of incidents requiring police</div>
                     </div>
                     <div className="text-2xl font-bold text-indigo-700">
-                      {Math.round((filteredIncidents.filter(i => i.policeInvolved).length / filteredIncidents.length) * 100)}%
+                                                  {Math.round((filteredIncidents.filter(i => i.policeInvolvement).length / filteredIncidents.length) * 100)}%
                     </div>
                   </div>
                   <Progress 
-                    value={Math.round((filteredIncidents.filter(i => i.policeInvolved).length / filteredIncidents.length) * 100)}
+                    value={Math.round((filteredIncidents.filter(i => i.policeInvolvement).length / filteredIncidents.length) * 100)}
                     className="h-2 mt-2 bg-indigo-200"
                   />
                 </div>
@@ -712,12 +743,12 @@ const ReportsDashboard = () => {
                   <div className="flex items-center justify-between mb-3">
                     <div className="text-xs text-indigo-700">Failed to Attend Rate</div>
                     <div className="text-sm font-medium text-indigo-900">
-                      {filteredIncidents.filter(i => i.involvedType === IncidentInvolved.POLICE_FAILED_TO_ATTEND).length} incidents
+                      {filteredIncidents.filter(i => i.incidentInvolved?.includes(IncidentInvolved.POLICE_FAILED_TO_ATTEND)).length} incidents
                     </div>
                   </div>
                   <div className="p-3 bg-white rounded-lg">
                     <div className="text-xs text-indigo-700">
-                      Police failed to attend in {Math.round((filteredIncidents.filter(i => i.involvedType === IncidentInvolved.POLICE_FAILED_TO_ATTEND).length / filteredIncidents.filter(i => i.policeInvolved).length) * 100)}% of cases where they were called.
+                      Police failed to attend in {Math.round((filteredIncidents.filter(i => i.incidentInvolved?.includes(IncidentInvolved.POLICE_FAILED_TO_ATTEND)).length / filteredIncidents.filter(i => i.policeInvolvement).length) * 100)}% of cases where they were called.
                     </div>
                   </div>
                 </div>
@@ -732,7 +763,7 @@ const ReportsDashboard = () => {
                   <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
                     <div className="text-xs text-indigo-600 mb-1">Violent Incidents</div>
                     <div className="text-xl font-bold text-indigo-700">
-                      {filteredIncidents.filter(i => i.involvedType === IncidentInvolved.VIOLENT_BEHAVIOR).length}
+                      {filteredIncidents.filter(i => i.incidentInvolved?.includes(IncidentInvolved.VIOLENT_BEHAVIOR)).length}
                     </div>
                   </div>
                 </div>

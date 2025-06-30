@@ -1,35 +1,53 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
-import type { Customer } from "@/types/customer"
-import { DUMMY_CUSTOMERS } from "@/data/customers"
 import CustomerSatisfactionPage from "@/pages/operations/CustomerSatisfactionPage"
-import { useAuth } from "@/hooks/useAuth"
+import { useAuth } from "@/contexts/AuthContext"
+import { findCustomerById } from "@/hooks/useAvailableCustomers"
 
 export default function CustomerSatisfactionReport() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const { user, isLoading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [customer, setCustomer] = useState<Customer | null>(null)
+  const [customer, setCustomer] = useState<{ id: number; name: string } | null>(null)
 
   console.log('CustomerSatisfactionReport: Component rendered')
 
   useEffect(() => {
     console.log('CustomerSatisfactionReport: useEffect called')
     try {
-      const dummyCustomer = DUMMY_CUSTOMERS[0]
-      console.log('CustomerSatisfactionReport: Dummy customer:', dummyCustomer)
-      console.log('CustomerSatisfactionReport: Enabled pages:', dummyCustomer?.viewConfig?.enabledPages)
-      
-      if (!dummyCustomer?.viewConfig?.enabledPages.includes('customer-satisfaction')) {
-        console.log('CustomerSatisfactionReport: Access denied - customer-satisfaction not in enabled pages')
-        setError('Access to satisfaction reports is not enabled for this customer')
+      // Wait for auth to finish loading
+      if (authLoading) {
+        return;
+      }
+
+      // Get customer ID from URL parameter or user's customerId (for customer users)
+      const urlCustomerId = searchParams.get('customerId')
+      const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined
+      const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : userCustomerId
+
+      console.log('CustomerSatisfactionReport: URL customerId:', urlCustomerId)
+      console.log('CustomerSatisfactionReport: User customerId:', userCustomerId)
+      console.log('CustomerSatisfactionReport: Target customerId:', targetCustomerId)
+
+      if (!targetCustomerId) {
+        setError("No customer ID found")
         return
       }
+
+      const customerData = findCustomerById(targetCustomerId)
+      console.log('CustomerSatisfactionReport: Found customer:', customerData)
+      
+      if (!customerData) {
+        setError("Customer not found")
+        return
+      }
+      
       console.log('CustomerSatisfactionReport: Access granted - setting customer')
-      setCustomer(dummyCustomer)
+      setCustomer(customerData)
     } catch (error) {
       console.error('CustomerSatisfactionReport: Error loading customer:', error)
       setError('Failed to load customer data')
@@ -37,7 +55,7 @@ export default function CustomerSatisfactionReport() {
       console.log('CustomerSatisfactionReport: Setting loading to false')
       setLoading(false)
     }
-  }, [])
+  }, [user, authLoading, searchParams])
 
   console.log('CustomerSatisfactionReport: Render state:', { loading, error, customer: !!customer })
 
@@ -74,7 +92,7 @@ export default function CustomerSatisfactionReport() {
       </div>
       <CustomerSatisfactionPage 
         isCustomerView={true}
-        customerId={customer?.id}
+        customerId={customer?.id.toString()}
       />
     </div>
   )

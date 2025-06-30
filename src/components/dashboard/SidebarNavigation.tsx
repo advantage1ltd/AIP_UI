@@ -119,10 +119,45 @@ const NavItem = ({ to, icon, label, onClick, className }: NavItemProps) => {
   )
 }
 
+// Helper function to check if officer has customer reporting access
+const getOfficerCustomerReportingAccess = (): boolean => {
+  // Check localStorage for officer customer reporting setting
+  // This can be configured in the Settings page
+  const officerReportingEnabled = localStorage.getItem('officer_customer_reporting_enabled');
+  return officerReportingEnabled === 'true';
+};
+
 export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate, onMobileClose }) => {
-  const { hasAccess, currentRole } = usePageAccess();
+  const { hasAccess, currentRole, isLoading } = usePageAccess();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  if (isLoading) {
+    return (
+      <div className="px-3 py-2">
+        <div className="space-y-4">
+          <div className="pl-5">
+            <div className="w-[180px] h-9 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-[20px]" />
+          </div>
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-10 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-lg" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentRole) {
+    return (
+      <div className="px-3 py-2">
+        <div className="text-sm text-gray-500 dark:text-gray-400">
+          Please log in to view navigation
+        </div>
+      </div>
+    );
+  }
   
   const hasSectionAccess = (paths: string[]) => {
     return paths.some(path => hasAccess(path));
@@ -156,19 +191,19 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
   ];
   
   const managementPaths = [
-    '/management/customer-reporting',
     '/management/manager-support',
     '/management/incidents-report',
     '/management/officer-performance'
   ];
   
   const customerPaths = [
-    '/customer/dar',
+    '/customer/daily-activity-report',
     '/customer/incident-graph',
     '/customer/incident-report',
-            '/customer/satisfaction-report',
+    '/customer/satisfaction-report',
     '/customer/be-safe-be-secure',
-    '/customer/reporting'
+    '/customer/officer-support',
+    '/customer/views-config'
   ];
   
   const compliancePaths = [
@@ -192,7 +227,11 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
     '/crm/tasks'
   ];
   
-  const showAdminSection = hasSectionAccess(adminPaths);
+  const isCustomerRole = currentRole === 'CustomerSiteManager' || currentRole === 'CustomerHOManager';
+  const isAdministrator = currentRole === 'Administrator';
+  const isOfficerRole = currentRole === 'AdvantageOneOfficer' || currentRole === 'AdvantageOneHOOfficer';
+  
+  const showAdminSection = !isCustomerRole && hasSectionAccess(adminPaths);
   const showOperationsSection = hasSectionAccess(operationsPaths);
   const showEmployeeSection = hasSectionAccess(employeePaths);
   const showManagementSection = hasSectionAccess(managementPaths);
@@ -244,31 +283,14 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           </div>
         )}
 
-        {hasAccess('/customer/reporting') && (
+        {/* Customer Reporting as top-level navigation */}
+        {(hasAccess('/management/customer-reporting') || (isOfficerRole && getOfficerCustomerReportingAccess())) && (
           <NavItem
             to="/management/customer-reporting"
-            icon={<FileText className="h-4 w-4" />}
+            icon={<BarChart3 className="h-4 w-4" />}
             label="Customer Reporting"
             onClick={onNavigate}
           />
-        )}
-
-        {hasAccess('/action-calendar') && (
-          <a
-            href="/action-calendar"
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-              "hover:bg-accent hover:text-accent-foreground",
-              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-              location.pathname === "/action-calendar" && "bg-accent text-accent-foreground"
-            )}
-            onClick={handleNavigation("/action-calendar")}
-            onKeyDown={handleKeyDown("/action-calendar")}
-            tabIndex={0}
-          >
-            <Calendar className="h-4 w-4" />
-            <span>Action Calendar</span>
-          </a>
         )}
 
         <Accordion type="multiple" className="space-y-2">
@@ -517,14 +539,6 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-1 pt-1">
-                  {hasAccess('/management/customer-reporting') && (
-                    <NavItem
-                      to="/management/customer-reporting"
-                      icon={<FileText className="h-4 w-4" />}
-                      label="Customer Reporting"
-                      onClick={onNavigate}
-                    />
-                  )}
                   {hasAccess('/management/manager-support') && (
                     <NavItem
                       to="/management/manager-support"
@@ -636,9 +650,9 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-1 pt-1">
-                  {hasAccess('/customer/dar') && (
+                  {hasAccess('/customer/daily-activity-report') && (
                     <NavItem
-                      to="/customer/dar"
+                      to="/customer/daily-activity-report"
                       icon={<FileText className="h-4 w-4" />}
                       label="Daily Activity Report"
                       onClick={onNavigate}
@@ -672,7 +686,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                     <NavItem
                     to="/customer/be-safe-be-secure"
                       icon={<ShieldCheck className="h-4 w-4" />}
-                    label="Be Safe Be Secure"
+                    label="Daily Activity Graphs"
                       onClick={onNavigate}
                     />
                   )}
@@ -681,7 +695,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           )}
         </Accordion>
 
-        {hasAccess('/settings') && (
+        {isAdministrator && hasAccess('/settings') && (
           <NavItem
             to="/settings"
             icon={<SettingsIcon className="h-4 w-4" />}

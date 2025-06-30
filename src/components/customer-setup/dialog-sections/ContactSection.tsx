@@ -13,11 +13,12 @@ export function ContactSection({ form }: ContactSectionProps) {
       <h3 className="font-semibold">Contact Details</h3>
       <div className="grid grid-cols-2 gap-4">
         <FormField
+          control={form.control}
           name="contact.title"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Title</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select title" />
@@ -35,6 +36,7 @@ export function ContactSection({ form }: ContactSectionProps) {
           )}
         />
         <FormField
+          control={form.control}
           name="contact.forename"
           render={({ field }) => (
             <FormItem>
@@ -46,6 +48,7 @@ export function ContactSection({ form }: ContactSectionProps) {
           )}
         />
         <FormField
+          control={form.control}
           name="contact.surname"
           render={({ field }) => (
             <FormItem>
@@ -57,6 +60,7 @@ export function ContactSection({ form }: ContactSectionProps) {
           )}
         />
         <FormField
+          control={form.control}
           name="contact.position"
           render={({ field }) => (
             <FormItem>
@@ -68,6 +72,7 @@ export function ContactSection({ form }: ContactSectionProps) {
           )}
         />
         <FormField
+          control={form.control}
           name="contact.email"
           render={({ field }) => (
             <FormItem>
@@ -79,6 +84,7 @@ export function ContactSection({ form }: ContactSectionProps) {
           )}
         />
         <FormField
+          control={form.control}
           name="contact.phone"
           render={({ field }) => (
             <FormItem>

@@ -171,27 +171,30 @@ const customerData = {
     incidentReports: [
       {
         id: '1',
-        customerName: 'HOE COOP',
+        customerName: 'Heart of England',
         store: 'Store #5678',
         officerName: 'Sarah Wilson',
         date: '2025-01-30',
-        amount: 1500.00
+        amount: 1500.00,
+        incidentType: 'Theft - Loss?'
       },
       {
         id: '2',
-        customerName: 'HOE COOP',
+        customerName: 'Heart of England',
         store: 'Store #5679',
         officerName: 'Tom Brown',
         date: '2025-01-29',
-        amount: 950.00
+        amount: 950.00,
+        incidentType: 'Credit Card Fraud?'
       },
       {
         id: '3',
-        customerName: 'HOE COOP',
+        customerName: 'Heart of England',
         store: 'Store #5680',
         officerName: 'Lisa Chen',
         date: '2025-01-28',
-        amount: 1800.00
+        amount: 1800.00,
+        incidentType: 'Theft - Loss?'
       }
     ]
   },
@@ -245,7 +248,8 @@ const customerData = {
         store: 'Store #9012',
         officerName: 'David Lee',
         date: '2025-01-30',
-        amount: 1750.00
+        amount: 1750.00,
+        incidentType: 'Theft - Loss?'
       },
       {
         id: '2',
@@ -253,7 +257,8 @@ const customerData = {
         store: 'Store #9013',
         officerName: 'Emma White',
         date: '2025-01-29',
-        amount: 1100.00
+        amount: 1100.00,
+        incidentType: 'Suspicious Behaviour?'
       },
       {
         id: '3',
@@ -261,7 +266,8 @@ const customerData = {
         store: 'Store #9014',
         officerName: 'Chris Taylor',
         date: '2025-01-28',
-        amount: 2300.00
+        amount: 2300.00,
+        incidentType: 'Theft - Loss?'
       },
       {
         id: '4',
@@ -269,7 +275,8 @@ const customerData = {
         store: 'Store #9015',
         officerName: 'Rachel Parker',
         date: '2025-01-27',
-        amount: 1850.00
+        amount: 1850.00,
+        incidentType: 'Deter - Saved?'
       },
       {
         id: '5',
@@ -277,7 +284,8 @@ const customerData = {
         store: 'Store #9016',
         officerName: 'Mark Thompson',
         date: '2025-01-26',
-        amount: 2100.00
+        amount: 2100.00,
+        incidentType: 'Theft - Loss?'
       },
       {
         id: '6',
@@ -285,7 +293,8 @@ const customerData = {
         store: 'Store #9017',
         officerName: 'Sophie Anderson',
         date: '2025-01-25',
-        amount: 1950.00
+        amount: 1950.00,
+        incidentType: 'Credit Card Fraud?'
       }
     ]
   }
@@ -322,7 +331,7 @@ const equipmentData = [
 
 const customers = [
   { id: 'customer1', name: 'Central England COOP' },
-  { id: 'customer2', name: 'HOE COOP' },
+  { id: 'customer2', name: 'Heart of England' },
   { id: 'customer3', name: 'Midcounties COOP' }
 ] as const;
 

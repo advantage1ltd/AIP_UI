@@ -1,41 +1,20 @@
 import * as React from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { getUser } from '@/services/auth'
+import { dashboardService } from '@/services/dashboardService'
+import { OfficerDashboardData, Activity, Task, RecentIncident } from '@/types/dashboard'
+import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 import {
-  FileWarning,
-  FileSearch,
-  Building,
-  Calendar,
-  CalendarRange,
-  BadgeCheck,
-  ClipboardCheck,
-  Key,
-  HelpCircle,
-  Wallet,
-  Shirt,
-  Bell,
-  Clock,
-  CheckCircle,
-  Target,
-  Award,
-  TrendingUp,
-  Shield,
-  Users,
-  Eye,
-  MapPin,
-  AlertTriangle,
-  Activity,
-  Star,
-  Timer,
-  ChevronRight,
-  ArrowUpRight,
-  ArrowDownRight,
-  Zap,
-  ChevronLeft,
-  ChevronRightIcon
+  FileWarning, FileSearch, Building, Calendar, CalendarRange,
+  BadgeCheck, ClipboardCheck, Key, HelpCircle, Wallet, Shirt,
+  Bell, Clock, CheckCircle, Target, Award, TrendingUp, Shield,
+  Users, Eye, MapPin, AlertTriangle, Activity as ActivityIcon,
+  Star, Timer, ChevronRight, ArrowUpRight, ArrowDownRight,
+  Zap, ChevronLeft, ChevronRightIcon
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
@@ -47,65 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-// Types and Interfaces
-interface OfficerData {
-  name: string
-  badgeNumber: string
-  role: string
-  avatar: string
-  shiftStatus: string
-  shiftStart: string
-  shiftEnd: string
-  location: string
-  stats: {
-    incidentsThisMonth: number
-    incidentsLastMonth: number
-    totalValueSaved: number
-    expensesYTD: number
-    completionRate: number
-    holidayBooked: number
-    hoursWorked: number
-    sitesVisited: number
-  }
-  monthlyTarget: {
-    incidents: number
-    valueSaved: number
-    current: {
-      incidents: number
-      valueSaved: number
-    }
-  }
-  recentActivities: Activity[]
-  upcomingTasks: Task[]
-}
-
-interface Activity {
-  id: string
-  type: 'incident' | 'patrol' | 'report'
-  title: string
-  location: string
-  time: string
-  value?: number
-  status: 'resolved' | 'submitted' | 'in-progress'
-}
-
-interface Task {
-  id: string
-  type: string
-  title: string
-  dueDate: string
-  priority: 'high' | 'medium' | 'low'
-}
-
-interface Incident {
-  id: string
-  date: string
-  siteName: string
-  type: string
-  value: number
-  assignedTo: string
-}
-
+// Component Props Types
 interface StatCardProps {
   title: string
   value: string | number
@@ -125,115 +46,6 @@ interface ProgressCardProps {
   color: string
 }
 
-// Mock data with proper typing
-const officerData: OfficerData = {
-  name: "John Smith",
-  badgeNumber: "ADV-001",
-  role: "Advantage One Officer",
-  avatar: "/api/placeholder/40/40",
-  shiftStatus: "On Duty",
-  shiftStart: "08:00",
-  shiftEnd: "20:00",
-  location: "Central Manchester Store",
-  stats: {
-    incidentsThisMonth: 24,
-    incidentsLastMonth: 18,
-    totalValueSaved: 45600,
-    expensesYTD: 1250.75,
-    completionRate: 92,
-    holidayBooked: 5,
-    hoursWorked: 156,
-    sitesVisited: 12
-  },
-  monthlyTarget: {
-    incidents: 30,
-    valueSaved: 50000,
-    current: {
-      incidents: 24,
-      valueSaved: 45600
-    }
-  },
-  recentActivities: [
-    {
-      id: "ACT-001",
-      type: "incident",
-      title: "Theft Prevention",
-      location: "Electronics Section",
-      time: "2 hours ago",
-      value: 299.99,
-      status: "resolved"
-    },
-    {
-      id: "ACT-002",
-      type: "report",
-      title: "Incident Report Submitted",
-      location: "Customer Service",
-      time: "1 day ago",
-      value: 150.00,
-      status: "submitted"
-    }
-  ],
-  upcomingTasks: [
-    {
-      id: "TASK-001",
-      type: "Site Visit",
-      title: "Site Visit",
-      dueDate: "Tomorrow",
-      priority: "high"
-    },
-    {
-      id: "TASK-002",
-      type: "inspection",
-      title: "Customer Satisfaction Survey",
-      dueDate: "2 days",
-      priority: "medium"
-    }
-  ]
-}
-
-const incidentReports: Incident[] = [
-  {
-    id: "INC-001",
-    date: "2024-03-15",
-    siteName: "Manchester Central Store",
-    type: "Theft Prevention",
-    value: 299.99,
-    assignedTo: "John Smith"
-  },
-  {
-    id: "INC-002",
-    date: "2024-03-14",
-    siteName: "Liverpool Main Store",
-    type: "Suspicious Activity",
-    value: 0,
-    assignedTo: "John Smith"
-  },
-  {
-    id: "INC-003",
-    date: "2024-03-14",
-    siteName: "Birmingham Store",
-    type: "Vehicle Damage",
-    value: 450.00,
-    assignedTo: "John Smith"
-  },
-  {
-    id: "INC-004",
-    date: "2024-03-13",
-    siteName: "Leeds Shopping Centre",
-    type: "Inventory Loss",
-    value: 1250.00,
-    assignedTo: "John Smith"
-  },
-  {
-    id: "INC-005",
-    date: "2024-03-13",
-    siteName: "Newcastle Mall",
-    type: "Customer Dispute",
-    value: 0,
-    assignedTo: "John Smith"
-  }
-]
-
 // Components
 const StatCard: React.FC<StatCardProps> = ({ 
   title, 
@@ -246,107 +58,39 @@ const StatCard: React.FC<StatCardProps> = ({
   link
 }) => {
   const content = (
-    <Card className={`relative overflow-hidden border-0 shadow-lg ${gradient} ${link ? 'cursor-pointer hover:shadow-xl transition-shadow' : ''}`}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <p className="text-white/80 text-sm font-medium">{title}</p>
+    <Card className={`relative overflow-hidden border-0 shadow-lg ${gradient} ${link ? 'cursor-pointer hover:shadow-xl transition-shadow duration-200' : ''} h-full`}>
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-start justify-between h-full">
+          <div className="space-y-1.5">
+            <p className="text-white/80 text-[11px] sm:text-xs font-medium line-clamp-1">{title}</p>
             <div className="space-y-1">
-              <p className="text-3xl font-bold text-white">{value}</p>
-              {subtitle && <p className="text-white/70 text-xs">{subtitle}</p>}
+              <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">{value}</p>
+              {subtitle && <p className="text-white/70 text-[10px] sm:text-xs line-clamp-1">{subtitle}</p>}
+              {change && (
+                <div className="flex items-center gap-1">
+                  {trend === 'up' ? (
+                    <ArrowUpRight className="h-3 w-3 text-white/80" />
+                  ) : (
+                    <ArrowDownRight className="h-3 w-3 text-white/80" />
+                  )}
+                  <span className="text-white/80 text-[10px] sm:text-xs">{change}</span>
+                </div>
+              )}
             </div>
-            {change && (
-              <div className="flex items-center gap-1">
-                {trend === 'up' ? (
-                  <ArrowUpRight className="h-4 w-4 text-white/80" />
-                ) : (
-                  <ArrowDownRight className="h-4 w-4 text-white/80" />
-                )}
-                <span className="text-white/80 text-sm">{change}</span>
-              </div>
-            )}
           </div>
-          <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
-            <Icon className="h-6 w-6 text-white" />
+          <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+            <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
           </div>
-        </div>
-        
-        {/* Background Pattern */}
-        <div className="absolute -bottom-6 -right-6 opacity-10">
-          <Icon className="h-24 w-24 text-white" />
         </div>
       </CardContent>
     </Card>
   );
 
   if (link) {
-    return <Link to={link}>{content}</Link>;
+    return <Link to={link} className="block h-full">{content}</Link>;
   }
 
   return content;
-}
-
-const QuickActionCard = ({ 
-  icon: Icon, 
-  title, 
-  link, 
-  description, 
-  color = "blue",
-  badge
-}: {
-  icon: any
-  title: string
-  link: string
-  description: string
-  color?: string
-  badge?: string
-}) => {
-  const colorClasses = {
-    blue: "border-blue-200 hover:border-blue-300 hover:bg-blue-50",
-    green: "border-green-200 hover:border-green-300 hover:bg-green-50",
-    purple: "border-purple-200 hover:border-purple-300 hover:bg-purple-50",
-    orange: "border-orange-200 hover:border-orange-300 hover:bg-orange-50",
-    red: "border-red-200 hover:border-red-300 hover:bg-red-50",
-    indigo: "border-indigo-200 hover:border-indigo-300 hover:bg-indigo-50"
-  }
-
-  const iconColors = {
-    blue: "text-blue-600 bg-blue-100",
-    green: "text-green-600 bg-green-100",
-    purple: "text-purple-600 bg-purple-100",
-    orange: "text-orange-600 bg-orange-100",
-    red: "text-red-600 bg-red-100",
-    indigo: "text-indigo-600 bg-indigo-100"
-  }
-
-  return (
-    <Link to={link}>
-      <Card className={`transition-all duration-200 ${colorClasses[color as keyof typeof colorClasses]} group cursor-pointer`}>
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className={`rounded-lg p-3 ${iconColors[color as keyof typeof iconColors]} group-hover:scale-110 transition-transform`}>
-              <Icon className="h-5 w-5" />
-            </div>
-            <div className="flex-1 space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900">{title}</h3>
-                {badge && (
-                  <Badge variant="secondary" className="text-xs">
-                    {badge}
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-gray-600 leading-relaxed">{description}</p>
-              <div className="flex items-center text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                Access now
-                <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  )
 }
 
 const ActivityItem: React.FC<{ activity: Activity }> = ({ activity }) => {
@@ -355,7 +99,7 @@ const ActivityItem: React.FC<{ activity: Activity }> = ({ activity }) => {
       case 'incident': return AlertTriangle
       case 'patrol': return Shield
       case 'report': return FileWarning
-      default: return Activity
+      default: return ActivityIcon
     }
   }
 
@@ -371,27 +115,27 @@ const ActivityItem: React.FC<{ activity: Activity }> = ({ activity }) => {
   const Icon = getActivityIcon(activity.type)
 
   return (
-    <div className="flex items-start gap-4 p-4 rounded-lg border bg-white hover:shadow-md transition-shadow">
-      <div className={`rounded-full p-2 ${getActivityColor(activity.type)} text-white`}>
-        <Icon className="h-4 w-4" />
+    <div className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-white hover:shadow-md transition-shadow">
+      <div className={`rounded-full p-1.5 ${getActivityColor(activity.type)} text-white flex-shrink-0`}>
+        <Icon className="h-3 w-3" />
       </div>
-      <div className="flex-1 space-y-1">
-        <div className="flex items-center justify-between">
-          <h4 className="font-medium text-gray-900">{activity.title}</h4>
-          <span className="text-xs text-gray-500">{activity.time}</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="font-medium text-xs sm:text-sm text-gray-900 truncate">{activity.title}</h4>
+          <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">{activity.time}</span>
         </div>
-        <p className="text-sm text-gray-600 flex items-center gap-1">
-          <MapPin className="h-3 w-3" />
-          {activity.location}
+        <p className="text-[10px] sm:text-xs text-gray-600 flex items-center gap-1 mt-1">
+          <MapPin className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate">{activity.location}</span>
         </p>
         {activity.value && (
-          <p className="text-sm font-medium text-green-600">
+          <p className="text-[10px] sm:text-xs font-medium text-green-600 mt-1">
             Value: £{activity.value.toFixed(2)}
           </p>
         )}
         <Badge 
           variant={activity.status === 'resolved' ? 'default' : 'secondary'}
-          className="text-xs"
+          className="text-[10px] sm:text-xs mt-2"
         >
           {activity.status}
         </Badge>
@@ -405,24 +149,24 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ title, current, target, uni
   
   return (
     <Card>
-      <CardContent className="p-6">
-        <div className="space-y-4">
+      <CardContent className="p-3 sm:p-4 md:p-6">
+        <div className="space-y-2 sm:space-y-3 md:space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium text-gray-900">{title}</h3>
-            <Badge variant={percentage >= 80 ? 'default' : 'secondary'}>
+            <h3 className="font-medium text-xs sm:text-sm md:text-base text-gray-900">{title}</h3>
+            <Badge variant={percentage >= 80 ? 'default' : 'secondary'} className="text-[10px] sm:text-xs">
               {percentage.toFixed(0)}%
             </Badge>
           </div>
           
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
+          <div className="space-y-1.5 sm:space-y-2">
+            <div className="flex justify-between text-[10px] sm:text-xs">
               <span className="text-gray-600">Current: {current.toLocaleString()} {unit}</span>
               <span className="text-gray-600">Target: {target.toLocaleString()} {unit}</span>
             </div>
-            <Progress value={percentage} className="h-2" />
+            <Progress value={percentage} className="h-1.5 sm:h-2" />
           </div>
           
-          <div className="text-sm text-gray-600">
+          <div className="text-[10px] sm:text-xs text-gray-600">
             {target - current > 0 ? (
               <>Need {(target - current).toLocaleString()} more {unit} to reach target</>
             ) : (
@@ -435,47 +179,52 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ title, current, target, uni
   )
 }
 
-// Add IncidentTable component
-const IncidentTable: React.FC = () => {
+const IncidentTable: React.FC<{ incidents: RecentIncident[] }> = ({ incidents }) => {
   const [page, setPage] = React.useState(1)
   const pageSize = 5
-  const totalPages = Math.ceil(incidentReports.length / pageSize)
+  const totalPages = Math.ceil(incidents.length / pageSize)
   
   const paginatedIncidents = React.useMemo(() => 
-    incidentReports.slice((page - 1) * pageSize, page * pageSize),
-    [page]
+    incidents.slice((page - 1) * pageSize, page * pageSize),
+    [page, incidents]
   )
 
   return (
-    <div className="space-y-4">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Officer</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Site Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead className="text-right">Value</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {paginatedIncidents.map((incident) => (
-            <TableRow key={incident.id}>
-              <TableCell className="font-medium">{incident.assignedTo}</TableCell>
-              <TableCell>{new Date(incident.date).toLocaleDateString()}</TableCell>
-              <TableCell>{incident.siteName}</TableCell>
-              <TableCell>{incident.type}</TableCell>
-              <TableCell className="text-right">
-                {incident.value > 0 ? `£${incident.value.toFixed(2)}` : '-'}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="space-y-3 sm:space-y-4">
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="inline-block min-w-full align-middle">
+          <div className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px] sm:w-[150px]">Officer</TableHead>
+                  <TableHead className="w-[80px] sm:w-[100px]">Date</TableHead>
+                  <TableHead className="w-[160px] sm:w-[200px]">Site Name</TableHead>
+                  <TableHead className="w-[120px] sm:w-[150px]">Type</TableHead>
+                  <TableHead className="text-right w-[80px] sm:w-[100px]">Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedIncidents.map((incident) => (
+                  <TableRow key={incident.id}>
+                    <TableCell className="font-medium text-xs sm:text-sm">{incident.officerName}</TableCell>
+                    <TableCell className="text-xs sm:text-sm">{new Date(incident.date).toLocaleDateString()}</TableCell>
+                    <TableCell className="max-w-[160px] sm:max-w-[200px] truncate text-xs sm:text-sm">{incident.siteName}</TableCell>
+                    <TableCell className="text-xs sm:text-sm">{incident.type}</TableCell>
+                    <TableCell className="text-right text-xs sm:text-sm">
+                      {incident.value > 0 ? `£${incident.value.toFixed(2)}` : '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </div>
       
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-500">
-          Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, incidentReports.length)} of {incidentReports.length} incidents
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4 px-1">
+        <div className="text-[10px] sm:text-xs text-gray-500 text-center sm:text-left">
+          Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, incidents.length)} of {incidents.length} incidents
         </div>
         <div className="flex items-center space-x-2">
           <Button
@@ -483,18 +232,20 @@ const IncidentTable: React.FC = () => {
             size="sm"
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
+            className="h-7 sm:h-8 px-2 sm:px-3"
           >
-            <ChevronLeft className="h-4 w-4" />
-            Previous
+            <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="sr-only sm:not-sr-only sm:ml-1">Previous</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
+            className="h-7 sm:h-8 px-2 sm:px-3"
           >
-            Next
-            <ChevronRightIcon className="h-4 w-4" />
+            <span className="sr-only sm:not-sr-only sm:mr-1">Next</span>
+            <ChevronRightIcon className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
         </div>
       </div>
@@ -502,49 +253,44 @@ const IncidentTable: React.FC = () => {
   )
 }
 
-export default function OfficerDashboard({ displayName }: { displayName?: string }) {
-  // Error handling state
-  const [error, setError] = React.useState<Error | null>(null)
-  const [isLoading, setIsLoading] = React.useState(true)
-  
+export default function OfficerDashboard() {
   // Get the logged-in user information
   const loggedInUser = getUser()
-  const userName = loggedInUser?.displayName || loggedInUser?.username || displayName || officerData.name
-  const userRole = loggedInUser?.role || officerData.role
 
-  // Fetch data on mount
-  React.useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setIsLoading(true)
-        // In production, replace with actual API calls
-        // const response = await fetch('/api/dashboard')
-        // const data = await response.json()
-        
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        setIsLoading(false)
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch dashboard data'))
-        setIsLoading(false)
-      }
-    }
+  // Fetch dashboard data
+  const { 
+    data: dashboardData,
+    isLoading: isDashboardLoading,
+    error: dashboardError
+  } = useQuery({
+    queryKey: ['officerDashboard'],
+    queryFn: () => dashboardService.getOfficerDashboard()
+  })
 
-    fetchDashboardData()
-  }, [])
+  // Fetch incidents data
+  const {
+    data: incidentsData,
+    isLoading: isIncidentsLoading,
+    error: incidentsError
+  } = useQuery({
+    queryKey: ['recentIncidents'],
+    queryFn: () => dashboardService.getRecentIncidents()
+  })
+
+  const isLoading = isDashboardLoading || isIncidentsLoading
+  const error = dashboardError || incidentsError
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <Card className="w-full max-w-md mx-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4">
+        <Card className="w-full max-w-md mx-auto">
           <CardHeader>
-            <CardTitle className="text-red-600">Error Loading Dashboard</CardTitle>
+            <CardTitle className="text-red-600 text-base sm:text-lg">Error Loading Dashboard</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600">{error.message}</p>
+            <p className="text-gray-600 text-sm">{error instanceof Error ? error.message : 'An error occurred'}</p>
             <Button 
-              className="mt-4"
+              className="mt-4 w-full sm:w-auto"
               onClick={() => window.location.reload()}
             >
               Retry
@@ -555,164 +301,163 @@ export default function OfficerDashboard({ displayName }: { displayName?: string
     )
   }
 
-  if (isLoading) {
+  if (isLoading || !dashboardData || !incidentsData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
+        <div className="text-center space-y-3">
+          <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-gray-600 text-sm">Loading dashboard...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="container mx-auto p-6 space-y-8">
-        {/* Header Section */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Welcome back, {userName}
-            </h1>
-            <div className="text-gray-600 flex items-center gap-2">
-              <Badge variant="outline" className="text-green-600 border-green-200">
-                {officerData.shiftStatus}
-              </Badge>
-              <span>•</span>
-              <span>{userRole}</span>              
-              <span className="flex items-center gap-1"></span>
-            </div>
-          </div>
-        </div>
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
+        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+          {/* Header Section */}
+          <header className="space-y-1">
+            <DashboardGreeting />
+          </header>
 
-        {/* Stats Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Incidents This Month"
-            value={officerData.stats.incidentsThisMonth}
-            change="+33% from last month"
-            trend="up"
-            icon={Shield}
-            gradient="bg-gradient-to-br from-blue-500 to-blue-700"
-            subtitle={`Target: ${officerData.monthlyTarget.incidents}`}
-            link="/operations/incident-report"
-          />
-          <StatCard
-            title="Value Saved"
-            value={`£${(officerData.stats.totalValueSaved / 1000).toFixed(1)}k`}
-            change="+£12k from last month"
-            trend="up"
-            icon={TrendingUp}
-            gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
-            subtitle="This month"
-            link="/operations/incident-report"
-          />
-          <StatCard
-            title="Expenses YTD"
-            value={`£${officerData.stats.expensesYTD.toFixed(2)}`}
-            change="+£150 from last month"
-            trend="up"
-            icon={Wallet}
-            gradient="bg-gradient-to-br from-purple-500 to-purple-700"
-            subtitle="Year to date"
-            link="/operations/officer-expenses"
-          />
-          <StatCard
-            title="Holiday Days Left YTD"
-            value={28 - officerData.stats.holidayBooked}
-            icon={CalendarRange}
-            gradient="bg-gradient-to-br from-amber-500 to-orange-600"
-            subtitle="Year to date"
-            link="/operations/holiday-requests"
-          />
-        </div>
+          {/* Stats Grid */}
+          <section aria-label="Dashboard Statistics" className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <StatCard
+              title="Incidents This Month"
+              value={dashboardData.stats.incidentsThisMonth}
+              change="+33% from last month"
+              trend="up"
+              icon={Shield}
+              gradient="bg-gradient-to-br from-blue-500 to-blue-700"
+              subtitle={`Target: ${dashboardData.monthlyTarget.incidents}`}
+              link="/operations/incident-report"
+            />
+            <StatCard
+              title="Value Saved"
+              value={`£${(dashboardData.stats.totalValueSaved / 1000).toFixed(1)}k`}
+              change="+£12k from last month"
+              trend="up"
+              icon={TrendingUp}
+              gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
+              subtitle="This month"
+              link="/operations/incident-report"
+            />
+            <StatCard
+              title="Expenses YTD"
+              value={`£${dashboardData.stats.expensesYTD.toFixed(2)}`}
+              change="+£150 from last month"
+              trend="up"
+              icon={Wallet}
+              gradient="bg-gradient-to-br from-purple-500 to-purple-700"
+              subtitle="Year to date"
+              link="/operations/officer-expenses"
+            />
+            <StatCard
+              title="Holiday Days Left"
+              value={28 - dashboardData.stats.holidayBooked}
+              icon={CalendarRange}
+              gradient="bg-gradient-to-br from-amber-500 to-orange-600"
+              subtitle="Year to date"
+              link="/operations/holiday-requests"
+            />
+          </section>
 
-        {/* Main Content Grid */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column - Monthly Progress and Incident Table */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Monthly Targets */}
-            <div>
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Target className="h-5 w-5 text-green-600" />
-                Monthly Progress
-              </h2>
-              <div className="grid gap-4 md:grid-cols-2">
-                <ProgressCard
-                  title="Incidents Handled"
-                  current={officerData.monthlyTarget.current.incidents}
-                  target={officerData.monthlyTarget.incidents}
-                  unit="incidents"
-                  color="blue"
-                />
-                <ProgressCard
-                  title="Value Saved"
-                  current={officerData.monthlyTarget.current.valueSaved}
-                  target={officerData.monthlyTarget.valueSaved}
-                  unit="£"
-                  color="green"
-                />
-              </div>
-            </div>
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Left Column - Monthly Progress and Incident Table */}
+            <div className="lg:col-span-2 space-y-4">
+              {/* Monthly Progress */}
+              <section aria-label="Monthly Progress">
+                <h2 className="text-sm sm:text-base font-semibold mb-3 flex items-center gap-2">
+                  <Target className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                  Monthly Progress
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <ProgressCard
+                    title="Incidents Handled"
+                    current={dashboardData.stats.incidentsThisMonth}
+                    target={dashboardData.monthlyTarget.incidents}
+                    unit="incidents"
+                    color="blue"
+                  />
+                  <ProgressCard
+                    title="Value Saved"
+                    current={dashboardData.stats.totalValueSaved}
+                    target={dashboardData.monthlyTarget.valueSaved}
+                    unit="£"
+                    color="green"
+                  />
+                </div>
+              </section>
 
-            {/* Incident Reports Table */}
-            <div>
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <FileWarning className="h-5 w-5 text-red-600" />
-                Recent Incidents
-              </h2>
-              <Card>
-                <CardContent className="p-4">
-                  <IncidentTable />
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* Right Column - Activity & Notifications */}
-          <div className="space-y-6">
-            {/* Recent Activity */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-blue-600" />
-                  Recent Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {officerData.recentActivities.map((activity) => (
-                  <ActivityItem key={activity.id} activity={activity} />
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Upcoming Tasks */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  Upcoming Tasks
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {officerData.upcomingTasks.map((task) => (
-                  <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg border bg-gray-50">
-                    <div className={`w-2 h-2 rounded-full ${
-                      task.priority === 'high' ? 'bg-red-500' : 
-                      task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                    }`} />
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{task.title}</p>
-                      <p className="text-xs text-gray-600">Due: {task.dueDate}</p>
+              {/* Recent Incidents */}
+              <section aria-label="Recent Incidents">
+                <h2 className="text-sm sm:text-base font-semibold mb-3 flex items-center gap-2">
+                  <FileWarning className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
+                  Recent Incidents
+                </h2>
+                <Card>
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="overflow-x-auto">
+                      <IncidentTable incidents={incidentsData} />
                     </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </section>
+            </div>
+
+            {/* Right Column - Activity & Tasks */}
+            <div className="space-y-4">
+              {/* Recent Activity */}
+              <section aria-label="Recent Activity">
+                <Card>
+                  <CardHeader className="p-3 sm:p-4">
+                    <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                      <ActivityIcon className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                      Recent Activity
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4 space-y-2">
+                    {dashboardData.recentActivities.map((activity) => (
+                      <ActivityItem key={activity.id} activity={activity} />
+                    ))}
+                  </CardContent>
+                </Card>
+              </section>
+
+              {/* Upcoming Tasks */}
+              <section aria-label="Upcoming Tasks">
+                <Card>
+                  <CardHeader className="p-3 sm:p-4">
+                    <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                      Upcoming Tasks
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4 space-y-2">
+                    {dashboardData.upcomingTasks.map((task) => (
+                      <div 
+                        key={task.id} 
+                        className="flex items-center gap-2 p-2 sm:p-3 rounded-lg border bg-gray-50 hover:bg-gray-100 transition-colors"
+                      >
+                        <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${
+                          task.priority === 'high' ? 'bg-red-500' : 
+                          task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-xs sm:text-sm truncate">{task.title}</p>
+                          <p className="text-[10px] sm:text-xs text-gray-600 mt-0.5">{task.dueDate}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </section>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 } 

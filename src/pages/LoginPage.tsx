@@ -82,14 +82,14 @@ export default function LoginPage() {
       console.log('✅ Login successful:', {
         username: user.username,
         role: user.role,
-        pageAccessRole: user.pageAccessRole,
         timestamp: new Date().toISOString()
       })
 
-      // Set the page access role
-      console.log('🔑 Setting page access role:', user.pageAccessRole)
+      // Set the page access role - use role if pageAccessRole is not available
+      const roleToSet = user.role
+      console.log('🔑 Setting role for page access:', roleToSet)
       console.log('🔍 Full user object from login:', user)
-      setCurrentRole(user.pageAccessRole)
+      await setCurrentRole(roleToSet)
 
       // All users now go to /dashboard
       const redirectPath = '/dashboard'
@@ -179,6 +179,30 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+          
+          {/* Development Helper - Test Credentials */}
+          {import.meta.env.DEV && (
+            <div className="mt-6 p-4 bg-slate-50 rounded-lg border">
+              <h3 className="text-sm font-semibold text-slate-700 mb-2">Test Credentials (Dev Only)</h3>
+              <div className="text-xs text-slate-600 space-y-1">
+                <div><strong>Central England COOP (ID: 21):</strong></div>
+                <div>• customerho / customer123</div>
+                <div>• customersite / site123</div>
+                <div>• central / central123</div>
+                <div className="mt-2"><strong>Heart of England (ID: 22):</strong></div>
+                <div>• heartengland / heart123</div>
+                <div>• heartsite / heartsite123</div>
+                <div className="mt-2"><strong>Midcounties COOP (ID: 23):</strong></div>
+                <div>• midcounties / mid123</div>
+                <div>• midsite / midsite123</div>
+                <div className="mt-2"><strong>Advantage One:</strong></div>
+                <div>• admin / admin123</div>
+                <div>• officer1 / officer123 (Customers: 21, 22)</div>
+                <div>• officer2 / officer456 (Customers: 22, 23)</div>
+                <div>• officer3 / officer789 (Customers: 21, 23)</div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

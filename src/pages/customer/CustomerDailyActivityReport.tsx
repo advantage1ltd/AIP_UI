@@ -1,52 +1,96 @@
-import { useEffect, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
-import { Card } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
-import type { CustomerWithRelations } from "@/types/customer"
-import { BASE_API_URL } from "@/config/api"
+import { DailyActivityTable } from "@/components/customer/DailyActivityTable"
+import { DailyActivityDialog } from "@/components/customer/DailyActivityDialog"
+import { DailyActivityForm } from "@/components/customer/DailyActivityForm"
+import type { DailyActivityReport } from "@/types/dailyActivity"
+import { useAuth } from "@/contexts/AuthContext"
+import { findCustomerById } from "@/hooks/useAvailableCustomers"
 
 export default function CustomerDailyActivityReport() {
   const navigate = useNavigate()
-  const { customerId } = useParams<{ customerId: string }>()
+  const [searchParams] = useSearchParams()
+  const { user, isLoading: authLoading } = useAuth()
+  const [selectedReport, setSelectedReport] = useState<DailyActivityReport | null>(null)
+  const [showDialog, setShowDialog] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [editingReport, setEditingReport] = useState<DailyActivityReport | null>(null)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [customer, setCustomer] = useState<CustomerWithRelations | null>(null)
+  const [customer, setCustomer] = useState<{ id: number; name: string } | null>(null)
 
   useEffect(() => {
-    const fetchCustomer = async () => {
-      if (!customerId) {
-        setError("Customer ID is required")
-        setLoading(false)
+    try {
+      // Wait for auth to finish loading
+      if (authLoading) {
+        return;
+      }
+
+      // Get customer ID from URL parameter or user's customerId (for customer users)
+      const urlCustomerId = searchParams.get('customerId')
+      const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined
+      const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : userCustomerId
+
+      console.log('CustomerDailyActivityReport: URL customerId:', urlCustomerId)
+      console.log('CustomerDailyActivityReport: User customerId:', userCustomerId)
+      console.log('CustomerDailyActivityReport: Target customerId:', targetCustomerId)
+
+      if (!targetCustomerId) {
+        setError("No customer ID found")
         return
       }
 
-      try {
-        const response = await fetch(`${BASE_API_URL}/customers/${customerId}`)
-        const data = await response.json()
-
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to fetch customer')
-        }
-
-        const customerData = data.data
-        
-        // Check if customer has access to this page
-        if (!customerData.pageAssignments?.['daily-activity']?.enabled) {
-          setError("You don't have access to this page for this customer")
-          return
-        }
-        
-        setCustomer(customerData)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load customer data")
-      } finally {
-        setLoading(false)
+      const customerData = findCustomerById(targetCustomerId)
+      console.log('CustomerDailyActivityReport: Found customer:', customerData)
+      
+      if (!customerData) {
+        setError("Customer not found")
+        return
       }
+      
+      console.log('CustomerDailyActivityReport: Access granted - setting customer')
+      setCustomer(customerData)
+    } catch (error) {
+      console.error('CustomerDailyActivityReport: Error loading customer:', error)
+      setError('Failed to load customer data')
+    } finally {
+      console.log('CustomerDailyActivityReport: Setting loading to false')
+      setLoading(false)
     }
+  }, [user, authLoading, searchParams])
 
-    fetchCustomer()
-  }, [customerId])
+  const handleViewReport = (report: DailyActivityReport) => {
+    setSelectedReport(report)
+    setShowDialog(true)
+  }
+
+  const handleEditReport = (report: DailyActivityReport) => {
+    setEditingReport(report)
+    setShowForm(true)
+  }
+
+  const handleNewReport = () => {
+    setEditingReport(null)
+    setShowForm(true)
+  }
+
+  const handleDialogClose = () => {
+    setShowDialog(false)
+    setSelectedReport(null)
+  }
+
+  const handleFormClose = () => {
+    setShowForm(false)
+    setEditingReport(null)
+  }
+
+  const handleFormSuccess = () => {
+    setRefreshTrigger(prev => prev + 1)
+    handleFormClose()
+  }
 
   if (loading) {
     return (
@@ -58,71 +102,51 @@ export default function CustomerDailyActivityReport() {
 
   if (error) {
     return (
-      <div className="container mx-auto p-4">
-        <Button
-          variant="ghost"
-          className="mb-4"
-          onClick={() => navigate('/management/customer-reporting')}
-        >
+      <div className="p-4">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Customer Reporting
+          Back
         </Button>
-        <Card className="p-4">
-          <p className="text-red-600">{error}</p>
-        </Card>
+        <div className="text-red-500">{error}</div>
       </div>
     )
   }
 
   return (
     <div className="container mx-auto p-4 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-4">
         <Button
           variant="ghost"
-          onClick={() => navigate('/management/customer-reporting')}
+          onClick={() => navigate(-1)}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Customer Reporting
+          Back
         </Button>
-        <h2 className="text-xl font-semibold">{customer?.companyName}</h2>
+        {customer && (
+          <h2 className="text-xl font-semibold">{customer.name} - Daily Activity Reports</h2>
+        )}
       </div>
 
-      <Card className="p-6">
-        <h1 className="text-2xl font-bold mb-4">Daily Activity Report</h1>
-        <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-medium text-blue-900 mb-2">Customer Information</h3>
-            <div className="text-sm text-blue-800 space-y-1">
-              <p><strong>Company:</strong> {customer?.companyName}</p>
-              <p><strong>Customer ID:</strong> {customerId}</p>
-              <p><strong>Type:</strong> {Array.isArray(customer?.customerType) ? customer?.customerType.join(', ') : customer?.customerType}</p>
-              <p><strong>Sites:</strong> {customer?.sites?.length || 0}</p>
-            </div>
-          </div>
-          
-          <p className="text-muted-foreground">
-            This is the daily activity report for <strong>{customer?.companyName}</strong>.
-            In a real application, this would show the daily activity logs,
-            security checks, patrol reports, and other relevant information specific to this customer.
-          </p>
-          
-          {/* Add more customer-specific content here */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="p-4">
-              <h4 className="font-medium mb-2">Recent Activities</h4>
-              <p className="text-sm text-muted-foreground">
-                Recent security activities and reports for this customer would appear here.
-              </p>
-            </Card>
-            <Card className="p-4">
-              <h4 className="font-medium mb-2">Security Metrics</h4>
-              <p className="text-sm text-muted-foreground">
-                Key performance indicators and security metrics would be displayed here.
-              </p>
-            </Card>
-          </div>
-        </div>
-      </Card>
+      <DailyActivityTable
+        onView={handleViewReport}
+        onEdit={handleEditReport}
+        onNew={handleNewReport}
+        refreshTrigger={refreshTrigger}
+        customerId={customer?.id.toString()}
+      />
+
+      <DailyActivityDialog
+        open={showDialog}
+        onOpenChange={handleDialogClose}
+        report={selectedReport}
+      />
+
+      <DailyActivityForm
+        open={showForm}
+        onOpenChange={handleFormClose}
+        report={editingReport}
+        onSuccess={handleFormSuccess}
+      />
     </div>
   )
-} 
+}

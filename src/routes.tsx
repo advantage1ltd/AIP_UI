@@ -54,12 +54,11 @@ import TakeTest from '@/pages/recruitment/TakeTest';
 
 // Import customer pages with lazy loading
 const DailyActivityReportPage = lazy(() => import('./pages/customer/CustomerDailyActivityReport'));
-const IncidentGraphPage = lazy(() => import('./pages/customer/CustomerIncidentGraph'));
+const IncidentGraphPage = lazy(() => import('./pages/customer/IncidentGraph').then(module => ({ default: module.default })));
 const CustomerIncidentReportPage = lazy(() => import('./pages/customer/CustomerIncidentReport'));
 const CustomerSatisfactionReport = lazy(() => import('./pages/customer/CustomerSatisfactionReport'));
-const BeSafeBeSecureGraphPage = lazy(() => import('./pages/customer/BeSafeBeSecureGraphPage'));
-const CustomerOfficerSupportPage = lazy(() => import('./pages/customer/CustomerOfficerSupportPage'));
-const CustomerReporting = lazy(() => import('./pages/customer/CustomerReporting'));
+const DailyActivityReportGraphs = lazy(() => import('./pages/customer/DailyActivityReportGraphs'));
+
 const CustomerViewsConfig = lazy(() => import('./pages/customer/CustomerViewsConfig'));
 
 const router = createBrowserRouter([
@@ -262,7 +261,7 @@ const router = createBrowserRouter([
           {
             path: 'management/customer-reporting',
             element: (
-              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer', 'CustomerHOManager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer', 'AdvantageOneOfficer', 'CustomerHOManager'] as UserRole[]}>
                 <CustomerReportingPage />
               </ProtectedRoute>
             ),
@@ -270,7 +269,7 @@ const router = createBrowserRouter([
           {
             path: 'management/manager-support',
             element: (
-              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer', 'CustomerHOManager'] as UserRole[]}>
                 <ManagerSupportPage />
               </ProtectedRoute>
             ),
@@ -278,7 +277,7 @@ const router = createBrowserRouter([
           {
             path: 'management/incidents-report',
             element: (
-              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer', 'CustomerHOManager'] as UserRole[]}>
                 <IncidentsReportPage />
               </ProtectedRoute>
             ),
@@ -286,125 +285,61 @@ const router = createBrowserRouter([
           {
             path: 'management/officer-performance',
             element: (
-              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer', 'CustomerHOManager'] as UserRole[]}>
                 <OfficerPerformance />
               </ProtectedRoute>
             ),
           },
           // Customer routes
           {
-            path: 'customer/reporting',
-            element: (
-              <ProtectedRoute>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <CustomerReporting />
-                </React.Suspense>
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: 'customer/daily-activity-report',
-            element: (
-              <ProtectedRoute>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <DailyActivityReportPage />
-                </React.Suspense>
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: 'customer/incident-graph',
-            element: (
-              <ProtectedRoute>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <IncidentGraphPage />
-                </React.Suspense>
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: 'customer/incident-report',
-            element: (
-              <ProtectedRoute>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <CustomerIncidentReportPage />
-                </React.Suspense>
-              </ProtectedRoute>
-            ),
-          },
-          {
             path: 'customer/satisfaction-report',
             element: (
-              <ProtectedRoute>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <CustomerSatisfactionReport />
-                </React.Suspense>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+                <CustomerSatisfactionReport />
               </ProtectedRoute>
             ),
           },
           {
             path: 'customer/be-safe-be-secure',
             element: (
-              <ProtectedRoute>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <BeSafeBeSecureGraphPage />
-                </React.Suspense>
-              </ProtectedRoute>
-            ),
-          },
-          
-          // Customer-specific routes with customerId
-          {
-            path: 'customer/:customerId/daily-activity-report',
-            element: (
-              <ProtectedRoute>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <DailyActivityReportPage />
-                </React.Suspense>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+                <DailyActivityReportGraphs />
               </ProtectedRoute>
             ),
           },
           {
-            path: 'customer/:customerId/incident-graph',
+            path: 'customer/daily-activity-report',
             element: (
-              <ProtectedRoute>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <IncidentGraphPage />
-                </React.Suspense>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+                <DailyActivityReportPage />
               </ProtectedRoute>
             ),
           },
           {
-            path: 'customer/:customerId/incident-report',
+            path: 'customer/incident-graph',
             element: (
-              <ProtectedRoute>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <CustomerIncidentReportPage />
-                </React.Suspense>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+                <IncidentGraphPage />
               </ProtectedRoute>
             ),
           },
           {
-            path: 'customer/:customerId/satisfaction-report',
+            path: 'customer/incident-report',
             element: (
-              <ProtectedRoute>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <CustomerSatisfactionReport />
-                </React.Suspense>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+                <CustomerIncidentReportPage />
               </ProtectedRoute>
             ),
           },
+
           {
-            path: 'customer/:customerId/be-safe-be-secure',
+            path: 'customer/views-config',
             element: (
-              <ProtectedRoute>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <BeSafeBeSecureGraphPage />
-                </React.Suspense>
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+                <CustomerViewsConfig />
               </ProtectedRoute>
             ),
           },
-       
           {
             path: 'customer/:customerId/*',
             element: (
@@ -508,17 +443,6 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute>
                 <TakeTest />
-              </ProtectedRoute>
-            ),
-          },
-          // Customer routes
-          {
-            path: 'customer/views-config',
-            element: (
-              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
-                <React.Suspense fallback={<div>Loading...</div>}>
-                  <CustomerViewsConfig />
-                </React.Suspense>
               </ProtectedRoute>
             ),
           },

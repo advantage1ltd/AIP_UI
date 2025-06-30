@@ -46,7 +46,7 @@ const ActionCalendar = () => {
   const [activeTab, setActiveTab] = useState<string>("day")
   const { toast } = useToast()
   const { currentRole } = usePageAccess()
-  const isAdmin = currentRole === 'administrator'
+  const isAdmin = currentRole === 'Administrator'
 
   const handleAddTask = (newTask: Omit<Task, 'id' | 'status'>) => {
     if (!isAdmin) {

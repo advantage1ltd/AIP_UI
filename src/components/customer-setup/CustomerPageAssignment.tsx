@@ -6,7 +6,6 @@ import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { 
   CUSTOMER_PAGES, 
-  getPagesByCustomerType, 
   getPagesByCategory,
   CUSTOMER_PAGE_CATEGORIES 
 } from '@/config/customerPages'
@@ -22,7 +21,11 @@ import {
   Building,
   Key,
   Users,
-  Info
+  Info,
+  Settings,
+  FileText,
+  ShieldCheck,
+  BarChart2
 } from 'lucide-react'
 
 interface CustomerPageAssignmentProps {
@@ -34,14 +37,18 @@ interface CustomerPageAssignmentProps {
 const iconMap = {
   Calendar,
   BarChart3,
+  BarChart2,
   AlertTriangle,
   MessageSquare,
   Shield,
+  ShieldCheck,
   UserCheck,
   Footprints,
   Building,
   Key,
-  Users
+  Users,
+  Settings,
+  FileText
 }
 
 export function CustomerPageAssignment({
@@ -50,31 +57,12 @@ export function CustomerPageAssignment({
   onAssignmentsChange
 }: CustomerPageAssignmentProps) {
   const [assignments, setAssignments] = useState<Record<string, CustomerPageAssignment>>(currentAssignments || {})
-  const [recommendedPages, setRecommendedPages] = useState<CustomerPage[]>([])
-  const [allPages, setAllPages] = useState<CustomerPage[]>([])
 
   useEffect(() => {
-    const recommended = getPagesByCustomerType(customerType)
-    const all = Object.values(CUSTOMER_PAGES)
-    
-    setRecommendedPages(recommended)
-    setAllPages(all)
-
-    // Auto-assign recommended pages if no assignments exist
-    if (Object.keys(assignments).length === 0) {
-      const autoAssignments: Record<string, CustomerPageAssignment> = {}
-      recommended.forEach(page => {
-        autoAssignments[page.id] = {
-          enabled: true,
-          customized: false,
-          lastModified: new Date().toISOString(),
-          modifiedBy: 'system'
-        }
-      })
-      setAssignments(autoAssignments)
-      onAssignmentsChange(autoAssignments)
-    }
-  }, [customerType])
+    // Sync with current assignments when they change
+    console.log('🔧 [CustomerPageAssignment] Loading page assignments:', currentAssignments)
+    setAssignments(currentAssignments || {})
+  }, [currentAssignments])
 
   const handlePageToggle = (pageId: string, enabled: boolean) => {
     const updatedAssignments = { ...assignments }
@@ -97,34 +85,31 @@ export function CustomerPageAssignment({
     return assignments[pageId]?.enabled || false
   }
 
-  const isPageRecommended = (pageId: string) => {
-    return recommendedPages.some(p => p.id === pageId)
-  }
-
-  const applyRecommended = () => {
-    const recommendedAssignments: Record<string, CustomerPageAssignment> = {}
-    recommendedPages.forEach(page => {
-      recommendedAssignments[page.id] = {
-        enabled: true,
-        customized: false,
-        lastModified: new Date().toISOString(),
-        modifiedBy: 'system'
-      }
-    })
-    
-    setAssignments(recommendedAssignments)
-    onAssignmentsChange(recommendedAssignments)
-  }
-
   const clearAll = () => {
     setAssignments({})
     onAssignmentsChange({})
   }
 
+  const selectAll = () => {
+    const allAssignments: Record<string, CustomerPageAssignment> = {}
+    Object.keys(CUSTOMER_PAGES).forEach(pageId => {
+      allAssignments[pageId] = {
+        enabled: true,
+        customized: true,
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'admin'
+      }
+    })
+    setAssignments(allAssignments)
+    onAssignmentsChange(allAssignments)
+  }
+
   const groupedPages = Object.entries(CUSTOMER_PAGE_CATEGORIES).map(([category, title]) => ({
     category: category as CustomerPage['category'],
     title,
-    pages: getPagesByCategory(category as CustomerPage['category'])
+    pages: Object.entries(CUSTOMER_PAGES)
+      .filter(([key, page]) => page.category === category)
+      .map(([key, page]) => ({ key, ...page }))
   }))
 
   const getIcon = (iconName: string | undefined) => {
@@ -141,8 +126,8 @@ export function CustomerPageAssignment({
         <div className="flex items-center justify-between">
           <CardTitle>Page Assignments</CardTitle>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={applyRecommended}>
-              Apply Recommended
+            <Button variant="outline" size="sm" onClick={selectAll}>
+              Select All
             </Button>
             <Button variant="outline" size="sm" onClick={clearAll}>
               Clear All
@@ -150,7 +135,7 @@ export function CustomerPageAssignment({
           </div>
         </div>
         <div className="text-sm text-muted-foreground">
-          Configure which pages are available for this customer based on their service type: {' '}
+          Configure which pages are available for this customer. Customer needs vary - select the pages that best fit their requirements. Service type: {' '}
           <Badge variant="secondary">{customerType}</Badge>
         </div>
       </CardHeader>
@@ -162,21 +147,20 @@ export function CustomerPageAssignment({
             </h4>
             <div className="grid gap-3">
               {pages.map(page => {
-                const enabled = isPageEnabled(page.id)
-                const recommended = isPageRecommended(page.id)
+                const enabled = isPageEnabled(page.key)
                 
                 return (
                   <div
-                    key={page.id}
+                    key={page.key}
                     className={`flex items-start space-x-3 p-3 rounded-lg border ${
                       enabled ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
                     }`}
                   >
                     <Checkbox
-                      id={page.id}
+                      id={page.key}
                       checked={enabled}
                       onCheckedChange={(checked) => 
-                        handlePageToggle(page.id, checked as boolean)
+                        handlePageToggle(page.key, checked as boolean)
                       }
                       className="mt-1"
                     />
@@ -184,16 +168,11 @@ export function CustomerPageAssignment({
                       <div className="flex items-center gap-2">
                         {getIcon(page.icon)}
                         <label
-                          htmlFor={page.id}
+                          htmlFor={page.key}
                           className="text-sm font-medium cursor-pointer"
                         >
                           {page.title}
                         </label>
-                        {recommended && (
-                          <Badge variant="default" className="text-xs">
-                            Recommended
-                          </Badge>
-                        )}
                         {page.readOnly && (
                           <Badge variant="outline" className="text-xs">
                             Read Only
@@ -203,31 +182,26 @@ export function CustomerPageAssignment({
                       <p className="text-xs text-muted-foreground mt-1">
                         {page.description}
                       </p>
-                      {page.sourceOperationPath && (
-                        <p className="text-xs text-blue-600 mt-1">
-                          Data source: {page.sourceOperationPath}
-                        </p>
-                      )}
                     </div>
                   </div>
                 )
               })}
             </div>
-            {category !== 'support' && <Separator className="mt-4" />}
+            {Object.entries(CUSTOMER_PAGE_CATEGORIES).indexOf([category, title]) !== Object.entries(CUSTOMER_PAGE_CATEGORIES).length - 1 && <Separator className="mt-4" />}
           </div>
         ))}
         
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
-            <Info className="h-4 w-4 text-yellow-600" />
-            <span className="text-sm font-medium text-yellow-800">
+            <Info className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-800">
               Assignment Summary
             </span>
           </div>
-          <div className="text-xs text-yellow-700 space-y-1">
+          <div className="text-xs text-blue-700 space-y-1">
             <p>• Total pages enabled: {Object.keys(assignments).length}</p>
-            <p>• Recommended for {customerType}: {recommendedPages.length} pages</p>
-            <p>• Custom assignments: {Object.keys(assignments).filter(id => assignments[id].customized).length}</p>
+            <p>• Available pages: {Object.keys(CUSTOMER_PAGES).length} pages</p>
+            <p>• Customer needs vary - select pages that fit their specific requirements</p>
           </div>
         </div>
       </CardContent>

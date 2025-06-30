@@ -73,8 +73,8 @@ import {
 
 // Mock data
 const mockCustomers = [
-  { id: "HOE", name: "Heart of England Cooperative" },
-  { id: "MCS", name: "Midcounties Co-operative" },
+  { id: "HOE", name: "Heart of England" },
+  { id: "MCS", name: "Midcounties COOP" },
 ];
 
 const mockRegions = [
@@ -121,7 +121,7 @@ const mockVisits = [
     actionId: "ACT12345",
     siteVisitId: "SV78901",
     customer: "HOE",
-    customerName: "Heart of England Cooperative",
+    customerName: "Heart of England",
     region: "SD",
     regionName: "Store Detective",
     location: "SAR",
@@ -168,7 +168,7 @@ const mockVisits = [
     actionId: "ACT67890",
     siteVisitId: "SV12345",
     customer: "MCS",
-    customerName: "Midcounties Co-operative",
+    customerName: "Midcounties COOP",
     region: "LP",
     regionName: "Loss Prevention",
     location: "SHR",
@@ -215,7 +215,7 @@ const mockVisits = [
     actionId: "ACT24680",
     siteVisitId: "SV97531",
     customer: "HOE",
-    customerName: "Heart of England Cooperative",
+    customerName: "Heart of England",
     region: "SD",
     regionName: "Store Detective",
     location: "SAR",
@@ -266,7 +266,7 @@ const additionalMockVisits = Array.from({ length: 15 }, (_, i) => ({
   actionId: `ACT${Math.floor(10000 + Math.random() * 90000)}`,
   siteVisitId: `SV${Math.floor(10000 + Math.random() * 90000)}`,
   customer: i % 2 === 0 ? "HOE" : "MCS",
-  customerName: i % 2 === 0 ? "Heart of England Cooperative" : "Midcounties Co-operative",
+  customerName: i % 2 === 0 ? "Heart of England" : "Midcounties COOP",
   region: i % 3 === 0 ? "SD" : "LP",
   regionName: i % 3 === 0 ? "Store Detective" : "Loss Prevention",
   location: i % 2 === 0 ? "SAR" : "SHR",

@@ -1,31 +1,38 @@
 import { useState, useEffect, useCallback } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Plus, ChevronLeft, ChevronRight } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Plus, ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { CustomerDialog } from "./CustomerDialog"
-import { CustomerTableHeader } from "./table-components/CustomerTableHeader"
 import { CustomerTableRow } from "./CustomerTableRow"
-import { DUMMY_CUSTOMERS } from "@/data/customers"
-import { TableActions } from "./table-components/TableActions"
+import { customerService } from "@/services/customerService"
 import type { Customer } from "@/types/customer"
 
 interface CustomersTableProps {
   onCustomerSelect: (customerId: string | null) => void
   selectedCustomerId: string | null
+  onDataChange?: () => void
 }
 
-export function CustomersTable({ onCustomerSelect, selectedCustomerId }: CustomersTableProps) {
+export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataChange }: CustomersTableProps) {
+  const { toast } = useToast()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>()
   const [selectedRows, setSelectedRows] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null)
   const itemsPerPage = 10
 
   const cleanup = useCallback(() => {
     setDialogOpen(false)
     setSelectedCustomer(undefined)
     setSelectedRows([])
+    setDeleteDialogOpen(false)
+    setCustomerToDelete(null)
   }, [])
 
   useEffect(() => {
@@ -51,18 +58,94 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId }: Custome
   }, [cleanup])
 
   const handleEdit = (customer: Customer) => {
+    if (!customer) {
+      toast({
+        title: "Error",
+        description: "Unable to load customer data for editing.",
+        variant: "destructive"
+      })
+      return
+    }
+    
     setSelectedCustomer(customer)
     setDialogOpen(true)
   }
 
-  const handleSave = (updatedCustomer: Customer) => {
-    // In a real app, this would be an API call
-    console.log('Saving customer:', updatedCustomer)
-    setDialogOpen(false)
+  const handleDelete = (customer: Customer) => {
+    setCustomerToDelete(customer)
+    setDeleteDialogOpen(true)
   }
 
-  // Filter customers based on search query
-  const filteredCustomers = DUMMY_CUSTOMERS.filter(customer => {
+  const confirmDelete = () => {
+    if (customerToDelete) {
+      const result = customerService.deleteCustomer(customerToDelete.id)
+      
+      if (result.success) {
+        // If the deleted customer was selected, clear the selection
+        if (selectedCustomerId === customerToDelete.id) {
+          onCustomerSelect(null)
+        }
+        
+        toast({
+          title: "Customer Deleted",
+          description: `${result.customerName} has been successfully deleted.`,
+          variant: "default"
+        })
+        
+        forceUpdate()
+        onDataChange?.() // Notify parent of data change
+      } else {
+        toast({
+          title: "Delete Failed",
+          description: result.error || "Failed to delete customer. Please try again.",
+          variant: "destructive"
+        })
+      }
+      
+      setDeleteDialogOpen(false)
+      setCustomerToDelete(null)
+    }
+  }
+
+  const handleSave = (updatedCustomer: Customer) => {
+    // Use customer service to update the data
+    const result = customerService.updateCustomer(updatedCustomer)
+    
+    if (result.success) {
+      if (result.isNew) {
+        toast({
+          title: "Customer Created",
+          description: `${updatedCustomer.companyName} has been successfully created.`,
+          variant: "default"
+        })
+      } else {
+        toast({
+          title: "Customer Updated", 
+          description: `${updatedCustomer.companyName} has been successfully updated.`,
+          variant: "default"
+        })
+      }
+      
+             setDialogOpen(false)
+       forceUpdate()
+       onDataChange?.() // Notify parent of data change
+    } else {
+      toast({
+        title: result.isNew ? "Create Failed" : "Update Failed",
+        description: result.error || "Failed to save customer. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Force re-render function to reflect data changes
+  const [updateTrigger, setUpdateTrigger] = useState(0)
+  const forceUpdate = () => setUpdateTrigger(prev => prev + 1)
+
+  // Get customers from service and filter based on search query
+  // Use updateTrigger to force refresh when data changes
+  const allCustomers = customerService.getAllCustomers()
+  const filteredCustomers = allCustomers.filter(customer => {
     const searchLower = searchQuery.toLowerCase()
     return (
       customer.companyName.toLowerCase().includes(searchLower) ||
@@ -100,8 +183,20 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId }: Custome
           }}
           className="bg-purple-600 hover:bg-purple-700"
         >
+          <Plus className="h-4 w-4 mr-2" />
           Add Customer
         </Button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <Input
+          placeholder="Search customers..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
       </div>
 
       <div className="rounded-md border">
@@ -117,18 +212,69 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId }: Custome
             </TableRow>
           </TableHeader>
           <TableBody>
-            {DUMMY_CUSTOMERS.map((customer) => (
-              <CustomerTableRow
-                key={customer.id}
-                customer={customer}
-                isSelected={customer.id === selectedCustomerId}
-                onSelect={onCustomerSelect}
-                onEdit={handleEdit}
-              />
-            ))}
+            {currentCustomers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                  {searchQuery ? (
+                    <>
+                      No customers found matching "{searchQuery}"
+                      <br />
+                      <span className="text-sm">Try adjusting your search terms</span>
+                    </>
+                  ) : (
+                    <>
+                      No customers available
+                      <br />
+                      <span className="text-sm">Click "Add Customer" to create your first customer</span>
+                    </>
+                  )}
+                </TableCell>
+              </TableRow>
+            ) : (
+              currentCustomers.map((customer) => (
+                <CustomerTableRow
+                  key={customer.id}
+                  customer={customer}
+                  isSelected={customer.id === selectedCustomerId}
+                  onSelect={onCustomerSelect}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6">
+          <div className="text-sm text-gray-500">
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredCustomers.length)} of {filteredCustomers.length} customers
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <CustomerDialog
         open={dialogOpen}
@@ -136,6 +282,27 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId }: Custome
         customer={selectedCustomer}
         onSave={handleSave}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{customerToDelete?.companyName}"? This action cannot be undone and will remove all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

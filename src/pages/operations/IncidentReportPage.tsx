@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { mockIncidents } from "@/data/mockIncidents"
+// Removed mockIncidents import - now using API service
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   PlusCircle, 
@@ -77,12 +77,13 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
   const itemsPerPage = 10
 
   // Fetch incidents using the API service
-  const { data: incidentsResponse = { data: [], pagination: { currentPage: 1, totalPages: 1 } }, isLoading, error } = useQuery({
-    queryKey: ['incidents', currentPage, searchTerm],
+  const { data: incidentsResponse = { data: [], pagination: { currentPage: 1, totalPages: 1, pageSize: 10, totalCount: 0, hasPrevious: false, hasNext: false } }, isLoading, error } = useQuery({
+    queryKey: ['incidents', currentPage, searchTerm, customerId],
     queryFn: () => incidentsApi.getIncidents({
       page: currentPage,
       pageSize: itemsPerPage,
-      search: searchTerm
+      search: searchTerm,
+      ...(isCustomerView && customerId && { customerId })
     })
   })
 
@@ -137,16 +138,32 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
     }
   })
 
+  // Fetch all incidents for stats calculation (separate query to get complete data)
+  const { data: allIncidentsResponse } = useQuery({
+    queryKey: ['incidents-stats', searchTerm, customerId],
+    queryFn: () => incidentsApi.getIncidents({
+      page: 1,
+      pageSize: 1000, // Large page size to get all incidents for stats
+      search: searchTerm,
+      ...(isCustomerView && customerId && { customerId })
+    })
+  })
+
   // Calculate statistics using useMemo with null checks
-  const stats = useMemo(() => ({
-    totalAmountSaved: Array.prototype.reduce.call(
-      incidentsResponse.data,
-      (acc: number, incident: Incident) => acc + (incident.totalValueRecovered || 0),
-      0
-    ),
-    uniqueStores: new Set(incidentsResponse.data.map(incident => incident?.siteName).filter(Boolean)).size,
-    totalIncidents: incidentsResponse.data.length
-  }), [incidentsResponse.data])
+  const stats = useMemo(() => {
+    // Use all incidents for stats calculation, fall back to current page if not available
+    const statsData = allIncidentsResponse?.data || incidentsResponse.data
+    
+    return {
+      totalAmountSaved: Array.prototype.reduce.call(
+        statsData,
+        (acc: number, incident: Incident) => acc + (incident.totalValueRecovered || 0),
+        0
+      ),
+      uniqueStores: new Set(statsData.map(incident => incident?.siteName).filter(Boolean)).size,
+      totalIncidents: allIncidentsResponse?.pagination?.totalCount || incidentsResponse.pagination?.totalCount || statsData.length
+    }
+  }, [allIncidentsResponse?.data, allIncidentsResponse?.pagination?.totalCount, incidentsResponse.data, incidentsResponse.pagination?.totalCount])
 
   const handleSubmit = useCallback((incident: Incident) => {
     mutation.mutate(incident)
@@ -172,8 +189,8 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
     }
   }, [deletingIncident, deleteMutation])
 
-  // Update pagination to use the API response
-  const { totalPages } = incidentsResponse.pagination
+  // Update pagination to use the API response (with safe fallback)
+  const { totalPages = 1 } = incidentsResponse.pagination || {}
 
   // Update the filtered and paginated incidents
   const paginatedIncidents = incidentsResponse.data
@@ -385,21 +402,17 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50 hover:bg-gray-50">
-                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">Customer Name</TableHead>
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">Store Name</TableHead>
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden sm:table-cell">Officer Name</TableHead>
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden md:table-cell">
                       <div className="flex items-center gap-1 sm:gap-2 xl:gap-3">
                         <Calendar className="w-3 h-3 sm:w-4 sm:h-4 xl:w-5 xl:h-5 text-gray-500" />
-                        <span>Date</span>
+                        <span>Incident Date</span>
                       </div>
                     </TableHead>
-                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden sm:table-cell">
-                      <div className="flex items-center gap-1 sm:gap-2 xl:gap-3">
-                        <Building2 className="w-3 h-3 sm:w-4 sm:h-4 xl:w-5 xl:h-5 text-gray-500" />
-                        <span>Site Name</span>
-                      </div>
-                    </TableHead>
-                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden md:table-cell">Incident Type</TableHead>
-                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 hidden lg:table-cell">Description</TableHead>
-                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">Value</TableHead>
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">Total Amount</TableHead>
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden lg:table-cell">Incident Type</TableHead>
                     <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -410,15 +423,14 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                       className="hover:bg-gray-50 transition-colors text-xs sm:text-sm lg:text-base xl:text-lg"
                     >
                       <TableCell className="py-2 md:py-3 xl:py-4 font-medium whitespace-nowrap">
-                        {new Date(incident.dateInputted).toLocaleDateString()}
-                        <div className="sm:hidden text-xs xl:text-sm text-gray-500 mt-1">
-                          {incident.siteName}
-                        </div>
+                        {incident.customerName || 'N/A'}
                       </TableCell>
-                      <TableCell className="py-2 md:py-3 xl:py-4 hidden sm:table-cell whitespace-nowrap">{incident.siteName}</TableCell>
-                      <TableCell className="py-2 md:py-3 xl:py-4 hidden md:table-cell whitespace-nowrap">{incident.incidentType}</TableCell>
-                      <TableCell className="py-2 md:py-3 xl:py-4 max-w-[200px] lg:max-w-[300px] xl:max-w-[400px] 2xl:max-w-[500px] hidden lg:table-cell">
-                        <div className="truncate">{incident.description}</div>
+                      <TableCell className="py-2 md:py-3 xl:py-4 font-medium whitespace-nowrap">
+                        {incident.siteName}
+                      </TableCell>
+                      <TableCell className="py-2 md:py-3 xl:py-4 hidden sm:table-cell whitespace-nowrap">{incident.officerName || 'N/A'}</TableCell>
+                      <TableCell className="py-2 md:py-3 xl:py-4 hidden md:table-cell whitespace-nowrap">
+                        {incident.date ? new Date(incident.date).toLocaleDateString() : 'N/A'}
                       </TableCell>
                       <TableCell className="py-2 md:py-3 xl:py-4 whitespace-nowrap">
                         £{(() => {
@@ -436,6 +448,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                           return '0.00'
                         })()}
                       </TableCell>
+                      <TableCell className="py-2 md:py-3 xl:py-4 hidden lg:table-cell whitespace-nowrap">{incident.incidentType}</TableCell>
                       <TableCell className="py-2 md:py-3 xl:py-4">
                         <div className="flex items-center justify-end gap-1 sm:gap-2 xl:gap-3">
                           <Button
@@ -471,7 +484,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                   ))}
                   {incidentsResponse.data.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 xl:py-12">
+                      <TableCell colSpan={7} className="text-center py-8 xl:py-12">
                         <p className="text-gray-500 text-sm xl:text-base">No incidents found</p>
                         <Button
                           variant="link"
@@ -626,17 +639,17 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                         <p className="mt-1 text-sm text-gray-900">{viewingIncident.officerName || 'N/A'}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Officer Role</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.officerRole || 'N/A'}</p>
+                        <label className="text-sm font-medium text-gray-500">Assigned To</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.assignedTo || 'N/A'}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Duty Manager</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.dutyManagerName || 'N/A'}</p>
+                        <label className="text-sm font-medium text-gray-500">Status</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.status || 'N/A'}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Date Inputted</label>
+                        <label className="text-sm font-medium text-gray-500">Date</label>
                         <p className="mt-1 text-sm text-gray-900">
-                          {viewingIncident.dateInputted ? new Date(viewingIncident.dateInputted).toLocaleDateString() : 'N/A'}
+                          {viewingIncident.date ? new Date(viewingIncident.date).toLocaleDateString() : 'N/A'}
                         </p>
                       </div>
                     </div>
@@ -652,12 +665,12 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                       <div>
                         <label className="text-sm font-medium text-gray-500">Date of Incident</label>
                         <p className="mt-1 text-sm text-gray-900">
-                          {viewingIncident.dateOfIncident ? new Date(viewingIncident.dateOfIncident).toLocaleDateString() : 'N/A'}
+                          {viewingIncident.date ? new Date(viewingIncident.date).toLocaleDateString() : 'N/A'}
                         </p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-500">Time of Incident</label>
-                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.timeOfIncident || 'N/A'}</p>
+                        <label className="text-sm font-medium text-gray-500">Priority</label>
+                        <p className="mt-1 text-sm text-gray-900">{viewingIncident.priority || 'N/A'}</p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-500">Incident Type</label>

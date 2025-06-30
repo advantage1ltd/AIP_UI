@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CustomerWithRelations, CustomerReportingAccess, CustomerPage } from '@/types/customer';
 import { CUSTOMER_PAGES } from '@/config/customerPages';
 import { BASE_API_URL } from '@/config/api';
+import { regionsService } from '@/services/regionsService';
+import { sitesService } from '@/services/sitesService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,7 +32,8 @@ import {
   UserCheck,
   Footprints,
   Key,
-  Info
+  Info,
+  RefreshCw
 } from 'lucide-react';
 
 const iconMap = {
@@ -49,7 +52,9 @@ const iconMap = {
 export default function CustomerReportingPage() {
   const [customers, setCustomers] = useState<CustomerWithRelations[]>([]);
   const [reportingData, setReportingData] = useState<CustomerReportingAccess[]>([]);
+  const [customerStats, setCustomerStats] = useState<Record<string, {regions: number, sites: number}>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
@@ -57,56 +62,117 @@ export default function CustomerReportingPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchCustomerReportingData = async () => {
-      try {
-        if (!user) return;
+  const fetchCustomerReportingData = async () => {
+    try {
+      if (!user) return;
+      
+      setIsLoading(true);
+      setError(null);
 
-        // Build API URL with proper parameters
-        const params = new URLSearchParams({
-          userId: user.id,
-          role: user.role
-        });
+      // Build API URL with proper parameters
+      const params = new URLSearchParams({
+        userId: user.id,
+        role: user.role
+      });
 
-        // Add assigned customer IDs for officers
-        if (user.role === 'AdvantageOneOfficer' && 'assignedCustomerIds' in user && user.assignedCustomerIds) {
-          params.append('assignedCustomerIds', user.assignedCustomerIds.join(','));
-        }
-
-        // Fetch customers based on user role and assignments
-        const response = await fetch(`${BASE_API_URL}/customers/reporting?${params.toString()}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to fetch customer reporting data');
-        }
-
-        setCustomers(data.data || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
+      // Add assigned customer IDs for officers
+      if (user.role === 'AdvantageOneOfficer' && 'assignedCustomerIds' in user && user.assignedCustomerIds) {
+        params.append('assignedCustomerIds', user.assignedCustomerIds.join(','));
       }
-    };
 
+      // Fetch customers based on user role and assignments
+      const response = await fetch(`${BASE_API_URL}/customers/reporting?${params.toString()}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch customer reporting data');
+      }
+
+      setCustomers(data.data || []);
+      
+      // Fetch regions and sites counts for each customer
+      await fetchCustomerStats(data.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchCustomerStats = async (customersData: CustomerWithRelations[]) => {
+    setIsLoadingStats(true);
+    try {
+      const [regionsResult, sitesResult] = await Promise.all([
+        regionsService.getRegions(),
+        sitesService.getSites()
+      ]);
+
+      const stats: Record<string, {regions: number, sites: number}> = {};
+      
+      customersData.forEach(customer => {
+        const customerRegions = regionsResult.success ? 
+          regionsResult.data.filter(region => region.customerId === customer.id).length : 0;
+        const customerSites = sitesResult.success ? 
+          sitesResult.data.filter(site => site.customerId === customer.id).length : 0;
+        
+        stats[customer.id] = {
+          regions: customerRegions,
+          sites: customerSites
+        };
+      });
+
+      setCustomerStats(stats);
+    } catch (error) {
+      console.error('Failed to fetch customer stats:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  useEffect(() => {
     fetchCustomerReportingData();
   }, [user]);
 
+  // Listen for customer configuration updates
+  useEffect(() => {
+    const handleConfigUpdate = () => {
+      console.log('🔄 Customer configuration updated, refreshing data...');
+      fetchCustomerReportingData();
+    };
+
+    window.addEventListener('customer-config-updated', handleConfigUpdate);
+    return () => window.removeEventListener('customer-config-updated', handleConfigUpdate);
+  }, []);
+
   const getAvailablePages = (customer: CustomerWithRelations): CustomerPage[] => {
+    console.log('🔍 [CustomerReportingPage] getAvailablePages called with user role:', user?.role);
+    console.log('🔍 [CustomerReportingPage] Available CUSTOMER_PAGES:', Object.keys(CUSTOMER_PAGES));
+    
+    // Administrator should have access to ALL customer pages regardless of customer configuration
+    if (user?.role === 'Administrator') {
+      console.log('🔍 [CustomerReportingPage] Administrator access - returning all pages');
+      return Object.values(CUSTOMER_PAGES);
+    }
+    
+    // For other roles, use customer's page assignments
+    if (customer.pageAssignments) {
+      const enabledPageIds = Object.entries(customer.pageAssignments)
+        .filter(([_, assignment]) => assignment.enabled)
+        .map(([pageId]) => pageId);
+      
+      // Match against the keys of CUSTOMER_PAGES, not the IDs
+      return Object.entries(CUSTOMER_PAGES)
+        .filter(([key, page]) => enabledPageIds.includes(key))
+        .map(([key, page]) => page);
+    }
+    
+    // Fallback to availablePages if pageAssignments is not available
     if (customer.availablePages) {
-      // If availablePages is provided directly from API
       return customer.availablePages;
     }
     
-    // Fallback: derive from pageAssignments
-    const assignments = customer.pageAssignments || {};
-    const enabledPageIds = Object.entries(assignments)
-      .filter(([_, assignment]) => assignment.enabled)
-      .map(([pageId]) => pageId);
-    
-    return Object.values(CUSTOMER_PAGES).filter(page => 
-      enabledPageIds.includes(page.id)
-    );
+    // Last fallback: return empty array
+    return [];
   };
 
   const getIcon = (iconName: string | undefined) => {
@@ -118,10 +184,10 @@ export default function CustomerReportingPage() {
   };
 
   const handlePageNavigation = (customer: CustomerWithRelations, page: CustomerPage) => {
-    // Navigate to the customer-specific page
-    const pathWithoutCustomer = page.path.replace('/customer/', '');
-    const customerSpecificPath = `/customer/${customer.id}/${pathWithoutCustomer}`;
-    navigate(customerSpecificPath);
+    // Navigate to the static customer page routes with customer ID as query parameter
+    // This way the customer pages know which customer to display
+    const url = `${page.path}?customerId=${customer.id}`;
+    navigate(url);
   };
 
   const filteredCustomers = customers.filter(customer => {
@@ -195,43 +261,43 @@ export default function CustomerReportingPage() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-4 mb-6">
-          <Card>
+          <Card className="border-0 bg-gradient-to-br from-orange-500 to-red-600 text-white">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-orange-500" />
-                <span className="text-sm font-medium">Incidents</span>
+                <AlertTriangle className="h-5 w-5 text-white" />
+                <span className="text-sm font-medium text-white/90">Incidents</span>
               </div>
-              <p className="text-2xl font-bold mt-2">{stats.incidents}</p>
+              <p className="text-2xl font-bold mt-2 text-white">{stats.incidents}</p>
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="border-0 bg-gradient-to-br from-blue-500 to-cyan-600 text-white">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-blue-500" />
-                <span className="text-sm font-medium">Reports</span>
+                <FileText className="h-5 w-5 text-white" />
+                <span className="text-sm font-medium text-white/90">Reports</span>
               </div>
-              <p className="text-2xl font-bold mt-2">{stats.reports}</p>
+              <p className="text-2xl font-bold mt-2 text-white">{stats.reports}</p>
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="border-0 bg-gradient-to-br from-green-500 to-emerald-600 text-white">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <Building className="h-4 w-4 text-green-500" />
-                <span className="text-sm font-medium">Sites</span>
+                <Building className="h-5 w-5 text-white" />
+                <span className="text-sm font-medium text-white/90">Sites</span>
               </div>
-              <p className="text-2xl font-bold mt-2">{selectedCustomer.sites?.length || 0}</p>
+              <p className="text-2xl font-bold mt-2 text-white">{customerStats[selectedCustomer.id]?.sites || 0}</p>
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="border-0 bg-gradient-to-br from-purple-500 to-indigo-600 text-white">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-purple-500" />
-                <span className="text-sm font-medium">Regions</span>
+                <Users className="h-5 w-5 text-white" />
+                <span className="text-sm font-medium text-white/90">Regions</span>
               </div>
-              <p className="text-2xl font-bold mt-2">{selectedCustomer.regions?.length || 0}</p>
+              <p className="text-2xl font-bold mt-2 text-white">{customerStats[selectedCustomer.id]?.regions || 0}</p>
             </CardContent>
           </Card>
         </div>
@@ -305,6 +371,16 @@ export default function CustomerReportingPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchCustomerReportingData}
+            disabled={isLoading}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? 'Refreshing...' : 'Refresh'}
+          </Button>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -333,59 +409,70 @@ export default function CustomerReportingPage() {
       </div>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredCustomers.map((customer) => {
+        {filteredCustomers.map((customer, index) => {
           const availablePages = getAvailablePages(customer);
           const stats = getCustomerStats(customer);
+          
+          // Cycle through different gradient backgrounds - more subtle and professional
+          const gradients = [
+            "bg-gradient-to-br from-slate-600 via-slate-700 to-slate-800",
+            "bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800", 
+            "bg-gradient-to-br from-emerald-600 via-green-700 to-teal-800",
+            "bg-gradient-to-br from-orange-600 via-amber-700 to-red-800",
+            "bg-gradient-to-br from-purple-600 via-violet-700 to-indigo-800",
+            "bg-gradient-to-br from-cyan-600 via-teal-700 to-emerald-800"
+          ];
+          const gradientClass = gradients[index % gradients.length];
           
           return (
             <Card
               key={customer.id}
-              className="cursor-pointer hover:shadow-md transition-shadow"
+              className={`cursor-pointer hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border-0 text-white shadow-lg ${gradientClass}`}
               onClick={() => setSelectedCustomer(customer)}
             >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-lg">{customer.companyName}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
+                    <CardTitle className="text-lg text-white">{customer.companyName}</CardTitle>
+                    <p className="text-sm text-white/80">
                       {customer.companyNumber}
                     </p>
                   </div>
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" className="bg-white/25 text-white border-white/40 backdrop-blur-sm font-medium">
                     {Array.isArray(customer.customerType) ? customer.customerType[0] : customer.customerType}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-orange-500">{stats.incidents}</p>
-                    <p className="text-xs text-muted-foreground">Incidents</p>
+                  <div className="text-center bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+                    <p className="text-3xl font-bold text-white">{stats.incidents}</p>
+                    <p className="text-xs text-white/80 font-medium">Incidents</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-500">{availablePages.length}</p>
-                    <p className="text-xs text-muted-foreground">Available Pages</p>
+                  <div className="text-center bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+                    <p className="text-3xl font-bold text-white">{availablePages.length}</p>
+                    <p className="text-xs text-white/80 font-medium">Available Pages</p>
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Building className="h-4 w-4 text-muted-foreground" />
-                    <span>{customer.sites?.length || 0} Sites</span>
+                  <div className="flex items-center gap-2 text-sm text-white/90">
+                    <Building className="h-4 w-4 text-white/80" />
+                    <span>{customerStats[customer.id]?.sites || 0} Sites</span>
                     <span>•</span>
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>{customer.regions?.length || 0} Regions</span>
+                    <Users className="h-4 w-4 text-white/80" />
+                    <span>{customerStats[customer.id]?.regions || 0} Regions</span>
                   </div>
                   
                   {availablePages.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {availablePages.slice(0, 3).map(page => (
-                        <Badge key={page.id} variant="outline" className="text-xs">
+                        <Badge key={page.id} variant="outline" className="text-xs bg-white/25 text-white border-white/40 backdrop-blur-sm">
                           {page.title}
                         </Badge>
                       ))}
                       {availablePages.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs bg-white/25 text-white border-white/40 backdrop-blur-sm">
                           +{availablePages.length - 3} more
                         </Badge>
                       )}

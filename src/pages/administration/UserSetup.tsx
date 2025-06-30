@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/hooks/redux'
 import { RootState } from '@/store/store'
 import { Button } from '@/components/ui/button'
@@ -47,8 +47,8 @@ import {
   Clock
 } from 'lucide-react'
 import { UserDialog } from '@/components/administration/UserDialog'
-import { addUser, updateUser, deleteUser } from '@/store/features/users/usersSlice'
-import { CreateUserInput, UpdateUserInput, User } from '@/types/user'
+import { fetchUsers, createUser, updateUserAsync, deleteUserAsync } from '@/store/features/users/usersSlice'
+import { CreateUserInput, UpdateUserInput, User, UserRole } from '@/types/user'
 import { useToast } from '@/hooks/use-toast'
 import {
   Select,
@@ -70,15 +70,20 @@ const UserSetup = () => {
   const [showUserDialog, setShowUserDialog] = useState(false)
   const [viewUser, setViewUser] = useState<User | undefined>()
 
-  // Get users from Redux store
-  const users = useAppSelector((state: RootState) => state.users)
+  // Get users and loading state from Redux store
+  const { users, loading, error } = useAppSelector((state: RootState) => state.users)
+
+  // Fetch users on mount
+  useEffect(() => {
+    dispatch(fetchUsers())
+  }, [dispatch])
 
   const filteredUsers = useMemo(() => {
     const query = searchQuery.toLowerCase()
     return users.filter(user => {
       const fullName = `${user.firstName} ${user.lastName}`.toLowerCase()
       const email = user.email.toLowerCase()
-      const company = user.userCompany.toLowerCase()
+      const company = ('companyId' in user ? user.companyId : '') || ''
 
       switch (filterType) {
         case 'name':
@@ -95,36 +100,71 @@ const UserSetup = () => {
     })
   }, [users, searchQuery, filterType])
 
-  const handleCreateUser = (data: CreateUserInput) => {
-    dispatch(addUser(data))
-    setShowUserDialog(false)
-    toast({
-      title: 'Success',
-      description: 'New user has been created successfully.',
-    })
-  }
-
-  const handleUpdateUser = (data: UpdateUserInput) => {
-    dispatch(updateUser(data))
-    setShowUserDialog(false)
-    setSelectedUser(undefined)
-    toast({
-      title: 'Success',
-      description: 'User has been updated successfully.',
-    })
-  }
-
-  const handleDeleteUser = () => {
-    if (selectedUser) {
-      dispatch(deleteUser(selectedUser.id))
-      setShowDeleteDialog(false)
-      setSelectedUser(undefined)
+  const handleCreateUser = async (data: CreateUserInput) => {
+    try {
+      await dispatch(createUser(data)).unwrap()
+      setShowUserDialog(false)
       toast({
         title: 'Success',
-        description: 'User has been deleted successfully.',
+        description: 'New user has been created successfully.',
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create user',
+        variant: 'destructive',
       })
     }
   }
+
+  const handleUpdateUser = async (data: UpdateUserInput) => {
+    try {
+      await dispatch(updateUserAsync(data)).unwrap()
+      setShowUserDialog(false)
+      setSelectedUser(undefined)
+      toast({
+        title: 'Success',
+        description: 'User has been updated successfully.',
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update user',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleDeleteUser = async () => {
+    if (selectedUser) {
+      try {
+        await dispatch(deleteUserAsync(selectedUser.id)).unwrap()
+        setShowDeleteDialog(false)
+        setSelectedUser(undefined)
+        toast({
+          title: 'Success',
+          description: 'User has been deleted successfully.',
+        })
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to delete user',
+          variant: 'destructive',
+        })
+      }
+    }
+  }
+
+  // Show error toast if API request fails
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error,
+        variant: 'destructive',
+      })
+    }
+  }, [error, toast])
 
   const openEditDialog = (user: User) => {
     setSelectedUser(user)
@@ -142,37 +182,33 @@ const UserSetup = () => {
 
   const handleCloseView = () => setViewUser(undefined)
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  const getStatusColor = (role: UserRole) => {
+    switch (role) {
       case 'Administrator':
         return 'bg-red-100 text-red-800'
-      case 'Advantage One HO Manager':
+      case 'AdvantageOneHOOfficer':
         return 'bg-purple-100 text-purple-800'
-      case 'Advantage One HO Editor':
-        return 'bg-blue-100 text-blue-800'
-      case 'Advantage One Officer':
+      case 'AdvantageOneOfficer':
         return 'bg-green-100 text-green-800'
-      case 'Customer - Site Manager':
+      case 'CustomerSiteManager':
         return 'bg-orange-100 text-orange-800'
-      case 'Customer - Head Office Manager':
+      case 'CustomerHOManager':
         return 'bg-yellow-100 text-yellow-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  const getStatusIcon = (role: UserRole) => {
+    switch (role) {
       case 'Administrator':
         return <Shield className="h-4 w-4 text-red-600" />
-      case 'Advantage One HO Manager':
+      case 'AdvantageOneHOOfficer':
         return <UserCheck className="h-4 w-4 text-purple-600" />
-      case 'Advantage One HO Editor':
-        return <Pencil className="h-4 w-4 text-blue-600" />
-      case 'Advantage One Officer':
+      case 'AdvantageOneOfficer':
         return <Users className="h-4 w-4 text-green-600" />
-      case 'Customer - Site Manager':
-      case 'Customer - Head Office Manager':
+      case 'CustomerSiteManager':
+      case 'CustomerHOManager':
         return <Building2 className="h-4 w-4 text-orange-600" />
       default:
         return <UserX className="h-4 w-4 text-gray-600" />
@@ -182,17 +218,16 @@ const UserSetup = () => {
   // Stats
   const totalUsers = filteredUsers.length
   const activeStatusList = [
-    'advantage one officer',
-    'advantage one ho manager',
-    'advantage one ho editor',
-    'customer - site manager',
-    'customer - head office manager',
-    'administrator',
+    'AdvantageOneOfficer',
+    'AdvantageOneHOOfficer',
+    'Administrator',
+    'CustomerSiteManager',
+    'CustomerHOManager'
   ]
-  const activeUsers = filteredUsers.filter(u => activeStatusList.includes(u.status.toLowerCase())).length
-  const adminUsers = filteredUsers.filter(u => u.status.toLowerCase() === 'administrator').length
+  const activeUsers = filteredUsers.filter(u => activeStatusList.includes(u.role)).length
+  const adminUsers = filteredUsers.filter(u => u.role === 'Administrator').length
   const adminPercent = totalUsers > 0 ? ((adminUsers / totalUsers) * 100).toFixed(1) : '0.0'
-  const officerUsers = filteredUsers.filter(u => u.status.toLowerCase() === 'advantage one officer').length
+  const officerUsers = filteredUsers.filter(u => u.role === 'AdvantageOneOfficer').length
 
   return (
     <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-indigo-100/80 via-purple-50/80 to-pink-100/80">
@@ -310,16 +345,18 @@ const UserSetup = () => {
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <Badge className={`${getStatusColor(user.status)} flex items-center gap-1.5`}>
-                      {getStatusIcon(user.status)}
-                      {user.status}
+                    <Badge className={`${getStatusColor(user.role)} flex items-center gap-1.5`}>
+                      {getStatusIcon(user.role)}
+                      {user.role}
                     </Badge>
                   </TableCell>
-                  <TableCell>{user.officerType}</TableCell>
+                  <TableCell>{user.role}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Users className="h-5 w-5 text-gray-500" />
-                      <span className="font-medium text-base">{user.assignedCustomers?.length || 0}</span>
+                      <span className="font-medium text-base">
+                        {'assignedCustomerIds' in user ? user.assignedCustomerIds?.length || 0 : 0}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -429,57 +466,26 @@ const UserSetup = () => {
                 <Card>
                   <CardHeader className="pb-4">
                     <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-primary" />
-                      Role & Company Information
+                      <UserCog className="h-5 w-5 text-primary" />
+                      Role Information
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">Status</div>
-                      <div className="font-medium text-base">{viewUser.status}</div>
+                      <div className="text-xs text-gray-500 mb-1">Role</div>
+                      <div className="font-medium text-base">{viewUser.role}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">Officer Type</div>
-                      <div className="font-medium text-base">{viewUser.officerType || '-'}</div>
+                      <div className="text-xs text-gray-500 mb-1">Page Access Role</div>
+                      <div className="font-medium text-base">{viewUser.pageAccessRole}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">User Company</div>
-                      <div className="font-medium text-base">{viewUser.userCompany || '-'}</div>
+                      <div className="text-xs text-gray-500 mb-1">Created At</div>
+                      <div className="font-medium text-base">{new Date(viewUser.createdAt).toLocaleDateString()}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">Job Title</div>
-                      <div className="font-medium text-base">{viewUser.jobTitle || '-'}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Signature</div>
-                      <div className="font-medium text-base">{viewUser.signature || '-'}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Signature Code</div>
-                      <div className="font-medium text-base">{viewUser.signatureCode || '-'}</div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Customer Assignment */}
-                <Card>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                      <Lock className="h-5 w-5 text-primary" />
-                      Customer Assignment
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {viewUser.assignedCustomers && viewUser.assignedCustomers.length > 0 ? (
-                        viewUser.assignedCustomers.map((c) => (
-                          <span key={c.id} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                            {c.name}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-gray-500 text-sm">No customers assigned</span>
-                      )}
+                      <div className="text-xs text-gray-500 mb-1">Last Updated</div>
+                      <div className="font-medium text-base">{new Date(viewUser.updatedAt).toLocaleDateString()}</div>
                     </div>
                   </CardContent>
                 </Card>

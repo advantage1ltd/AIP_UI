@@ -14,6 +14,7 @@ export function AddressSection({ form }: AddressSectionProps) {
       <h3 className="font-semibold">Address</h3>
       <div className="grid grid-cols-2 gap-4">
         <FormField
+          control={form.control}
           name="address.building"
           render={({ field }) => (
             <FormItem>
@@ -25,6 +26,7 @@ export function AddressSection({ form }: AddressSectionProps) {
           )}
         />
         <FormField
+          control={form.control}
           name="address.street"
           render={({ field }) => (
             <FormItem>
@@ -36,6 +38,7 @@ export function AddressSection({ form }: AddressSectionProps) {
           )}
         />
         <FormField
+          control={form.control}
           name="address.village"
           render={({ field }) => (
             <FormItem>
@@ -47,6 +50,7 @@ export function AddressSection({ form }: AddressSectionProps) {
           )}
         />
         <FormField
+          control={form.control}
           name="address.town"
           render={({ field }) => (
             <FormItem>
@@ -58,11 +62,12 @@ export function AddressSection({ form }: AddressSectionProps) {
           )}
         />
         <FormField
+          control={form.control}
           name="address.county"
           render={({ field }) => (
             <FormItem>
               <FormLabel>County</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select county" />
@@ -80,6 +85,7 @@ export function AddressSection({ form }: AddressSectionProps) {
           )}
         />
         <FormField
+          control={form.control}
           name="address.postcode"
           render={({ field }) => (
             <FormItem>

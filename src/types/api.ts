@@ -31,6 +31,7 @@ export interface GetIncidentsParams {
   incidentType?: string
   siteName?: string
   status?: string
+  customerId?: string
 }
 
 // Create/Update incident request

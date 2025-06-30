@@ -1,6 +1,6 @@
 import { TableCell, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Pencil } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 import type { Customer } from "@/types/customer"
 
 interface CustomerTableRowProps {
@@ -8,13 +8,15 @@ interface CustomerTableRowProps {
   isSelected: boolean
   onSelect: (customerId: string | null) => void
   onEdit: (customer: Customer) => void
+  onDelete: (customer: Customer) => void
 }
 
 export function CustomerTableRow({ 
   customer, 
   isSelected, 
   onSelect, 
-  onEdit 
+  onEdit,
+  onDelete 
 }: CustomerTableRowProps) {
   return (
     <TableRow 
@@ -39,17 +41,32 @@ export function CustomerTableRow({
         </span>
       </TableCell>
       <TableCell className="py-2 md:py-3 text-right">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation()
-            onEdit(customer)
-          }}
-        >
-          <Pencil className="h-4 w-4" />
-          <span className="sr-only">Edit customer</span>
-        </Button>
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit(customer)
+            }}
+            className="h-8 w-8 p-0"
+          >
+            <Pencil className="h-4 w-4" />
+            <span className="sr-only">Edit customer</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(customer)
+            }}
+            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span className="sr-only">Delete customer</span>
+          </Button>
+        </div>
       </TableCell>
     </TableRow>
   )

@@ -36,7 +36,7 @@ import {
   MOCK_OFFICERS, 
   MOCK_OFFICER_ROLES 
 } from "@/data/mockDropdownData"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { v4 as uuidv4 } from "uuid"
@@ -155,6 +155,11 @@ export interface IncidentFormProps {
 }
 
 const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit, onCancel, onScanBarcode, isLoading = false }) => {
+  // Debug logging (remove in production)
+  if (initialData) {
+    console.log('📝 Form initializing with incident:', initialData.id, '|', initialData.customerName, '|', initialData.siteName)
+  }
+  
   const [stolenItems, setStolenItems] = useState<StolenItem[]>(initialData?.stolenItems || [])
   const [incidentType, setIncidentType] = useState(initialData?.incidentType || '')
   const [arrestSaveComment, setArrestSaveComment] = useState(initialData?.arrestSaveComment || '')
@@ -272,11 +277,73 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
     },
   })
 
+  // Watch customerName for cascading dropdown
+  const customerName = form.watch('customerName')
+  const selectedCustomer = MOCK_CUSTOMERS.find(c => c.name === customerName)
+  const filteredStores = selectedCustomer ? MOCK_STORES.filter(store => store.customerId === selectedCustomer.id) : []
+
+  // Reset store when customer changes
   useEffect(() => {
-    if (initialData) {
+    if (customerName) form.setValue('siteName', '')
+  }, [customerName])
+
+  useEffect(() => {
+    if (initialData && initialData.id) {
       setStolenItems(initialData.stolenItems || [])
+      
+      // Reset form with the new initial data
+      const formData = {
+        customerName: initialData.customerName || "",
+        siteName: initialData.siteName || "",
+        officerName: initialData.officerName || "",
+        officerRole: initialData.officerRole || "",
+        dateOfIncident: initialData.dateOfIncident ? new Date(initialData.dateOfIncident) : new Date(),
+        timeOfIncident: initialData.timeOfIncident || "",
+        incidentType: initialData.incidentType || "",
+        description: initialData.description || "",
+        incidentDetails: initialData.incidentDetails || initialData.description || "",
+        storeComments: initialData.storeComments || "",
+        incidentInvolved: initialData.incidentInvolved || [],
+        policeInvolvement: initialData.policeInvolvement || false,
+        urnNumber: initialData.urnNumber || "",
+        totalValueRecovered: initialData.totalValueRecovered?.toString() || "",
+        stolenItems: initialData.stolenItems || [],
+        dutyManagerName: initialData.dutyManagerName || "",
+        status: initialData.status || 'pending',
+        priority: initialData.priority || 'medium',
+        actionTaken: initialData.actionTaken || "",
+        evidenceAttached: initialData.evidenceAttached || false,
+        witnessStatements: initialData.witnessStatements || [],
+        involvedParties: initialData.involvedParties || [],
+        reportNumber: initialData.reportNumber || "",
+        offenderName: initialData.offenderName || "",
+        offenderAddress: initialData.offenderAddress || {
+          houseName: "",
+          numberAndStreet: "",
+          villageOrSuburb: "",
+          town: "",
+          county: "",
+          postCode: "",
+        },
+        gender: initialData.gender || 'N/A or N/K',
+        offenderDOB: initialData.offenderDOB ? new Date(initialData.offenderDOB) : undefined,
+        offenderPlaceOfBirth: initialData.offenderPlaceOfBirth || "",
+        policeID: initialData.policeID || "",
+        crimeRefNumber: initialData.crimeRefNumber || "",
+        arrestSaveComment: initialData.arrestSaveComment || "",
+      }
+      
+      form.reset(formData)
+      
+      // Also set individual field values as backup to ensure dropdowns populate
+      setTimeout(() => {
+        form.setValue('customerName', formData.customerName)
+        form.setValue('siteName', formData.siteName)
+        form.setValue('officerName', formData.officerName)
+        form.setValue('incidentType', formData.incidentType)
+      }, 0)
     }
-  }, [initialData])
+  }, [initialData?.id, form])
 
   // Add useEffect to update totalValueRecovered when stolen items change
   React.useEffect(() => {
@@ -293,7 +360,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       // Log form values for debugging
-      console.log('Form values:', values)
+      console.log('Form values (on submit):', values)
       console.log('URN Number:', values.urnNumber)
       console.log('Crime Ref Number:', values.crimeRefNumber)
       console.log('Form validation state:', form.formState)
@@ -362,11 +429,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         crimeRefNumber: values.crimeRefNumber || '',
         // Additional fields
         dateInputted: new Date().toISOString(),
-        timeOfDay,
-        dayOfWeek: isValidDateOfIncident ? format(new Date(values.dateOfIncident), 'EEEE') : '',
         arrestSaveComment: values.arrestSaveComment,
       }
-      console.log('Submitting incident:', formattedData)
+      console.log('Formatted data to submit:', formattedData)
       onSubmit(formattedData)
     } catch (error) {
       console.error('Error submitting incident:', error)
@@ -465,14 +530,14 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-medium">Store Name *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger className="h-11">
                               <SelectValue placeholder="Select store" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {MOCK_STORES.map((store) => (
+                            {filteredStores.map((store) => (
                               <SelectItem key={store.id} value={store.name}>
                                 {store.name}
                               </SelectItem>

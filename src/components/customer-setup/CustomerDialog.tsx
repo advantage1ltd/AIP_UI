@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form"
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -7,7 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useToast } from "@/hooks/use-toast"
 import type { Customer, CustomerType, CustomerPageAssignment } from "@/types/customer"
 import { AddressSection } from "./dialog-sections/AddressSection"
 import { ContactSection } from "./dialog-sections/ContactSection"
@@ -23,6 +24,31 @@ const customerTypes: { value: CustomerType; label: string }[] = [
   { value: "event", label: "Event" }
 ]
 
+// Form validation schema
+const customerSchema = z.object({
+  companyName: z.string().min(1, "Company name is required").min(2, "Company name must be at least 2 characters"),
+  companyNumber: z.string().min(1, "Company number is required"),
+  vatNumber: z.string().min(1, "VAT number is required"),
+  status: z.enum(["active", "inactive"]),
+  customerType: z.enum(["retail", "static", "gatehouse", "mobile-patrol", "keyholding-alarm-response", "event"]),
+  address: z.object({
+    building: z.string().min(1, "Building is required"),
+    street: z.string().min(1, "Street is required"),
+    village: z.string().optional(),
+    town: z.string().min(1, "Town/City is required"),
+    county: z.string().min(1, "County is required"),
+    postcode: z.string().min(1, "Postcode is required").regex(/^[A-Z]{1,2}[0-9]{1,2}[A-Z]?\s?[0-9][A-Z]{2}$/i, "Invalid UK postcode format")
+  }),
+  contact: z.object({
+    title: z.string().min(1, "Title is required"),
+    forename: z.string().min(1, "Forename is required"),
+    surname: z.string().min(1, "Surname is required"),
+    position: z.string().min(1, "Position is required"),
+    email: z.string().min(1, "Email is required").email("Invalid email address"),
+    phone: z.string().min(1, "Phone number is required").min(10, "Phone number must be at least 10 digits")
+  })
+})
+
 interface CustomerDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -31,12 +57,19 @@ interface CustomerDialogProps {
 }
 
 export function CustomerDialog({ open, onOpenChange, customer, onSave }: CustomerDialogProps) {
+  const { toast } = useToast()
   const [pageAssignments, setPageAssignments] = useState<Record<string, CustomerPageAssignment>>(
     customer?.pageAssignments || {}
   )
+
+  // Update pageAssignments when customer prop changes
+  useEffect(() => {
+    setPageAssignments(customer?.pageAssignments || {})
+  }, [customer])
   
-  const form = useForm({
-    defaultValues: customer || {
+  const form = useForm<z.infer<typeof customerSchema>>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
       companyName: "",
       companyNumber: "",
       vatNumber: "",
@@ -61,27 +94,95 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
     }
   })
 
+  // Reset form when customer data changes
+  useEffect(() => {
+    if (customer) {
+      console.log('Loading customer data into form:', customer)
+      form.reset({
+        companyName: customer.companyName || "",
+        companyNumber: customer.companyNumber || "",
+        vatNumber: customer.vatNumber || "",
+        status: customer.status || "active",
+        customerType: customer.customerType || "retail",
+        address: {
+          building: customer.address?.building || "",
+          street: customer.address?.street || "",
+          village: customer.address?.village || "",
+          town: customer.address?.town || "",
+          county: customer.address?.county || "",
+          postcode: customer.address?.postcode || ""
+        },
+        contact: {
+          title: customer.contact?.title || "",
+          forename: customer.contact?.forename || "",
+          surname: customer.contact?.surname || "",
+          position: customer.contact?.position || "",
+          email: customer.contact?.email || "",
+          phone: customer.contact?.phone || ""
+        }
+      })
+    } else {
+      // Reset to empty form for new customer
+      form.reset({
+        companyName: "",
+        companyNumber: "",
+        vatNumber: "",
+        status: "active",
+        customerType: "retail",
+        address: {
+          building: "",
+          street: "",
+          village: "",
+          town: "",
+          county: "",
+          postcode: ""
+        },
+        contact: {
+          title: "",
+          forename: "",
+          surname: "",
+          position: "",
+          email: "",
+          phone: ""
+        }
+      })
+    }
+  }, [customer, form])
+
   const watchedCustomerType = form.watch("customerType") as CustomerType
 
-  const onSubmit = (data: any) => {
-    const customerData = {
-      ...data,
-      pageAssignments,
-      id: customer?.id || `CUST${Date.now()}`,
-      createdAt: customer?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      viewConfig: customer?.viewConfig || {
-        id: `VC${Date.now()}`,
-        customerId: customer?.id || `CUST${Date.now()}`,
-        customerType: data.customerType,
-        enabledPages: Object.keys(pageAssignments).filter(pageId => pageAssignments[pageId].enabled),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+  const onSubmit = (data: z.infer<typeof customerSchema>) => {
+    try {
+      const enabledPages = Object.keys(pageAssignments).filter(pageId => pageAssignments[pageId].enabled)
+      
+      const customerData = {
+        ...data,
+        pageAssignments,
+        id: customer?.id || `CUST${Date.now()}`,
+        createdAt: customer?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        viewConfig: {
+          id: customer?.viewConfig?.id || `VC${Date.now()}`,
+          customerId: customer?.id || `CUST${Date.now()}`,
+          customerType: data.customerType,
+          enabledPages,
+          createdAt: customer?.viewConfig?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
       }
+      
+      onSave(customerData as Customer)
+      
+      // Note: Success/error notifications are handled in the parent component
+      // Only close dialog on successful validation
+      
+    } catch (error) {
+      toast({
+        title: "Validation Error",
+        description: "Please check all required fields and try again.",
+        variant: "destructive"
+      })
     }
-    
-    onSave(customerData)
-    onOpenChange(false)
   }
 
   return (
