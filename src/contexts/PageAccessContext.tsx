@@ -5,7 +5,7 @@ import { PageAccess, pageAccessApi } from '@/api/pageAccess';
 interface PageAccessContextType {
   hasAccess: (path: string) => boolean;
   currentRole: string | null;
-  setCurrentRole: (role: string | null) => void;
+  setCurrentRole: (role: string | null) => Promise<void>;
   pageAccessByRole: Record<string, string[]>;
   setPageAccessByRole: (access: Record<string, string[]>) => void;
   availablePages: PageAccess[];
@@ -35,6 +35,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isTestMode, setIsTestMode] = useState(false);
   const [testRole, setTestRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasInitialized, setHasInitialized] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -150,6 +151,38 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  // Enhanced setCurrentRole that ensures page access data is loaded
+  const setCurrentRoleWithData = async (role: string | null) => {
+    if (!role) {
+      setCurrentRole(null);
+      return;
+    }
+
+    console.log('🔑 Setting current role with data loading:', role);
+    
+    // Set the role immediately for UI responsiveness
+    setCurrentRole(role);
+    
+    // If we don't have page access data for this role, load it
+    const hasRoleData = pageAccessByRole[role] && availablePages.length > 0;
+    if (!hasRoleData) {
+      try {
+        console.log('🔄 Loading page access data for role:', role);
+        setIsLoading(true);
+        
+        const data = await pageAccessApi.getSettings();
+        setPageAccessByRole(data.pageAccessByRole);
+        setAvailablePages(data.availablePages);
+        
+        console.log('✅ Page access data loaded for role:', role);
+      } catch (error) {
+        console.error('Error loading page access data for role:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
   // Initialize role and fetch page access
   useEffect(() => {
     const initializeAccess = async () => {
@@ -206,11 +239,42 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         console.error('Error initializing access:', error);
       } finally {
         setIsLoading(false);
+        setHasInitialized(true);
       }
     };
 
     initializeAccess();
   }, []);
+
+  // Re-initialize page access data when currentRole changes during session (e.g., after login)
+  useEffect(() => {
+    const reloadPageAccessForRole = async () => {
+      // Skip if not initialized yet, no role, or if we already have data for this role
+      if (!hasInitialized || !currentRole) return;
+      
+      // Check if we already have page access data for this role
+      const hasRoleData = pageAccessByRole[currentRole] && availablePages.length > 0;
+      if (hasRoleData) return;
+      
+      try {
+        console.log('🔄 Role changed during session, reloading page access for:', currentRole);
+        setIsLoading(true);
+        
+        // Fetch fresh page access data
+        const data = await pageAccessApi.getSettings();
+        setPageAccessByRole(data.pageAccessByRole);
+        setAvailablePages(data.availablePages);
+        
+        console.log('✅ Page access data reloaded for new role:', currentRole);
+      } catch (error) {
+        console.error('Error reloading page access for role change:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    reloadPageAccessForRole();
+  }, [currentRole, hasInitialized]);
 
   // Update localStorage when role changes
   useEffect(() => {
@@ -267,7 +331,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     <PageAccessContext.Provider value={{
       hasAccess,
       currentRole,
-      setCurrentRole,
+      setCurrentRole: setCurrentRoleWithData,
       pageAccessByRole,
       setPageAccessByRole,
       availablePages,

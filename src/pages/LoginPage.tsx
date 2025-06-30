@@ -89,7 +89,7 @@ export default function LoginPage() {
       const roleToSet = user.role
       console.log('🔑 Setting role for page access:', roleToSet)
       console.log('🔍 Full user object from login:', user)
-      setCurrentRole(roleToSet)
+      await setCurrentRole(roleToSet)
 
       // All users now go to /dashboard
       const redirectPath = '/dashboard'
