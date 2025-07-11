@@ -32,8 +32,6 @@ import {
 } from "@/components/ui/popover"
 import { 
   MOCK_CUSTOMERS, 
-  MOCK_STORES, 
-  MOCK_OFFICERS, 
   MOCK_OFFICER_ROLES 
 } from "@/data/mockDropdownData"
 import { useForm, useWatch } from "react-hook-form"
@@ -43,6 +41,7 @@ import { v4 as uuidv4 } from "uuid"
 import React from "react"
 import { Badge } from "@/components/ui/badge"
 import { incidentService } from "@/services/incidentService"
+import { useAuth } from "@/hooks/useAuth"
 
 const formSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
@@ -104,7 +103,7 @@ const incidentTypes: IncidentType[] = [
   IncidentType.SUSPICIOUS_BEHAVIOUR,
   IncidentType.UNDERAGE_PURCHASE,
   IncidentType.ANTI_SOCIAL,
-  IncidentType.OTHER
+  IncidentType.OTHERS
 ]
 
 const incidentInvolved: IncidentInvolved[] = [
@@ -152,9 +151,14 @@ export interface IncidentFormProps {
   onCancel: () => void
   onScanBarcode: () => void
   isLoading?: boolean
+  customerId?: string
+  siteId?: string | null
 }
 
-const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit, onCancel, onScanBarcode, isLoading = false }) => {
+const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit, onCancel, onScanBarcode, isLoading = false, customerId: propCustomerId, siteId: propSiteId }) => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Administrator';
+  
   // Debug logging (remove in production)
   if (initialData) {
     console.log('📝 Form initializing with incident:', initialData.id, '|', initialData.customerName, '|', initialData.siteName)
@@ -179,7 +183,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
     setIsSearchingOffender(true);
     try {
       // Get all incidents from the service
-      const allIncidents = await incidentService.getAll();
+      const allIncidents = await incidentService.getIncidents();
       
       // Filter incidents by offender name and DOB if provided
       const matchingIncidents = allIncidents.filter(incident => {
@@ -280,12 +284,115 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   // Watch customerName for cascading dropdown
   const customerName = form.watch('customerName')
   const selectedCustomer = MOCK_CUSTOMERS.find(c => c.name === customerName)
-  const filteredStores = selectedCustomer ? MOCK_STORES.filter(store => store.customerId === selectedCustomer.id) : []
+  
+  // Create site options based on selected customer (simplified for direct mapping)
+  const getSitesForCustomer = (customerId: string): Array<{id: string, name: string}> => {
+    const sitesByCustomer: Record<string, Array<{id: string, name: string}>> = {
+      '1': [ // Central England COOP
+        { id: 'SITE001', name: 'Leicester Central' },
+        { id: 'SITE002', name: 'Birmingham Store' },
+        { id: 'SITE003', name: 'Sheffield Branch' },
+      ],
+      '2': [ // Midcounties COOP  
+        { id: 'SITE004', name: 'Oxford City Centre' },
+        { id: 'SITE005', name: 'Cheltenham Store' },
+        { id: 'SITE006', name: 'Swindon Branch' },
+      ],
+      '3': [ // Heart of England COOP
+        { id: 'SITE007', name: 'Coventry Central' },
+        { id: 'SITE008', name: 'Nuneaton Main Store' },
+        { id: 'SITE009', name: 'Rugby Store' },
+      ],
+    };
+    return sitesByCustomer[customerId] || [];
+  };
+  
+  const filteredSites = selectedCustomer ? getSitesForCustomer(selectedCustomer.id) : []
 
-  // Reset store when customer changes
+  // Helper functions to get pre-filled data
+  const getCustomerNameFromId = (customerId: string): string => {
+    // Direct mapping based on actual database customer IDs
+    const customerMap: Record<string, string> = {
+      '21': 'Central England COOP',
+      '22': 'Heart of England COOP', 
+      '23': 'Midcounties COOP',
+      // Also support MOCK_CUSTOMERS IDs for backward compatibility
+      '1': 'Central England COOP',
+      '2': 'Midcounties COOP',
+      '3': 'Heart of England COOP',
+    };
+    
+    const customerName = customerMap[customerId];
+    return customerName || '';
+  };
+
+    const getSiteNameFromId = (siteId: string): string => {
+    // Map database site IDs to site names (consistent with database sites table)
+    const siteMap: Record<string, string> = {
+      'SITE001': 'Leicester Central',
+      'SITE002': 'Birmingham Store', 
+      'SITE003': 'Sheffield Branch',
+      'SITE004': 'Oxford City Centre',
+      'SITE005': 'Cheltenham Store',
+      'SITE006': 'Swindon Branch',
+      'SITE007': 'Coventry Central',
+      'SITE008': 'Nuneaton Main Store',
+      'SITE009': 'Rugby Store',
+    };
+    
+    return siteMap[siteId] || '';
+  };
+
+  // Reset site when customer changes
   useEffect(() => {
     if (customerName) form.setValue('siteName', '')
   }, [customerName])
+
+  // Pre-fill customer, site, and officer info for new incidents
+  useEffect(() => {
+    if (!initialData) {
+      // Auto-fill customer and site when props are provided
+      if (propCustomerId && propSiteId) {
+        const customerName = getCustomerNameFromId(propCustomerId);
+        const siteName = getSiteNameFromId(propSiteId);
+        
+        if (customerName && siteName) {
+          // Set values immediately
+          form.setValue('customerName', customerName);
+          form.setValue('siteName', siteName);
+          
+          // Also set with a slight delay to ensure dropdowns are rendered
+          setTimeout(() => {
+            form.setValue('customerName', customerName);
+            form.setValue('siteName', siteName);
+          }, 50);
+        }
+      }
+      
+      // Auto-fill officer information from current user
+      if (user) {
+        const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+        if (fullName) {
+          form.setValue('officerName', fullName);
+        }
+        
+        // Auto-fill officer role if available
+        if (user.role) {
+          // Map user roles to officer roles
+          const roleMapping: Record<string, string> = {
+            'Security Officer': 'Security Officer',
+            'AdvantageOneOfficer': 'Security Officer',
+            'CustomerSiteManager': 'Site Manager',
+            'CustomerHOManager': 'Head of Security',
+            'Administrator': 'Security Officer'
+          };
+          
+          const officerRole = roleMapping[user.role] || 'Security Officer';
+          form.setValue('officerRole', officerRole);
+        }
+      }
+    }
+  }, [propCustomerId, propSiteId, initialData, form, user]);
 
   useEffect(() => {
     if (initialData && initialData.id) {
@@ -393,6 +500,8 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
 
       const formattedData: Incident = {
         id: initialData?.id || uuidv4(),
+        customerId: parseInt(propCustomerId || selectedCustomer?.id || '0'),
+        siteId: propSiteId || '',
         customerName: values.customerName,
         siteName: values.siteName,
         officerName: values.officerName,
@@ -505,20 +614,26 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-medium">Customer Name *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="h-11">
-                              <SelectValue placeholder="Select customer" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {MOCK_CUSTOMERS.map((customer) => (
-                              <SelectItem key={customer.id} value={customer.name}>
-                                {customer.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {!isAdmin && propCustomerId ? (
+                          <div className="flex h-11 w-full rounded-md border border-input bg-gray-50 px-3 py-2 text-sm">
+                            {field.value}
+                          </div>
+                        ) : (
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="h-11">
+                                <SelectValue placeholder="Select customer" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {MOCK_CUSTOMERS.map((customer) => (
+                                <SelectItem key={customer.id} value={customer.name}>
+                                  {customer.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -529,21 +644,27 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="siteName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Store Name *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="h-11">
-                              <SelectValue placeholder="Select store" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {filteredStores.map((store) => (
-                              <SelectItem key={store.id} value={store.name}>
-                                {store.name}
+                        <FormLabel className="text-base font-medium">Site Name *</FormLabel>
+                        {!isAdmin && propSiteId ? (
+                          <div className="flex h-11 w-full rounded-md border border-input bg-gray-50 px-3 py-2 text-sm">
+                            {field.value}
+                          </div>
+                        ) : (
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="h-11">
+                                <SelectValue placeholder="Select site" />
+                              </SelectTrigger>
+                            </FormControl>
+                                                      <SelectContent>
+                            {filteredSites.map((site) => (
+                              <SelectItem key={site.id} value={site.name}>
+                                {site.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
-                        </Select>
+                          </Select>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -555,20 +676,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-medium">Officer Name *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="h-11">
-                              <SelectValue placeholder="Select officer" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {MOCK_OFFICERS.map((officer) => (
-                              <SelectItem key={officer.id} value={officer.name}>
-                                {officer.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Input className="h-11" {...field} placeholder="Enter officer name" />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

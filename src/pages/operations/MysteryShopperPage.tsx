@@ -70,6 +70,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, ClipboardCheck, Users, BarChart } from "lucide-react";
 import { Toaster } from '@/components/ui/toaster'
 
+// Import the service
+import { mysteryShopperService, type MysteryShopperFilters } from '@/services/mysteryShopperService';
+
 // Mock data
 const mockOfficers = [
   { id: "OFF001", name: "John Smith" },
@@ -199,149 +202,51 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-// Mock data for initial evaluations
+// Sample data for testing
 const mockEvaluations = [
   {
-    id: "ev001",
+    id: uuidv4(),
     officerId: "OFF001",
     officerName: "John Smith",
     customerName: "Walmart Supercenter",
-    locationName: "New York City",
-    location: "LOC001",
-    mysteryShopperName: "Emily Wilson",
-    date: new Date(2023, 11, 15),
+    location: "New York City",
+    date: "2023-12-10",
     time: "14:30",
-    totalScore: 32,
-    maxPossibleScore: 40,
-    percentage: "80.0",
-    createdAt: new Date(2023, 11, 15).toISOString(),
-    updatedAt: new Date(2023, 11, 15).toISOString(),
+    mysteryShopperName: "Sarah Wilson",
     scores: {
-      location: { score: 4, comments: "Officer was positioned well but occasionally distracted" },
-      security: { score: 5, comments: "Excellent awareness of surroundings" },
-      presentation: { score: 6, comments: "Uniform was clean and appropriate" },
-      license: { score: 3, comments: "SIA license properly displayed" },
-      customer: { score: 4, comments: "Greeted promptly but was finishing another task" },
-      courtesy: { score: 4, comments: "Very polite and professional" },
-      knowledge: { score: 3, comments: "Good knowledge but hesitated on a few specifics" },
-      professionalism: { score: 3, comments: "Handled situation well overall" }
-    }
-  },
-  {
-    id: "ev002",
-    officerId: "OFF003",
-    officerName: "Michael Brown",
-    customerName: "Target Corporation",
-    locationName: "Los Angeles",
-    location: "LOC002",
-    mysteryShopperName: "Robert Johnson",
-    date: new Date(2023, 11, 20),
-    time: "10:15",
-    totalScore: 35,
+      location: { score: 4, comments: "Good positioning" },
+      security: { score: 5, comments: "Very alert" },
+      presentation: { score: 6, comments: "Professional appearance" },
+      license: { score: 3, comments: "License visible" },
+      customer: { score: 4, comments: "Helpful approach" },
+      courtesy: { score: 5, comments: "Polite and courteous" },
+      knowledge: { score: 4, comments: "Good store knowledge" },
+      professionalism: { score: 5, comments: "Excellent service" }
+    },
+    totalScore: 36,
     maxPossibleScore: 40,
-    percentage: "87.5",
-    createdAt: new Date(2023, 11, 20).toISOString(),
-    updatedAt: new Date(2023, 11, 20).toISOString(),
-    scores: {
-      location: { score: 5, comments: "Excellent positioning near entrance" },
-      security: { score: 5, comments: "Very attentive to all customers" },
-      presentation: { score: 6, comments: "Impeccable uniform" },
-      license: { score: 3, comments: "SIA license visible and properly displayed" },
-      customer: { score: 5, comments: "Immediate acknowledgment upon entry" },
-      courtesy: { score: 4, comments: "Very professional demeanor" },
-      knowledge: { score: 4, comments: "Knew all store policies and locations" },
-      professionalism: { score: 3, comments: "Handled query efficiently" }
-    }
-  },
-  {
-    id: "ev003",
-    officerId: "OFF002",
-    officerName: "Sarah Johnson",
-    customerName: "Costco Wholesale",
-    locationName: "Chicago",
-    location: "LOC003",
-    mysteryShopperName: "Jessica Taylor",
-    date: new Date(2023, 12, 5),
-    time: "15:45",
-    totalScore: 28,
-    maxPossibleScore: 40,
-    percentage: "70.0",
-    createdAt: new Date(2023, 12, 5).toISOString(),
-    updatedAt: new Date(2023, 12, 5).toISOString(),
-    scores: {
-      location: { score: 3, comments: "Positioned adequately but too near staff area" },
-      security: { score: 3, comments: "Occasionally distracted by conversation with staff" },
-      presentation: { score: 5, comments: "Uniform good but badge slightly obscured" },
-      license: { score: 2, comments: "SIA license visible but not prominently displayed" },
-      customer: { score: 3, comments: "Acknowledged after brief delay" },
-      courtesy: { score: 4, comments: "Polite and helpful once engaged" },
-      knowledge: { score: 4, comments: "Good knowledge of store layout and policies" },
-      professionalism: { score: 4, comments: "Professional resolution of query" }
-    }
-  },
-  {
-    id: "ev004",
-    officerId: "OFF005",
-    officerName: "James Wilson",
-    customerName: "Home Depot",
-    locationName: "Houston",
-    location: "LOC004",
-    mysteryShopperName: "David Anderson",
-    date: new Date(2024, 0, 10),
-    time: "09:30",
-    totalScore: 38,
-    maxPossibleScore: 40,
-    percentage: "95.0",
-    createdAt: new Date(2024, 0, 10).toISOString(),
-    updatedAt: new Date(2024, 0, 10).toISOString(),
-    scores: {
-      location: { score: 5, comments: "Perfect positioning with excellent visibility" },
-      security: { score: 5, comments: "Highly alert and aware" },
-      presentation: { score: 7, comments: "Exemplary uniform presentation" },
-      license: { score: 3, comments: "SIA license clearly displayed" },
-      customer: { score: 5, comments: "Immediate and friendly acknowledgment" },
-      courtesy: { score: 5, comments: "Exceptionally courteous and professional" },
-      knowledge: { score: 4, comments: "Excellent store knowledge" },
-      professionalism: { score: 4, comments: "Outstanding problem-solving approach" }
-    }
-  },
-  {
-    id: "ev005",
-    officerId: "OFF004",
-    officerName: "Emily Davis",
-    customerName: "Best Buy",
-    locationName: "Phoenix",
-    location: "LOC005",
-    mysteryShopperName: "Michael Thompson",
-    date: new Date(2024, 0, 15),
-    time: "13:20",
-    totalScore: 31,
-    maxPossibleScore: 40,
-    percentage: "77.5",
-    createdAt: new Date(2024, 0, 15).toISOString(),
-    updatedAt: new Date(2024, 0, 15).toISOString(),
-    scores: {
-      location: { score: 4, comments: "Well positioned but occasionally moved away from post" },
-      security: { score: 4, comments: "Good awareness with minor lapses" },
-      presentation: { score: 5, comments: "Uniform generally neat with minor issues" },
-      license: { score: 3, comments: "SIA license properly displayed" },
-      customer: { score: 3, comments: "Acknowledged after short delay" },
-      courtesy: { score: 4, comments: "Polite and professional" },
-      knowledge: { score: 4, comments: "Good knowledge of store layout and policies" },
-      professionalism: { score: 4, comments: "Handled query effectively" }
-    }
+    percentage: "90.0%",
+    createdAt: "2023-12-10T14:30:00.000Z",
+    status: "submitted"
   }
 ];
 
-export default function MysteryShopperPage() {
-  const [evaluations, setEvaluations] = useState<any[]>(mockEvaluations);
+interface MysteryShopperPageProps {
+  customerId?: string;
+  siteId?: string;
+}
+
+export default function MysteryShopperPage({ customerId, siteId }: MysteryShopperPageProps) {
+  const [evaluations, setEvaluations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<any | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [evaluationToDelete, setEvaluationToDelete] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalEvaluations, setTotalEvaluations] = useState(0);
+  const itemsPerPage = 10;
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
@@ -356,6 +261,40 @@ export default function MysteryShopperPage() {
       scores: defaultScores
     }
   });
+
+  // Fetch evaluations from API
+  const fetchEvaluations = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      console.log('🔍 [MysteryShopperPage] Fetching evaluations with filters:', { customerId, siteId, currentPage });
+      
+      const filters: MysteryShopperFilters = {};
+      if (customerId) filters.customerId = customerId;
+      if (siteId) filters.siteId = siteId;
+
+      const response = await mysteryShopperService.getEvaluations(currentPage, itemsPerPage, filters);
+      
+      console.log('📤 [MysteryShopperPage] Evaluations response:', response);
+      
+      setEvaluations(response.data);
+      setTotalEvaluations(response.pagination.total);
+      setTotalPages(Math.ceil(response.pagination.total / itemsPerPage));
+    } catch (error) {
+      console.error('❌ [MysteryShopperPage] Error fetching evaluations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load evaluations. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPage, customerId, siteId, toast]);
+
+  // Load evaluations on component mount and when filters change
+  React.useEffect(() => {
+    fetchEvaluations();
+  }, [fetchEvaluations]);
 
   const resetForm = useCallback(() => {
     form.reset({
@@ -397,6 +336,8 @@ export default function MysteryShopperPage() {
   const handleSubmit = useCallback(async (data: any) => {
     setIsLoading(true);
     try {
+      console.log('💾 [MysteryShopperPage] Saving evaluation:', { data, selectedEvaluation: !!selectedEvaluation });
+      
       // Calculate total score and max possible score
       const total: number = Object.values(data.scores as Record<string, {score: number, comments?: string}>).reduce(
         (total: number, { score }) => total + (Number(score) || 0),
@@ -414,40 +355,42 @@ export default function MysteryShopperPage() {
 
       // Prepare evaluation data
       const evaluationData = {
-        id: selectedEvaluation?.id || uuidv4(),
         ...data,
+        customerId: customerId ? parseInt(customerId) : undefined,
+        siteId: siteId,
         officerName: selectedOfficer?.name || '',
         customerName: selectedCustomer?.name || '',
         locationName: selectedLocation?.name || '',
         totalScore: total,
         maxPossibleScore: max,
         percentage: ((total / max) * 100).toFixed(1),
-        createdAt: selectedEvaluation?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        date: format(data.date, 'yyyy-MM-dd')
       };
 
-      // Update evaluations
-      setEvaluations((prev) => {
-        const existing = prev.findIndex((e) => e.id === evaluationData.id);
-        if (existing >= 0) {
-          const updated = [...prev];
-          updated[existing] = evaluationData;
-          return updated;
-        }
-        return [...prev, evaluationData];
-      });
+      if (selectedEvaluation) {
+        // Update existing evaluation
+        await mysteryShopperService.updateEvaluation(selectedEvaluation.id, evaluationData);
+        toast({
+          title: "Success",
+          description: "Evaluation updated successfully.",
+        });
+      } else {
+        // Create new evaluation
+        await mysteryShopperService.createEvaluation(evaluationData);
+        toast({
+          title: "Success",
+          description: "Evaluation created successfully.",
+        });
+      }
 
-      // Show success message
-      toast({
-        title: "Success",
-        description: `Evaluation ${selectedEvaluation ? 'updated' : 'created'} successfully.`,
-      });
+      // Refresh the evaluations list
+      await fetchEvaluations();
 
       // Reset form and close dialog
       resetForm();
       setIsDialogOpen(false);
     } catch (error) {
-      console.error('Error saving evaluation:', error);
+      console.error('❌ [MysteryShopperPage] Error saving evaluation:', error);
       toast({
         title: "Error",
         description: "Failed to save evaluation. Please try again.",
@@ -456,18 +399,25 @@ export default function MysteryShopperPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedEvaluation, resetForm, toast]);
+  }, [selectedEvaluation, resetForm, toast, customerId, siteId, fetchEvaluations]);
 
   const handleDeleteConfirm = async () => {
     if (!evaluationToDelete) return;
 
     try {
-      setEvaluations(prev => prev.filter(e => e.id !== evaluationToDelete.id));
+      console.log('🗑️ [MysteryShopperPage] Deleting evaluation:', evaluationToDelete.id);
+      
+      await mysteryShopperService.deleteEvaluation(evaluationToDelete.id);
+      
       toast({
         title: "Success",
         description: "Evaluation has been deleted",
       });
+
+      // Refresh the evaluations list
+      await fetchEvaluations();
     } catch (error) {
+      console.error('❌ [MysteryShopperPage] Error deleting evaluation:', error);
       toast({
         title: "Error",
         description: "Failed to delete evaluation",
@@ -482,17 +432,21 @@ export default function MysteryShopperPage() {
   const onSubmit = form.handleSubmit(handleSubmit);
 
   // Pagination logic
-  const totalPages = Math.ceil(evaluations.length / itemsPerPage);
-  
-  const paginatedEvaluations = evaluations.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-  
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return;
     setCurrentPage(page);
   };
+
+  // Calculate stats
+  const avgScore = useMemo(() => {
+    if (evaluations.length === 0) return 0;
+    const total = evaluations.reduce((sum, evaluation) => sum + evaluation.totalScore, 0);
+    return (total / evaluations.length).toFixed(1);
+  }, [evaluations]);
+
+  const highPerformers = useMemo(() => {
+    return evaluations.filter(evaluation => parseFloat(evaluation.percentage) >= 85).length;
+  }, [evaluations]);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-100 overflow-x-hidden">
@@ -527,7 +481,7 @@ export default function MysteryShopperPage() {
                 <ClipboardCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 xl:h-5 xl:w-5 text-purple-300" />
               </CardHeader>
               <CardContent className="p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pt-0 md:pt-1 xl:pt-2">
-                <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">{evaluations.length}</div>
+                <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">{totalEvaluations}</div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-br from-blue-800 to-blue-900 border-blue-700 shadow-md">
@@ -537,10 +491,7 @@ export default function MysteryShopperPage() {
               </CardHeader>
               <CardContent className="p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pt-0 md:pt-1 xl:pt-2">
                 <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">
-                  {evaluations.length > 0 
-                    ? `${(evaluations.reduce((sum, ev) => sum + parseFloat(ev.percentage), 0) / evaluations.length).toFixed(1)}%` 
-                    : '0%'
-                  }
+                  {avgScore}%
                 </div>
               </CardContent>
             </Card>
@@ -575,8 +526,8 @@ export default function MysteryShopperPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedEvaluations.length > 0 ? (
-                    paginatedEvaluations.map((evaluation) => (
+                  {evaluations.length > 0 ? (
+                    evaluations.map((evaluation) => (
                       <TableRow key={evaluation.id} className="hover:bg-gray-50 transition-colors text-[10px] sm:text-xs lg:text-sm xl:text-base">
                         <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4 font-medium">
                           {evaluation.officerName}
@@ -653,7 +604,7 @@ export default function MysteryShopperPage() {
         </div>
 
         {/* Pagination */}
-        {evaluations.length > itemsPerPage && (
+        {totalPages > 1 && (
           <div className="flex justify-center py-2 sm:py-3 md:py-4 xl:py-6 mt-2 sm:mt-3 md:mt-4 xl:mt-6 overflow-x-auto">
             <Pagination>
               <PaginationContent className="flex flex-wrap items-center justify-center gap-0.5 sm:gap-1 xl:gap-2">

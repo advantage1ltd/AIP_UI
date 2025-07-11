@@ -172,11 +172,10 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Customer Name</TableHead>
+              <TableHead>Site Name</TableHead>
               <TableHead>Officer Name</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Site</TableHead>
-              <TableHead>Region</TableHead>
               <TableHead>Average Rating</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -184,24 +183,23 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={6} className="text-center py-8">
                   Loading surveys...
                 </TableCell>
               </TableRow>
             ) : surveys.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={6} className="text-center py-8">
                   No surveys found matching your search.
                 </TableCell>
               </TableRow>
             ) : (
               surveys.map((survey) => (
                 <TableRow key={survey.id}>
-                  <TableCell>{survey.officerName}</TableCell>
-                  <TableCell>{format(new Date(survey.date), 'PP')}</TableCell>
                   <TableCell>{survey.customer}</TableCell>
                   <TableCell>{survey.location}</TableCell>
-                  <TableCell>{survey.region}</TableCell>
+                  <TableCell>{survey.officerName}</TableCell>
+                  <TableCell>{format(new Date(survey.date), 'PP')}</TableCell>
                   <TableCell>{getAverageRating(survey).toFixed(1)}/10</TableCell>
                   <TableCell>
                     <div className="flex gap-2">

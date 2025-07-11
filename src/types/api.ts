@@ -30,6 +30,7 @@ export interface GetIncidentsParams {
   toDate?: string
   incidentType?: string
   siteName?: string
+  siteId?: string
   status?: string
   customerId?: string
 }

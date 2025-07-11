@@ -2,11 +2,11 @@ import { useEffect, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
-import CustomerSatisfactionPage from "@/pages/operations/CustomerSatisfactionPage"
+import SiteVisitPage from "@/pages/operations/SiteVisitPage"
 import { useAuth } from "@/contexts/AuthContext"
 import { findCustomerById } from "@/hooks/useAvailableCustomers"
 
-export default function CustomerSatisfactionReport() {
+export default function CustomerSiteVisitReport() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user, isLoading: authLoading } = useAuth()
@@ -29,7 +29,7 @@ export default function CustomerSatisfactionReport() {
         const site = sites.find((s: any) => s.id === siteId);
         if (site) {
           setSelectedSiteName(site.locationName);
-          console.log('CustomerSatisfactionReport: Found site name:', site.locationName);
+          console.log('CustomerSiteVisitReport: Found site name:', site.locationName);
         }
       }
     } catch (error) {
@@ -37,10 +37,7 @@ export default function CustomerSatisfactionReport() {
     }
   }
 
-  console.log('CustomerSatisfactionReport: Component rendered')
-
   useEffect(() => {
-    console.log('CustomerSatisfactionReport: useEffect called')
     const loadCustomer = async () => {
       try {
         // Wait for auth to finish loading
@@ -54,10 +51,10 @@ export default function CustomerSatisfactionReport() {
         const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined
         const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : userCustomerId
 
-        console.log('CustomerSatisfactionReport: URL customerId:', urlCustomerId)
-        console.log('CustomerSatisfactionReport: URL siteId:', urlSiteId)
-        console.log('CustomerSatisfactionReport: User customerId:', userCustomerId)
-        console.log('CustomerSatisfactionReport: Target customerId:', targetCustomerId)
+        console.log('CustomerSiteVisitReport: URL customerId:', urlCustomerId)
+        console.log('CustomerSiteVisitReport: URL siteId:', urlSiteId)
+        console.log('CustomerSiteVisitReport: User customerId:', userCustomerId)
+        console.log('CustomerSiteVisitReport: Target customerId:', targetCustomerId)
 
         // Set selected site if provided in URL
         if (urlSiteId && targetCustomerId) {
@@ -72,20 +69,19 @@ export default function CustomerSatisfactionReport() {
         }
 
         const customerData = await findCustomerById(targetCustomerId)
-        console.log('CustomerSatisfactionReport: Found customer:', customerData)
+        console.log('CustomerSiteVisitReport: Found customer:', customerData)
         
         if (!customerData) {
           setError("Customer not found")
           return
         }
         
-        console.log('CustomerSatisfactionReport: Access granted - setting customer')
+        console.log('CustomerSiteVisitReport: Access granted - setting customer')
         setCustomer(customerData)
-      } catch (error) {
-        console.error('CustomerSatisfactionReport: Error loading customer:', error)
-        setError('Failed to load customer data')
+      } catch (err) {
+        console.error('CustomerSiteVisitReport: Error loading customer:', err)
+        setError("Failed to load customer data")
       } finally {
-        console.log('CustomerSatisfactionReport: Setting loading to false')
         setLoading(false)
       }
     }
@@ -93,10 +89,7 @@ export default function CustomerSatisfactionReport() {
     loadCustomer()
   }, [user, authLoading, searchParams])
 
-  console.log('CustomerSatisfactionReport: Render state:', { loading, error, customer: !!customer })
-
   if (loading) {
-    console.log('CustomerSatisfactionReport: Rendering loading state')
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
@@ -105,19 +98,23 @@ export default function CustomerSatisfactionReport() {
   }
 
   if (error) {
-    console.log('CustomerSatisfactionReport: Rendering error state:', error)
     return (
-      <div className="p-4">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
+      <div className="container mx-auto p-4">
+        <Button
+          variant="ghost"
+          className="mb-4"
+          onClick={() => navigate(-1)}
+        >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <div className="text-red-500">{error}</div>
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-600">{error}</p>
+        </div>
       </div>
     )
   }
 
-  console.log('CustomerSatisfactionReport: Rendering CustomerSatisfactionPage with customer:', customer?.id)
   return (
     <div className="container mx-auto space-y-6">
       <div className="flex items-center justify-between p-4">
@@ -129,7 +126,7 @@ export default function CustomerSatisfactionReport() {
           Back
         </Button>
         <div>
-          <h2 className="text-xl font-semibold">{customer?.name} - Customer Satisfaction Surveys</h2>
+          <h2 className="text-xl font-semibold">{customer?.name} - Site Visit Reports</h2>
           {selectedSiteName && (
             <p className="text-sm text-gray-600 mt-1">
               Filtered by site: <span className="font-medium">{selectedSiteName}</span>
@@ -138,8 +135,7 @@ export default function CustomerSatisfactionReport() {
         </div>
       </div>
 
-      <CustomerSatisfactionPage 
-        isCustomerView={true}
+      <SiteVisitPage 
         customerId={customer?.id.toString()}
         siteId={selectedSiteId}
       />

@@ -569,18 +569,30 @@ export const incidentHandlers = [
 		const page = parseInt(url.searchParams.get('page') || '1')
 		const pageSize = parseInt(url.searchParams.get('pageSize') || '10')
 		const search = url.searchParams.get('search') || ''
+		const siteId = url.searchParams.get('siteId') || ''
+		
+		console.log('🔍 [MSW] Query parameters:', { page, pageSize, search, siteId, customerId })
+		
+		// Apply filters
+		let filteredIncidents = incidents
+		
+		// Filter by siteId if provided
+		if (siteId) {
+			filteredIncidents = filteredIncidents.filter(incident => incident.siteId === siteId)
+			console.log('🔍 [MSW] After siteId filter:', filteredIncidents.length, 'incidents for siteId:', siteId)
+		}
 		
 		// Apply search filter if provided
-		let filteredIncidents = incidents
 		if (search) {
 			const searchLower = search.toLowerCase()
-			filteredIncidents = incidents.filter(incident => 
+			filteredIncidents = filteredIncidents.filter(incident => 
 				incident.siteName?.toLowerCase().includes(searchLower) ||
 				incident.customerName?.toLowerCase().includes(searchLower) ||
 				incident.officerName?.toLowerCase().includes(searchLower) ||
 				incident.incidentType?.toLowerCase().includes(searchLower) ||
 				incident.description?.toLowerCase().includes(searchLower)
 			)
+			console.log('🔍 [MSW] After search filter:', filteredIncidents.length, 'incidents')
 		}
 		
 		// Calculate pagination
@@ -589,6 +601,15 @@ export const incidentHandlers = [
 		const startIndex = (page - 1) * pageSize
 		const endIndex = startIndex + pageSize
 		const paginatedIncidents = filteredIncidents.slice(startIndex, endIndex)
+		
+		console.log('🔍 [MSW] Final results:', {
+			totalIncidents: totalCount,
+			paginatedCount: paginatedIncidents.length,
+			page,
+			totalPages,
+			siteIds: paginatedIncidents.map(i => i.siteId),
+			siteNames: paginatedIncidents.map(i => i.siteName)
+		})
 		
 		return HttpResponse.json({
 			success: true,

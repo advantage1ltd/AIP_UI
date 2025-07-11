@@ -416,7 +416,12 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function SiteVisitPage() {
+interface SiteVisitPageProps {
+  customerId?: string;
+  siteId?: string;
+}
+
+export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [visits, setVisits] = useState<any[]>(allMockVisits);
   const [isLoading, setIsLoading] = useState(false);
@@ -432,14 +437,24 @@ export default function SiteVisitPage() {
     const loadVisits = async () => {
       try {
         setIsLoading(true);
-        const response = await siteVisitService.getSiteVisits({
+        console.log('🔍 [SiteVisitPage] Loading visits with filters:', { customerId, siteId, currentPage, searchQuery });
+        
+        const params: any = {
           page: currentPage,
           pageSize: itemsPerPage,
           search: searchQuery
-        });
+        };
+        
+        // Add customer and site filters if provided
+        if (customerId) params.customerId = customerId;
+        if (siteId) params.siteId = siteId;
+        
+        const response = await siteVisitService.getSiteVisits(params);
+        console.log('📤 [SiteVisitPage] Site visits response:', response);
+        
         setVisits(response.data);
       } catch (error) {
-        console.error('Failed to load visits:', error);
+        console.error('❌ [SiteVisitPage] Failed to load visits:', error);
         toast.error('Failed to load site visits', {
           position: "top-right",
           autoClose: 5000,
@@ -454,7 +469,7 @@ export default function SiteVisitPage() {
     };
 
     loadVisits();
-  }, [currentPage, itemsPerPage, searchQuery, toast]);
+  }, [currentPage, itemsPerPage, searchQuery, customerId, siteId]);
 
   // Filter visits based on search query
   const filteredVisits = useMemo(() => {

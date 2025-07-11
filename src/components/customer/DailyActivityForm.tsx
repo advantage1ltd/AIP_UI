@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
@@ -33,9 +33,11 @@ interface DailyActivityFormProps {
   onOpenChange: (open: boolean) => void;
   report?: DailyActivityReport | null;
   onSuccess: () => void;
+  customerId?: string;
+  siteId?: string | null;
 }
 
-export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess }: DailyActivityFormProps) => {
+export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess, customerId: propCustomerId, siteId: propSiteId }: DailyActivityFormProps) => {
   const { user } = useAuth();
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(false);
@@ -103,18 +105,32 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess }: Dai
     }
   }, [open, report]);
 
+  // Reset form when sites are loaded and propSiteId is available
+  useEffect(() => {
+    if (open && !report && sites.length > 0 && propSiteId) {
+      resetForm();
+    }
+  }, [sites, propSiteId, open, report]);
+
   const loadSites = async () => {
     try {
+      // Use the passed customerId if available, otherwise fall back to user's customerId
+      const targetCustomerId = propCustomerId || user?.customerId?.toString() || '21';
+      
+      console.log('🏢 [DailyActivityForm] Loading sites for customer ID:', targetCustomerId);
+      
       // Use fetch directly since we don't have a proper exported service method
       const response = await fetch('/api/dashboard/sites', {
         headers: {
-          'X-Customer-Id': user?.customerId?.toString() || '21'
+          'X-Customer-Id': targetCustomerId
         }
       });
       if (!response.ok) {
         throw new Error('Failed to fetch sites');
       }
       const sitesData = await response.json();
+      
+      console.log('🏢 [DailyActivityForm] Loaded sites:', sitesData.length, 'sites for customer', targetCustomerId);
       setSites(sitesData);
     } catch (err) {
       console.error('Failed to load sites:', err);
@@ -152,9 +168,12 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess }: Dai
   };
 
   const resetForm = () => {
+    // Pre-fill site if provided
+    const selectedSite = propSiteId ? sites.find(site => site.id === propSiteId) : null;
+    
     setFormData({
-      siteId: '',
-      siteName: '',
+      siteId: propSiteId || '',
+      siteName: selectedSite?.locationName || '',
       officerName: user?.username || '',
       reportDate: new Date(),
       notes: ''
@@ -194,6 +213,11 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess }: Dai
   };
 
   const handleSiteChange = (siteId: string) => {
+    // Don't allow selection of the "no-sites" placeholder
+    if (siteId === "no-sites") {
+      return;
+    }
+    
     const selectedSite = sites.find(site => site.id === siteId);
     setFormData(prev => ({
       ...prev,
@@ -260,12 +284,12 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess }: Dai
     setError(null);
 
     try {
-      // Get customer info
+      // Get customer info - use the passed customerId if available
+      const targetCustomerId = propCustomerId ? parseInt(propCustomerId) : (isAdmin ? getCustomerIdFromSite(formData.siteId) : user?.customerId || 21);
       const customerName = isAdmin ? getCustomerNameFromSite(formData.siteId) : user?.username || '';
-      const customerId = isAdmin ? getCustomerIdFromSite(formData.siteId) : user?.customerId || 21;
 
       const reportData: DailyActivityRequest = {
-        customerId,
+        customerId: targetCustomerId,
         customerName,
         siteId: formData.siteId,
         siteName: formData.siteName,
@@ -381,6 +405,9 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess }: Dai
           <DialogTitle>
             {report ? 'Edit Daily Activity Report' : 'New Daily Activity Report'}
           </DialogTitle>
+          <DialogDescription>
+            {report ? 'Update the details of this daily activity report.' : 'Create a new daily activity report for a site.'}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
@@ -394,18 +421,31 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess }: Dai
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="site">Site</Label>
-                    <Select value={formData.siteId} onValueChange={handleSiteChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select site" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sites.map((site) => (
-                          <SelectItem key={site.id} value={site.id}>
-                            {site.locationName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {!isAdmin && propSiteId ? (
+                      // Read-only site field for officers when site is pre-selected
+                      <div className="flex h-10 w-full rounded-md border border-input bg-gray-50 px-3 py-2 text-sm">
+                        {formData.siteName}
+                      </div>
+                    ) : (
+                      <Select value={formData.siteId} onValueChange={handleSiteChange} disabled={!isAdmin && propSiteId ? true : false}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={sites.length === 0 ? "No sites available for this customer" : "Select site"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sites.length === 0 ? (
+                            <SelectItem value="no-sites" disabled>
+                              No sites available for this customer
+                            </SelectItem>
+                          ) : (
+                            sites.map((site) => (
+                              <SelectItem key={site.id} value={site.id}>
+                                {site.locationName}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div>
@@ -666,9 +706,17 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess }: Dai
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button 
+              type="submit" 
+              disabled={loading || sites.length === 0 || !formData.siteId || formData.siteId === "no-sites"}
+            >
               {loading ? 'Saving...' : report ? 'Update Report' : 'Create Report'}
             </Button>
+            {sites.length === 0 && (
+              <p className="text-sm text-red-600 mt-2">
+                Cannot create report: No sites are available for this customer. Please contact administrator to add sites first.
+              </p>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>

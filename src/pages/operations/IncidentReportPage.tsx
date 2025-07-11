@@ -61,9 +61,10 @@ import { Toaster } from '@/components/ui/toaster'
 interface IncidentReportPageProps {
   isCustomerView?: boolean;
   customerId?: string;
+  siteId?: string | null;
 }
 
-export default function IncidentReportPage({ isCustomerView = false, customerId }: IncidentReportPageProps) {
+export default function IncidentReportPage({ isCustomerView = false, customerId, siteId }: IncidentReportPageProps) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
@@ -78,12 +79,13 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
 
   // Fetch incidents using the API service
   const { data: incidentsResponse = { data: [], pagination: { currentPage: 1, totalPages: 1, pageSize: 10, totalCount: 0, hasPrevious: false, hasNext: false } }, isLoading, error } = useQuery({
-    queryKey: ['incidents', currentPage, searchTerm, customerId],
+    queryKey: ['incidents', currentPage, searchTerm, customerId, siteId],
     queryFn: () => incidentsApi.getIncidents({
       page: currentPage,
       pageSize: itemsPerPage,
       search: searchTerm,
-      ...(isCustomerView && customerId && { customerId })
+      ...(isCustomerView && customerId && { customerId }),
+      ...(siteId && { siteId })
     })
   })
 
@@ -140,12 +142,13 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
 
   // Fetch all incidents for stats calculation (separate query to get complete data)
   const { data: allIncidentsResponse } = useQuery({
-    queryKey: ['incidents-stats', searchTerm, customerId],
+    queryKey: ['incidents-stats', searchTerm, customerId, siteId],
     queryFn: () => incidentsApi.getIncidents({
       page: 1,
       pageSize: 1000, // Large page size to get all incidents for stats
       search: searchTerm,
-      ...(isCustomerView && customerId && { customerId })
+      ...(isCustomerView && customerId && { customerId }),
+      ...(siteId && { siteId })
     })
   })
 
@@ -160,7 +163,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
         (acc: number, incident: Incident) => acc + (incident.totalValueRecovered || 0),
         0
       ),
-      uniqueStores: new Set(statsData.map(incident => incident?.siteName).filter(Boolean)).size,
+      uniqueSites: new Set(statsData.map(incident => incident?.siteName).filter(Boolean)).size,
       totalIncidents: allIncidentsResponse?.pagination?.totalCount || incidentsResponse.pagination?.totalCount || statsData.length
     }
   }, [allIncidentsResponse?.data, allIncidentsResponse?.pagination?.totalCount, incidentsResponse.data, incidentsResponse.pagination?.totalCount])
@@ -333,7 +336,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900">Incident Reports</h1>
-                <p className="text-xs sm:text-sm lg:text-base xl:text-lg text-gray-500">Track and manage security incidents across all stores</p>
+                <p className="text-xs sm:text-sm lg:text-base xl:text-lg text-gray-500">Track and manage security incidents across all sites</p>
               </div>
             </div>
             <Button
@@ -362,11 +365,11 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
             </Card>
             <Card className="bg-gradient-to-br from-emerald-800 to-emerald-900 border-emerald-700 shadow-md col-span-1">
               <CardHeader className="flex flex-row items-center justify-between p-2 md:p-4 xl:p-6 pb-1 md:pb-2 xl:pb-3">
-                <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Unique Stores</CardTitle>
+                <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Unique Sites</CardTitle>
                 <Store className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 text-emerald-300" />
               </CardHeader>
               <CardContent className="p-2 md:p-4 xl:p-6 pt-0 md:pt-1 xl:pt-2">
-                <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white">{stats.uniqueStores}</div>
+                <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white">{stats.uniqueSites}</div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-br from-purple-800 to-purple-900 border-purple-700 shadow-md col-span-2 md:col-span-1">
@@ -403,7 +406,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
                 <TableHeader>
                   <TableRow className="bg-gray-50 hover:bg-gray-50">
                     <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">Customer Name</TableHead>
-                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">Store Name</TableHead>
+                    <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap">Site Name</TableHead>
                     <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden sm:table-cell">Officer Name</TableHead>
                     <TableHead className="font-medium text-xs sm:text-sm lg:text-base xl:text-lg text-gray-900 py-2 md:py-3 xl:py-4 whitespace-nowrap hidden md:table-cell">
                       <div className="flex items-center gap-1 sm:gap-2 xl:gap-3">
@@ -599,6 +602,8 @@ export default function IncidentReportPage({ isCustomerView = false, customerId 
               }}
               onScanBarcode={() => setScanningBarcode(true)}
               isLoading={mutation.isPending}
+              customerId={customerId}
+              siteId={siteId}
             />
           </div>
         </DialogContent>

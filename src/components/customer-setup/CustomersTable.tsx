@@ -76,28 +76,36 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
     setDeleteDialogOpen(true)
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (customerToDelete) {
-      const result = customerService.deleteCustomer(customerToDelete.id)
-      
-      if (result.success) {
-        // If the deleted customer was selected, clear the selection
-        if (selectedCustomerId === customerToDelete.id) {
-          onCustomerSelect(null)
-        }
-        
-        toast({
-          title: "Customer Deleted",
-          description: `${result.customerName} has been successfully deleted.`,
-          variant: "default"
+      try {
+        const response = await fetch(`/api/customers/${customerToDelete.id}`, {
+          method: 'DELETE',
         })
+        const result = await response.json()
         
-        forceUpdate()
-        onDataChange?.() // Notify parent of data change
-      } else {
+        if (result.success) {
+          // If the deleted customer was selected, clear the selection
+          if (selectedCustomerId === String(customerToDelete.id)) {
+            onCustomerSelect(null)
+          }
+          
+          toast({
+            title: "Customer Deleted",
+            description: result.message || `Customer has been successfully deleted.`,
+            variant: "default"
+          })
+          
+          forceUpdate()
+          onDataChange?.() // Notify parent of data change
+        } else {
+          throw new Error(result.message || 'Failed to delete customer')
+        }
+      } catch (error) {
+        console.error('Error deleting customer:', error)
         toast({
           title: "Delete Failed",
-          description: result.error || "Failed to delete customer. Please try again.",
+          description: error instanceof Error ? error.message : "Failed to delete customer. Please try again.",
           variant: "destructive"
         })
       }
@@ -107,32 +115,53 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
     }
   }
 
-  const handleSave = (updatedCustomer: Customer) => {
-    // Use customer service to update the data
-    const result = customerService.updateCustomer(updatedCustomer)
-    
-    if (result.success) {
-      if (result.isNew) {
-        toast({
-          title: "Customer Created",
-          description: `${updatedCustomer.companyName} has been successfully created.`,
-          variant: "default"
+  const handleSave = async (updatedCustomer: Customer) => {
+    try {
+      // Determine if this is a new customer based on ID
+      const idString = String(updatedCustomer.id || '')
+      const isNew = !updatedCustomer.id || idString.startsWith('CUST')
+      
+      let result
+      if (isNew) {
+        // Create new customer via API
+        const response = await fetch('/api/customers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updatedCustomer),
         })
+        result = await response.json()
       } else {
-        toast({
-          title: "Customer Updated", 
-          description: `${updatedCustomer.companyName} has been successfully updated.`,
-          variant: "default"
+        // Update existing customer via API
+        const response = await fetch(`/api/customers/${String(updatedCustomer.id)}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updatedCustomer),
         })
+        result = await response.json()
       }
       
-             setDialogOpen(false)
-       forceUpdate()
-       onDataChange?.() // Notify parent of data change
-    } else {
+      if (result.success) {
+        toast({
+          title: isNew ? "Customer Created" : "Customer Updated",
+          description: result.message || `${updatedCustomer.companyName} has been successfully ${isNew ? 'created' : 'updated'}.`,
+          variant: "default"
+        })
+        
+        setDialogOpen(false)
+        forceUpdate()
+        onDataChange?.() // Notify parent of data change
+      } else {
+        throw new Error(result.message || 'Failed to save customer')
+      }
+    } catch (error) {
+      console.error('Error saving customer:', error)
       toast({
-        title: result.isNew ? "Create Failed" : "Update Failed",
-        description: result.error || "Failed to save customer. Please try again.",
+        title: "Save Failed",
+        description: error instanceof Error ? error.message : "Failed to save customer. Please try again.",
         variant: "destructive"
       })
     }
@@ -142,9 +171,51 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
   const [updateTrigger, setUpdateTrigger] = useState(0)
   const forceUpdate = () => setUpdateTrigger(prev => prev + 1)
 
-  // Get customers from service and filter based on search query
-  // Use updateTrigger to force refresh when data changes
-  const allCustomers = customerService.getAllCustomers()
+  // Get customers from API and filter based on search query
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([])
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(true)
+
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        setIsLoadingCustomers(true)
+        const response = await fetch('/api/customers')
+        const result = await response.json()
+        
+        if (result.success) {
+          setAllCustomers(result.data || [])
+        } else {
+          console.error('Failed to fetch customers:', result.message)
+          setAllCustomers([])
+        }
+      } catch (error) {
+        console.error('Error fetching customers:', error)
+        setAllCustomers([])
+      } finally {
+        setIsLoadingCustomers(false)
+      }
+    }
+
+    fetchCustomers()
+  }, [updateTrigger])
+
+  // Listen for customer events to refresh data
+  useEffect(() => {
+    const handleCustomerEvent = () => {
+      forceUpdate()
+    }
+
+    window.addEventListener('customer-created', handleCustomerEvent)
+    window.addEventListener('customer-updated', handleCustomerEvent)
+    window.addEventListener('customer-deleted', handleCustomerEvent)
+    
+    return () => {
+      window.removeEventListener('customer-created', handleCustomerEvent)
+      window.removeEventListener('customer-updated', handleCustomerEvent)
+      window.removeEventListener('customer-deleted', handleCustomerEvent)
+    }
+  }, [])
+
   const filteredCustomers = allCustomers.filter(customer => {
     const searchLower = searchQuery.toLowerCase()
     return (
@@ -212,7 +283,16 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
             </TableRow>
           </TableHeader>
           <TableBody>
-            {currentCustomers.length === 0 ? (
+            {isLoadingCustomers ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600" />
+                    <span>Loading customers...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : currentCustomers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                   {searchQuery ? (
@@ -235,7 +315,7 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
                 <CustomerTableRow
                   key={customer.id}
                   customer={customer}
-                  isSelected={customer.id === selectedCustomerId}
+                  isSelected={String(customer.id) === selectedCustomerId}
                   onSelect={onCustomerSelect}
                   onEdit={handleEdit}
                   onDelete={handleDelete}

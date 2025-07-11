@@ -8,7 +8,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { EmployeeSelect } from "./form/EmployeeSelect"
 import { CustomerSelect } from "./form/CustomerSelect"
 import { User, UserRole, AdvantageOneUser } from "@/types/user"
-import { customerOperations } from "@/mocks/customerStore"
 
 interface UserFormProps {
   mode: 'new' | 'edit'
@@ -56,18 +55,41 @@ export function UserForm({ mode, user, onSubmit, onCancel }: UserFormProps) {
   useEffect(() => {
     const loadCustomers = async () => {
       try {
-        const customers = await customerOperations.getAll()
-        setAvailableCustomers(
-          customers.map(c => ({
-            id: c.id,
-            name: c.companyName
-          }))
-        )
+        const response = await fetch('/api/customers')
+        const result = await response.json()
+        
+        if (result.success) {
+          setAvailableCustomers(
+            result.data.map((c: any) => ({
+              id: c.id,
+              name: c.companyName
+            }))
+          )
+        } else {
+          console.error('Failed to fetch customers:', result.message)
+          setAvailableCustomers([])
+        }
       } catch (error) {
         console.error('Failed to load customers:', error)
+        setAvailableCustomers([])
       }
     }
     loadCustomers()
+
+    // Listen for customer events to refresh the list
+    const handleCustomerEvent = () => {
+      loadCustomers()
+    }
+
+    window.addEventListener('customer-created', handleCustomerEvent)
+    window.addEventListener('customer-updated', handleCustomerEvent)
+    window.addEventListener('customer-deleted', handleCustomerEvent)
+    
+    return () => {
+      window.removeEventListener('customer-created', handleCustomerEvent)
+      window.removeEventListener('customer-updated', handleCustomerEvent)
+      window.removeEventListener('customer-deleted', handleCustomerEvent)
+    }
   }, [])
 
   // Update formData when assigned customers change

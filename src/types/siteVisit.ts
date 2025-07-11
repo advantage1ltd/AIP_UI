@@ -2,10 +2,12 @@ export interface SiteVisit {
   id: string
   actionId: string
   siteVisitId: string
+  customerId?: number
   customer: string
   customerName: string
   region: string
   regionName: string
+  siteId?: string
   location: string
   locationName: string
   visitType: 'retail' | 'warehouse' | 'office'
@@ -50,6 +52,8 @@ export interface GetSiteVisitsParams {
   page?: number
   pageSize?: number
   search?: string
+  customerId?: string
+  siteId?: string
   fromDate?: string
   toDate?: string
   visitType?: string

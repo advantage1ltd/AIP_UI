@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Button } from '@/components/ui/button';
@@ -91,6 +92,7 @@ const SafeComponent: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
 const DailyActivityReportGraphs: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [startDate, setStartDate] = React.useState<Date | null>(null);
   const [endDate, setEndDate] = React.useState<Date | null>(null);
   const [selectedSite, setSelectedSite] = React.useState<string>('all');
@@ -105,6 +107,11 @@ const DailyActivityReportGraphs: React.FC = () => {
 
   // Check if user is admin
   const isAdmin = user?.role === 'Administrator';
+
+  // Get customer ID from URL parameter or user's customerId
+  const urlCustomerId = searchParams.get('customerId');
+  const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined;
+  const targetCustomerId = urlCustomerId || userCustomerId;
 
   // Get customer region data based on authenticated user
   const customer = AVAILABLE_CUSTOMERS.find(c => c.id === user?.customerId);
@@ -130,11 +137,19 @@ const DailyActivityReportGraphs: React.FC = () => {
         ...(startDate && { startDate: startDate.toISOString().split('T')[0] }),
         ...(endDate && { endDate: endDate.toISOString().split('T')[0] }),
         ...(selectedSite !== 'all' && { siteId: selectedSite }),
-        ...(isAdmin && selectedCustomer !== 'all' && { customerId: selectedCustomer })
+        // For admin users with customer selection, or when viewing customer-specific page
+        ...((isAdmin && selectedCustomer !== 'all') || targetCustomerId ? { 
+          customerId: (isAdmin && selectedCustomer !== 'all') ? selectedCustomer : targetCustomerId?.toString() 
+        } : {})
       };
 
       console.log('[Analytics] Loading data with filters:', filters);
-      console.log('[Analytics] User context:', { role: user?.role, customerId: user?.customerId });
+      console.log('[Analytics] User context:', { 
+        role: user?.role, 
+        customerId: user?.customerId, 
+        urlCustomerId, 
+        targetCustomerId 
+      });
       const data = await dailyActivityAnalyticsService.getAnalytics(filters);
       setAnalyticsData(data);
       console.log('[Analytics] Data loaded successfully:', data);
@@ -145,7 +160,7 @@ const DailyActivityReportGraphs: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [startDate, endDate, selectedSite, selectedCustomer, isAdmin]);
+  }, [startDate, endDate, selectedSite, selectedCustomer, isAdmin, targetCustomerId, urlCustomerId]);
 
   // Process data based on selected filter
   const processDisplayData = React.useCallback(() => {

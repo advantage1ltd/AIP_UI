@@ -22,9 +22,10 @@ interface DailyActivityTableProps {
   onNew: () => void;
   refreshTrigger?: number;
   customerId?: string;
+  siteId?: string | null;
 }
 
-export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, customerId }: DailyActivityTableProps) => {
+export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, customerId, siteId }: DailyActivityTableProps) => {
   const { user } = useAuth();
   const [reports, setReports] = useState<DailyActivityReport[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
@@ -53,12 +54,14 @@ export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, cust
 
   const isAdmin = user?.role === 'Administrator';
 
-  // Update filters when customerId prop changes
+  // Update filters when customerId or siteId props change
   useEffect(() => {
-    if (customerId) {
-      setFilters(prev => ({ ...prev, customerId: customerId }));
-    }
-  }, [customerId]);
+    setFilters(prev => ({ 
+      ...prev, 
+      customerId: customerId || '',
+      siteId: siteId || ''
+    }));
+  }, [customerId, siteId]);
 
   // Load initial data
   useEffect(() => {
@@ -400,10 +403,10 @@ export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, cust
         <Table>
           <TableHeader>
             <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100/50 border-b-0">
-              <TableHead className="font-semibold text-gray-900 py-4">Date Created</TableHead>
-              <TableHead className="font-semibold text-gray-900">Officer</TableHead>
-              <TableHead className="font-semibold text-gray-900">Customer</TableHead>
+              <TableHead className="font-semibold text-gray-900 py-4">Customer</TableHead>
               <TableHead className="font-semibold text-gray-900">Site</TableHead>
+              <TableHead className="font-semibold text-gray-900">Officer</TableHead>
+              <TableHead className="font-semibold text-gray-900">Date Created</TableHead>
               <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -439,6 +442,20 @@ export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, cust
                     index % 2 === 0 ? "bg-white" : "bg-gray-50/30"
                   )}
                 >
+                  <TableCell>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                      {report.customerName}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-medium text-gray-700">{report.siteName}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center text-white text-sm font-semibold">
+                        {report.officerName.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-medium">{report.officerName}</span>
+                    </div>
+                  </TableCell>
                   <TableCell className="font-medium py-4">
                     <div className="space-y-1">
                       <div className="text-sm font-semibold">
@@ -449,20 +466,6 @@ export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, cust
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center text-white text-sm font-semibold">
-                        {report.officerName.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="font-medium">{report.officerName}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                      {report.customerName}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-medium text-gray-700">{report.siteName}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button

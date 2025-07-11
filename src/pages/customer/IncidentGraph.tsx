@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -88,7 +89,16 @@ interface IncidentGraphProps {
 const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 	// Get user and customer info from auth context
 	const { user } = useAuth()
-	const currentCustomerId = customerId ? parseInt(customerId) : user?.customerId || 21 // Default to customer 21
+	const [searchParams] = useSearchParams()
+	
+	// Get customer ID from URL parameter, prop, or user's customerId
+	const urlCustomerId = searchParams.get('customerId')
+	const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined
+	const currentCustomerId = customerId 
+		? parseInt(customerId) 
+		: urlCustomerId 
+			? parseInt(urlCustomerId) 
+			: userCustomerId || 21 // Default to customer 21
 
 	// State management
   const [startDate, setStartDate] = useState<Date>()

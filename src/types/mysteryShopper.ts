@@ -7,7 +7,9 @@ export interface MysteryShopperEvaluation {
   id: string
   officerId: string
   officerName: string
+  customerId?: number
   customerName: string
+  siteId?: string
   location: string
   locationName: string
   date: string | Date

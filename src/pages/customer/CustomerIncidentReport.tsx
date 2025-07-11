@@ -13,44 +13,80 @@ export default function CustomerIncidentReport() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [customer, setCustomer] = useState<{ id: number; name: string } | null>(null)
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
+  const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null)
+
+  const fetchSiteName = async (customerId: number, siteId: string) => {
+    try {
+      const response = await fetch('/api/dashboard/sites', {
+        headers: {
+          'X-Customer-Id': customerId.toString()
+        }
+      });
+      
+      if (response.ok) {
+        const sites = await response.json();
+        const site = sites.find((s: any) => s.id === siteId);
+        if (site) {
+          setSelectedSiteName(site.locationName);
+          console.log('CustomerIncidentReport: Found site name:', site.locationName);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch site name:', error);
+    }
+  }
 
   useEffect(() => {
-    try {
-      // Wait for auth to finish loading
-      if (authLoading) {
-        return;
+    const loadCustomer = async () => {
+      try {
+        // Wait for auth to finish loading
+        if (authLoading) {
+          return;
+        }
+
+        // Get customer ID from URL parameter or user's customerId (for customer users)
+        const urlCustomerId = searchParams.get('customerId')
+        const urlSiteId = searchParams.get('siteId')
+        const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined
+        const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : userCustomerId
+
+        console.log('CustomerIncidentReport: URL customerId:', urlCustomerId)
+        console.log('CustomerIncidentReport: URL siteId:', urlSiteId)
+        console.log('CustomerIncidentReport: User customerId:', userCustomerId)
+        console.log('CustomerIncidentReport: Target customerId:', targetCustomerId)
+
+        // Set selected site if provided in URL
+        if (urlSiteId && targetCustomerId) {
+          setSelectedSiteId(urlSiteId)
+          // Fetch site name for display
+          fetchSiteName(targetCustomerId, urlSiteId)
+        }
+
+        if (!targetCustomerId) {
+          setError("No customer ID found")
+          return
+        }
+
+        const customerData = await findCustomerById(targetCustomerId)
+        console.log('CustomerIncidentReport: Found customer:', customerData)
+        
+        if (!customerData) {
+          setError("Customer not found")
+          return
+        }
+        
+        console.log('CustomerIncidentReport: Access granted - setting customer')
+        setCustomer(customerData)
+      } catch (err) {
+        console.error('CustomerIncidentReport: Error loading customer:', err)
+        setError("Failed to load customer data")
+      } finally {
+        setLoading(false)
       }
-
-      // Get customer ID from URL parameter or user's customerId (for customer users)
-      const urlCustomerId = searchParams.get('customerId')
-      const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined
-      const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : userCustomerId
-
-      console.log('CustomerIncidentReport: URL customerId:', urlCustomerId)
-      console.log('CustomerIncidentReport: User customerId:', userCustomerId)
-      console.log('CustomerIncidentReport: Target customerId:', targetCustomerId)
-
-      if (!targetCustomerId) {
-        setError("No customer ID found")
-        return
-      }
-
-      const customerData = findCustomerById(targetCustomerId)
-      console.log('CustomerIncidentReport: Found customer:', customerData)
-      
-      if (!customerData) {
-        setError("Customer not found")
-        return
-      }
-      
-      console.log('CustomerIncidentReport: Access granted - setting customer')
-      setCustomer(customerData)
-    } catch (err) {
-      console.error('CustomerIncidentReport: Error loading customer:', err)
-      setError("Failed to load customer data")
-    } finally {
-      setLoading(false)
     }
+
+    loadCustomer()
   }, [user, authLoading, searchParams])
 
   if (loading) {
@@ -89,12 +125,20 @@ export default function CustomerIncidentReport() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <h2 className="text-xl font-semibold">{customer?.name}</h2>
+        <div>
+          <h2 className="text-xl font-semibold">{customer?.name} - Incident Reports</h2>
+          {selectedSiteName && (
+            <p className="text-sm text-gray-600 mt-1">
+              Filtered by site: <span className="font-medium">{selectedSiteName}</span>
+            </p>
+          )}
+        </div>
       </div>
 
       <IncidentReportPage 
         isCustomerView={true}
         customerId={customer?.id.toString()}
+        siteId={selectedSiteId}
       />
     </div>
   )

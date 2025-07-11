@@ -58,6 +58,8 @@ const IncidentGraphPage = lazy(() => import('./pages/customer/IncidentGraph').th
 const CustomerIncidentReportPage = lazy(() => import('./pages/customer/CustomerIncidentReport'));
 const CustomerSatisfactionReport = lazy(() => import('./pages/customer/CustomerSatisfactionReport'));
 const DailyActivityReportGraphs = lazy(() => import('./pages/customer/DailyActivityReportGraphs'));
+const CustomerMysteryShopperReport = lazy(() => import('./pages/customer/CustomerMysteryShopperReport'));
+const CustomerSiteVisitReport = lazy(() => import('./pages/customer/CustomerSiteVisitReport'));
 
 const CustomerViewsConfig = lazy(() => import('./pages/customer/CustomerViewsConfig'));
 
@@ -328,6 +330,22 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
                 <CustomerIncidentReportPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/mystery-shopper-report',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <CustomerMysteryShopperReport />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/site-visit-reports',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
+                <CustomerSiteVisitReport />
               </ProtectedRoute>
             ),
           },

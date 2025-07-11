@@ -84,26 +84,40 @@ const filterSurveys = (surveys: CustomerSurvey[], searchParams: URLSearchParams,
       }
     }
 
-    // Filter by site ID - map dashboard site IDs to survey location names
+    // Filter by site ID - map actual site IDs to survey location names
     if (siteId) {
       const siteIdToLocation: Record<string, string> = {
-        's1': 'Birmingham Central Store', // Leicester City Centre -> Birmingham Central Store
-        's2': 'Coventry Store',          // Nottingham Victoria -> Coventry Store
-        's3': 'Solihull Store',          // Derby Marketplace -> Solihull Store
-        's4': 'Birmingham Central Store', // Birmingham Bull Ring
-        's5': 'Coventry Store',          // Wolverhampton Central
-        's6': 'Solihull Store',          // Coventry Arena
-        's7': 'Leicester Store',         // Oxford City
-        's8': 'Northampton Store',       // Cheltenham High Street
-        's9': 'Leicester Store',         // Gloucester Quays
-        's10': 'Northampton Store',      // Swindon Orbital
-        's11': 'Leicester Store',        // Bath City Centre
-        's12': 'Northampton Store',      // Trowbridge Gateway
-        's13': 'Stratford Store',        // Heart of England sites
-        's14': 'Warwick Store',
-        's15': 'Rugby Store'
+        // Map actual site IDs to exact survey location names as they appear in data
+        'SITE001': 'Leicester Store',    // Leicester Central → Leicester Store
+        'SITE002': 'Birmingham Central Store',
+        'SITE003': 'Sheffield Branch',
+        'SITE004': 'Oxford Store',
+        'SITE005': 'Cheltenham Store',
+        'SITE006': 'Swindon Branch',
+        'SITE007': 'Coventry Store',
+        'SITE008': 'Nuneaton Main Store',
+        'SITE009': 'Rugby Store',
+        'SITE010': 'Worcester Store',
+        'SITE011': 'Solihull Store',
+        'SITE012': 'Stratford Store',
+        'SITE013': 'Warwick Store',
+        'SITE014': 'Northampton Store',
+        // Legacy support for old site IDs
+        's1': 'Leicester Store',
+        's2': 'Birmingham Central Store',
+        's3': 'Sheffield Branch'
       };
       const expectedLocation = siteIdToLocation[siteId];
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [CustomerSatisfaction] Site filtering:', { 
+          siteId, 
+          expectedLocation, 
+          surveyLocation: survey.location,
+          match: expectedLocation ? survey.location === expectedLocation : 'no-filter'
+        });
+      }
+      
       if (expectedLocation && survey.location !== expectedLocation) {
         return false;
       }

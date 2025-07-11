@@ -3,6 +3,7 @@ import { BASE_API_URL } from '@/config/api'
 import { CUSTOMER_PAGES } from '@/config/customerPages'
 import type { Customer } from '@/types/customer'
 import { customerOperations } from './customerStore'
+import db from '../../db.json'
 
 // Helper function to validate request
 const validateRequest = async (request: Request) => {
@@ -24,6 +25,124 @@ const createErrorResponse = (status: number, message: string) => {
     { status }
   )
 }
+
+// Helper function to determine if a customer is "new" (created recently with minimal data)
+const isNewCustomer = (customer: any): boolean => {
+  console.log('🔍 [isNewCustomer] Checking customer:', {
+    name: customer.companyName,
+    id: customer.id,
+    createdAt: customer.createdAt,
+    pageAssignments: customer.pageAssignments,
+    regions: customer.regions?.length || 0,
+    sites: customer.sites?.length || 0
+  });
+
+  // Check if customer was created within the last 7 days (extended from 24 hours for testing)
+  const createdAt = new Date(customer.createdAt);
+  const now = new Date();
+  const hoursAge = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+  const daysAge = hoursAge / 24;
+  
+  // Consider a customer "new" if:
+  // 1. Created within last 7 days, AND
+  // 2. Has no page assignments OR only empty page assignments, AND  
+  // 3. Has no regions or sites
+  const hasNoPageAssignments = !customer.pageAssignments || Object.keys(customer.pageAssignments).length === 0;
+  const hasNoRegions = !customer.regions || customer.regions.length === 0;
+  const hasNoSites = !customer.sites || customer.sites.length === 0;
+  
+  const isNew = daysAge < 7 && hasNoPageAssignments && hasNoRegions && hasNoSites;
+  
+  console.log('🔍 [isNewCustomer] Result:', {
+    name: customer.companyName,
+    id: customer.id,
+    daysAge: daysAge.toFixed(2),
+    hasNoPageAssignments,
+    hasNoRegions,
+    hasNoSites,
+    isNew,
+    pageAssignmentsKeys: customer.pageAssignments ? Object.keys(customer.pageAssignments) : [],
+    regionsCount: customer.regions?.length || 0,
+    sitesCount: customer.sites?.length || 0
+  });
+  
+  return isNew;
+};
+
+// Helper function to calculate real statistics for a customer from actual data
+const calculateCustomerStatistics = (customer: any) => {
+  console.log('🔍 [calculateCustomerStatistics] Calculating for:', customer.companyName, customer.id);
+  
+  try {
+    // Get real incidents for this customer from db.json
+    const customerIncidents = db.dashboard?.incidents?.filter(incident => 
+      incident.customerId === customer.id
+    ) || [];
+    
+    // Get real daily activity reports for this customer  
+    const customerReports = db.dailyActivityReports?.filter(report =>
+      report.customerId === customer.id
+    ) || [];
+    
+    // Calculate real statistics
+    const incidents = customerIncidents.length;
+    const reports = customerReports.length;
+    const regions = customer.regions?.length || 0;
+    const sites = customer.sites?.length || 0;
+    
+    // Get last incident date
+    const lastIncident = customerIncidents.length > 0 
+      ? customerIncidents
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+          .date
+      : null;
+    
+    // Count active issues (incidents from last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const activeIssues = customerIncidents.filter(incident => {
+      const incidentDate = new Date(incident.date);
+      return incidentDate >= thirtyDaysAgo;
+    }).length;
+    
+    const statistics = {
+      incidents,
+      reports,
+      lastIncident,
+      activeIssues,
+      regions,
+      sites
+    };
+    
+    console.log('🔍 [calculateCustomerStatistics] Real statistics calculated:', {
+      customer: customer.companyName,
+      customerId: customer.id,
+      incidents: statistics.incidents,
+      reports: statistics.reports,
+      regions: statistics.regions,
+      sites: statistics.sites,
+      lastIncident: statistics.lastIncident,
+      activeIssues: statistics.activeIssues,
+      customerIncidentsFound: customerIncidents.length,
+      customerReportsFound: customerReports.length
+    });
+    
+    return statistics;
+    
+  } catch (error) {
+    console.error('❌ [calculateCustomerStatistics] Error calculating real statistics:', error);
+    
+    // Fallback to zero statistics if there's an error
+    return {
+      incidents: 0,
+      reports: 0,
+      lastIncident: null,
+      activeIssues: 0,
+      regions: customer.regions?.length || 0,
+      sites: customer.sites?.length || 0
+    };
+  }
+};
 
 // Mock data for Be Safe Be Secure Graph
 const beSafeBeSecureData = {
@@ -140,10 +259,46 @@ export const customerHandlers = [
     const url = new URL(request.url)
     const page = parseInt(url.searchParams.get('page') || '1')
     const pageSize = parseInt(url.searchParams.get('pageSize') || '10')
+    const customerId = url.searchParams.get('customerId')
+    
+    let responseData = satisfactionReportsData.data
+    
+    // Filter by customer if customerId is provided
+    if (customerId) {
+      try {
+        const customer = await customerOperations.getById(parseInt(customerId))
+        
+        if (!customer) {
+          return createErrorResponse(404, 'Customer not found')
+        }
+        
+        // If it's a new customer, return empty data
+        if (isNewCustomer(customer)) {
+          return HttpResponse.json({
+            success: true,
+            data: [],
+            pagination: {
+              currentPage: page,
+              pageSize: pageSize,
+              total: 0,
+              totalPages: 0
+            }
+          })
+        }
+        
+        // For existing customers, filter mock data by customer name (simplified)
+        responseData = satisfactionReportsData.data.filter(report => 
+          report.customer.toLowerCase().includes(customer.companyName.toLowerCase()) ||
+          report.location.toLowerCase().includes(customer.companyName.toLowerCase())
+        )
+      } catch (error) {
+        console.error('Error filtering satisfaction reports:', error)
+      }
+    }
     
     const startIndex = (page - 1) * pageSize
     const endIndex = startIndex + pageSize
-    const paginatedData = satisfactionReportsData.data.slice(startIndex, endIndex)
+    const paginatedData = responseData.slice(startIndex, endIndex)
     
     return HttpResponse.json({
       success: true,
@@ -151,8 +306,8 @@ export const customerHandlers = [
       pagination: {
         currentPage: page,
         pageSize: pageSize,
-        total: satisfactionReportsData.data.length,
-        totalPages: Math.ceil(satisfactionReportsData.data.length / pageSize)
+        total: responseData.length,
+        totalPages: Math.ceil(responseData.length / pageSize)
       }
     })
   }),
@@ -161,6 +316,38 @@ export const customerHandlers = [
   http.get('/api/customers/be-safe-be-secure-graph', async ({ request }) => {
     await delay(500)
     
+    const url = new URL(request.url)
+    const customerId = url.searchParams.get('customerId')
+    
+    if (customerId) {
+      // Get customer data to check if it's a new customer
+      try {
+        const customer = await customerOperations.getById(parseInt(customerId))
+        
+        if (!customer) {
+          return createErrorResponse(404, 'Customer not found')
+        }
+        
+        // If it's a new customer, return empty data
+        if (isNewCustomer(customer)) {
+          return HttpResponse.json({
+            success: true,
+            data: {
+              sites: [],
+              types: [],
+              insecureAreas: [],
+              systemsChecks: [],
+              complianceChecks: [],
+              region: customer.companyName
+            }
+          })
+        }
+      } catch (error) {
+        console.error('Error checking customer:', error)
+      }
+    }
+    
+    // Return mock data for existing customers or when no customer ID is specified
     return HttpResponse.json({
       success: true,
       data: beSafeBeSecureData
@@ -170,6 +357,31 @@ export const customerHandlers = [
   // Customer DAR (Daily Activity Report)
   http.get('/api/customers/dar', async ({ request }) => {
     await delay(300)
+    
+    const url = new URL(request.url)
+    const customerId = url.searchParams.get('customerId')
+    
+    if (customerId) {
+      try {
+        const customer = await customerOperations.getById(parseInt(customerId))
+        
+        if (!customer) {
+          return createErrorResponse(404, 'Customer not found')
+        }
+        
+        // If it's a new customer, return empty data
+        if (isNewCustomer(customer)) {
+          return HttpResponse.json({
+            success: true,
+            data: {
+              activities: []
+            }
+          })
+        }
+      } catch (error) {
+        console.error('Error checking customer:', error)
+      }
+    }
     
     return HttpResponse.json({
       success: true,
@@ -231,15 +443,18 @@ export const customerHandlers = [
             })
             .filter(Boolean) : [];
 
-        // Calculate statistics
-        const statistics = {
-          incidents: Math.floor(Math.random() * 50), // Mock data
-          reports: Math.floor(Math.random() * 200) + 50,
-          lastIncident: new Date().toISOString(),
-          activeIssues: Math.floor(Math.random() * 10),
-          regions: customer.regions?.length || 0,
-          sites: customer.sites?.length || 0
-        };
+        // Calculate statistics based on whether it's a new customer
+        const statistics = calculateCustomerStatistics(customer);
+
+        console.log('🔍 [Customer Reporting] Customer processed:', {
+          name: customer.companyName,
+          id: customer.id,
+          incidents: statistics.incidents,
+          reports: statistics.reports,
+          availablePages: enabledPages.length,
+          isDetectedAsNew: isNewCustomer(customer),
+          enabledPageIds: enabledPages.map(p => p.id)
+        });
 
         return {
           ...customer,
@@ -292,15 +507,8 @@ export const customerHandlers = [
           })
           .filter(Boolean) : [];
 
-      // Calculate statistics
-      const statistics = {
-        incidents: Math.floor(Math.random() * 50),
-        reports: Math.floor(Math.random() * 200) + 50,
-        lastIncident: new Date().toISOString(),
-        activeIssues: Math.floor(Math.random() * 10),
-        regions: customer.regions?.length || 0,
-        sites: customer.sites?.length || 0
-      };
+      // Calculate statistics based on whether it's a new customer
+      const statistics = calculateCustomerStatistics(customer);
 
       console.log('🔍 [Individual Customer] Loaded:', {
         customerId: customer.id,
@@ -393,17 +601,154 @@ export const customerHandlers = [
         success: true,
         data: customers.map(customer => ({
           ...customer,
-          statistics: {
-            incidents: Math.floor(Math.random() * 50),
-            reports: Math.floor(Math.random() * 200) + 50,
-            regions: customer.regions?.length || 0,
-            sites: customer.sites?.length || 0
-          }
+          statistics: calculateCustomerStatistics(customer)
         }))
       });
     } catch (error) {
       console.error('❌ [All Customers] Error:', error);
       return createErrorResponse(500, 'Failed to fetch customers');
+    }
+  }),
+
+  // Create new customer
+  http.post('/api/customers', async ({ request }) => {
+    try {
+      await delay(300);
+      const customerData = await validateRequest(request) as Customer;
+      
+      // Generate ID if not provided or if it's a temporary string ID
+      let customerId: number;
+      const idString = String(customerData.id || '');
+      const isTemporaryId = idString.startsWith('CUST');
+      if (!customerData.id || isTemporaryId) {
+        // Generate a proper numeric ID
+        const customers = await customerOperations.getAll();
+        const existingIds = customers.map(c => c.id).filter(id => !isNaN(Number(id)));
+        const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 20;
+        customerId = maxId + 1;
+      } else {
+        customerId = Number(customerData.id);
+      }
+
+      // Set timestamps
+      const now = new Date().toISOString();
+      
+      // Create CustomerWithRelations object with required relations and proper defaults
+      const customerWithRelations = {
+        ...customerData,
+        id: customerId,
+        regions: [],
+        sites: [],
+        pageAssignments: {}, // Initialize with empty page assignments
+        viewConfig: {
+          id: `view_config_${customerId}`,
+          customerId: customerId,
+          customerType: customerData.customerType,
+          enabledPages: [],
+          createdAt: now,
+          updatedAt: now
+        },
+        createdAt: customerData.createdAt || now,
+        updatedAt: now
+      };
+
+      console.log('🆕 [Create Customer] Creating:', {
+        id: customerId,
+        name: customerData.companyName,
+        type: customerData.customerType
+      });
+
+      const result = await customerOperations.create(customerWithRelations);
+      
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('customer-created', {
+        detail: { customer: result }
+      }));
+
+      return HttpResponse.json({
+        success: true,
+        data: result,
+        message: `Customer "${customerData.companyName}" created successfully`
+      }, { status: 201 });
+    } catch (error) {
+      console.error('❌ [Create Customer] Error:', error);
+      return createErrorResponse(500, 'Failed to create customer');
+    }
+  }),
+
+  // Update existing customer
+  http.put('/api/customers/:id', async ({ params, request }) => {
+    try {
+      await delay(300);
+      const customerId = parseInt(params.id as string);
+      const updates = await validateRequest(request) as Partial<Customer>;
+      
+      const existingCustomer = await customerOperations.getById(customerId);
+      if (!existingCustomer) {
+        return createErrorResponse(404, 'Customer not found');
+      }
+
+      // Set updated timestamp
+      updates.updatedAt = new Date().toISOString();
+
+      console.log('✏️ [Update Customer] Updating:', {
+        id: customerId,
+        name: existingCustomer.companyName,
+        changes: Object.keys(updates)
+      });
+
+      const result = await customerOperations.update(customerId, updates);
+      
+      if (!result) {
+        return createErrorResponse(500, 'Failed to update customer');
+      }
+
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('customer-updated', {
+        detail: { customer: result }
+      }));
+
+      return HttpResponse.json({
+        success: true,
+        data: result,
+        message: `Customer "${result.companyName}" updated successfully`
+      });
+    } catch (error) {
+      console.error('❌ [Update Customer] Error:', error);
+      return createErrorResponse(500, 'Failed to update customer');
+    }
+  }),
+
+  // Delete customer
+  http.delete('/api/customers/:id', async ({ params }) => {
+    try {
+      await delay(300);
+      const customerId = parseInt(params.id as string);
+      
+      const existingCustomer = await customerOperations.getById(customerId);
+      if (!existingCustomer) {
+        return createErrorResponse(404, 'Customer not found');
+      }
+
+      console.log('🗑️ [Delete Customer] Deleting:', {
+        id: customerId,
+        name: existingCustomer.companyName
+      });
+
+      await customerOperations.delete(customerId);
+
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('customer-deleted', {
+        detail: { customerId, customerName: existingCustomer.companyName }
+      }));
+
+      return HttpResponse.json({
+        success: true,
+        message: `Customer "${existingCustomer.companyName}" deleted successfully`
+      });
+    } catch (error) {
+      console.error('❌ [Delete Customer] Error:', error);
+      return createErrorResponse(500, 'Failed to delete customer');
     }
   }),
 

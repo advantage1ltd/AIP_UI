@@ -18,8 +18,36 @@ const loadDashboardData = async () => {
   return db.dashboard
 }
 
+// Helper function to determine if a customer is "new" based on incident data
+const isNewCustomerByData = (customerId: number): boolean => {
+  // Check if customer has any incidents - new customers typically have no historical data
+  const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId);
+  const customerSites = db.sites.filter(s => s.customerId === customerId);
+  
+  // Consider a customer "new" if they have no incidents and no sites
+  return customerIncidents.length === 0 && customerSites.length === 0;
+};
+
 // Helper function to calculate dynamic metrics for a customer
 const calculateDynamicMetrics = (customerId: number, siteIds?: string | string[]) => {
+  // Check if this is a new customer with no data
+  if (isNewCustomerByData(customerId)) {
+    return {
+      activityScore: 0,
+      totalIncidents: 0,
+      monthlyIncidents: 0,
+      todayIncidents: 0,
+      ytdIncidents: 0,
+      activeSites: 0,
+      totalValue: 0,
+      ytdValue: 0,
+      satisfaction: 0,
+      monthlyChange: 0,
+      ytdChange: 0,
+      activeSitesChange: 0
+    };
+  }
+  
   // Get all incidents for this customer
   const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId)
   
@@ -162,6 +190,16 @@ const calculateDynamicMetrics = (customerId: number, siteIds?: string | string[]
 
 // Helper function to calculate dynamic incident chart data
 const calculateIncidentChartData = (customerId: number, siteIds?: string | string[]) => {
+  // Check if this is a new customer with no data
+  if (isNewCustomerByData(customerId)) {
+    return {
+      daily: [],
+      weekly: [],
+      monthly: [],
+      yearly: []
+    };
+  }
+  
   // Get customer incidents
   const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId);
   

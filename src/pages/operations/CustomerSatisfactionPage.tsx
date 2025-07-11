@@ -37,6 +37,7 @@ import {
 interface CustomerSatisfactionPageProps {
   isCustomerView?: boolean;
   customerId?: string;
+  siteId?: string | null;
 }
 
 // Helper function to generate CSV data
@@ -91,7 +92,8 @@ const generateCsvData = (data: CustomerSurvey[]): string => {
 
 const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({ 
   isCustomerView = false,
-  customerId
+  customerId,
+  siteId
 }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'Administrator';
@@ -112,7 +114,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
     search: '',
     customerId: customerId || '',
     regionId: '',
-    siteId: '',
+    siteId: siteId || '',
     dateRange: undefined
   });
   const [downloadStartDate, setDownloadStartDate] = useState<Date | undefined>();
@@ -161,12 +163,14 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
     fetchRegionsAndSites();
   }, []);
 
-  // Update filters when customerId prop changes
+  // Update filters when customerId or siteId props change
   useEffect(() => {
-    if (customerId) {
-      setFilters(prev => ({ ...prev, customerId: customerId }));
-    }
-  }, [customerId]);
+    setFilters(prev => ({ 
+      ...prev, 
+      customerId: customerId || prev.customerId,
+      siteId: siteId || prev.siteId
+    }));
+  }, [customerId, siteId]);
 
   // Initial load
   useEffect(() => {
@@ -585,6 +589,8 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
                       onSubmit={handleSurveySubmit} 
                       onCancel={handleCancelForm}
                       initialData={editingSurvey}
+                      customerId={customerId}
+                      siteId={siteId}
                     />
                   </div>
                 </div>
