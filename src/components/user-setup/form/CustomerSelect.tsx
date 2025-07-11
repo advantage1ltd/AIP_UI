@@ -2,16 +2,16 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 
 interface Customer {
-  id: string;
+  id: number;
   name: string;
 }
 
 interface CustomerSelectProps {
   availableCustomers: Customer[]
-  selectedCustomers: string[]
-  assignedCustomers: string[]
-  onSelectedChange: (customers: string[]) => void
-  onAssignedChange: (customers: string[]) => void
+  selectedCustomers: number[]
+  assignedCustomers: number[]
+  onSelectedChange: (customers: number[]) => void
+  onAssignedChange: (customers: number[]) => void
   onAdd: () => void
   onRemove: () => void
 }
@@ -25,6 +25,20 @@ export function CustomerSelect({
   onAdd,
   onRemove
 }: CustomerSelectProps) {
+  // Helper function to get unique values
+  const getUniqueIds = (arr: number[]) => [...new Set(arr)];
+
+  const handleAdd = () => {
+    const newAssigned = getUniqueIds([...assignedCustomers, ...selectedCustomers]);
+    onAssignedChange(newAssigned);
+    onSelectedChange([]); // Clear selection after adding
+  };
+
+  const handleRemove = () => {
+    onAssignedChange([]);
+    onSelectedChange([]); // Clear selection after removing
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="space-y-2">
@@ -32,17 +46,19 @@ export function CustomerSelect({
         <select 
           multiple 
           className="w-full h-48 bg-white/50 border border-purple-200 rounded-lg p-2 focus:border-purple-400 focus:ring-purple-400"
-          value={selectedCustomers}
+          value={selectedCustomers.map(String)}
           onChange={(e) => {
-            const values = Array.from(e.target.selectedOptions, option => option.value);
+            const values = Array.from(e.target.selectedOptions, option => Number(option.value));
             onSelectedChange(values);
           }}
         >
-          {availableCustomers.map((customer) => (
-            <option key={customer.id} value={customer.id} className="py-1">
-              {customer.name}
-            </option>
-          ))}
+          {availableCustomers
+            .filter(customer => !assignedCustomers.includes(customer.id))
+            .map((customer) => (
+              <option key={customer.id} value={customer.id} className="py-1">
+                {customer.name}
+              </option>
+            ))}
         </select>
       </div>
 
@@ -52,35 +68,37 @@ export function CustomerSelect({
           <select 
             multiple 
             className="w-full h-48 bg-white/50 border border-purple-200 rounded-lg p-2 focus:border-purple-400 focus:ring-purple-400"
-            value={assignedCustomers}
+            value={assignedCustomers.map(String)}
             onChange={(e) => {
-              const values = Array.from(e.target.selectedOptions, option => option.value);
+              const values = Array.from(e.target.selectedOptions, option => Number(option.value));
               onAssignedChange(values);
             }}
           >
             {assignedCustomers.map((customerId) => {
               const customer = availableCustomers.find(c => c.id === customerId);
-              return (
+              return customer ? (
                 <option key={customerId} value={customerId} className="py-1">
-                  {customer?.name || customerId}
+                  {customer.name}
                 </option>
-              );
-            })}
+              ) : null;
+            }).filter(Boolean)}
           </select>
           <div className="flex justify-center gap-4">
             <Button 
               type="button" 
-              onClick={onAdd}
+              onClick={handleAdd}
               variant="outline"
               className="border-purple-200 hover:bg-purple-50"
+              disabled={selectedCustomers.length === 0}
             >
               Add &gt;&gt;
             </Button>
             <Button 
               type="button" 
-              onClick={onRemove}
+              onClick={handleRemove}
               variant="outline"
               className="border-purple-200 hover:bg-purple-50"
+              disabled={assignedCustomers.length === 0}
             >
               &lt;&lt; Remove
             </Button>

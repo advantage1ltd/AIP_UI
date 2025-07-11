@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CUSTOMER_PAGES } from "@/config/customerPages"
 import type { Customer } from "@/types/customer"
-import { customerService } from "@/services/customerService"
+import { BASE_API_URL } from "@/config/api"
 import useAuth from "@/hooks/useAuth"
+import { RefreshCw } from "lucide-react"
 
 export default function CustomerReporting() {
   const navigate = useNavigate()
@@ -22,24 +24,70 @@ export default function CustomerReporting() {
   useEffect(() => {
     const loadCustomers = async () => {
       try {
-        // In a real app, this would be an API call
         const isAdmin = user?.role?.toLowerCase() === 'administrator' || 
                        user?.pageAccessRole?.toLowerCase() === 'administrator'
 
-        const allCustomers = customerService.getAllCustomers()
-        
         if (isAdmin) {
-          setCustomers(allCustomers)
+          // For admin users, fetch all customers via API
+          const response = await fetch(`${BASE_API_URL}/customers`)
+          const result = await response.json()
+          
+          if (result.success && result.data) {
+            setCustomers(result.data)
+          } else {
+            throw new Error('Failed to fetch customers')
+          }
         } else {
-          // Get assigned customers from user data
-          const assignedCustomerIds = (user as any)?.assignedCustomers?.map((c: any) => c.id) || []
-          const filteredCustomers = allCustomers.filter(c => 
-            assignedCustomerIds.includes(c.id)
-          )
-          setCustomers(filteredCustomers)
+          // For officers, use the same approach as CustomerReportingPage
+          // This fetches customers that are already filtered based on current assignments
+          let assignedCustomerIds: string[] = []
+          
+          if (user?.role === 'AdvantageOneOfficer') {
+            try {
+              // Fetch fresh user data to get latest assignments
+              const userResponse = await fetch(`${BASE_API_URL}/users/${user.id}`)
+              if (userResponse.ok) {
+                const userData = await userResponse.json()
+                assignedCustomerIds = userData.data?.assignedCustomerIds?.map((id: number) => id.toString()) || []
+                console.log('🔄 [CustomerReporting] Fetched fresh assignment data:', {
+                  userId: user.id,
+                  cachedAssignments: 'assignedCustomerIds' in user ? user.assignedCustomerIds : 'none',
+                  freshAssignments: assignedCustomerIds
+                })
+              } else {
+                console.warn('🔄 [CustomerReporting] Failed to fetch fresh assignments')
+                assignedCustomerIds = []
+              }
+            } catch (fetchError) {
+              console.warn('🔄 [CustomerReporting] Error fetching fresh assignments:', fetchError)
+              assignedCustomerIds = []
+            }
+          }
+
+          // Build API URL with proper parameters
+          const params = new URLSearchParams({
+            userId: user?.id || '',
+            role: user?.role || ''
+          })
+
+          // Add fresh assigned customer IDs for officers
+          if (user?.role === 'AdvantageOneOfficer' && assignedCustomerIds.length > 0) {
+            params.append('assignedCustomerIds', assignedCustomerIds.join(','))
+          }
+
+          // Fetch customers based on user role and fresh assignments
+          const response = await fetch(`${BASE_API_URL}/customers/reporting?${params.toString()}`)
+          const data = await response.json()
+
+          if (!response.ok) {
+            throw new Error(data.message || 'Failed to fetch customer reporting data')
+          }
+
+          setCustomers(data.data || [])
         }
       } catch (error) {
         console.error('Error loading customers:', error)
+        setCustomers([])
       } finally {
         setLoading(false)
       }
@@ -48,13 +96,36 @@ export default function CustomerReporting() {
     loadCustomers()
   }, [user, refreshTrigger])
 
+  // Listen for user assignment updates to refresh data automatically
+  useEffect(() => {
+    const handleAssignmentUpdate = (event: CustomEvent) => {
+      const { userId, newAssignments } = event.detail
+      
+      // Only refresh if this is the current user's assignment that was updated
+      if (user?.id === userId) {
+        console.log('🔄 [CustomerReporting] Received assignment update for current user:', {
+          userId,
+          newAssignments,
+          currentUser: user.id
+        })
+        refreshData()
+      }
+    }
+
+    window.addEventListener('user-assignments-updated', handleAssignmentUpdate as EventListener)
+    
+    return () => {
+      window.removeEventListener('user-assignments-updated', handleAssignmentUpdate as EventListener)
+    }
+  }, [user?.id, refreshData])
+
   useEffect(() => {
     if (!selectedCustomer) {
       setAvailablePages([])
       return
     }
 
-    const customer = customers.find(c => c.id === selectedCustomer)
+    const customer = customers.find(c => c.id.toString() === selectedCustomer)
     if (customer) {
       // Get enabled pages from pageAssignments if available, fallback to viewConfig
       if (customer.pageAssignments) {
@@ -103,11 +174,23 @@ export default function CustomerReporting() {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold">Customer Reporting</h1>
-        <p className="text-muted-foreground">
-          Select a customer to view their reports and metrics
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold">Customer Reporting</h1>
+          <p className="text-muted-foreground">
+            Select a customer to view their reports and metrics
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={refreshData}
+          disabled={loading}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       <div className="w-full max-w-md">
@@ -117,7 +200,7 @@ export default function CustomerReporting() {
           </SelectTrigger>
           <SelectContent>
             {customers.map(customer => (
-              <SelectItem key={customer.id} value={customer.id}>
+              <SelectItem key={customer.id} value={customer.id.toString()}>
                 {customer.companyName}
               </SelectItem>
             ))}

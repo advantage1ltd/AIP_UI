@@ -1,11 +1,8 @@
 import { http, HttpResponse, delay } from 'msw'
 import { BASE_API_URL } from '@/config/api'
-// Import db.json data directly for regions and sites
-import dbData from '../../db.json'
-import { mockRegions, mockSites } from '@/data/mockCustomers'
 import { CUSTOMER_PAGES } from '@/config/customerPages'
-import { DUMMY_CUSTOMERS } from '@/data/customers'
-import type { Customer, CustomerWithRelations, Region, Site } from '@/types/customer'
+import type { Customer } from '@/types/customer'
+import { customerOperations } from './customerStore'
 
 // Helper function to validate request
 const validateRequest = async (request: Request) => {
@@ -27,10 +24,6 @@ const createErrorResponse = (status: number, message: string) => {
     { status }
   )
 }
-
-// In-memory data store for regions and sites (using DUMMY_CUSTOMERS for customer data)
-let regions = [...mockRegions]
-let sites = [...mockSites]
 
 // Mock data for Be Safe Be Secure Graph
 const beSafeBeSecureData = {
@@ -184,48 +177,106 @@ export const customerHandlers = [
     })
   }),
 
-  // Customer reporting endpoint with role-based access
-  http.get('/api/customers/reporting', ({ request }) => {
-    const url = new URL(request.url)
-    const role = url.searchParams.get('role')
-    const userId = url.searchParams.get('userId')
-    const assignedCustomerIds = url.searchParams.get('assignedCustomerIds')
+  // Get customer reporting data
+  http.get('/api/customers/reporting', async ({ request }) => {
+    try {
+      const url = new URL(request.url);
+      const userId = url.searchParams.get('userId');
+      const userRole = url.searchParams.get('role');
+      const assignedCustomerIds = url.searchParams.get('assignedCustomerIds');
 
-    // Read customers from db.json instead of DUMMY_CUSTOMERS
-    const customersFromDb = (dbData as any).customerDetails || []
-    let filteredCustomers = customersFromDb
-
-    console.log('🔍 [Customer Reporting] Loading from db.json:', {
-      totalCustomers: customersFromDb.length,
-      customerIds: customersFromDb.map((c: any) => c.id)
-    })
-
-    // Role-based filtering
-    if (role === 'AdvantageOneOfficer' && assignedCustomerIds) {
-      const assignedIds = assignedCustomerIds.split(',').map(id => id.trim())
-      filteredCustomers = customersFromDb.filter((customer: any) => 
-        assignedIds.includes(customer.id.toString())
-      )
-      
-      console.log('🔍 [Customer Reporting] Officer access filter:', {
-        role,
-        assignedCustomerIds,
-        assignedIds,
-        filteredCount: filteredCustomers.length
-      })
-    }
-    // Administrator, AdvantageOneHOOfficer, and other roles see all customers (no filtering needed)
-    else {
-      console.log('🔍 [Customer Reporting] Full access for role:', {
-        role,
+      console.log('🔍 [Customer Reporting] Processing request:', {
         userId,
-        totalCustomers: customersFromDb.length
-      })
-    }
+        userRole,
+        assignedCustomerIds,
+        url: request.url
+      });
 
-    // Add statistics and available pages to each customer
-    const customersWithDetails = filteredCustomers.map((customer: any) => {
-      // Get enabled page assignments from db.json pageAssignments
+      let customers = await customerOperations.getAll();
+      
+      // Filter customers based on user role and assignments
+      if (userRole !== 'Administrator' && assignedCustomerIds) {
+        const assignedIds = assignedCustomerIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+        customers = customers.filter(customer => assignedIds.includes(customer.id));
+        
+        console.log('🔍 [Customer Reporting] Filtered customers for officer:', {
+          assignedIds,
+          totalCustomers: await customerOperations.getAll().then(all => all.length),
+          filteredCustomers: customers.length,
+          customerNames: customers.map(c => c.companyName)
+        });
+      } else if (userRole === 'Administrator') {
+        console.log('🔍 [Customer Reporting] Administrator access - returning all customers');
+      } else if (userRole !== 'Administrator') {
+        // For officers without assignments, return empty array
+        customers = [];
+        console.log('🔍 [Customer Reporting] Officer with no assignments - returning empty array');
+      }
+      
+      // Add statistics and available pages to each customer
+      const customersWithDetails = await Promise.all(customers.map(async (customer) => {
+        // Get enabled page assignments
+        const enabledPages = customer.pageAssignments ? 
+          Object.entries(customer.pageAssignments)
+            .filter(([_, assignment]) => (assignment as any).enabled)
+            .map(([pageId, _]) => {
+              const pageConfig = Object.values(CUSTOMER_PAGES).find(p => p.id === pageId)
+              return pageConfig ? {
+                id: pageId,
+                title: pageConfig.title,
+                category: pageConfig.category,
+                icon: pageConfig.icon,
+                path: pageConfig.path
+              } : null
+            })
+            .filter(Boolean) : [];
+
+        // Calculate statistics
+        const statistics = {
+          incidents: Math.floor(Math.random() * 50), // Mock data
+          reports: Math.floor(Math.random() * 200) + 50,
+          lastIncident: new Date().toISOString(),
+          activeIssues: Math.floor(Math.random() * 10),
+          regions: customer.regions?.length || 0,
+          sites: customer.sites?.length || 0
+        };
+
+        return {
+          ...customer,
+          statistics,
+          availablePages: enabledPages
+        };
+      }));
+
+      console.log('✅ [Customer Reporting] Returning customers:', {
+        count: customersWithDetails.length,
+        customersWithPages: customersWithDetails.map(c => ({
+          id: c.id,
+          name: c.companyName,
+          pagesCount: c.availablePages?.length || 0
+        }))
+      });
+
+      return HttpResponse.json({
+        success: true,
+        data: customersWithDetails
+      });
+    } catch (error) {
+      console.error('❌ [Customer Reporting] Error:', error);
+      return createErrorResponse(500, 'Failed to fetch customer reporting data');
+    }
+  }),
+
+  // Get customer details by ID
+  http.get('/api/customers/:id', async ({ params }) => {
+    try {
+      const customer = await customerOperations.getById(parseInt(params.id as string));
+      
+      if (!customer) {
+        return createErrorResponse(404, 'Customer not found');
+      }
+
+      // Get enabled page assignments
       const enabledPages = customer.pageAssignments ? 
         Object.entries(customer.pageAssignments)
           .filter(([_, assignment]) => (assignment as any).enabled)
@@ -239,268 +290,138 @@ export const customerHandlers = [
               path: pageConfig.path
             } : null
           })
-          .filter(Boolean) : []
+          .filter(Boolean) : [];
 
-      // Calculate real statistics from incident data
-      const incidentsDb = (dbData as any).dashboard?.incidents || []
-      const customerIncidents = incidentsDb.filter((incident: any) => 
-        incident.customerId === customer.id || 
-        incident.customerName === customer.companyName
-      )
-      
-      // Calculate regions and sites counts from database
-      const regionsDb = (dbData as any).regions || []
-      const sitesDb = (dbData as any).sites || []
-      
-      const customerRegions = regionsDb.filter((region: any) => region.customerId === customer.id)
-      const customerSites = sitesDb.filter((site: any) => site.customerId === customer.id)
-      
-      // Fallback counts if db data doesn't work
-      const regionsCount = customerRegions.length > 0 ? customerRegions.length : 
-        (customer.id === 21 ? 3 : customer.id === 22 ? 3 : customer.id === 23 ? 3 : 0)
-      const sitesCount = customerSites.length > 0 ? customerSites.length : 
-        (customer.id === 21 ? 6 : customer.id === 22 ? 3 : customer.id === 23 ? 6 : 0)
-      
-      console.log('🔍 [Customer Statistics Debug]:', {
+      // Calculate statistics
+      const statistics = {
+        incidents: Math.floor(Math.random() * 50),
+        reports: Math.floor(Math.random() * 200) + 50,
+        lastIncident: new Date().toISOString(),
+        activeIssues: Math.floor(Math.random() * 10),
+        regions: customer.regions?.length || 0,
+        sites: customer.sites?.length || 0
+      };
+
+      console.log('🔍 [Individual Customer] Loaded:', {
         customerId: customer.id,
         customerName: customer.companyName,
-        regionsDbLength: regionsDb.length,
-        sitesDbLength: sitesDb.length,
-        foundRegions: customerRegions.length,
-        foundSites: customerSites.length,
-        fallbackRegions: regionsCount,
-        fallbackSites: sitesCount,
-        enabledPagesCount: enabledPages.length
-      })
-      
-      // Calculate last incident date
-      const lastIncidentDate = customerIncidents.length > 0 
-        ? customerIncidents
-            .map((i: any) => new Date(i.date))
-            .sort((a: Date, b: Date) => b.getTime() - a.getTime())[0]
-            .toISOString()
-        : undefined
+        enabledPagesCount: enabledPages.length,
+        pageAssignments: Object.keys(customer.pageAssignments || {})
+      });
 
-      return {
-        ...customer,
-        statistics: {
-          incidents: customerIncidents.length,
-          reports: Math.floor(Math.random() * 200) + 50, // Keep reports random for now
-          lastIncident: lastIncidentDate,
-          activeIssues: customerIncidents.filter((i: any) => i.status !== 'resolved' && i.status !== 'closed').length,
-          regions: regionsCount,
-          sites: sitesCount
-        },
-        availablePages: enabledPages
-      }
-    })
-
-    console.log('✅ [Customer Reporting] Returning customers from db.json:', {
-      count: customersWithDetails.length,
-      customersWithPages: customersWithDetails.map((c: any) => ({
-        id: c.id,
-        name: c.companyName,
-        pagesCount: c.availablePages?.length || 0
-      }))
-    })
-
-    return HttpResponse.json({
-      success: true,
-      data: customersWithDetails
-    })
-  }),
-
-  // Get customer details by ID
-  http.get('/api/customers/:id', ({ params }) => {
-    // Read from db.json instead of DUMMY_CUSTOMERS
-    const customersFromDb = (dbData as any).customerDetails || []
-    const customer = customersFromDb.find((c: any) => c.id === parseInt(params.id as string))
-    
-    if (!customer) {
       return HttpResponse.json({
-        success: false,
-        message: 'Customer not found'
-      }, { status: 404 })
-    }
-
-    // Get enabled page assignments from db.json pageAssignments
-    const enabledPages = customer.pageAssignments ? 
-      Object.entries(customer.pageAssignments)
-        .filter(([_, assignment]) => (assignment as any).enabled)
-        .map(([pageId, _]) => {
-          const pageConfig = Object.values(CUSTOMER_PAGES).find(p => p.id === pageId)
-          return pageConfig ? {
-            id: pageId,
-            title: pageConfig.title,
-            category: pageConfig.category,
-            icon: pageConfig.icon,
-            path: pageConfig.path
-          } : null
-        })
-        .filter(Boolean) : []
-
-    // Calculate real statistics from incident data for individual customer
-    const incidentsDb = (dbData as any).dashboard?.incidents || []
-    const customerIncidents = incidentsDb.filter((incident: any) => 
-      incident.customerId === customer.id || 
-      incident.customerName === customer.companyName
-    )
-    
-    // Calculate regions and sites counts from database
-    const regionsDb = (dbData as any).regions || []
-    const sitesDb = (dbData as any).sites || []
-    const customerRegions = regionsDb.filter((region: any) => region.customerId === customer.id)
-    const customerSites = sitesDb.filter((site: any) => site.customerId === customer.id)
-    
-    // Fallback counts if db data doesn't work
-    const regionsCount = customerRegions.length > 0 ? customerRegions.length : 
-      (customer.id === 21 ? 3 : customer.id === 22 ? 3 : customer.id === 23 ? 3 : 0)
-    const sitesCount = customerSites.length > 0 ? customerSites.length : 
-      (customer.id === 21 ? 6 : customer.id === 22 ? 3 : customer.id === 23 ? 6 : 0)
-    
-    // Calculate last incident date
-    const lastIncidentDate = customerIncidents.length > 0 
-      ? customerIncidents
-          .map((i: any) => new Date(i.date))
-          .sort((a: Date, b: Date) => b.getTime() - a.getTime())[0]
-          .toISOString()
-      : undefined
-
-    console.log('🔍 [Individual Customer] Loaded from db.json:', {
-      customerId: customer.id,
-      customerName: customer.companyName,
-      enabledPagesCount: enabledPages.length,
-      pageAssignments: Object.keys(customer.pageAssignments || {})
-    })
-
-    return HttpResponse.json({
-      success: true,
-      data: {
-        ...customer,
-        availablePages: enabledPages,
-        statistics: {
-          incidents: customerIncidents.length,
-          reports: Math.floor(Math.random() * 200) + 50,
-          lastIncident: lastIncidentDate,
-          activeIssues: customerIncidents.filter((i: any) => i.status !== 'resolved' && i.status !== 'closed').length,
-          regions: regionsCount,
-          sites: sitesCount
+        success: true,
+        data: {
+          ...customer,
+          availablePages: enabledPages,
+          statistics
         }
-      }
-    })
+      });
+    } catch (error) {
+      console.error('❌ [Individual Customer] Error:', error);
+      return createErrorResponse(500, 'Failed to fetch customer details');
+    }
   }),
 
   // Update customer page assignments
   http.patch('/api/customers/:id/page-assignments', async ({ params, request }) => {
-    const customerId = params.id as string
-    const updates = await request.json() as { pageAssignments: Record<string, any> }
-    
-    // Read from db.json instead of DUMMY_CUSTOMERS
-    const customersFromDb = (dbData as any).customerDetails || []
-    const customerIndex = customersFromDb.findIndex((c: any) => c.id === parseInt(customerId))
-    
-    if (customerIndex === -1) {
+    try {
+      const customerId = parseInt(params.id as string);
+      const updates = await validateRequest(request) as { pageAssignments: Record<string, any> };
+      
+      const customer = await customerOperations.getById(customerId);
+      if (!customer) {
+        return createErrorResponse(404, 'Customer not found');
+      }
+
+      console.log('🔧 [Page Assignments] Updating customer:', {
+        customerId,
+        customerName: customer.companyName,
+        currentPageAssignments: Object.keys(customer.pageAssignments || {}),
+        newPageAssignments: Object.keys(updates.pageAssignments)
+      });
+
+      // Update the customer's page assignments
+      const updatedCustomer = await customerOperations.update(customerId, {
+        pageAssignments: {
+          ...customer.pageAssignments,
+          ...updates.pageAssignments
+        },
+        viewConfig: {
+          ...customer.viewConfig,
+          enabledPages: Object.entries(updates.pageAssignments)
+            .filter(([_, assignment]) => (assignment as any).enabled)
+            .map(([pageId]) => pageId),
+          updatedAt: new Date().toISOString()
+        }
+      });
+
+      if (!updatedCustomer) {
+        return createErrorResponse(500, 'Failed to update customer');
+      }
+
+      console.log('✅ [Page Assignments] Updated customer configuration:', {
+        customerId,
+        enabledPages: updatedCustomer.viewConfig?.enabledPages,
+        pageAssignments: Object.entries(updatedCustomer.pageAssignments || {})
+          .filter(([_, assignment]) => (assignment as any).enabled)
+          .map(([pageId]) => pageId)
+      });
+
       return HttpResponse.json({
-        success: false,
-        message: 'Customer not found'
-      }, { status: 404 })
+        success: true,
+        data: updatedCustomer,
+        message: `Page assignments updated for ${customer.companyName}`
+      });
+    } catch (error) {
+      console.error('❌ [Page Assignments] Error:', error);
+      return createErrorResponse(500, 'Failed to update page assignments');
     }
-
-    const customer = customersFromDb[customerIndex]
-    console.log('🔧 [Page Assignments] Updating customer:', {
-      customerId,
-      customerName: customer.companyName,
-      currentPageAssignments: Object.keys(customer.pageAssignments || {}),
-      newPageAssignments: Object.keys(updates.pageAssignments)
-    })
-
-    // Update the customer's page assignments in db.json data
-    customersFromDb[customerIndex].pageAssignments = {
-      ...customersFromDb[customerIndex].pageAssignments,
-      ...updates.pageAssignments
-    }
-
-    // Update the viewConfig.enabledPages to match the enabled page assignments
-    const enabledPageIds = Object.entries(updates.pageAssignments)
-      .filter(([_, assignment]) => (assignment as any).enabled)
-      .map(([pageId]) => pageId)
-
-    customersFromDb[customerIndex].viewConfig = {
-      ...customersFromDb[customerIndex].viewConfig,
-      enabledPages: enabledPageIds,
-      updatedAt: new Date().toISOString()
-    }
-
-    // Note: In a real backend, you would write this back to the actual database
-    // For MSW simulation, we update the in-memory dbData object
-    console.log('✅ [Page Assignments] Updated customer configuration:', {
-      customerId,
-      enabledPages: enabledPageIds,
-      pageAssignments: Object.entries(updates.pageAssignments)
-        .filter(([_, assignment]) => (assignment as any).enabled)
-        .map(([pageId]) => pageId)
-    })
-
-    return HttpResponse.json({
-      success: true,
-      data: customersFromDb[customerIndex],
-      message: `Page assignments updated for ${customer.companyName}`
-    })
   }),
 
   // Get all customers for admin/setup purposes
-  http.get('/api/customers', () => {
-    // Read from db.json instead of DUMMY_CUSTOMERS
-    const customersFromDb = (dbData as any).customerDetails || []
-    const incidentsDb = (dbData as any).dashboard?.incidents || []
-    const regionsDb = (dbData as any).regions || []
-    const sitesDb = (dbData as any).sites || []
-    
-    console.log('🔍 [All Customers] Loading from db.json:', {
-      totalCustomers: customersFromDb.length,
-      customers: customersFromDb.map((c: any) => ({ id: c.id, name: c.companyName }))
-    })
-    
-    return HttpResponse.json({
-      success: true,
-      data: customersFromDb.map((customer: any) => {
-        const customerIncidents = incidentsDb.filter((incident: any) => 
-          incident.customerId === customer.id || 
-          incident.customerName === customer.companyName
-        )
-        
-        // Calculate regions and sites counts from database
-        const customerRegions = regionsDb.filter((region: any) => region.customerId === customer.id)
-        const customerSites = sitesDb.filter((site: any) => site.customerId === customer.id)
-        
-        // Fallback counts if db data doesn't work
-        const regionsCount = customerRegions.length > 0 ? customerRegions.length : 
-          (customer.id === 21 ? 3 : customer.id === 22 ? 3 : customer.id === 23 ? 3 : 0)
-        const sitesCount = customerSites.length > 0 ? customerSites.length : 
-          (customer.id === 21 ? 6 : customer.id === 22 ? 3 : customer.id === 23 ? 6 : 0)
-        
-        return {
+  http.get('/api/customers', async () => {
+    try {
+      const customers = await customerOperations.getAll();
+      
+      console.log('🔍 [All Customers] Loading:', {
+        totalCustomers: customers.length,
+        customers: customers.map(c => ({ id: c.id, name: c.companyName }))
+      });
+      
+      return HttpResponse.json({
+        success: true,
+        data: customers.map(customer => ({
           ...customer,
           statistics: {
-            incidents: customerIncidents.length,
+            incidents: Math.floor(Math.random() * 50),
             reports: Math.floor(Math.random() * 200) + 50,
-            regions: regionsCount,
-            sites: sitesCount
+            regions: customer.regions?.length || 0,
+            sites: customer.sites?.length || 0
           }
-        }
-      })
-    })
+        }))
+      });
+    } catch (error) {
+      console.error('❌ [All Customers] Error:', error);
+      return createErrorResponse(500, 'Failed to fetch customers');
+    }
   }),
 
-  // GET /api/customers/:id/regions - Get customer regions
+  // Get customer regions
   http.get(`${BASE_API_URL}/customers/:id/regions`, async ({ params }) => {
-    await delay(200)
-    
-    const customerRegions = regions.filter(r => r.customerId === parseInt(params.id as string))
-    
-    return HttpResponse.json({
-      success: true,
-      data: customerRegions
-    })
+    try {
+      const customer = await customerOperations.getById(parseInt(params.id as string));
+      if (!customer) {
+        return createErrorResponse(404, 'Customer not found');
+      }
+      
+      return HttpResponse.json({
+        success: true,
+        data: customer.regions || []
+      });
+    } catch (error) {
+      console.error('❌ [Customer Regions] Error:', error);
+      return createErrorResponse(500, 'Failed to fetch customer regions');
+    }
   })
-]
+];

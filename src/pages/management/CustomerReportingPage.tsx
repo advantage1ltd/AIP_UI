@@ -69,18 +69,54 @@ export default function CustomerReportingPage() {
       setIsLoading(true);
       setError(null);
 
+      // For officers, always fetch fresh assignment data instead of relying on cached user data
+      let assignedCustomerIds: string[] = [];
+      if (user.role === 'AdvantageOneOfficer') {
+        try {
+          // Fetch fresh user data to get latest assignments
+          console.log('🔍 [CustomerReportingPage] Making fresh API call to GET /api/users/' + user.id);
+          const userResponse = await fetch(`${BASE_API_URL}/users/${user.id}`);
+          console.log('🔍 [CustomerReportingPage] API response status:', userResponse.status, userResponse.statusText);
+          
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            assignedCustomerIds = userData.data?.assignedCustomerIds?.map((id: number) => id.toString()) || [];
+            console.log('🔄 [CustomerReportingPage] Fetched fresh assignment data:', {
+              userId: user.id,
+              userName: user.username,
+              apiResponseSuccess: userData.success,
+              cachedAssignments: 'assignedCustomerIds' in user ? user.assignedCustomerIds : 'none',
+              freshAssignments: assignedCustomerIds,
+              fullUserData: userData.data
+            });
+          } else {
+            // Fallback to cached data if API call fails
+            assignedCustomerIds = ('assignedCustomerIds' in user && user.assignedCustomerIds) 
+              ? user.assignedCustomerIds.map(id => id.toString()) 
+              : [];
+            console.warn('🔄 [CustomerReportingPage] Failed to fetch fresh assignments, using cached data');
+          }
+        } catch (fetchError) {
+          // Fallback to cached data if API call fails
+          assignedCustomerIds = ('assignedCustomerIds' in user && user.assignedCustomerIds) 
+            ? user.assignedCustomerIds.map(id => id.toString()) 
+            : [];
+          console.warn('🔄 [CustomerReportingPage] Error fetching fresh assignments, using cached data:', fetchError);
+        }
+      }
+
       // Build API URL with proper parameters
       const params = new URLSearchParams({
         userId: user.id,
         role: user.role
       });
 
-      // Add assigned customer IDs for officers
-      if (user.role === 'AdvantageOneOfficer' && 'assignedCustomerIds' in user && user.assignedCustomerIds) {
-        params.append('assignedCustomerIds', user.assignedCustomerIds.join(','));
+      // Add fresh assigned customer IDs for officers
+      if (user.role === 'AdvantageOneOfficer' && assignedCustomerIds.length > 0) {
+        params.append('assignedCustomerIds', assignedCustomerIds.join(','));
       }
 
-      // Fetch customers based on user role and assignments
+      // Fetch customers based on user role and fresh assignments
       const response = await fetch(`${BASE_API_URL}/customers/reporting?${params.toString()}`);
       const data = await response.json();
 
@@ -143,6 +179,29 @@ export default function CustomerReportingPage() {
     window.addEventListener('customer-config-updated', handleConfigUpdate);
     return () => window.removeEventListener('customer-config-updated', handleConfigUpdate);
   }, []);
+
+  // Listen for user assignment updates to refresh data automatically
+  useEffect(() => {
+    const handleAssignmentUpdate = (event: CustomEvent) => {
+      const { userId, newAssignments } = event.detail
+      
+      // Only refresh if this is the current user's assignment that was updated
+      if (user?.id === userId) {
+        console.log('🔄 [CustomerReportingPage] Received assignment update for current user:', {
+          userId,
+          newAssignments,
+          currentUser: user.id
+        })
+        fetchCustomerReportingData()
+      }
+    }
+
+    window.addEventListener('user-assignments-updated', handleAssignmentUpdate as EventListener)
+    
+    return () => {
+      window.removeEventListener('user-assignments-updated', handleAssignmentUpdate as EventListener)
+    }
+  }, [user?.id, fetchCustomerReportingData]);
 
   const getAvailablePages = (customer: CustomerWithRelations): CustomerPage[] => {
     console.log('🔍 [CustomerReportingPage] getAvailablePages called with user role:', user?.role);
@@ -374,6 +433,49 @@ export default function CustomerReportingPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={async () => {
+              console.log('🧪 [Test] Direct API test for user:', user?.id);
+              try {
+                const response = await fetch(`${BASE_API_URL}/users/${user?.id}`);
+                const data = await response.json();
+                console.log('🧪 [Test] Direct API result:', {
+                  status: response.status,
+                  success: data.success,
+                  assignedCustomerIds: data.data?.assignedCustomerIds,
+                  username: data.data?.username,
+                  fullData: data.data
+                });
+                alert(`Test Result:\nUser: ${data.data?.username}\nAssignments: ${JSON.stringify(data.data?.assignedCustomerIds)}`);
+              } catch (error) {
+                console.error('🧪 [Test] API test failed:', error);
+                alert('Test failed: ' + error);
+              }
+            }}
+            className="bg-yellow-500 hover:bg-yellow-600 text-white"
+          >
+            🧪 Test API
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              console.log('🧹 [Clear] Clearing all caches...');
+              // Clear MSW cache
+              if ((window as any).clearUserStore) {
+                (window as any).clearUserStore();
+              }
+              // Clear localStorage
+              localStorage.removeItem('msw_user_store');
+              // Force refresh
+              window.location.reload();
+            }}
+            className="bg-red-500 hover:bg-red-600 text-white"
+          >
+            🧹 Clear Cache
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={fetchCustomerReportingData}
             disabled={isLoading}
             className="flex items-center gap-2"
@@ -407,6 +509,33 @@ export default function CustomerReportingPage() {
           </Select>
         </div>
       </div>
+
+      {/* Debug Panel - Only show for officers during testing */}
+      {user?.role === 'AdvantageOneOfficer' && (
+        <Card className="mb-6 bg-gray-50 border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-gray-700">🔍 Debug Info</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-gray-600">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p><strong>User:</strong> {user.username} ({user.firstName} {user.lastName})</p>
+                <p><strong>Role:</strong> {user.role}</p>
+                <p><strong>User ID:</strong> {user.id}</p>
+              </div>
+              <div>
+                <p><strong>Cached Assignments:</strong> {
+                  'assignedCustomerIds' in user 
+                    ? JSON.stringify(user.assignedCustomerIds)
+                    : 'None'
+                }</p>
+                <p><strong>Customers Found:</strong> {customers.length}</p>
+                <p><strong>Loading:</strong> {isLoading ? 'Yes' : 'No'}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredCustomers.map((customer, index) => {

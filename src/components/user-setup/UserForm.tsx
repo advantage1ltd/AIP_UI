@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { EmployeeSelect } from "./form/EmployeeSelect"
 import { CustomerSelect } from "./form/CustomerSelect"
-import { User, AVAILABLE_CUSTOMERS, UserRole, AdvantageOneUser } from "@/types/user"
+import { User, UserRole, AdvantageOneUser } from "@/types/user"
+import { customerOperations } from "@/mocks/customerStore"
 
 interface UserFormProps {
   mode: 'new' | 'edit'
@@ -44,18 +45,59 @@ export function UserForm({ mode, user, onSubmit, onCancel }: UserFormProps) {
       : [],
   })
 
-  const [selectedCustomers, setSelectedCustomers] = useState<string[]>(
+  const [selectedCustomers, setSelectedCustomers] = useState<number[]>([])
+  const [assignedCustomers, setAssignedCustomers] = useState<number[]>(
     user?.role === 'AdvantageOneOfficer' || user?.role === 'AdvantageOneHOOfficer' || user?.role === 'Administrator'
       ? (user as AdvantageOneUser)?.assignedCustomerIds || []
       : []
   )
+  const [availableCustomers, setAvailableCustomers] = useState<Array<{ id: number; name: string }>>([])
+
+  useEffect(() => {
+    const loadCustomers = async () => {
+      try {
+        const customers = await customerOperations.getAll()
+        setAvailableCustomers(
+          customers.map(c => ({
+            id: c.id,
+            name: c.companyName
+          }))
+        )
+      } catch (error) {
+        console.error('Failed to load customers:', error)
+      }
+    }
+    loadCustomers()
+  }, [])
+
+  // Update formData when assigned customers change
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      assignedCustomerIds: assignedCustomers
+    }))
+  }, [assignedCustomers])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit({
+    console.log('Submitting form with assigned customers:', assignedCustomers)
+    const submitData = {
       ...formData,
-      assignedCustomerIds: selectedCustomers
+      assignedCustomerIds: assignedCustomers
+    }
+    
+    // Log for debugging
+    console.log('🔄 [UserForm] Submitting user with assignments:', {
+      userId: user?.id,
+      username: formData.username,
+      role: formData.role,
+      assignedCustomerIds: assignedCustomers,
+      previousAssignments: user?.role === 'AdvantageOneOfficer' || user?.role === 'AdvantageOneHOOfficer' || user?.role === 'Administrator' 
+        ? (user as AdvantageOneUser)?.assignedCustomerIds || []
+        : []
     })
+    
+    onSubmit(submitData)
   }
 
   return (
@@ -164,13 +206,20 @@ export function UserForm({ mode, user, onSubmit, onCancel }: UserFormProps) {
 
           {formData.role === 'AdvantageOneOfficer' && (
             <CustomerSelect
-              availableCustomers={AVAILABLE_CUSTOMERS}
+              availableCustomers={availableCustomers}
               selectedCustomers={selectedCustomers}
-              assignedCustomers={selectedCustomers}
+              assignedCustomers={assignedCustomers}
               onSelectedChange={setSelectedCustomers}
-              onAssignedChange={setSelectedCustomers}
-              onAdd={() => setSelectedCustomers(prev => [...prev, ...selectedCustomers])}
-              onRemove={() => setSelectedCustomers([])}
+              onAssignedChange={setAssignedCustomers}
+              onAdd={() => {
+                const newAssigned = [...new Set([...assignedCustomers, ...selectedCustomers])]
+                setAssignedCustomers(newAssigned)
+                setSelectedCustomers([])
+              }}
+              onRemove={() => {
+                setAssignedCustomers([])
+                setSelectedCustomers([])
+              }}
             />
           )}
 

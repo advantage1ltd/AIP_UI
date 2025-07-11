@@ -652,17 +652,6 @@ const EmployeeDiaryPage: React.FC = () => {
               </div>
             </div>
           </CardHeader>
-
-          <CardContent className="pt-4 px-4 lg:px-6 pb-0 overflow-hidden">
-            <div className="w-full overflow-x-auto pb-2">
-              <SyncStatus
-                sources={state.syncStatus}
-                onSync={handleSync}
-                onToggleStatus={handleToggleSourceStatus}
-                isSyncing={state.isSyncing}
-              />
-            </div>
-          </CardContent>
         </Card>
 
         {/* Content Card */}

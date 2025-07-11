@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { BASE_API_URL } from '@/config/api';
 import { User, CreateUserInput, UpdateUserInput, CustomerUser, AdvantageOneUser } from '@/types/user';
+import { userOperations } from './handlers';
 
 // Helper function to validate request
 const validateRequest = async (request: Request) => {
@@ -8,39 +9,6 @@ const validateRequest = async (request: Request) => {
     return await request.json();
   } catch (error) {
     throw new Error('Invalid JSON payload');
-  }
-};
-
-// Helper function to save to db.json
-const saveToDb = async (users: User[]) => {
-  try {
-    const dbResponse = await fetch('/db.json');
-    const db = await dbResponse.json();
-    
-    db.users = users;
-    
-    await fetch('/db.json', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(db),
-    });
-  } catch (error) {
-    console.error('Failed to save to db.json:', error);
-    throw error;
-  }
-};
-
-// Helper function to load from db.json
-const loadFromDb = async (): Promise<User[]> => {
-  try {
-    const dbResponse = await fetch('/db.json');
-    const db = await dbResponse.json();
-    return db.users || [];
-  } catch (error) {
-    console.error('Failed to load from db.json:', error);
-    throw error;
   }
 };
 
@@ -91,8 +59,6 @@ const updateTypedUser = (existingUser: User, data: UpdateUserInput): User => {
   }
 };
 
-// All user data is now loaded dynamically from db.json
-
 interface LoginRequest {
   username: string;
   password: string;
@@ -104,120 +70,121 @@ const loginHandler = http.post<any, LoginRequest>(`${BASE_API_URL}/login`, async
   const { username, password } = body;
   
   try {
-    // Load users dynamically from db.json
-    const users = await loadFromDb();
+    // Load users from store
+    const users = await userOperations.getAll();
     const user = users.find(u => u.username === username);
     
-         if (!user || user.password !== password) {
-       return HttpResponse.json({
-         success: false,
-         message: 'Invalid username or password'
-       }, { status: 401 });
-     }
-   
-     // Generate a proper JWT token structure
-     const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-     const payload = btoa(JSON.stringify({
-       sub: user.id,
-       username: user.username,
-       role: user.role,
-       ...('customerId' in user ? { companyId: user.customerId } : {}),
-       exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-     }));
-     const signature = btoa('mock-signature'); // In a real app, this would be a proper signature
-     
-     const token = `${header}.${payload}.${signature}`;
-     
-     // Return the response in the format expected by AuthContext
-     return HttpResponse.json({
-       success: true,
-       message: 'Login successful',
-       data: {
-         token,
-         user: {
-           ...user,
-           // Add pageAccessRole which is the same as role
-           pageAccessRole: user.role,
-           // Add any additional fields required by the frontend
-           ...(user.role === 'CustomerSiteManager' || user.role === 'CustomerHOManager'
-             ? { 
-                 companyId: (user as CustomerUser).customerId,
-                 customerId: (user as CustomerUser).customerId // Set customerId to same value as companyId for compatibility
-               }
-             : { assignedCustomerIds: (user as AdvantageOneUser).assignedCustomerIds || [] }
-           )
-         }
-       }
-     }, { status: 200 });
-   } catch (error) {
-     console.error('Login error:', error);
-     return HttpResponse.json({
-       success: false,
-       message: 'Login failed due to server error'
-     }, { status: 500 });
-   }
- });
+    if (!user || user.password !== password) {
+      return HttpResponse.json({
+        success: false,
+        message: 'Invalid username or password'
+      }, { status: 401 });
+    }
+    
+    // Generate a proper JWT token structure
+    const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const payload = btoa(JSON.stringify({
+      sub: user.id,
+      username: user.username,
+      role: user.role,
+      ...('customerId' in user ? { companyId: user.customerId } : {}),
+      exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+    }));
+    const signature = btoa('mock-signature');
+    
+    const token = `${header}.${payload}.${signature}`;
+    
+    return HttpResponse.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        token,
+        user: {
+          ...user,
+          pageAccessRole: user.role,
+          ...(user.role === 'CustomerSiteManager' || user.role === 'CustomerHOManager'
+            ? { 
+                companyId: (user as CustomerUser).customerId,
+                customerId: (user as CustomerUser).customerId
+              }
+            : { assignedCustomerIds: (user as AdvantageOneUser).assignedCustomerIds || [] }
+          )
+        }
+      }
+    }, { status: 200 });
+  } catch (error) {
+    console.error('Login error:', error);
+    return HttpResponse.json({
+      success: false,
+      message: 'Login failed due to server error'
+    }, { status: 500 });
+  }
+});
 
 export const userHandlers = [
   loginHandler,
+  
   // GET /api/users - Get all users
   http.get(`${BASE_API_URL}/users`, async () => {
     try {
-      const users = await loadFromDb();
+      const users = await userOperations.getAll();
       return HttpResponse.json({
         success: true,
         data: users,
       });
     } catch (error) {
-      return new HttpResponse(
-        JSON.stringify({ 
+      return HttpResponse.json({ 
+        success: false,
+        message: 'Failed to fetch users' 
+      }, { status: 500 });
+    }
+  }),
+
+  // GET /api/users/:id - Get user by ID
+  http.get(`${BASE_API_URL}/users/:id`, async ({ params }) => {
+    try {
+      const user = await userOperations.getById(params.id as string);
+      if (!user) {
+        return HttpResponse.json({ 
           success: false,
-          message: 'Failed to fetch users' 
-        }),
-        { status: 500 }
-      );
+          message: 'User not found' 
+        }, { status: 404 });
+      }
+      
+      console.log('🔍 [UserHandler] Returning user data for ID:', params.id, {
+        username: user.username,
+        role: user.role,
+        assignedCustomerIds: 'assignedCustomerIds' in user ? user.assignedCustomerIds : 'N/A'
+      });
+      
+      return HttpResponse.json({
+        success: true,
+        data: user,
+      });
+    } catch (error) {
+      return HttpResponse.json({ 
+        success: false,
+        message: 'Failed to fetch user' 
+      }, { status: 500 });
     }
   }),
 
   // POST /api/users - Create new user
   http.post(`${BASE_API_URL}/users`, async ({ request }) => {
     try {
-      const newUser = await validateRequest(request) as CreateUserInput;
-      const users = await loadFromDb();
-      
-      // Check if username already exists
-      if (users.some(u => u.username === newUser.username)) {
-        return new HttpResponse(
-          JSON.stringify({ 
-            success: false,
-            message: 'Username already exists' 
-          }),
-          { status: 400 }
-        );
-      }
-      
-      // Create new user with ID and timestamps
-      const userWithId = {
-        ...newUser,
-        id: String(users.length + 1),
-      };
-      
-      const typedUser = createTypedUser(userWithId);
-      users.push(typedUser);
-      await saveToDb(users);
+      const userData = await validateRequest(request) as CreateUserInput;
+      const newUser = createTypedUser({ ...userData, id: Date.now().toString() });
+      await userOperations.create(newUser);
       
       return HttpResponse.json({
         success: true,
-        data: typedUser,
-      }, { status: 201 });
+        data: newUser,
+      });
     } catch (error) {
-      return new HttpResponse(
-        JSON.stringify({ 
-          success: false,
-          message: error instanceof Error ? error.message : 'Failed to create user' 
-        }),
-        { status: 500 }
-      );
+      return HttpResponse.json({ 
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to create user' 
+      }, { status: 500 });
     }
   }),
 
@@ -225,69 +192,47 @@ export const userHandlers = [
   http.put(`${BASE_API_URL}/users/:id`, async ({ request, params }) => {
     try {
       const userData = await validateRequest(request) as UpdateUserInput;
-      const users = await loadFromDb();
+      const existingUser = await userOperations.getById(params.id as string);
       
-      const index = users.findIndex(u => u.id === params.id);
-      if (index === -1) {
-        return new HttpResponse(
-          JSON.stringify({ 
-            success: false,
-            message: 'User not found' 
-          }),
-          { status: 404 }
-        );
+      if (!existingUser) {
+        return HttpResponse.json({ 
+          success: false,
+          message: 'User not found' 
+        }, { status: 404 });
       }
       
-      // Update user with proper typing
-      const updatedUser = updateTypedUser(users[index], userData);
-      users[index] = updatedUser;
-      await saveToDb(users);
+      const updatedUser = updateTypedUser(existingUser, userData);
+      const result = await userOperations.update(params.id as string, updatedUser);
+      
+      if (!result) {
+        throw new Error('Failed to update user');
+      }
       
       return HttpResponse.json({
         success: true,
-        data: updatedUser,
+        data: result,
       });
     } catch (error) {
-      return new HttpResponse(
-        JSON.stringify({ 
-          success: false,
-          message: error instanceof Error ? error.message : 'Failed to update user' 
-        }),
-        { status: 500 }
-      );
+      return HttpResponse.json({ 
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to update user' 
+      }, { status: 500 });
     }
   }),
 
   // DELETE /api/users/:id - Delete user
   http.delete(`${BASE_API_URL}/users/:id`, async ({ params }) => {
     try {
-      const users = await loadFromDb();
-      
-      const filteredUsers = users.filter(u => u.id !== params.id);
-      if (filteredUsers.length === users.length) {
-        return new HttpResponse(
-          JSON.stringify({ 
-            success: false,
-            message: 'User not found' 
-          }),
-          { status: 404 }
-        );
-      }
-      
-      await saveToDb(filteredUsers);
-      
+      await userOperations.delete(params.id as string);
       return HttpResponse.json({
         success: true,
         message: 'User deleted successfully',
       });
     } catch (error) {
-      return new HttpResponse(
-        JSON.stringify({ 
-          success: false,
-          message: 'Failed to delete user' 
-        }),
-        { status: 500 }
-      );
+      return HttpResponse.json({ 
+        success: false,
+        message: 'Failed to delete user' 
+      }, { status: 500 });
     }
   }),
 ];
