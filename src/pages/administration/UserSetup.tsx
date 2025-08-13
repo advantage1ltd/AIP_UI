@@ -44,7 +44,8 @@ import {
   Lock,
   KeyRound,
   UserCog,
-  Clock
+  Clock,
+  FileText
 } from 'lucide-react'
 import { UserDialog } from '@/components/administration/UserDialog'
 import { fetchUsers, createUser, updateUserAsync, deleteUserAsync } from '@/store/features/users/usersSlice'
@@ -59,6 +60,15 @@ import {
 } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 
 const UserSetup = () => {
   const dispatch = useAppDispatch()
@@ -69,6 +79,8 @@ const UserSetup = () => {
   const [selectedUser, setSelectedUser] = useState<User | undefined>()
   const [showUserDialog, setShowUserDialog] = useState(false)
   const [viewUser, setViewUser] = useState<User | undefined>()
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(10)
 
   // Get users and loading state from Redux store
   const { users, loading, error } = useAppSelector((state: RootState) => state.users)
@@ -83,7 +95,7 @@ const UserSetup = () => {
     return users.filter(user => {
       const fullName = `${user.firstName} ${user.lastName}`.toLowerCase()
       const email = user.email.toLowerCase()
-      const company = ('companyId' in user ? user.companyId : '') || ''
+      const company = user.userCompany?.toLowerCase() || ''
 
       switch (filterType) {
         case 'name':
@@ -92,13 +104,25 @@ const UserSetup = () => {
           return email.includes(query)
         case 'company':
           return company.includes(query)
-      default:
+        default:
           return fullName.includes(query) || 
                  email.includes(query) || 
                  company.includes(query)
-    }
+      }
     })
   }, [users, searchQuery, filterType])
+
+  // Pagination calculations
+  const totalUsers = filteredUsers.length
+  const totalPages = Math.ceil(totalUsers / pageSize)
+  const startIndex = (currentPage - 1) * pageSize
+  const endIndex = startIndex + pageSize
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex)
+
+  // Reset to first page when search/filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, filterType])
 
   const handleCreateUser = async (data: CreateUserInput) => {
     try {
@@ -215,8 +239,8 @@ const UserSetup = () => {
     }
   }
 
-  // Stats
-  const totalUsers = filteredUsers.length
+  // Stats (using all filtered users, not paginated)
+  const totalFilteredUsers = filteredUsers.length
   const activeStatusList = [
     'AdvantageOneOfficer',
     'AdvantageOneHOOfficer',
@@ -226,7 +250,7 @@ const UserSetup = () => {
   ]
   const activeUsers = filteredUsers.filter(u => activeStatusList.includes(u.role)).length
   const adminUsers = filteredUsers.filter(u => u.role === 'Administrator').length
-  const adminPercent = totalUsers > 0 ? ((adminUsers / totalUsers) * 100).toFixed(1) : '0.0'
+  const adminPercent = totalFilteredUsers > 0 ? ((adminUsers / totalFilteredUsers) * 100).toFixed(1) : '0.0'
   const officerUsers = filteredUsers.filter(u => u.role === 'AdvantageOneOfficer').length
 
   return (
@@ -278,7 +302,7 @@ const UserSetup = () => {
             <div className="rounded-xl overflow-hidden shadow bg-gradient-to-br from-blue-500 to-blue-700 flex items-stretch">
               <div className="flex-1 flex flex-col justify-center px-6 py-6">
                 <span className="text-white text-base font-medium mb-1">Total Users</span>
-                <span className="text-3xl font-bold text-white">{totalUsers}</span>
+                <span className="text-3xl font-bold text-white">{totalFilteredUsers}</span>
                 <span className="text-white/80 text-sm mt-1">{activeUsers} active</span>
               </div>
               <div className="flex items-center pr-6">
@@ -323,6 +347,8 @@ const UserSetup = () => {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Job Title</TableHead>
+                <TableHead>Company</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Officer Type</TableHead>
                 <TableHead>Assigned Customers</TableHead>
@@ -330,7 +356,7 @@ const UserSetup = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
+              {paginatedUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -344,6 +370,16 @@ const UserSetup = () => {
                     </div>
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <div className="text-sm text-gray-600">
+                      {user.jobTitle || 'N/A'}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm text-gray-600">
+                      {user.userCompany || 'N/A'}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge className={`${getStatusColor(user.role)} flex items-center gap-1.5`}>
                       {getStatusIcon(user.role)}
@@ -374,9 +410,9 @@ const UserSetup = () => {
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredUsers.length === 0 && (
+              {totalFilteredUsers === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <div className="flex flex-col items-center gap-2 text-gray-500">
                       <UserX className="h-8 w-8" />
                       <div>No users found</div>
@@ -388,6 +424,86 @@ const UserSetup = () => {
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-500">
+              Showing {startIndex + 1} to {Math.min(endIndex, totalFilteredUsers)} of {totalFilteredUsers} results
+            </div>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (currentPage > 1) {
+                        setCurrentPage(currentPage - 1)
+                      }
+                    }}
+                    className={currentPage <= 1 ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+                
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  // Show first page, last page, current page, and pages around current page
+                  const shouldShow = 
+                    page === 1 || 
+                    page === totalPages || 
+                    Math.abs(page - currentPage) <= 1
+                  
+                  if (!shouldShow && page !== 2 && page !== totalPages - 1) {
+                    // Show ellipsis for gaps
+                    if (page === 2 && currentPage > 4) {
+                      return (
+                        <PaginationItem key={`ellipsis-${page}`}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )
+                    }
+                    if (page === totalPages - 1 && currentPage < totalPages - 3) {
+                      return (
+                        <PaginationItem key={`ellipsis-${page}`}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )
+                    }
+                    return null
+                  }
+                  
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setCurrentPage(page)
+                        }}
+                        isActive={page === currentPage}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (currentPage < totalPages) {
+                        setCurrentPage(currentPage + 1)
+                      }
+                    }}
+                    className={currentPage >= totalPages ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
 
         {/* User Dialog */}
         <UserDialog
@@ -459,6 +575,14 @@ const UserSetup = () => {
                       <div className="text-xs text-gray-500 mb-1">Email</div>
                       <div className="font-medium text-base">{viewUser.email}</div>
                     </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Job Title</div>
+                      <div className="font-medium text-base">{viewUser.jobTitle || 'N/A'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">User Company</div>
+                      <div className="font-medium text-base">{viewUser.userCompany || 'N/A'}</div>
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -486,6 +610,42 @@ const UserSetup = () => {
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Last Updated</div>
                       <div className="font-medium text-base">{new Date(viewUser.updatedAt).toLocaleDateString()}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Signature and Additional Information */}
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-primary" />
+                      Signature & Additional Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Signature</div>
+                      <div className="font-medium text-base">{viewUser.signature || 'N/A'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Signature Code</div>
+                      <div className="font-medium text-base">{viewUser.signatureCode || 'N/A'}</div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="text-xs text-gray-500 mb-1">Record Status</div>
+                      <div className={`font-medium text-base flex items-center gap-2 ${viewUser.recordIsDeleted ? 'text-red-600' : 'text-green-600'}`}>
+                        {viewUser.recordIsDeleted ? (
+                          <>
+                            <UserX className="h-4 w-4" />
+                            Record is Deleted
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="h-4 w-4" />
+                            Record is Active
+                          </>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

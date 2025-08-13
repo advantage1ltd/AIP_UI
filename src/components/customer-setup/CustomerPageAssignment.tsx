@@ -65,6 +65,8 @@ export function CustomerPageAssignment({
   }, [currentAssignments])
 
   const handlePageToggle = (pageId: string, enabled: boolean) => {
+    console.log('🔧 [CustomerPageAssignment] handlePageToggle:', { pageId, enabled, currentAssignments: assignments })
+    
     const updatedAssignments = { ...assignments }
     if (enabled) {
       updatedAssignments[pageId] = {
@@ -76,6 +78,8 @@ export function CustomerPageAssignment({
     } else {
       delete updatedAssignments[pageId]
     }
+    
+    console.log('🔧 [CustomerPageAssignment] handlePageToggle - updatedAssignments:', updatedAssignments)
     
     setAssignments(updatedAssignments)
     onAssignmentsChange(updatedAssignments)

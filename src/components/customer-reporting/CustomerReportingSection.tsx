@@ -5,6 +5,7 @@ import type { Customer, CustomerPageId } from "@/types/customer"
 import { CUSTOMER_PAGES } from "@/config/customerPages"
 import { cn } from "@/lib/utils"
 import { FileText, ClipboardList, Shield, Star, Calendar, Wrench, BarChart, FileCheck, Building, ArrowLeft } from "lucide-react"
+import { customerOperations } from "@/mocks/customerStore"
 
 interface CustomerReportingSectionProps {
   customers: Customer[]
@@ -31,7 +32,16 @@ export function CustomerReportingSection({ customers, onNavigate }: CustomerRepo
   }
 
   if (selectedCustomer) {
-    const enabledPages = selectedCustomer.viewConfig?.enabledPages || []
+    // Get enabled pages from pageAssignments if available, fallback to viewConfig
+    let enabledPages: string[] = []
+    
+    if (selectedCustomer.pageAssignments) {
+      enabledPages = Object.entries(selectedCustomer.pageAssignments)
+        .filter(([_, assignment]) => (assignment as any).enabled)
+        .map(([pageId]) => pageId)
+    } else if (selectedCustomer.viewConfig?.enabledPages) {
+      enabledPages = selectedCustomer.viewConfig.enabledPages
+    }
     
     return (
       <div className="space-y-6">
@@ -61,7 +71,7 @@ export function CustomerReportingSection({ customers, onNavigate }: CustomerRepo
                       "h-auto p-4 flex flex-col items-center text-center gap-2",
                       "hover:bg-purple-50 hover:border-purple-200 transition-colors"
                     )}
-                    onClick={() => onNavigate(selectedCustomer.id, pageId as CustomerPageId)}
+                    onClick={() => onNavigate(String(selectedCustomer.id), pageId as CustomerPageId)}
                   >
                     <Icon className="h-6 w-6 text-purple-600" />
                     <div>
@@ -90,28 +100,41 @@ export function CustomerReportingSection({ customers, onNavigate }: CustomerRepo
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {customers.map(customer => (
-          <Button
-            key={customer.id}
-            variant="outline"
-            className={cn(
-              "h-auto p-4 flex flex-col items-center text-center gap-2",
-              "hover:bg-purple-50 hover:border-purple-200 transition-colors"
-            )}
-            onClick={() => handleCustomerSelect(customer)}
-          >
-            <Building className="h-6 w-6 text-purple-600" />
-            <div>
-              <h3 className="font-medium">{customer.companyName}</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                {customer.address.town}, {customer.address.county}
-              </p>
-              <p className="text-xs text-purple-600 mt-1">
-                {customer.viewConfig?.enabledPages.length || 0} Reports Available
-              </p>
-            </div>
-          </Button>
-        ))}
+        {customers.map(customer => {
+          // Get enabled pages count from pageAssignments if available, fallback to viewConfig
+          let availablePagesCount = 0
+          
+          if (customer.pageAssignments) {
+            availablePagesCount = Object.entries(customer.pageAssignments)
+              .filter(([_, assignment]) => (assignment as any).enabled)
+              .length
+          } else if (customer.viewConfig?.enabledPages) {
+            availablePagesCount = customer.viewConfig.enabledPages.length
+          }
+          
+          return (
+            <Button
+              key={customer.id}
+              variant="outline"
+              className={cn(
+                "h-auto p-4 flex flex-col items-center text-center gap-2",
+                "hover:bg-purple-50 hover:border-purple-200 transition-colors"
+              )}
+              onClick={() => handleCustomerSelect(customer)}
+            >
+              <Building className="h-6 w-6 text-purple-600" />
+              <div>
+                <h3 className="font-medium">{customer.companyName}</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {customer.address.town}, {customer.address.county}
+                </p>
+                <p className="text-xs text-purple-600 mt-1">
+                  {availablePagesCount} Reports Available
+                </p>
+              </div>
+            </Button>
+          )
+        })}
       </div>
     </div>
   )

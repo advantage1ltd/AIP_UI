@@ -202,6 +202,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
     '/customer/incident-report',
     '/customer/satisfaction-report',
     '/customer/be-safe-be-secure',
+    '/customer/daily-occurrence-book',
     '/customer/officer-support',
     '/customer/views-config'
   ];
@@ -687,6 +688,14 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                     to="/customer/be-safe-be-secure"
                       icon={<ShieldCheck className="h-4 w-4" />}
                     label="Daily Activity Graphs"
+                      onClick={onNavigate}
+                    />
+                  )}
+                  {hasAccess('/customer/daily-occurrence-book') && (
+                    <NavItem
+                      to="/customer/daily-occurrence-book"
+                      icon={<BookOpen className="h-4 w-4" />}
+                      label="Daily Occurrence Book (DOB)"
                       onClick={onNavigate}
                     />
                   )}

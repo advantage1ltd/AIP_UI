@@ -66,6 +66,11 @@ export interface BaseUser {
   email: string;
   role: UserRole;
   pageAccessRole: UserRole;
+  signature?: string;
+  signatureCode?: string;
+  jobTitle?: string;
+  userCompany?: 'Central England COOP' | 'Midcounties COOP' | 'Eastbrook Worcester' | 'Eastbrook Tewksbury' | 'Heart of England';
+  recordIsDeleted?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -124,8 +129,18 @@ export interface UsersResponse {
 export const AVAILABLE_CUSTOMERS = [
   { id: 21, name: "Central England COOP" },
   { id: 22, name: "Heart of England" },
-  { id: 23, name: "Midcounties COOP" }
+  { id: 23, name: "Midcounties COOP" },
+  { id: 24, name: "Eastbrook Worcester" },
+  { id: 25, name: "Eastbrook Tewksbury" }
 ];
+
+export const USER_COMPANIES = [
+  'Central England COOP',
+  'Midcounties COOP',
+  'Eastbrook Worcester',
+  'Eastbrook Tewksbury',
+  'Heart of England'
+] as const;
 
 export interface CreateUserInput extends Omit<User, 'id' | 'createdAt' | 'updatedAt'> {}
 export interface UpdateUserInput extends Partial<Omit<User, 'createdAt' | 'updatedAt'>> {

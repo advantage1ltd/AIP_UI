@@ -72,6 +72,12 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
   }
 
   const handleDelete = (customer: Customer) => {
+    console.log('🔧 [CustomersTable] handleDelete called for customer:', {
+      id: customer.id,
+      name: customer.companyName,
+      idType: typeof customer.id,
+      idString: String(customer.id)
+    })
     setCustomerToDelete(customer)
     setDeleteDialogOpen(true)
   }
@@ -79,10 +85,18 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
   const confirmDelete = async () => {
     if (customerToDelete) {
       try {
+        console.log('🔧 [CustomersTable] confirmDelete - attempting to delete customer:', {
+          id: customerToDelete.id,
+          name: customerToDelete.companyName,
+          idType: typeof customerToDelete.id
+        })
+        
         const response = await fetch(`/api/customers/${customerToDelete.id}`, {
           method: 'DELETE',
         })
         const result = await response.json()
+        
+        console.log('🔧 [CustomersTable] confirmDelete - API response:', result)
         
         if (result.success) {
           // If the deleted customer was selected, clear the selection
@@ -102,7 +116,7 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
           throw new Error(result.message || 'Failed to delete customer')
         }
       } catch (error) {
-        console.error('Error deleting customer:', error)
+        console.error('❌ [CustomersTable] confirmDelete - error:', error)
         toast({
           title: "Delete Failed",
           description: error instanceof Error ? error.message : "Failed to delete customer. Please try again.",
@@ -117,13 +131,31 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
 
   const handleSave = async (updatedCustomer: Customer) => {
     try {
+      console.log('🔧 [CustomersTable] handleSave - received customer data:', {
+        id: updatedCustomer.id,
+        companyName: updatedCustomer.companyName,
+        pageAssignmentsCount: Object.keys(updatedCustomer.pageAssignments || {}).length,
+        enabledPagesCount: updatedCustomer.viewConfig?.enabledPages?.length || 0,
+        pageAssignments: updatedCustomer.pageAssignments,
+        enabledPages: updatedCustomer.viewConfig?.enabledPages
+      })
+      
       // Determine if this is a new customer based on ID
+      // New customers have IDs starting with 'CUST' (temporary IDs)
+      // Existing customers have numeric IDs from the database
       const idString = String(updatedCustomer.id || '')
-      const isNew = !updatedCustomer.id || idString.startsWith('CUST')
+      const isNew = idString.startsWith('CUST')
+      
+      console.log('🔧 [CustomersTable] handleSave - customer type:', { 
+        id: updatedCustomer.id, 
+        idString, 
+        isNew 
+      })
       
       let result
       if (isNew) {
         // Create new customer via API
+        console.log('🔧 [CustomersTable] handleSave - creating new customer')
         const response = await fetch('/api/customers', {
           method: 'POST',
           headers: {
@@ -134,6 +166,7 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
         result = await response.json()
       } else {
         // Update existing customer via API
+        console.log('🔧 [CustomersTable] handleSave - updating existing customer')
         const response = await fetch(`/api/customers/${String(updatedCustomer.id)}`, {
           method: 'PUT',
           headers: {
@@ -143,6 +176,8 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
         })
         result = await response.json()
       }
+      
+      console.log('🔧 [CustomersTable] handleSave - API response:', result)
       
       if (result.success) {
         toast({
@@ -158,7 +193,7 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
         throw new Error(result.message || 'Failed to save customer')
       }
     } catch (error) {
-      console.error('Error saving customer:', error)
+      console.error('❌ [CustomersTable] handleSave - error:', error)
       toast({
         title: "Save Failed",
         description: error instanceof Error ? error.message : "Failed to save customer. Please try again.",

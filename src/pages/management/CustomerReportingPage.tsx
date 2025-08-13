@@ -36,6 +36,7 @@ import {
   ArrowLeft,
   MapPin
 } from 'lucide-react';
+import { customerOperations } from '@/mocks/customerStore';
 
 const iconMap = {
   Calendar,
@@ -84,43 +85,36 @@ export default function CustomerReportingPage() {
       setIsLoading(true);
       setError(null);
 
-      // For officers, fetch fresh assignment data
-      let assignedCustomerIds: string[] = [];
+      // Load customer data from customer store (which uses cached data)
+      let customerData = await customerOperations.getAll();
+      
+      // For officers, filter to only assigned customers
       if (user.role === 'AdvantageOneOfficer') {
-        try {
-          const userResponse = await fetch(`${BASE_API_URL}/users/${user.id}`);
-          if (userResponse.ok) {
-            const userData = await userResponse.json();
-            assignedCustomerIds = userData.data?.assignedCustomerIds?.map((id: number) => id.toString()) || [];
-            console.log('🔄 [CustomerReportingPage] Fresh assignments:', assignedCustomerIds);
-          }
-        } catch (fetchError) {
-          assignedCustomerIds = ('assignedCustomerIds' in user && user.assignedCustomerIds) 
-            ? user.assignedCustomerIds.map(id => id.toString()) 
-            : [];
-        }
+        const assignedCustomerIds = user.assignedCustomerIds || [];
+        customerData = customerData.filter((customer: any) => 
+          assignedCustomerIds.includes(customer.id)
+        );
+        console.log('🔄 [CustomerReportingPage] Filtered customers for officer:', {
+          assignedCustomerIds,
+          filteredCount: customerData.length
+        });
       }
-
-      // Build API URL with proper parameters
-      const params = new URLSearchParams({
-        userId: user.id,
-        role: user.role
+      
+      // Transform customer data to include available pages
+      const customersWithPages = customerData.map((customer: any) => {
+        const availablePages = getAvailablePages(customer);
+        return {
+          ...customer,
+          availablePages
+        };
       });
-
-      if (user.role === 'AdvantageOneOfficer' && assignedCustomerIds.length > 0) {
-        params.append('assignedCustomerIds', assignedCustomerIds.join(','));
-      }
-
-      const response = await fetch(`${BASE_API_URL}/customers/reporting?${params.toString()}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch customer reporting data');
-      }
-
-      setCustomers(data.data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      
+      setCustomers(customersWithPages);
+      console.log('✅ [CustomerReportingPage] Loaded customers from store:', customersWithPages.length);
+      
+    } catch (error) {
+      console.error('❌ [CustomerReportingPage] Error fetching customer data:', error);
+      setError('Failed to load customer data');
     } finally {
       setIsLoading(false);
     }
@@ -158,33 +152,67 @@ export default function CustomerReportingPage() {
   }, [user]);
 
   const getAvailablePages = (customer: CustomerWithRelations): CustomerPage[] => {
-    console.log('🔍 [CustomerReportingPage] getAvailablePages called with customer:', customer);
-    console.log('🔍 [CustomerReportingPage] User role:', user?.role);
-    
-    // Use customer's page assignments if available
-    if (customer.pageAssignments) {
-      const enabledPageIds = Object.entries(customer.pageAssignments)
-        .filter(([_, assignment]) => assignment.enabled)
-        .map(([pageId]) => pageId);
+    try {
+      // Get enabled pages from customer's pageAssignments
+      if (customer.pageAssignments) {
+        const enabledPageIds = Object.entries(customer.pageAssignments)
+          .filter(([_, assignment]) => (assignment as any).enabled)
+          .map(([pageId]) => pageId);
+        
+        // Map page IDs to CustomerPage objects
+        const availablePages = enabledPageIds.map(pageId => {
+          const pageConfig = CUSTOMER_PAGES[pageId];
+          if (pageConfig) {
+            return {
+              ...pageConfig,
+              id: pageId
+            };
+          }
+          return null;
+        }).filter(Boolean) as CustomerPage[];
+        
+        console.log('🔍 [CustomerReportingPage] Available pages for customer:', {
+          customerId: customer.id,
+          customerName: customer.companyName,
+          enabledPageIds,
+          availablePagesCount: availablePages.length
+        });
+        
+        return availablePages;
+      }
       
-      console.log('🔍 [CustomerReportingPage] Enabled page IDs:', enabledPageIds);
+      // Fallback to viewConfig if pageAssignments not available
+      if (customer.viewConfig?.enabledPages) {
+        const availablePages = customer.viewConfig.enabledPages.map(pageId => {
+          const pageConfig = CUSTOMER_PAGES[pageId];
+          if (pageConfig) {
+            return {
+              ...pageConfig,
+              id: pageId
+            };
+          }
+          return null;
+        }).filter(Boolean) as CustomerPage[];
+        
+        console.log('🔍 [CustomerReportingPage] Using viewConfig fallback for customer:', {
+          customerId: customer.id,
+          customerName: customer.companyName,
+          availablePagesCount: availablePages.length
+        });
+        
+        return availablePages;
+      }
       
-      const matchedPages = Object.entries(CUSTOMER_PAGES)
-        .filter(([key, page]) => enabledPageIds.includes(key))
-        .map(([key, page]) => page);
+      console.log('🔍 [CustomerReportingPage] No page assignments found for customer:', {
+        customerId: customer.id,
+        customerName: customer.companyName
+      });
       
-      console.log('🔍 [CustomerReportingPage] Matched pages:', matchedPages);
-      return matchedPages;
+      return [];
+    } catch (error) {
+      console.error('❌ [CustomerReportingPage] Error getting available pages:', error);
+      return [];
     }
-    
-    // Fallback to availablePages if pageAssignments is not available
-    if (customer.availablePages) {
-      console.log('🔍 [CustomerReportingPage] Using fallback availablePages:', customer.availablePages);
-      return customer.availablePages;
-    }
-    
-    console.log('🔍 [CustomerReportingPage] No page assignments or available pages found');
-    return [];
   };
 
   const getIcon = (iconName: string | undefined) => {

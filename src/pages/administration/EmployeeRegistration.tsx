@@ -53,7 +53,7 @@ export default function EmployeeRegistration() {
       setEmployees(employees.filter(e => e.id !== employee.id))
       toast({
         title: "Success",
-        description: `${employee.employeeName} has been deleted`,
+        description: `${employee.firstName} ${employee.lastName} has been deleted`,
       })
     } catch (error) {
       toast({
@@ -76,7 +76,7 @@ export default function EmployeeRegistration() {
         setEmployees(employees.map(e => e.id === updated.id ? updated : e))
         toast({
           title: "Success",
-          description: `${updated.employeeName} has been updated`,
+          description: `${updated.firstName} ${updated.lastName} has been updated`,
         })
       } else {
         // Create
@@ -84,7 +84,7 @@ export default function EmployeeRegistration() {
         setEmployees([...employees, created])
         toast({
           title: "Success",
-          description: `${created.employeeName} has been created`,
+          description: `${created.firstName} ${created.lastName} has been created`,
         })
       }
       setIsDialogOpen(false)

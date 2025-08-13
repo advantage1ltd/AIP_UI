@@ -1,186 +1,416 @@
-import { CustomerWithRelations as Customer } from '@/types/customer';
-
-interface CustomerStoreData {
-  customers: Customer[];
-  lastUpdated: number;
-  version: number;
-}
-
-// In-memory store
-let dataStore: CustomerStoreData | null = null;
-let initPromise: Promise<CustomerStoreData> | null = null;
+import { CustomerWithRelations as Customer } from '@/types/customer'
+import { customerApiService, CustomerCreateRequest } from '@/services/customerApiService'
 
 // Debug logging with timestamps
 const log = {
   info: (message: string, data?: any) => {
-    console.log(`${new Date().toISOString()} 📝 [Customer Store] ${message}`, data ? data : '');
+    console.log(`${new Date().toISOString()} 📝 [Customer Store] ${message}`, data ? data : '')
   },
   warn: (message: string, data?: any) => {
-    console.warn(`${new Date().toISOString()} ⚠️ [Customer Store] ${message}`, data ? data : '');
+    console.warn(`${new Date().toISOString()} ⚠️ [Customer Store] ${message}`, data ? data : '')
   },
   error: (message: string, data?: any) => {
-    console.error(`${new Date().toISOString()} ❌ [Customer Store] ${message}`, data ? data : '');
+    console.error(`${new Date().toISOString()} ❌ [Customer Store] ${message}`, data ? data : '')
   },
   success: (message: string, data?: any) => {
-    console.log(`${new Date().toISOString()} ✅ [Customer Store] ${message}`, data ? data : '');
+    console.log(`${new Date().toISOString()} ✅ [Customer Store] ${message}`, data ? data : '')
   }
-};
+}
 
-// Initialize store from db.json
-const initializeStore = async (): Promise<CustomerStoreData> => {
-  if (initPromise) {
-    log.info('Waiting for existing initialization...');
-    return initPromise;
-  }
-  
-  initPromise = (async () => {
-    if (dataStore !== null) {
-      log.info('Store already initialized');
-      return dataStore;
-    }
-    
+// In-memory cache for performance
+let customerCache: Customer[] = []
+let cacheTimestamp: number = 0
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+// Check if cache is valid
+const isCacheValid = (): boolean => {
+  return customerCache.length > 0 && (Date.now() - cacheTimestamp) < CACHE_DURATION
+}
+
+// Clear cache
+const clearCache = (): void => {
+  customerCache = []
+  cacheTimestamp = 0
+  log.info('Customer cache cleared')
+}
+
+// Customer operations with real API calls and caching
+export const customerOperations = {
+  /**
+   * Get all customers with caching
+   */
+  getAll: async (): Promise<Customer[]> => {
     try {
-      // Try localStorage first
-      const stored = localStorage.getItem('msw_customer_store');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed && parsed.version === 1) { // Version check
-          dataStore = parsed;
-          log.success('Loaded from localStorage', { customers: dataStore.customers.length });
-          return dataStore;
+      if (isCacheValid()) {
+        log.info('Retrieved customers from cache', { 
+          count: customerCache.length,
+          cacheAge: Math.round((Date.now() - cacheTimestamp) / 1000) + 's'
+        })
+        return customerCache
+      }
+
+      log.info('Fetching customers from API...')
+      const response = await customerApiService.getCustomers()
+      
+      customerCache = response.customers
+      cacheTimestamp = Date.now()
+      
+      log.success('Retrieved customers from API', { 
+        count: customerCache.length,
+        total: response.total
+      })
+      
+      return customerCache
+    } catch (error) {
+      log.error('Failed to retrieve customers:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Get customer by ID
+   */
+  getById: async (id: number | string): Promise<Customer | undefined> => {
+    try {
+      const numericId = typeof id === 'string' ? parseInt(id, 10) : id
+      
+      // Check cache first
+      if (isCacheValid()) {
+        const customer = customerCache.find(c => c.id === numericId)
+        if (customer) {
+          log.info(`Retrieved customer ${id} from cache`, { found: true })
+          return customer
+        }
+      }
+
+      // Fetch from API if not in cache
+      log.info(`Fetching customer ${id} from API...`)
+      const customer = await customerApiService.getCustomerById(numericId)
+      
+      // Update cache
+      if (isCacheValid()) {
+        const index = customerCache.findIndex(c => c.id === numericId)
+        if (index !== -1) {
+          customerCache[index] = customer
+        } else {
+          customerCache.push(customer)
         }
       }
       
-      // Load from db.json if localStorage is empty or outdated
-      const response = await fetch('/db.json');
-      const data = await response.json();
-      
-      dataStore = {
-        customers: data.customerDetails || [],
-        lastUpdated: Date.now(),
-        version: 1 // Store version for future migrations
-      };
-      
-      // Save to localStorage
-      localStorage.setItem('msw_customer_store', JSON.stringify(dataStore));
-      log.success('Initialized with data from db.json', { customers: dataStore.customers.length });
-      
-      return dataStore;
+      log.success(`Retrieved customer ${id} from API`, { found: true })
+      return customer
     } catch (error) {
-      log.error('Failed to initialize:', error);
-      throw error;
-    } finally {
-      initPromise = null;
+      log.error(`Failed to retrieve customer ${id}:`, error)
+      return undefined
     }
-  })();
-  
-  return initPromise;
-};
+  },
 
-// Save store to localStorage with debouncing
-let saveTimeout: NodeJS.Timeout | null = null;
-const persistStore = () => {
-  if (!dataStore) return;
-  
-  if (saveTimeout) {
-    clearTimeout(saveTimeout);
-  }
-  
-  saveTimeout = setTimeout(() => {
+  /**
+   * Update customer
+   */
+  update: async (id: number | string, updates: Partial<Customer>): Promise<Customer | null> => {
     try {
-      dataStore!.lastUpdated = Date.now();
-      localStorage.setItem('msw_customer_store', JSON.stringify(dataStore));
-      log.success('Persisted to localStorage', { 
-        customers: dataStore!.customers.length,
-        lastUpdated: new Date(dataStore!.lastUpdated).toISOString()
-      });
-    } catch (error) {
-      log.error('Failed to persist:', error);
-    }
-  }, 100); // Debounce saves
-};
-
-// Load store from localStorage or initialize
-export const getStore = async () => {
-  return initializeStore();
-};
-
-// Clear store (for testing)
-export const clearStore = () => {
-  dataStore = null;
-  localStorage.removeItem('msw_customer_store');
-  log.info('Cleared store');
-};
-
-// Customer operations with enhanced error handling and logging
-export const customerOperations = {
-  getAll: async () => {
-    const store = await getStore();
-    log.info('Retrieved all customers', { count: store.customers.length });
-    return store.customers;
-  },
-  
-  getById: async (id: number) => {
-    const store = await getStore();
-    const customer = store.customers.find(c => c.id === id);
-    log.info(`Retrieved customer ${id}`, { found: !!customer });
-    return customer;
-  },
-  
-  update: async (id: number, updates: Partial<Customer>) => {
-    const store = await getStore();
-    const index = store.customers.findIndex(c => c.id === id);
-    
-    if (index === -1) {
-      log.warn(`Customer ${id} not found for update`);
-      return null;
-    }
-    
-    const oldData = { ...store.customers[index] };
-    store.customers[index] = { ...store.customers[index], ...updates };
-    
-    log.info(`Updated customer ${id}`, {
-      changes: Object.keys(updates),
-      before: {
-        name: oldData.companyName,
-        pageAssignments: oldData.pageAssignments
-      },
-      after: {
-        name: store.customers[index].companyName,
-        pageAssignments: store.customers[index].pageAssignments
+      const numericId = typeof id === 'string' ? parseInt(id, 10) : id
+      
+      log.info(`Updating customer ${id}`, {
+        updateKeys: Object.keys(updates)
+      })
+      
+      // Convert Customer updates to CustomerCreateRequest format
+      const apiUpdates: Partial<CustomerCreateRequest> = {}
+      
+      if (updates.companyName) apiUpdates.companyName = updates.companyName
+      if (updates.status) apiUpdates.status = updates.status
+      if (updates.pageAssignments) apiUpdates.pageAssignments = updates.pageAssignments
+      if (updates.regions) apiUpdates.regions = updates.regions.map(r => r.name)
+      if (updates.sites) apiUpdates.sites = updates.sites.map(s => s.locationName)
+      if (updates.address) {
+        apiUpdates.address = {
+          street: updates.address.street,
+          city: updates.address.town,
+          county: updates.address.county,
+          postCode: updates.address.postcode,
+          region: updates.address.county // Using county as region for now
+        }
       }
-    });
-    
-    persistStore();
-    return store.customers[index];
+      
+      const updatedCustomer = await customerApiService.updateCustomer(numericId, apiUpdates)
+      
+      // Update cache
+      if (isCacheValid()) {
+        const index = customerCache.findIndex(c => c.id === numericId)
+        if (index !== -1) {
+          customerCache[index] = updatedCustomer
+        }
+      }
+      
+      log.success(`Updated customer ${id}`, {
+        changes: Object.keys(updates)
+      })
+      
+      return updatedCustomer
+    } catch (error) {
+      log.error(`Failed to update customer ${id}:`, error)
+      throw error
+    }
   },
-  
-  create: async (customer: Customer) => {
-    const store = await getStore();
-    store.customers.push(customer);
-    persistStore();
-    log.success('Created new customer', { id: customer.id, name: customer.companyName });
-    return customer;
+
+  /**
+   * Create new customer
+   */
+  create: async (customer: Customer): Promise<Customer> => {
+    try {
+      log.info('Creating new customer', { 
+        name: customer.companyName
+      })
+      
+      const newCustomer = await customerApiService.createCustomer({
+        companyName: customer.companyName,
+        contactName: customer.contact?.forename + ' ' + customer.contact?.surname,
+        contactEmail: customer.contact?.email,
+        contactPhone: customer.contact?.phone,
+        address: {
+          street: customer.address.street,
+          city: customer.address.town,
+          county: customer.address.county,
+          postCode: customer.address.postcode,
+          region: customer.address.county // Using county as region for now
+        },
+        pageAssignments: customer.pageAssignments,
+        regions: customer.regions?.map(r => r.name) || [],
+        sites: customer.sites?.map(s => s.locationName) || [],
+        status: customer.status
+      })
+      
+      // Add to cache
+      if (isCacheValid()) {
+        customerCache.push(newCustomer)
+      }
+      
+      log.success('Created new customer', { 
+        id: newCustomer.id, 
+        name: newCustomer.companyName
+      })
+      
+      return newCustomer
+    } catch (error) {
+      log.error('Failed to create customer:', error)
+      throw error
+    }
   },
-  
-  delete: async (id: number) => {
-    const store = await getStore();
-    const initialLength = store.customers.length;
-    store.customers = store.customers.filter(c => c.id !== id);
+
+  /**
+   * Delete customer
+   */
+  delete: async (id: number | string): Promise<void> => {
+    try {
+      const numericId = typeof id === 'string' ? parseInt(id, 10) : id
+      
+      log.info(`Deleting customer ${id}`)
+      await customerApiService.deleteCustomer(numericId)
+      
+      // Remove from cache
+      if (isCacheValid()) {
+        customerCache = customerCache.filter(c => c.id !== numericId)
+      }
+      
+      log.success(`Deleted customer ${id}`)
+    } catch (error) {
+      log.error(`Failed to delete customer ${id}:`, error)
+      throw error
+    }
+  },
+
+  /**
+   * Search customers
+   */
+  search: async (query: string): Promise<Customer[]> => {
+    try {
+      log.info(`Searching customers with query: ${query}`)
+      const results = await customerApiService.searchCustomers(query)
+      log.success(`Search completed`, { results: results.length })
+      return results
+    } catch (error) {
+      log.error('Failed to search customers:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Get customers by region
+   */
+  getByRegion: async (region: string): Promise<Customer[]> => {
+    try {
+      log.info(`Getting customers by region: ${region}`)
+      const results = await customerApiService.getCustomersByRegion(region)
+      log.success(`Retrieved customers by region`, { region, count: results.length })
+      return results
+    } catch (error) {
+      log.error(`Failed to get customers by region ${region}:`, error)
+      throw error
+    }
+  },
+
+  /**
+   * Get customers by status
+   */
+  getByStatus: async (status: 'active' | 'inactive'): Promise<Customer[]> => {
+    try {
+      log.info(`Getting customers by status: ${status}`)
+      const results = await customerApiService.getCustomersByStatus(status)
+      log.success(`Retrieved customers by status`, { status, count: results.length })
+      return results
+    } catch (error) {
+      log.error(`Failed to get customers by status ${status}:`, error)
+      throw error
+    }
+  },
+
+  /**
+   * Update customer page assignments
+   */
+  updatePageAssignments: async (id: number | string, pageAssignments: Record<string, any>): Promise<Customer> => {
+    try {
+      const numericId = typeof id === 'string' ? parseInt(id, 10) : id
+      
+      log.info(`Updating page assignments for customer ${id}`)
+      const updatedCustomer = await customerApiService.updateCustomerPageAssignments(numericId, pageAssignments)
+      
+      // Update cache
+      if (isCacheValid()) {
+        const index = customerCache.findIndex(c => c.id === numericId)
+        if (index !== -1) {
+          customerCache[index] = updatedCustomer
+        }
+      }
+      
+      log.success(`Updated page assignments for customer ${id}`)
+      return updatedCustomer
+    } catch (error) {
+      log.error(`Failed to update page assignments for customer ${id}:`, error)
+      throw error
+    }
+  },
+
+  /**
+   * Get customer statistics
+   */
+  getStatistics: async () => {
+    try {
+      log.info('Getting customer statistics')
+      const stats = await customerApiService.getCustomerStatistics()
+      log.success('Retrieved customer statistics')
+      return stats
+    } catch (error) {
+      log.error('Failed to get customer statistics:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Force refresh cache
+   */
+  forceRefresh: async (): Promise<Customer[]> => {
+    try {
+      log.info('Forcing cache refresh')
+      clearCache()
+      return await customerOperations.getAll()
+    } catch (error) {
+      log.error('Failed to force refresh:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Clear cache
+   */
+  clearCache: (): void => {
+    clearCache()
+  }
+}
+
+// Export current state to db.json format (for backward compatibility)
+export const exportToDbJson = async () => {
+  try {
+    const customers = await customerOperations.getAll()
     
-    if (store.customers.length === initialLength) {
-      log.warn(`Customer ${id} not found for deletion`);
-      return;
+    const dbJsonData = {
+      customerDetails: customers
     }
     
-    persistStore();
-    log.success(`Deleted customer ${id}`);
+    const dbJsonString = JSON.stringify(dbJsonData, null, 2)
+    
+    // Create a downloadable file
+    const blob = new Blob([dbJsonString], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'db_updated.json'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    
+    log.success('Exported updated data to db_updated.json', {
+      customerCount: customers.length,
+      totalSize: dbJsonString.length
+    })
+    
+    return dbJsonData
+  } catch (error) {
+    log.error('Failed to export to db.json format:', error)
+    return null
   }
-};
+}
+
+// Legacy functions for backward compatibility
+export const getStore = async () => {
+  const customers = await customerOperations.getAll()
+  return {
+    customers,
+    lastUpdated: Date.now(),
+    version: 3 // New version for API-based store
+  }
+}
+
+export const clearStore = () => {
+  clearCache()
+  log.info('Cleared store')
+}
 
 // Make debug functions available globally
 (window as any).customerDebug = {
-  clearStore,
-  getStore,
-  log
-}; 
+  clearCache: customerOperations.clearCache,
+  forceRefresh: customerOperations.forceRefresh,
+  getStatistics: customerOperations.getStatistics,
+  exportToDbJson,
+  log,
+  // Debug function to check cache status
+  checkCacheStatus: () => {
+    console.log('🔍 [Debug] Cache status:', {
+      cacheValid: isCacheValid(),
+      cacheSize: customerCache.length,
+      cacheAge: cacheTimestamp ? Math.round((Date.now() - cacheTimestamp) / 1000) + 's' : 'N/A',
+      cacheDuration: Math.round(CACHE_DURATION / 1000) + 's'
+    })
+  },
+  // Debug function to list all customers in cache
+  listAllCustomers: () => {
+    console.log('🔍 [Debug] All customers in cache:', customerCache.map(c => ({
+      id: c.id,
+      name: c.companyName,
+      status: c.status
+    })))
+    return customerCache
+  },
+  // Debug function to find customer by name
+  findCustomerByName: (name: string) => {
+    const customer = customerCache.find(c => c.companyName.toLowerCase().includes(name.toLowerCase()))
+    console.log('🔍 [Debug] Search result for name:', name, customer ? {
+      id: customer.id,
+      name: customer.companyName,
+      status: customer.status
+    } : 'Not found')
+    return customer
+  }
+} 

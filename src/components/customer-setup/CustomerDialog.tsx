@@ -14,6 +14,7 @@ import { AddressSection } from "./dialog-sections/AddressSection"
 import { ContactSection } from "./dialog-sections/ContactSection"
 import { CompanyDetailsSection } from "./dialog-sections/CompanyDetailsSection"
 import { CustomerPageAssignment as PageAssignmentComponent } from "./CustomerPageAssignment"
+import { customerOperations } from "@/mocks/customerStore"
 
 const customerTypes: { value: CustomerType; label: string }[] = [
   { value: "retail", label: "Retail" },
@@ -64,7 +65,31 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
 
   // Update pageAssignments when customer prop changes
   useEffect(() => {
-    setPageAssignments(customer?.pageAssignments || {})
+    const loadPageAssignments = async () => {
+      if (customer?.id) {
+        try {
+          console.log('🔧 [CustomerDialog] Loading page assignments from customer store for customer:', customer.id)
+          
+          // Load customer data from customer store (which uses cached data)
+          const customerData = await customerOperations.getById(customer.id)
+          
+          if (customerData?.pageAssignments) {
+            setPageAssignments(customerData.pageAssignments)
+            console.log('🔧 [CustomerDialog] Loaded page assignments from store:', customerData.pageAssignments)
+          } else {
+            setPageAssignments({})
+            console.log('🔧 [CustomerDialog] No page assignments found in store')
+          }
+        } catch (error) {
+          console.error('❌ [CustomerDialog] Error loading page assignments from store:', error)
+          setPageAssignments({})
+        }
+      } else {
+        setPageAssignments({})
+      }
+    }
+
+    loadPageAssignments()
   }, [customer])
   
   const form = useForm<z.infer<typeof customerSchema>>({
@@ -151,19 +176,32 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
 
   const watchedCustomerType = form.watch("customerType") as CustomerType
 
-  const onSubmit = (data: z.infer<typeof customerSchema>) => {
+  const onSubmit = async (data: z.infer<typeof customerSchema>) => {
     try {
+      console.log('🔧 [CustomerDialog] onSubmit - pageAssignments before processing:', pageAssignments)
+      
       const enabledPages = Object.keys(pageAssignments).filter(pageId => pageAssignments[pageId].enabled)
+      console.log('🔧 [CustomerDialog] onSubmit - enabledPages calculated:', enabledPages)
+      
+      // Ensure we don't generate new IDs for existing customers
+      const isExistingCustomer = customer && customer.id && !String(customer.id).startsWith('CUST')
+      const customerId = isExistingCustomer ? customer.id : (customer?.id || `CUST${Date.now()}`)
+      
+      console.log('🔧 [CustomerDialog] onSubmit - customer ID logic:', {
+        isExistingCustomer,
+        originalId: customer?.id,
+        finalId: customerId
+      })
       
       const customerData = {
         ...data,
         pageAssignments,
-        id: customer?.id || `CUST${Date.now()}`,
+        id: customerId,
         createdAt: customer?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         viewConfig: {
           id: customer?.viewConfig?.id || `VC${Date.now()}`,
-          customerId: customer?.id || `CUST${Date.now()}`,
+          customerId: customerId,
           customerType: data.customerType,
           enabledPages,
           createdAt: customer?.viewConfig?.createdAt || new Date().toISOString(),
@@ -171,12 +209,36 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
         }
       }
       
+      console.log('🔧 [CustomerDialog] onSubmit - final customerData:', {
+        id: customerData.id,
+        companyName: customerData.companyName,
+        pageAssignmentsCount: Object.keys(customerData.pageAssignments).length,
+        enabledPagesCount: customerData.viewConfig.enabledPages.length,
+        pageAssignments: customerData.pageAssignments,
+        enabledPages: customerData.viewConfig.enabledPages
+      })
+      
+      // Save customer data first
       onSave(customerData as Customer)
+      
+      // Dispatch event to notify PageAccessContext about page assignment changes
+      if (customer?.id && Object.keys(pageAssignments).length > 0) {
+        window.dispatchEvent(new CustomEvent('customer-page-assignments-updated', {
+          detail: { 
+            customerId: customer.id,
+            customerName: customerData.companyName,
+            pageAssignments: customerData.pageAssignments,
+            enabledPages: customerData.viewConfig.enabledPages
+          }
+        }));
+        console.log('✅ [CustomerDialog] Dispatched customer-page-assignments-updated event')
+      }
       
       // Note: Success/error notifications are handled in the parent component
       // Only close dialog on successful validation
       
     } catch (error) {
+      console.error('❌ [CustomerDialog] onSubmit - error:', error)
       toast({
         title: "Validation Error",
         description: "Please check all required fields and try again.",

@@ -89,6 +89,17 @@ export const CUSTOMER_PAGES: Record<string, CustomerPage> = {
     readOnly: false,
     category: 'support',
     icon: 'Users'
+  },
+  'daily-occurrence-book': {
+    id: 'customer-daily-occurrence-book',
+    title: 'Daily Occurrence Book (DOB)',
+    description: 'Record and manage daily occurrences, incidents, and events for this customer',
+    enabled: true,
+    requiredForTypes: [], // No required pages - customers needs vary
+    path: '/customer/daily-occurrence-book',
+    readOnly: false,
+    category: 'security',
+    icon: 'BookOpen'
   }
 }
 

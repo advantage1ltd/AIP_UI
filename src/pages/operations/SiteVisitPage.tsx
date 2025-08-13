@@ -1,12 +1,11 @@
 import * as React from "react";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { MoreHorizontal, Plus, Pencil, Trash2, Search, X } from "lucide-react";
 import * as z from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { SiteVisit } from "@/types/siteVisit";
-import axios from 'axios';
 import { toast } from 'react-toastify';
 import { siteVisitService } from '@/services/siteVisitService'
 
@@ -423,14 +422,16 @@ interface SiteVisitPageProps {
 
 export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [visits, setVisits] = useState<any[]>(allMockVisits);
+  const [visits, setVisits] = useState<SiteVisit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [searchQuery, setSearchQuery] = useState("");
-  const [editingVisit, setEditingVisit] = useState<any>(null);
+  const [editingVisit, setEditingVisit] = useState<SiteVisit | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Load initial data
   useEffect(() => {
@@ -451,8 +452,9 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
         
         const response = await siteVisitService.getSiteVisits(params);
         console.log('📤 [SiteVisitPage] Site visits response:', response);
-        
         setVisits(response.data);
+        setTotalPages(response.totalPages);
+        setTotalCount(response.total);
       } catch (error) {
         console.error('❌ [SiteVisitPage] Failed to load visits:', error);
         toast.error('Failed to load site visits', {
@@ -471,28 +473,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
     loadVisits();
   }, [currentPage, itemsPerPage, searchQuery, customerId, siteId]);
 
-  // Filter visits based on search query
-  const filteredVisits = useMemo(() => {
-    if (!searchQuery.trim()) return visits;
-    
-    const query = searchQuery.toLowerCase().trim();
-    return visits.filter(visit => 
-      visit.customerName.toLowerCase().includes(query) ||
-      visit.officerName.toLowerCase().includes(query) ||
-      visit.locationName.toLowerCase().includes(query) ||
-      visit.status.toLowerCase().includes(query) ||
-      format(new Date(visit.date), 'dd/MM/yyyy').toLowerCase().includes(query)
-    );
-  }, [visits, searchQuery]);
-
-  // Calculate total pages from filtered visits
-  const totalPages = Math.ceil(filteredVisits.length / itemsPerPage);
-  
-  // Get current page items from filtered visits
-  const paginatedVisits = filteredVisits.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // Server-side pagination is used. "visits" already contains only current page items.
 
   // Add search handler
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -630,6 +611,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
         console.log('Create successful:', created)
         
         setVisits(currentVisits => [created, ...currentVisits])
+        setTotalCount(count => count + 1)
         toast.success('New site visit has been created successfully! ✨', {
           position: "top-right",
           autoClose: 4000,
@@ -769,6 +751,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
       try {
         await siteVisitService.deleteSiteVisit(deleteId);
         setVisits(currentVisits => currentVisits.filter(visit => visit.id !== deleteId));
+        setTotalCount(count => Math.max(0, count - 1));
         setIsDeleteDialogOpen(false);
         setDeleteId(null);
         
@@ -825,7 +808,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                 <FileText className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 xl:h-5 xl:w-5 text-blue-300" />
               </CardHeader>
               <CardContent className="p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pt-0 md:pt-1 xl:pt-2">
-                <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">{visits.length}</div>
+                <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">{totalCount}</div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-br from-green-800 to-green-900 border-green-700 shadow-md">
@@ -890,7 +873,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
           </div>
           {searchQuery && (
             <p className="text-[10px] sm:text-xs xl:text-sm text-gray-500 mt-1">
-              Found {filteredVisits.length} {filteredVisits.length === 1 ? 'result' : 'results'}
+              Found {totalCount} {totalCount === 1 ? 'result' : 'results'}
             </p>
           )}
         </div>
@@ -911,7 +894,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredVisits.length === 0 ? (
+                  {visits.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-4 sm:py-6 md:py-8 xl:py-12">
                         {searchQuery ? (
@@ -931,7 +914,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedVisits.map((visit) => (
+                    visits.map((visit) => (
                       <TableRow key={visit.id} className="hover:bg-gray-50 transition-colors text-[10px] sm:text-xs lg:text-sm xl:text-base">
                         <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4">
                           <div className="font-medium text-[11px] sm:text-sm xl:text-base text-blue-700">
@@ -989,7 +972,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
         </div>
 
         {/* Pagination */}
-        {filteredVisits.length > itemsPerPage && (
+        {totalPages > 1 && (
           <div className="flex justify-center py-2 sm:py-3 md:py-4 xl:py-6 mt-2 sm:mt-3 md:mt-4 xl:mt-6 overflow-x-auto">
             <Pagination>
               <PaginationContent className="flex flex-wrap items-center justify-center gap-0.5 sm:gap-1 xl:gap-2">

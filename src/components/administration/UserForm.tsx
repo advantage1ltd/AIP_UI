@@ -17,9 +17,11 @@ import {
   UserRole,
   CustomerUser,
   AdvantageOneUser,
+  USER_COMPANIES,
 } from '@/types/user';
 import { useAvailableCustomers } from '@/hooks/useAvailableCustomers';
-import { Users, Eye, EyeOff, Building2, Lock } from 'lucide-react';
+import { Users, Eye, EyeOff, Building2, Lock, FileText, Shield, Briefcase, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface UserFormProps {
@@ -44,8 +46,13 @@ type FormState = {
   password?: string;
   role: UserRole;
   pageAccessRole: UserRole;
+  signature?: string;
+  signatureCode?: string;
+  jobTitle?: string;
+  userCompany?: string;
+  recordIsDeleted?: boolean;
 } & (
-  | { role: 'CustomerSiteManager' | 'CustomerHOManager'; customerId: string }
+  | { role: 'CustomerSiteManager' | 'CustomerHOManager' }
   | { role: 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator'; assignedCustomerIds: number[] }
 );
 
@@ -61,13 +68,17 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
       password: '',
       role: initialData?.role || USER_ROLES[0],
       pageAccessRole: initialData?.pageAccessRole || USER_ROLES[0],
+      signature: initialData?.signature || '',
+      signatureCode: initialData?.signatureCode || '',
+      jobTitle: initialData?.jobTitle || '',
+      userCompany: initialData?.userCompany || '',
+      recordIsDeleted: initialData?.recordIsDeleted || false,
     };
 
     if (initialData?.role === 'CustomerSiteManager' || initialData?.role === 'CustomerHOManager') {
       return {
         ...baseData,
         role: initialData.role,
-        customerId: (initialData && 'customerId' in initialData ? initialData.customerId.toString() : ''),
       } as FormState;
     } else {
       return {
@@ -79,6 +90,28 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
   });
 
   const [showPassword, setShowPassword] = useState(false);
+
+  const handleCheckboxChange = (name: string, checked: boolean) => {
+    setFormData(prev => ({ ...prev, [name]: checked }));
+  };
+
+  const handleAddCustomer = (customerId: number) => {
+    if ('assignedCustomerIds' in formData && !formData.assignedCustomerIds.includes(customerId)) {
+      setFormData({
+        ...formData,
+        assignedCustomerIds: [...formData.assignedCustomerIds, customerId],
+      } as FormState);
+    }
+  };
+
+  const handleRemoveCustomer = (customerId: number) => {
+    if ('assignedCustomerIds' in formData) {
+      setFormData({
+        ...formData,
+        assignedCustomerIds: formData.assignedCustomerIds.filter(id => id !== customerId),
+      } as FormState);
+    }
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement>
@@ -97,7 +130,6 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
           ...formData,
           role,
           pageAccessRole: role,
-          customerId: '',
         } as FormState);
       } else {
         setFormData({
@@ -107,11 +139,8 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
           assignedCustomerIds: [],
         } as FormState);
       }
-    } else if (name === 'customerId' && (formData.role === 'CustomerSiteManager' || formData.role === 'CustomerHOManager')) {
-      setFormData({
-        ...formData,
-        customerId: value,
-      } as FormState);
+    } else if (name === 'userCompany') {
+      setFormData(prev => ({ ...prev, userCompany: value }));
     }
   };
 
@@ -225,7 +254,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="role">Role</Label>
+            <Label htmlFor="role">User Role</Label>
             <Select
               value={formData.role}
               onValueChange={(value) => handleSelectChange('role', value)}
@@ -243,77 +272,141 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
             </Select>
           </div>
 
-          {isCustomerRole ? (
+          {formData.role === 'AdvantageOneOfficer' ? (
+            <div className="md:col-span-2">
+              <Label>Customer Assignments</Label>
+              <div className="grid grid-cols-5 gap-4 mt-2">
+                {/* Available Customers List */}
+                <div className="col-span-2">
+                  <Label className="text-sm font-medium">Select customers to add to the list on the right</Label>
+                  <div className="border rounded-md p-2 h-48 overflow-y-auto bg-gray-50">
+                    {availableCustomers
+                      .filter(customer => !('assignedCustomerIds' in formData) || !formData.assignedCustomerIds.includes(customer.id))
+                      .map((customer) => (
+                        <div
+                          key={customer.id}
+                          className="p-2 hover:bg-gray-100 cursor-pointer rounded text-sm"
+                          onClick={() => handleAddCustomer(customer.id)}
+                        >
+                          {customer.name}
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+
+                {/* Control Buttons */}
+                <div className="flex flex-col justify-center items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="p-2 h-8 w-8"
+                    disabled={true}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="p-2 h-8 w-8"
+                    disabled={true}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Assigned Customers List */}
+                <div className="col-span-2">
+                  <Label className="text-sm font-medium">Customers this officer works at</Label>
+                  <div className="border rounded-md p-2 h-48 overflow-y-auto bg-gray-50">
+                    {'assignedCustomerIds' in formData && formData.assignedCustomerIds.map((customerId) => {
+                      const customer = availableCustomers.find(c => c.id === customerId);
+                      return customer ? (
+                        <div
+                          key={customer.id}
+                          className="p-2 hover:bg-gray-100 cursor-pointer rounded text-sm"
+                          onClick={() => handleRemoveCustomer(customer.id)}
+                        >
+                          {customer.name}
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Additional Information Section */}
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <Briefcase className="h-5 w-5 text-primary" />
+            Additional Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="jobTitle">Job Title</Label>
+            <Input
+              id="jobTitle"
+              name="jobTitle"
+              value={formData.jobTitle || ''}
+              onChange={handleInputChange}
+            />
+          </div>
+          {isCustomerRole && (
             <div>
-              <Label htmlFor="customerId">Customer</Label>
+              <Label htmlFor="userCompany">User Company</Label>
               <Select
-                value={'customerId' in formData ? formData.customerId : ''}
-                onValueChange={(value) => handleSelectChange('customerId', value)}
+                value={formData.userCompany || ''}
+                onValueChange={(value) => handleSelectChange('userCompany', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
-                                  {availableCustomers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id.toString()}>
-                    {customer.name}
-                  </SelectItem>
-                ))}
+                  {USER_COMPANIES.map((company) => (
+                    <SelectItem key={company} value={company}>
+                      {company}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-          ) : (
-            <div>
-              <Label>Assigned Customers</Label>
-              <Select
-                value=""
-                onValueChange={(value) => {
-                  if ('assignedCustomerIds' in formData) {
-                    setFormData({
-                      ...formData,
-                      assignedCustomerIds: [...formData.assignedCustomerIds, parseInt(value)],
-                    } as FormState);
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Add customer" />
-                </SelectTrigger>
-                <SelectContent>
-                                  {availableCustomers
-                  .filter(customer => !('assignedCustomerIds' in formData) || !formData.assignedCustomerIds.includes(customer.id))
-                  .map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id.toString()}>
-                      {customer.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            <div className="mt-2 space-y-2">
-              {'assignedCustomerIds' in formData && formData.assignedCustomerIds.map((customerId) => {
-                const customer = availableCustomers.find(c => c.id === customerId);
-                  return customer ? (
-                    <div key={customer.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                      <span>{customer.name}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setFormData({
-                            ...formData,
-                            assignedCustomerIds: formData.assignedCustomerIds.filter(id => id !== customer.id),
-                          } as FormState);
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ) : null;
-                })}
-              </div>
-            </div>
           )}
+          <div className={isCustomerRole ? "" : "md:col-start-1"}>
+            <Label htmlFor="signature">Signature</Label>
+            <Input
+              id="signature"
+              name="signature"
+              value={formData.signature || ''}
+              onChange={handleInputChange}
+            />
+          </div>
+          <div>
+            <Label htmlFor="signatureCode">Signature Code</Label>
+            <Input
+              id="signatureCode"
+              name="signatureCode"
+              value={formData.signatureCode || ''}
+              onChange={handleInputChange}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="recordIsDeleted"
+                checked={formData.recordIsDeleted || false}
+                onCheckedChange={(checked) => handleCheckboxChange('recordIsDeleted', !!checked)}
+              />
+              <Label htmlFor="recordIsDeleted">Record is Deleted</Label>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

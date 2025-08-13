@@ -20,6 +20,20 @@
       "code": "MCOOP",
       "status": "active",
       "createdAt": "2024-01-15T00:00:00.000Z"
+    },
+    {
+      "id": 24,
+      "name": "Eastbrook Worcester",
+      "code": "EBW",
+      "status": "active",
+      "createdAt": "2024-01-15T00:00:00.000Z"
+    },
+    {
+      "id": 25,
+      "name": "Eastbrook Tewksbury",
+      "code": "EBT",
+      "status": "active",
+      "createdAt": "2024-01-15T00:00:00.000Z"
     }
   ],
   "officers": [
@@ -84,7 +98,7 @@
       "id": "page-003",
       "name": "incident graph",
       "path": "/incident-graph",
-      "customerAccess": [21, 22, 23],
+      "customerAccess": [21, 23],
       "status": "active",
       "createdAt": "2024-01-15T00:00:00.000Z"
     },
@@ -529,6 +543,7 @@
         "customer-incident-report",
         "satisfaction-reports",
         "be-safe-be-secure-graph",
+        "daily-occurrence-book",
         "customer-officer-support",
         "customer-views-config",
         "contract-renewal",
@@ -559,7 +574,8 @@
         "diary",
         "take-test",
         "test-session",
-        "customer-reporting"
+        "customer-reporting",
+        "daily-occurrence-book"
       ],
       "AdvantageOneHOOfficer": [
         "dashboard",
@@ -621,6 +637,7 @@
         "customer-incident-report",
         "satisfaction-reports",
         "be-safe-be-secure-graph",
+        "daily-occurrence-book",
         "customer-officer-support",
         "customer-views-config"
       ]
@@ -657,6 +674,7 @@
       { "id": "customer-incident-report", "title": "Customer Incident Report", "path": "/customer/incident-report" },
       { "id": "satisfaction-reports", "title": "Satisfaction Reports", "path": "/customer/satisfaction-report" },
       { "id": "be-safe-be-secure-graph", "title": "Daily Activity Graphs", "path": "/customer/be-safe-be-secure" },
+      { "id": "daily-occurrence-book", "title": "Daily Occurrence Book (DOB)", "path": "/customer/daily-occurrence-book" },
       { "id": "customer-officer-support", "title": "Customer Officer Support", "path": "/customer/officer-support" },
       { "id": "customer-views-config", "title": "Customer Views Config", "path": "/customer/views-config" },
       
@@ -825,7 +843,7 @@
           "modifiedBy": "system"
         },
         "incident-graph": {
-          "enabled": true,
+          "enabled": false,
           "customized": false,
           "lastModified": "2024-03-21T18:30:00.000Z",
           "modifiedBy": "system"
@@ -1179,7 +1197,12 @@
       "lastName": "Admin",
       "email": "admin@advantageone.com",
       "role": "Administrator",
-      "pageAccessRole": "administrator",
+      "pageAccessRole": "Administrator",
+      "signature": "A.Admin",
+      "signatureCode": "ADM001",
+      "jobTitle": "System Administrator",
+      "userCompany": "Central England COOP",
+      "recordIsDeleted": false,
       "createdAt": "2024-01-01T00:00:00.000Z",
       "updatedAt": "2024-01-01T00:00:00.000Z"
     },
@@ -1191,9 +1214,14 @@
       "lastName": "Officer",
       "email": "officer1@advantageone.com",
       "role": "AdvantageOneOfficer",
-      "pageAccessRole": "advantage-officer",
+      "pageAccessRole": "AdvantageOneOfficer",
       "assignedCustomerIds": [21],
       "badgeNumber": "ADV-001",
+      "signature": "O.Officer",
+      "signatureCode": "OFF001",
+      "jobTitle": "Security Officer",
+      "userCompany": "Heart of England",
+      "recordIsDeleted": false,
       "createdAt": "2024-01-01T00:00:00.000Z",
       "updatedAt": "2024-01-01T00:00:00.000Z"
     },
@@ -1207,6 +1235,11 @@
       "role": "CustomerHOManager",
       "pageAccessRole": "CustomerHOManager",
       "customerId": 21,
+      "signature": "C.Central",
+      "signatureCode": "CUS001",
+      "jobTitle": "Customer Head Office Manager",
+      "userCompany": "Central England COOP",
+      "recordIsDeleted": false,
       "createdAt": "2024-01-01T00:00:00.000Z",
       "updatedAt": "2024-01-01T00:00:00.000Z"
     },
@@ -1220,6 +1253,11 @@
       "role": "CustomerSiteManager",
       "pageAccessRole": "CustomerSiteManager",
       "customerId": 21,
+      "signature": "S.Site",
+      "signatureCode": "SIT001",
+      "jobTitle": "Site Manager",
+      "userCompany": "Midcounties COOP",
+      "recordIsDeleted": false,
       "createdAt": "2024-01-01T00:00:00.000Z",
       "updatedAt": "2024-01-01T00:00:00.000Z"
     },
@@ -1233,6 +1271,11 @@
       "role": "CustomerHOManager",
       "pageAccessRole": "CustomerHOManager",
       "customerId": 21,
+      "signature": "C.Manager",
+      "signatureCode": "CEN001",
+      "jobTitle": "Regional Manager",
+      "userCompany": "Eastbrook Worcester",
+      "recordIsDeleted": true,
       "createdAt": "2024-01-15T00:00:00.000Z",
       "updatedAt": "2024-01-15T00:00:00.000Z"
     },
@@ -1246,6 +1289,11 @@
       "role": "CustomerHOManager",
       "pageAccessRole": "CustomerHOManager",
       "customerId": 22,
+      "signature": "H.Manager",
+      "signatureCode": "HRT001",
+      "jobTitle": "Operations Manager",
+      "userCompany": "Eastbrook Tewksbury",
+      "recordIsDeleted": false,
       "createdAt": "2024-01-15T00:00:00.000Z",
       "updatedAt": "2024-01-15T00:00:00.000Z"
     },
@@ -1259,6 +1307,11 @@
       "role": "CustomerHOManager",
       "pageAccessRole": "CustomerHOManager",
       "customerId": 23,
+      "signature": "M.Manager",
+      "signatureCode": "MID001",
+      "jobTitle": "Branch Manager",
+      "userCompany": "Midcounties COOP",
+      "recordIsDeleted": false,
       "createdAt": "2024-01-15T00:00:00.000Z",
       "updatedAt": "2024-01-15T00:00:00.000Z"
     },
@@ -1272,6 +1325,11 @@
       "role": "CustomerSiteManager",
       "pageAccessRole": "CustomerSiteManager",
       "customerId": 23,
+      "signature": "M.MidSite",
+      "signatureCode": "MST001",
+      "jobTitle": "Site Supervisor",
+      "userCompany": "Heart of England",
+      "recordIsDeleted": false,
       "createdAt": "2024-01-15T00:00:00.000Z",
       "updatedAt": "2024-01-15T00:00:00.000Z"
     },
@@ -1285,6 +1343,11 @@
       "role": "CustomerSiteManager",
       "pageAccessRole": "CustomerSiteManager",
       "customerId": 22,
+      "signature": "H.HeartSite",
+      "signatureCode": "HST001",
+      "jobTitle": "Assistant Manager",
+      "userCompany": "Heart of England",
+      "recordIsDeleted": false,
       "createdAt": "2024-01-15T00:00:00.000Z",
       "updatedAt": "2024-01-15T00:00:00.000Z"
     },
@@ -1296,9 +1359,14 @@
       "lastName": "Thompson",
       "email": "david.thompson@advantageone.com",
       "role": "AdvantageOneOfficer",
-      "pageAccessRole": "advantage-officer",
+      "pageAccessRole": "AdvantageOneOfficer",
       "assignedCustomerIds": [22, 23],
       "badgeNumber": "ADV-002",
+      "signature": "D.Thompson",
+      "signatureCode": "OFF002",
+      "jobTitle": "Senior Security Officer",
+      "userCompany": "Central England COOP",
+      "recordIsDeleted": false,
       "createdAt": "2024-01-15T00:00:00.000Z",
       "updatedAt": "2024-01-15T00:00:00.000Z"
     },
@@ -1310,9 +1378,14 @@
       "lastName": "Williams",
       "email": "emma.williams@advantageone.com",
       "role": "AdvantageOneOfficer",
-      "pageAccessRole": "advantage-officer",
+      "pageAccessRole": "AdvantageOneOfficer",
       "assignedCustomerIds": [21, 23],
       "badgeNumber": "ADV-003",
+      "signature": "E.Williams",
+      "signatureCode": "OFF003",
+      "jobTitle": "Security Officer",
+      "userCompany": "Midcounties COOP",
+      "recordIsDeleted": false,
       "createdAt": "2024-01-15T00:00:00.000Z",
       "updatedAt": "2024-01-15T00:00:00.000Z"
     }

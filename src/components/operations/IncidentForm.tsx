@@ -397,8 +397,10 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   useEffect(() => {
     if (initialData && initialData.id) {
       setStolenItems(initialData.stolenItems || [])
+      setIncidentType(initialData.incidentType || '')
+      setArrestSaveComment(initialData.arrestSaveComment || '')
       
-      // Reset form with the new initial data
+      // Reset form with the new initial data - fix date handling
       const formData = {
         customerName: initialData.customerName || "",
         siteName: initialData.siteName || "",
@@ -440,15 +442,24 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         arrestSaveComment: initialData.arrestSaveComment || "",
       }
       
-      form.reset(formData)
-      
-      // Also set individual field values as backup to ensure dropdowns populate
+      // Use form.reset with proper timing to ensure all fields update
       setTimeout(() => {
+        form.reset(formData)
+        // Force update critical fields that might not populate correctly
         form.setValue('customerName', formData.customerName)
         form.setValue('siteName', formData.siteName)
         form.setValue('officerName', formData.officerName)
         form.setValue('incidentType', formData.incidentType)
-      }, 0)
+        form.setValue('status', formData.status)
+        form.setValue('priority', formData.priority)
+        form.setValue('incidentInvolved', formData.incidentInvolved)
+        if (formData.dateOfIncident) {
+          form.setValue('dateOfIncident', formData.dateOfIncident)
+        }
+        if (formData.offenderDOB) {
+          form.setValue('offenderDOB', formData.offenderDOB)
+        }
+      }, 100)
     }
   }, [initialData?.id, form])
 
@@ -548,6 +559,30 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   }
 
   const addStolenItem = () => {
+    // Check if the last stolen item is complete before adding a new one
+    if (stolenItems.length > 0) {
+      const lastItem = stolenItems[stolenItems.length - 1]
+      const incompleteFields = []
+      
+      if (!lastItem.category) incompleteFields.push('Category')
+      if (!lastItem.productName) incompleteFields.push('Product Name')
+      if (!lastItem.description) incompleteFields.push('Description')
+      if (!lastItem.cost || lastItem.cost <= 0) incompleteFields.push('Cost')
+      if (!lastItem.quantity || lastItem.quantity <= 0) incompleteFields.push('Quantity')
+
+      if (incompleteFields.length > 0) {
+        // Show error message to user
+        form.setError('root', {
+          type: 'manual',
+          message: `Please complete the previous stolen item before adding a new one. Missing: ${incompleteFields.join(', ')}`
+        })
+        return
+      }
+    }
+
+    // Clear any existing error
+    form.clearErrors('root')
+    
     setStolenItems([
       ...stolenItems,
       {
@@ -589,21 +624,35 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       <form onSubmit={form.handleSubmit(handleSubmit)} className="bg-[#F8F3F1]">
         <div className="w-full max-w-[98%] mx-auto px-4 py-4">
           {/* Header */}
-          <div className="space-y-2 mb-4">
-            <h1 className="text-xl font-semibold text-gray-900">New Incident Report</h1>
-            <p className="text-sm text-gray-500">Fill in the details of the security incident below. All fields marked with * are required.</p>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex items-center gap-4">
+              <div className="bg-blue-100 p-3 rounded-lg">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">New Incident Report</h1>
+                <p className="text-gray-600 mt-1">Complete all required fields to submit your incident report. Fields marked with * are mandatory.</p>
+              </div>
+            </div>
           </div>
 
           {/* Form Content */}
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Main Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {/* Basic Information */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-5">
-                <div className="flex items-center gap-2 sm:gap-3 mb-4">
-                  <div className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-blue-600">📋</div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="bg-blue-100 p-2 rounded-lg">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
                   <div>
-                    <h2 className="text-base sm:text-lg lg:text-xl font-medium text-gray-900">Basic Information</h2>
+                    <h2 className="text-lg font-semibold text-gray-900">Basic Information</h2>
+                    <p className="text-sm text-gray-500">Essential incident details</p>
                   </div>
                 </div>
 
@@ -613,7 +662,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="customerName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Customer Name *</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Customer Name *</FormLabel>
                         {!isAdmin && propCustomerId ? (
                           <div className="flex h-11 w-full rounded-md border border-input bg-gray-50 px-3 py-2 text-sm">
                             {field.value}
@@ -621,7 +670,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                         ) : (
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
-                              <SelectTrigger className="h-11">
+                              <SelectTrigger className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm">
                                 <SelectValue placeholder="Select customer" />
                               </SelectTrigger>
                             </FormControl>
@@ -644,7 +693,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="siteName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Site Name *</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Site Name *</FormLabel>
                         {!isAdmin && propSiteId ? (
                           <div className="flex h-11 w-full rounded-md border border-input bg-gray-50 px-3 py-2 text-sm">
                             {field.value}
@@ -652,7 +701,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                         ) : (
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
-                              <SelectTrigger className="h-11">
+                              <SelectTrigger className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm">
                                 <SelectValue placeholder="Select site" />
                               </SelectTrigger>
                             </FormControl>
@@ -675,9 +724,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="officerName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Officer Name *</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Officer Name *</FormLabel>
                         <FormControl>
-                          <Input className="h-11" {...field} placeholder="Enter officer name" />
+                          <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter officer name" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -689,10 +738,10 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="officerRole"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Officer Role *</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Officer Role *</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger className="h-11">
+                            <SelectTrigger className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm">
                               <SelectValue placeholder="Select role" />
                             </SelectTrigger>
                           </FormControl>
@@ -714,9 +763,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="dutyManagerName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Duty Manager Name *</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Duty Manager Name *</FormLabel>
                         <FormControl>
-                          <Input className="h-11" {...field} placeholder="Enter duty manager name" />
+                          <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter duty manager name" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -734,45 +783,101 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                   </div>
                 </div>
 
-                <div className="space-y-3 sm:space-y-4">
+                <div className="space-y-4">
                   <FormField
                     control={form.control}
                     name="dateOfIncident"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Date of Incident *</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Date of Incident *</FormLabel>
                         <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
                                 variant={"outline"}
                                 className={cn(
-                                  "w-full h-11 pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
+                                  "w-full h-12 px-4 text-left font-medium bg-white border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg shadow-sm",
+                                  !field.value && "text-gray-400"
                                 )}
                               >
-                                {field.value ? (
-                                  format(field.value, "PPP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-5 w-5 opacity-50" />
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="flex items-center gap-3">
+                                    <CalendarIcon className="h-5 w-5 text-blue-500" />
+                                    {field.value ? (
+                                      <span className="text-gray-900 font-medium">
+                                        {format(field.value, "EEE, MMM d, yyyy")}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400">Select incident date</span>
+                                    )}
+                                  </span>
+                                </div>
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              initialFocus
-                              ISOWeek
-                              captionLayout="dropdown"
-                              defaultMonth={new Date(1990, 0)}
-                              disabled={(date) =>
-                                date > new Date() || date < new Date('1920-01-01')
-                              }
-                            />
+                          <PopoverContent className="w-auto p-0 border-2 border-gray-200 shadow-lg rounded-lg" align="start">
+                            <div className="p-4 bg-white rounded-lg">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                  <select
+                                    className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={field.value ? field.value.getMonth() : new Date().getMonth()}
+                                    onChange={(e) => {
+                                      const newDate = new Date(field.value || new Date())
+                                      newDate.setMonth(parseInt(e.target.value))
+                                      field.onChange(newDate)
+                                    }}
+                                  >
+                                    {Array.from({ length: 12 }, (_, i) => (
+                                      <option key={i} value={i}>
+                                        {new Date(2000, i).toLocaleDateString('en-US', { month: 'long' })}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={field.value ? field.value.getFullYear() : new Date().getFullYear()}
+                                    onChange={(e) => {
+                                      const newDate = new Date(field.value || new Date())
+                                      newDate.setFullYear(parseInt(e.target.value))
+                                      field.onChange(newDate)
+                                    }}
+                                  >
+                                    {Array.from({ length: 100 }, (_, i) => {
+                                      const year = new Date().getFullYear() - i
+                                      return (
+                                        <option key={year} value={year}>
+                                          {year}
+                                        </option>
+                                      )
+                                    })}
+                                  </select>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => field.onChange(new Date())}
+                                  className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+                                >
+                                  Today
+                                </button>
+                              </div>
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                month={field.value || new Date()}
+                                onMonthChange={(month) => {
+                                  const newDate = new Date(field.value || new Date())
+                                  newDate.setMonth(month.getMonth())
+                                  newDate.setFullYear(month.getFullYear())
+                                  field.onChange(newDate)
+                                }}
+                                disabled={(date) =>
+                                  date > new Date() || date < new Date('1920-01-01')
+                                }
+                                className="rounded-lg"
+                              />
+                            </div>
                           </PopoverContent>
                         </Popover>
                         <FormMessage />
@@ -785,7 +890,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="timeOfIncident"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Time of Incident *</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Time of Incident *</FormLabel>
                         <FormControl>
                           <Input type="time" className="h-11" {...field} />
                         </FormControl>
@@ -799,7 +904,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="incidentType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Type of Incident *</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Type of Incident *</FormLabel>
                         <Select
                           value={incidentType}
                           onValueChange={value => {
@@ -808,7 +913,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                           }}
                         >
                           <FormControl>
-                            <SelectTrigger className="h-11">
+                            <SelectTrigger className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm">
                               <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                           </FormControl>
@@ -857,7 +962,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Incident Details *</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Incident Details *</FormLabel>
                         <FormControl>
                           <Textarea
                             placeholder="Describe the incident in detail"
@@ -884,7 +989,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="storeComments"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Store Comments</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Store Comments</FormLabel>
                         <FormControl>
                           <Textarea
                             placeholder="Add any store-specific comments"
@@ -950,9 +1055,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                         name="urnNumber"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base font-medium">URN Number</FormLabel>
+                            <FormLabel className="text-sm font-semibold text-gray-700 mb-2">URN Number</FormLabel>
                             <FormControl>
-                              <Input className="h-11" {...field} placeholder="Enter URN Number" />
+                              <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter URN Number" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -964,9 +1069,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                         name="crimeRefNumber"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base font-medium">Crime Reference Number</FormLabel>
+                            <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Crime Reference Number</FormLabel>
                             <FormControl>
-                              <Input className="h-11" {...field} placeholder="Enter reference number" />
+                              <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter reference number" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -994,11 +1099,11 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="offenderName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Offender Name</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Offender Name</FormLabel>
                         <div className="space-y-2">
                           <div className="flex gap-2">
                             <FormControl>
-                              <Input className="h-11" {...field} placeholder="Enter offender name" />
+                              <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter offender name" />
                             </FormControl>
                             <Button
                               type="button"
@@ -1055,10 +1160,10 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="gender"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Gender</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Gender</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger className="h-11">
+                            <SelectTrigger className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm">
                               <SelectValue placeholder="N/A or N/K" />
                             </SelectTrigger>
                           </FormControl>
@@ -1078,7 +1183,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="offenderDOB"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel className="text-base font-medium">Date of Birth</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Date of Birth</FormLabel>
                         <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
@@ -1101,20 +1206,69 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              initialFocus
-                              disabled={(date) =>
-                                date > new Date() || date < new Date('1920-01-01')
-                              }
-                              defaultMonth={field.value || new Date(1990, 0)}
-                              fromYear={1920}
-                              toYear={new Date().getFullYear()}
-                              captionLayout="dropdown"
-                            />
+                          <PopoverContent className="w-auto p-0 border-2 border-gray-200 shadow-lg rounded-lg" align="start">
+                            <div className="p-4 bg-white rounded-lg">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                  <select
+                                    className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={field.value ? field.value.getMonth() : 0}
+                                    onChange={(e) => {
+                                      const newDate = new Date(field.value || new Date(1990, 0, 1))
+                                      newDate.setMonth(parseInt(e.target.value))
+                                      field.onChange(newDate)
+                                    }}
+                                  >
+                                    {Array.from({ length: 12 }, (_, i) => (
+                                      <option key={i} value={i}>
+                                        {new Date(2000, i).toLocaleDateString('en-US', { month: 'long' })}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={field.value ? field.value.getFullYear() : 1990}
+                                    onChange={(e) => {
+                                      const newDate = new Date(field.value || new Date(1990, 0, 1))
+                                      newDate.setFullYear(parseInt(e.target.value))
+                                      field.onChange(newDate)
+                                    }}
+                                  >
+                                    {Array.from({ length: 100 }, (_, i) => {
+                                      const year = 2010 - i
+                                      return (
+                                        <option key={year} value={year}>
+                                          {year}
+                                        </option>
+                                      )
+                                    })}
+                                  </select>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => field.onChange(new Date(1990, 0, 1))}
+                                  className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+                                >
+                                  1990
+                                </button>
+                              </div>
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                month={field.value || new Date(1990, 0)}
+                                onMonthChange={(month) => {
+                                  const newDate = new Date(field.value || new Date(1990, 0, 1))
+                                  newDate.setMonth(month.getMonth())
+                                  newDate.setFullYear(month.getFullYear())
+                                  field.onChange(newDate)
+                                }}
+                                disabled={(date) =>
+                                  date > new Date() || date < new Date('1920-01-01')
+                                }
+                                className="rounded-lg"
+                              />
+                            </div>
                           </PopoverContent>
                         </Popover>
                         {field.value && (
@@ -1136,9 +1290,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     name="offenderAddress.numberAndStreet"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Address</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Address</FormLabel>
                         <FormControl>
-                          <Input className="h-11" {...field} placeholder="Enter street address" />
+                          <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter street address" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1151,9 +1305,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                       name="offenderAddress.town"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">Town</FormLabel>
+                          <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Town</FormLabel>
                           <FormControl>
-                            <Input className="h-11" {...field} placeholder="Enter town" />
+                            <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter town" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1165,9 +1319,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                       name="offenderAddress.county"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">County</FormLabel>
+                          <FormLabel className="text-sm font-semibold text-gray-700 mb-2">County</FormLabel>
                           <FormControl>
-                            <Input className="h-11" {...field} placeholder="Enter county" />
+                            <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter county" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1179,9 +1333,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                       name="offenderPlaceOfBirth"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">Place of Birth</FormLabel>
+                          <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Place of Birth</FormLabel>
                           <FormControl>
-                            <Input className="h-11" {...field} placeholder="Enter place of birth" />
+                            <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter place of birth" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1193,9 +1347,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                       name="offenderAddress.postCode"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">Post Code</FormLabel>
+                          <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Post Code</FormLabel>
                           <FormControl>
-                            <Input className="h-11" {...field} placeholder="Enter post code" />
+                            <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter post code" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1279,6 +1433,15 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                 </div>
               </div>
 
+              {/* Validation Error Display */}
+              {form.formState.errors.root && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm font-medium text-red-700">
+                    {form.formState.errors.root.message}
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div className="hidden sm:grid sm:grid-cols-12 gap-4">
                   <div className="col-span-2">
@@ -1311,7 +1474,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                             value={item.category}
                             onValueChange={(value) => updateStolenItem(index, "category", value)}
                           >
-                            <SelectTrigger className="h-11">
+                            <SelectTrigger className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm">
                               <SelectValue placeholder="Select category" />
                             </SelectTrigger>
                             <SelectContent>

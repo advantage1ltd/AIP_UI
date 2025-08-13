@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CUSTOMER_PAGES } from "@/config/customerPages"
 import type { Customer } from "@/types/customer"
-import { BASE_API_URL } from "@/config/api"
 import useAuth from "@/hooks/useAuth"
 import { RefreshCw } from "lucide-react"
+import { customerOperations } from "@/mocks/customerStore"
 
 export default function CustomerReporting() {
   const navigate = useNavigate()
@@ -24,69 +24,28 @@ export default function CustomerReporting() {
   useEffect(() => {
     const loadCustomers = async () => {
       try {
-        const isAdmin = user?.role?.toLowerCase() === 'administrator' || 
-                       user?.pageAccessRole?.toLowerCase() === 'administrator'
-
-        if (isAdmin) {
-          // For admin users, fetch all customers via API
-          const response = await fetch(`${BASE_API_URL}/customers`)
-          const result = await response.json()
-          
-          if (result.success && result.data) {
-            setCustomers(result.data)
-          } else {
-            throw new Error('Failed to fetch customers')
-          }
-        } else {
-          // For officers, use the same approach as CustomerReportingPage
-          // This fetches customers that are already filtered based on current assignments
-          let assignedCustomerIds: string[] = []
-          
-          if (user?.role === 'AdvantageOneOfficer') {
-            try {
-              // Fetch fresh user data to get latest assignments
-              const userResponse = await fetch(`${BASE_API_URL}/users/${user.id}`)
-              if (userResponse.ok) {
-                const userData = await userResponse.json()
-                assignedCustomerIds = userData.data?.assignedCustomerIds?.map((id: number) => id.toString()) || []
-                console.log('🔄 [CustomerReporting] Fetched fresh assignment data:', {
-                  userId: user.id,
-                  cachedAssignments: 'assignedCustomerIds' in user ? user.assignedCustomerIds : 'none',
-                  freshAssignments: assignedCustomerIds
-                })
-              } else {
-                console.warn('🔄 [CustomerReporting] Failed to fetch fresh assignments')
-                assignedCustomerIds = []
-              }
-            } catch (fetchError) {
-              console.warn('🔄 [CustomerReporting] Error fetching fresh assignments:', fetchError)
-              assignedCustomerIds = []
-            }
-          }
-
-          // Build API URL with proper parameters
-          const params = new URLSearchParams({
-            userId: user?.id || '',
-            role: user?.role || ''
+        setLoading(true)
+        
+        // Load customer data from customer store (which uses cached data)
+        let customerData = await customerOperations.getAll()
+        
+        // For officers, filter to only assigned customers
+        if (user?.role === 'AdvantageOneOfficer') {
+          const assignedCustomerIds = user.assignedCustomerIds || []
+          customerData = customerData.filter((customer: any) => 
+            assignedCustomerIds.includes(customer.id)
+          )
+          console.log('🔄 [CustomerReporting] Filtered customers for officer:', {
+            assignedCustomerIds,
+            filteredCount: customerData.length
           })
-
-          // Add fresh assigned customer IDs for officers
-          if (user?.role === 'AdvantageOneOfficer' && assignedCustomerIds.length > 0) {
-            params.append('assignedCustomerIds', assignedCustomerIds.join(','))
-          }
-
-          // Fetch customers based on user role and fresh assignments
-          const response = await fetch(`${BASE_API_URL}/customers/reporting?${params.toString()}`)
-          const data = await response.json()
-
-          if (!response.ok) {
-            throw new Error(data.message || 'Failed to fetch customer reporting data')
-          }
-
-          setCustomers(data.data || [])
         }
+        
+        setCustomers(customerData)
+        console.log('✅ [CustomerReporting] Loaded customers from store:', customerData.length)
+        
       } catch (error) {
-        console.error('Error loading customers:', error)
+        console.error('❌ [CustomerReporting] Error loading customers from store:', error)
         setCustomers([])
       } finally {
         setLoading(false)
@@ -96,28 +55,19 @@ export default function CustomerReporting() {
     loadCustomers()
   }, [user, refreshTrigger])
 
-  // Listen for user assignment updates to refresh data automatically
+  // Listen for customer data updates to refresh data automatically
   useEffect(() => {
-    const handleAssignmentUpdate = (event: CustomEvent) => {
-      const { userId, newAssignments } = event.detail
-      
-      // Only refresh if this is the current user's assignment that was updated
-      if (user?.id === userId) {
-        console.log('🔄 [CustomerReporting] Received assignment update for current user:', {
-          userId,
-          newAssignments,
-          currentUser: user.id
-        })
-        refreshData()
-      }
+    const handleCustomerDataUpdate = (event: CustomEvent) => {
+      console.log('🔄 [CustomerReporting] Received customer data update:', event.detail)
+      refreshData()
     }
 
-    window.addEventListener('user-assignments-updated', handleAssignmentUpdate as EventListener)
+    window.addEventListener('customer-data-updated', handleCustomerDataUpdate as EventListener)
     
     return () => {
-      window.removeEventListener('user-assignments-updated', handleAssignmentUpdate as EventListener)
+      window.removeEventListener('customer-data-updated', handleCustomerDataUpdate as EventListener)
     }
-  }, [user?.id, refreshData])
+  }, [refreshData])
 
   useEffect(() => {
     if (!selectedCustomer) {
@@ -130,13 +80,27 @@ export default function CustomerReporting() {
       // Get enabled pages from pageAssignments if available, fallback to viewConfig
       if (customer.pageAssignments) {
         const enabledPages = Object.entries(customer.pageAssignments)
-          .filter(([_, assignment]) => assignment.enabled)
+          .filter(([_, assignment]) => (assignment as any).enabled)
           .map(([pageId]) => pageId)
         setAvailablePages(enabledPages)
-      } else if (customer.viewConfig) {
+        console.log('🔍 [CustomerReporting] Available pages from pageAssignments:', {
+          customerId: customer.id,
+          customerName: customer.companyName,
+          enabledPages
+        })
+      } else if (customer.viewConfig?.enabledPages) {
         setAvailablePages(customer.viewConfig.enabledPages)
+        console.log('🔍 [CustomerReporting] Available pages from viewConfig:', {
+          customerId: customer.id,
+          customerName: customer.companyName,
+          enabledPages: customer.viewConfig.enabledPages
+        })
       } else {
         setAvailablePages([])
+        console.log('🔍 [CustomerReporting] No page assignments found for customer:', {
+          customerId: customer.id,
+          customerName: customer.companyName
+        })
       }
     }
   }, [selectedCustomer, customers])

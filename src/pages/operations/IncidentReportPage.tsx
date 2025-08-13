@@ -207,13 +207,34 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     try {
       setIsLoadingProduct(true)
       
-      // Mock product data instead of API call
+      // TODO: Replace with real product API call when barcode database is available
+      // Example implementation:
+      // const productResponse = await fetch(`/api/products/barcode/${barcode}`)
+      // const productData = await productResponse.json()
+      // if (!productResponse.ok) {
+      //   throw new Error('Product not found in database')
+      // }
+      
+      // Mock product data instead of API call (remove when real API is ready)
       const mockProduct = {
         name: `Product ${barcode}`,
         category: 'Electronics',
         price: 99.99,
         description: 'Mock product description'
       }
+      
+      // Create stolen item from barcode data
+      // TODO: When real API is implemented, use actual product data:
+      // const newItem: StolenItem = {
+      //   id: Date.now().toString(),
+      //   category: productData.category.toLowerCase(),
+      //   description: productData.description,
+      //   productName: productData.name,
+      //   cost: productData.price,
+      //   quantity: 1,
+      //   totalAmount: productData.price,
+      //   barcode: barcode // Add barcode to item for reference
+      // }
       
       const newItem: StolenItem = {
         id: Date.now().toString(),

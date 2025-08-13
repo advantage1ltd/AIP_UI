@@ -21,8 +21,8 @@ const loadDashboardData = async () => {
 // Helper function to determine if a customer is "new" based on incident data
 const isNewCustomerByData = (customerId: number): boolean => {
   // Check if customer has any incidents - new customers typically have no historical data
-  const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId);
-  const customerSites = db.sites.filter(s => s.customerId === customerId);
+  const customerIncidents = (db.dashboard?.incidents || []).filter(i => i.customerId === customerId);
+  const customerSites = (db.sites || []).filter(s => s.customerId === customerId);
   
   // Consider a customer "new" if they have no incidents and no sites
   return customerIncidents.length === 0 && customerSites.length === 0;
@@ -49,7 +49,7 @@ const calculateDynamicMetrics = (customerId: number, siteIds?: string | string[]
   }
   
   // Get all incidents for this customer
-  const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId)
+  const customerIncidents = (db.dashboard?.incidents || []).filter(i => i.customerId === customerId)
   
   console.log('🔍 calculateDynamicMetrics - Customer incidents found:', customerIncidents.length);
   console.log('🔍 First few incident dates:', customerIncidents.slice(0, 5).map(i => ({ id: i.id, date: i.date })));
@@ -201,7 +201,7 @@ const calculateIncidentChartData = (customerId: number, siteIds?: string | strin
   }
   
   // Get customer incidents
-  const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId);
+  const customerIncidents = (db.dashboard?.incidents || []).filter(i => i.customerId === customerId);
   
   let incidents = customerIncidents;
   if (siteIds) {
@@ -375,8 +375,8 @@ export const dashboardHandlers = [
       
       console.log('🔍 Store handler - Looking for:', { storeId, customerId })
       
-      // Get store data from db.json
-      const store = db.stores.find(s => s.id === storeId && s.customerId === customerId)
+      // Get store data from db.json (using sites as stores)
+      const store = db.sites ? db.sites.find(s => s.id === storeId && s.customerId === customerId) : null
       console.log('📦 Store data found:', store)
       
       if (!store) {
@@ -464,10 +464,12 @@ export const dashboardHandlers = [
       ];
 
       // Get store incidents
-      const storeIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId && i.siteId === storeIdStr);
+      const storeIncidents = (db.dashboard?.incidents || []).filter(i => i.customerId === customerId && i.siteId === storeIdStr);
 
       const storeData: CustomerStoreData = {
-        ...store,
+        id: store.id,
+        name: store.locationName || `Site ${store.id}`,
+        customerId: store.customerId,
         metrics: {
           CustomerHOManager: dynamicHOMetrics,
           CustomerSiteManager: dynamicSiteMetrics
@@ -556,16 +558,16 @@ export const dashboardHandlers = [
       const siteIdStr = Array.isArray(siteId) ? siteId[0] : siteId;
       
       // First try to find a site with the given ID
-      let site = db.sites.find(s => s.id === siteIdStr && s.customerId === customerId);
+      let site = (db.sites || []).find(s => s.id === siteIdStr && s.customerId === customerId);
       
       // If no site found, try to find a store with that ID and get the corresponding site
       if (!site) {
         console.log('🔍 No site found, looking for store with ID:', siteId);
-        const store = db.stores.find(st => st.id === siteIdStr && st.customerId === customerId);
+        const store = db.sites ? db.sites.find(st => st.id === siteIdStr && st.customerId === customerId) : null;
         if (store) {
           // Find the corresponding site for this store
           // For now, we'll use the first site for this customer as a fallback
-          site = db.sites.find(s => s.customerId === customerId);
+          site = (db.sites || []).find(s => s.customerId === customerId);
           console.log('🔍 Found store, using corresponding site:', site);
         }
       }
@@ -653,9 +655,9 @@ export const dashboardHandlers = [
 
       // Filter incidents by both customerId and siteId
       console.log('🔍 Filtering incidents for customerId:', customerId, 'siteId:', site.id);
-      console.log('🔍 Total incidents in database:', db.dashboard.incidents.length);
+      console.log('🔍 Total incidents in database:', (db.dashboard?.incidents || []).length);
       
-      const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId);
+      const customerIncidents = (db.dashboard?.incidents || []).filter(i => i.customerId === customerId);
       console.log('🔍 Customer incidents found:', customerIncidents.length);
       
       // For now, return all customer incidents instead of filtering by site to debug
@@ -773,7 +775,7 @@ export const dashboardHandlers = [
       ];
 
       // Get incidents for this customer
-      const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId);
+      const customerIncidents = (db.dashboard?.incidents || []).filter(i => i.customerId === customerId);
       let aggregatedSiteIncidents = customerIncidents;
       
       if (siteIds.length > 0) {
@@ -812,13 +814,15 @@ export const dashboardHandlers = [
     }
   }),
 
-  // Get all stores
+  // Get all stores (using sites data structure)
   http.get('/api/dashboard/stores', async ({ request }) => {
     try {
       const customerId = getCustomerId(request)
       console.log('🔍 Stores handler - Looking for customer:', customerId)
-      const stores = db.stores.filter(store => store.customerId === customerId)
-      console.log('📋 Found stores:', stores)
+      
+      // Use sites data structure since stores doesn't exist in db.json
+      const stores = db.sites ? db.sites.filter(site => site.customerId === customerId) : []
+      console.log('📋 Found stores/sites:', stores)
       return HttpResponse.json(stores)
     } catch (error) {
       console.error('❌ Error in stores handler:', error)
@@ -845,7 +849,7 @@ export const dashboardHandlers = [
     try {
       const customerId = getCustomerId(request)
       console.log('🔍 Sites handler - Looking for customer:', customerId)
-      const sites = db.sites.filter(site => site.customerId === customerId)
+      const sites = (db.sites || []).filter(site => site.customerId === customerId)
       console.log('🏢 Found sites:', sites)
       return HttpResponse.json(sites)
     } catch (error) {
@@ -986,9 +990,9 @@ export const dashboardHandlers = [
 
       // Aggregate incidents - filter by customerId and siteIds
       console.log('🔍 Filtering incidents for customerId:', customerId, 'siteIds:', siteIds);
-      console.log('🔍 Total incidents in database:', db.dashboard.incidents.length);
+      console.log('🔍 Total incidents in database:', (db.dashboard?.incidents || []).length);
       
-      const customerIncidents = db.dashboard.incidents.filter(i => i.customerId === customerId);
+      const customerIncidents = (db.dashboard?.incidents || []).filter(i => i.customerId === customerId);
       console.log('🔍 Customer incidents found:', customerIncidents.length);
       
       // Filter incidents by the specified site IDs

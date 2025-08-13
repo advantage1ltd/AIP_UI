@@ -610,111 +610,73 @@ export const customerHandlers = [
     }
   }),
 
-  // Create new customer
-  http.post('/api/customers', async ({ request }) => {
+  // POST /api/customers
+  http.post(`${BASE_API_URL}/customers`, async ({ request }) => {
     try {
       await delay(300);
-      const customerData = await validateRequest(request) as Customer;
+      const customerData = await validateRequest(request);
       
-      // Generate ID if not provided or if it's a temporary string ID
-      let customerId: number;
-      const idString = String(customerData.id || '');
-      const isTemporaryId = idString.startsWith('CUST');
-      if (!customerData.id || isTemporaryId) {
-        // Generate a proper numeric ID
-        const customers = await customerOperations.getAll();
-        const existingIds = customers.map(c => c.id).filter(id => !isNaN(Number(id)));
-        const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 20;
-        customerId = maxId + 1;
-      } else {
-        customerId = Number(customerData.id);
-      }
-
-      // Set timestamps
-      const now = new Date().toISOString();
+      console.log('🔧 [CustomerHandlers] Creating new customer:', customerData);
       
-      // Create CustomerWithRelations object with required relations and proper defaults
-      const customerWithRelations = {
-        ...customerData,
-        id: customerId,
-        regions: [],
-        sites: [],
-        pageAssignments: {}, // Initialize with empty page assignments
-        viewConfig: {
-          id: `view_config_${customerId}`,
-          customerId: customerId,
-          customerType: customerData.customerType,
-          enabledPages: [],
-          createdAt: now,
-          updatedAt: now
-        },
-        createdAt: customerData.createdAt || now,
-        updatedAt: now
-      };
-
-      console.log('🆕 [Create Customer] Creating:', {
-        id: customerId,
-        name: customerData.companyName,
-        type: customerData.customerType
-      });
-
-      const result = await customerOperations.create(customerWithRelations);
+      const result = await customerOperations.create(customerData);
       
-      // Dispatch event to notify other components
-      window.dispatchEvent(new CustomEvent('customer-created', {
-        detail: { customer: result }
+      // Dispatch event to notify about customer data update
+      window.dispatchEvent(new CustomEvent('customer-data-updated', {
+        detail: { 
+          customerId: result.id,
+          customerName: result.companyName,
+          pageAssignments: result.pageAssignments,
+          enabledPages: result.viewConfig?.enabledPages
+        }
       }));
-
+      
       return HttpResponse.json({
         success: true,
         data: result,
-        message: `Customer "${customerData.companyName}" created successfully`
-      }, { status: 201 });
+        message: `Customer ${result.companyName} created successfully`
+      });
     } catch (error) {
-      console.error('❌ [Create Customer] Error:', error);
+      console.error('❌ [CustomerHandlers] Error creating customer:', error);
       return createErrorResponse(500, 'Failed to create customer');
     }
   }),
 
-  // Update existing customer
-  http.put('/api/customers/:id', async ({ params, request }) => {
+  // PUT /api/customers/:id
+  http.put(`${BASE_API_URL}/customers/:id`, async ({ params, request }) => {
     try {
       await delay(300);
-      const customerId = parseInt(params.id as string);
-      const updates = await validateRequest(request) as Partial<Customer>;
+      const rawId = params.id as string;
+      // Convert to number if it's a numeric string, otherwise keep as string
+      const id = /^\d+$/.test(rawId) ? parseInt(rawId, 10) : rawId;
+      const updates = await validateRequest(request);
       
-      const existingCustomer = await customerOperations.getById(customerId);
-      if (!existingCustomer) {
-        return createErrorResponse(404, 'Customer not found');
-      }
-
-      // Set updated timestamp
-      updates.updatedAt = new Date().toISOString();
-
-      console.log('✏️ [Update Customer] Updating:', {
-        id: customerId,
-        name: existingCustomer.companyName,
-        changes: Object.keys(updates)
-      });
-
-      const result = await customerOperations.update(customerId, updates);
+      console.log('🔧 [CustomerHandlers] Updating customer:', { rawId, id, idType: typeof id, updates });
+      
+      // Note: To enable auto-export, change this line to:
+      // const result = await customerOperations.update(id, updates, true);
+      const result = await customerOperations.update(id, updates);
       
       if (!result) {
-        return createErrorResponse(500, 'Failed to update customer');
+        return createErrorResponse(404, 'Customer not found');
       }
-
-      // Dispatch event to notify other components
-      window.dispatchEvent(new CustomEvent('customer-updated', {
-        detail: { customer: result }
+      
+      // Dispatch event to notify about customer data update
+      window.dispatchEvent(new CustomEvent('customer-data-updated', {
+        detail: { 
+          customerId: result.id,
+          customerName: result.companyName,
+          pageAssignments: result.pageAssignments,
+          enabledPages: result.viewConfig?.enabledPages
+        }
       }));
-
+      
       return HttpResponse.json({
         success: true,
         data: result,
-        message: `Customer "${result.companyName}" updated successfully`
+        message: `Customer ${result.companyName} updated successfully`
       });
     } catch (error) {
-      console.error('❌ [Update Customer] Error:', error);
+      console.error('❌ [CustomerHandlers] Error updating customer:', error);
       return createErrorResponse(500, 'Failed to update customer');
     }
   }),
@@ -723,7 +685,11 @@ export const customerHandlers = [
   http.delete('/api/customers/:id', async ({ params }) => {
     try {
       await delay(300);
-      const customerId = parseInt(params.id as string);
+      const rawId = params.id as string;
+      // Convert to number if it's a numeric string, otherwise keep as string
+      const customerId = /^\d+$/.test(rawId) ? parseInt(rawId, 10) : rawId;
+      
+      console.log('🔧 [CustomerHandlers] Deleting customer:', { rawId, customerId, idType: typeof customerId });
       
       const existingCustomer = await customerOperations.getById(customerId);
       if (!existingCustomer) {

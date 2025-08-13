@@ -18,6 +18,9 @@ import { dailyActivityHandlers } from './dailyActivityHandlers'
 import { dailyActivityAnalyticsHandlers } from './dailyActivityAnalyticsHandlers'
 import { User, CustomerUser, AdvantageOneUser } from '@/types/user'
 import { employeeDiaryHandlers } from './employeeDiaryHandlers'
+import { dailyOccurrenceBookHandlers } from './dailyOccurrenceBookHandlers'
+import { lookupTableHandlers } from './lookupTableHandlers'
+
 
 export const handlers = [
   ...customerHandlers,
@@ -36,7 +39,9 @@ export const handlers = [
   ...dailyActivityHandlers,
   ...dailyActivityAnalyticsHandlers,
   ...settingsHandlers,
-  ...employeeDiaryHandlers
+  ...employeeDiaryHandlers,
+  ...dailyOccurrenceBookHandlers,
+  ...lookupTableHandlers
 ]
 
 // MSW Data Store with Enhanced Synchronization

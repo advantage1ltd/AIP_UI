@@ -7,12 +7,87 @@ import { TablePagination } from "./TablePagination"
 
 export interface Employee {
   id: string
-  employeeName: string
+  employeeId?: number
+  firstName: string
+  surname: string
   position: string
   employeeNumber: string
-  licenseType: string
+  siaLicenceType: string
   startDate: string
   status: 'active' | 'inactive'
+  
+  // Basic Information
+  aipAccessLevel?: string
+  title?: string
+  
+  // Address Information
+  houseName?: string
+  numberAndStreet?: string
+  town?: string
+  county?: string
+  postCode?: string
+  region?: string
+  
+  // Employment Information
+  employeeStatus?: string
+  employmentType?: string
+  department?: string
+  
+  // Contact Information
+  email?: string
+  contactNumber?: string
+  
+  // SIA Information
+  siaLicenceExpiry?: string
+  siaLicenceNumber?: string
+  
+  // Personal Information
+  nationality?: string
+  rightToWorkCondition?: string
+  
+  // Driving License Information
+  drivingLicenceType?: string
+  dateDLChecked?: string
+  drivingLicenceCopyTaken?: boolean
+  sixMonthlyCheck?: boolean
+  
+  // Checks and References
+  graydonCheckAuthorised?: boolean
+  graydonCheckDetails?: string
+  initialOralReferencesComplete?: boolean
+  initialOralReferencesDate?: string
+  writtenRefsComplete?: boolean
+  writtenRefsCompleteDate?: string
+  quickStarterFormCompleted?: boolean
+  
+  // Employment Documentation
+  workingTimeDirective?: string
+  workingTimeDirectiveComplete?: boolean
+  contractOfEmploymentSigned?: boolean
+  photoTaken?: boolean
+  photoFile?: string
+  idCardIssued?: boolean
+  equipmentIssued?: boolean
+  uniformIssued?: boolean
+  nextOfKinDetailsComplete?: boolean
+  peopleHoursPin?: string
+  
+  // Training and Induction
+  fullRotasIssued?: string
+  inductionAndTrainingBooked?: string
+  location?: string
+  trainer?: string
+  
+  // Relationships
+  userId?: string
+  supervisorId?: number
+  supervisorName?: string
+  
+  // Audit Fields
+  createdAt?: string
+  createdBy?: string
+  updatedAt?: string
+  updatedBy?: string
 }
 
 interface EmployeesTableProps {
@@ -27,10 +102,13 @@ export function EmployeesTable({ employees, onNewEmployee, onEditEmployee, onDel
   const [searchQuery, setSearchQuery] = useState("")
   const itemsPerPage = 10
 
-  const filteredEmployees = employees.filter(employee => 
-    employee.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    employee.employeeNumber.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredEmployees = employees.filter(employee => {
+    const fullName = `${employee.firstName || ''} ${employee.lastName || ''}`.toLowerCase()
+    const employeeNumber = (employee.employeeNumber || '').toLowerCase()
+    const searchLower = searchQuery.toLowerCase()
+    
+    return fullName.includes(searchLower) || employeeNumber.includes(searchLower)
+  })
 
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
@@ -39,7 +117,7 @@ export function EmployeesTable({ employees, onNewEmployee, onEditEmployee, onDel
   // Function to determine which columns to hide on different screen sizes
   const getResponsiveClasses = (column: string) => {
     switch (column) {
-      case 'licenseType':
+      case 'siaLicenceType':
         return 'hidden lg:table-cell'
       case 'startDate':
         return 'hidden md:table-cell'
@@ -69,7 +147,7 @@ export function EmployeesTable({ employees, onNewEmployee, onEditEmployee, onDel
                 <TableHead className="text-xs md:text-sm font-medium">Employee Name</TableHead>
                 <TableHead className="text-xs md:text-sm font-medium">Employee No.</TableHead>
                 <TableHead className={`text-xs md:text-sm font-medium ${getResponsiveClasses('position')}`}>Position</TableHead>
-                <TableHead className={`text-xs md:text-sm font-medium ${getResponsiveClasses('licenseType')}`}>License Type</TableHead>
+                <TableHead className={`text-xs md:text-sm font-medium ${getResponsiveClasses('siaLicenceType')}`}>SIA Licence Type</TableHead>
                 <TableHead className={`text-xs md:text-sm font-medium ${getResponsiveClasses('startDate')}`}>Start Date</TableHead>
                 <TableHead className="text-xs md:text-sm font-medium">Status</TableHead>
                 <TableHead className="text-right text-xs md:text-sm font-medium">Actions</TableHead>
@@ -79,10 +157,10 @@ export function EmployeesTable({ employees, onNewEmployee, onEditEmployee, onDel
               {paginatedEmployees.length > 0 ? (
                 paginatedEmployees.map((employee) => (
                   <TableRow key={employee.id} className="hover:bg-purple-50/50 text-xs md:text-sm">
-                    <TableCell className="font-medium py-2 md:py-3">{employee.employeeName}</TableCell>
+                    <TableCell className="font-medium py-2 md:py-3">{`${employee.firstName || ''} ${employee.lastName || ''}`}</TableCell>
                     <TableCell className="py-2 md:py-3">{employee.employeeNumber}</TableCell>
                     <TableCell className={`py-2 md:py-3 ${getResponsiveClasses('position')}`}>{employee.position}</TableCell>
-                    <TableCell className={`py-2 md:py-3 ${getResponsiveClasses('licenseType')}`}>{employee.licenseType}</TableCell>
+                    <TableCell className={`py-2 md:py-3 ${getResponsiveClasses('siaLicenceType')}`}>{employee.siaLicenceType}</TableCell>
                     <TableCell className={`py-2 md:py-3 ${getResponsiveClasses('startDate')}`}>{employee.startDate}</TableCell>
                     <TableCell className="py-2 md:py-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
