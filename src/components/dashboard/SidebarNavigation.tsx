@@ -284,6 +284,16 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           </div>
         )}
 
+        {/* Action Calendar as top-level navigation */}
+        {hasAccess('/action-calendar') && (
+          <NavItem
+            to="/action-calendar"
+            icon={<Calendar className="h-4 w-4" />}
+            label="Action Calendar"
+            onClick={onNavigate}
+          />
+        )}
+
         {/* Customer Reporting as top-level navigation */}
         {(hasAccess('/management/customer-reporting') || (isOfficerRole && getOfficerCustomerReportingAccess())) && (
           <NavItem

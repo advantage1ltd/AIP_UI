@@ -1,16 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, Briefcase, Building2, CalendarCheck } from "lucide-react"
-import { Employee } from "./EmployeesTable"
+import { Employee } from "@/types/employee"
 
 interface EmployeeStatsProps {
-  employees: Employee[]
+  employees?: Employee[]
 }
 
 export const EmployeeStats = ({ employees }: EmployeeStatsProps) => {
-  const totalEmployees = employees.length
-  const activeEmployees = employees.filter(emp => emp.status === "active").length
-  const positions = new Set(employees.map(emp => emp.position)).size
-  const licenses = new Set(employees.map(emp => emp.licenseType)).size
+  // Add null checks to prevent errors when employees is undefined
+  const employeesArray = employees || []
+  const totalEmployees = employeesArray.length
+  const activeEmployees = employeesArray.filter(emp => emp.employeeStatus === "Active").length
+  const positions = new Set(employeesArray.map(emp => emp.position)).size
+  const licenses = new Set(employeesArray.map(emp => emp.siaLicenceType).filter(Boolean)).size
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">

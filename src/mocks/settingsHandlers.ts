@@ -72,28 +72,29 @@ const saveToDb = async (settings: PageAccessSettings): Promise<void> => {
 
 // Settings handlers
 export const settingsHandlers = [
-  // GET /api/settings/page-access
-  http.get(`${BASE_API_URL}/settings/page-access`, async () => {
+  // GET /api/pageaccess/settings
+  http.get('/api/pageaccess/settings', async () => {
     try {
-      console.log('🔍 [Settings] Loading page access settings from db.json');
+      console.log('🔍 [Settings] MSW Handler: Loading page access settings from db.json');
       
       // Load settings directly from db.json
       const settings = await loadFromDb();
       
-      console.log('📝 [Settings] Loaded settings:', {
+      console.log('📝 [Settings] MSW Handler: Loaded settings:', {
         roles: Object.keys(settings.pageAccessByRole),
-        totalPages: settings.availablePages.length
+        totalPages: settings.availablePages.length,
+        adminPages: settings.pageAccessByRole.Administrator?.length || 0
       });
       
-      return HttpResponse.json(settings);
+      return HttpResponse.json({ data: settings });
     } catch (error) {
-      console.error('❌ [Settings] Error getting page access:', error);
+      console.error('❌ [Settings] MSW Handler: Error getting page access:', error);
       return new HttpResponse(null, { status: 500 });
     }
   }),
 
-  // PUT /api/settings/page-access
-  http.put(`${BASE_API_URL}/settings/page-access`, async ({ request }) => {
+  // PUT /api/pageaccess/settings
+  http.put('/api/pageaccess/settings', async ({ request }) => {
     try {
       const settings = await request.json() as PageAccessSettings;
       console.log('💾 [Settings] Saving page access settings:', {

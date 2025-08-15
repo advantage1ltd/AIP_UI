@@ -62,8 +62,15 @@ export const customerOperations = {
       
       return customerCache
     } catch (error) {
-      log.error('Failed to retrieve customers:', error)
-      throw error
+      log.error('Failed to fetch customers from backend API:', error)
+      
+      // Return empty array instead of fallback data
+      customerCache = []
+      cacheTimestamp = Date.now()
+      
+      log.warn('Returning empty customer list - no fallback data used')
+      
+      return []
     }
   },
 

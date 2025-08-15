@@ -29,11 +29,11 @@ const customerTypes: { value: CustomerType; label: string }[] = [
 const customerSchema = z.object({
   companyName: z.string().min(1, "Company name is required").min(2, "Company name must be at least 2 characters"),
   companyNumber: z.string().min(1, "Company number is required"),
-  vatNumber: z.string().min(1, "VAT number is required"),
+  vatNumber: z.string().optional(),
   status: z.enum(["active", "inactive"]),
   customerType: z.enum(["retail", "static", "gatehouse", "mobile-patrol", "keyholding-alarm-response", "event"]),
   address: z.object({
-    building: z.string().min(1, "Building is required"),
+    building: z.string().optional(),
     street: z.string().min(1, "Street is required"),
     village: z.string().optional(),
     town: z.string().min(1, "Town/City is required"),

@@ -91,14 +91,11 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
           idType: typeof customerToDelete.id
         })
         
-        const response = await fetch(`/api/customers/${customerToDelete.id}`, {
-          method: 'DELETE',
-        })
-        const result = await response.json()
-        
-        console.log('🔧 [CustomersTable] confirmDelete - API response:', result)
+        const result = await customerService.deleteCustomer(String(customerToDelete.id))
         
         if (result.success) {
+          console.log('🔧 [CustomersTable] confirmDelete - customer deleted successfully')
+          
           // If the deleted customer was selected, clear the selection
           if (selectedCustomerId === String(customerToDelete.id)) {
             onCustomerSelect(null)
@@ -106,14 +103,14 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
           
           toast({
             title: "Customer Deleted",
-            description: result.message || `Customer has been successfully deleted.`,
+            description: `Customer has been successfully deleted.`,
             variant: "default"
           })
           
           forceUpdate()
           onDataChange?.() // Notify parent of data change
         } else {
-          throw new Error(result.message || 'Failed to delete customer')
+          throw new Error(result.error || 'Failed to delete customer')
         }
       } catch (error) {
         console.error('❌ [CustomersTable] confirmDelete - error:', error)
@@ -154,35 +151,21 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
       
       let result
       if (isNew) {
-        // Create new customer via API
+        // Create new customer via customerService
         console.log('🔧 [CustomersTable] handleSave - creating new customer')
-        const response = await fetch('/api/customers', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(updatedCustomer),
-        })
-        result = await response.json()
+        result = await customerService.createCustomer(updatedCustomer)
       } else {
-        // Update existing customer via API
+        // Update existing customer via customerService
         console.log('🔧 [CustomersTable] handleSave - updating existing customer')
-        const response = await fetch(`/api/customers/${String(updatedCustomer.id)}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(updatedCustomer),
-        })
-        result = await response.json()
+        result = await customerService.updateCustomer(updatedCustomer)
       }
       
-      console.log('🔧 [CustomersTable] handleSave - API response:', result)
+      console.log('🔧 [CustomersTable] handleSave - service response:', result)
       
       if (result.success) {
         toast({
           title: isNew ? "Customer Created" : "Customer Updated",
-          description: result.message || `${updatedCustomer.companyName} has been successfully ${isNew ? 'created' : 'updated'}.`,
+          description: `${updatedCustomer.companyName} has been successfully ${isNew ? 'created' : 'updated'}.`,
           variant: "default"
         })
         
@@ -190,7 +173,7 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
         forceUpdate()
         onDataChange?.() // Notify parent of data change
       } else {
-        throw new Error(result.message || 'Failed to save customer')
+        throw new Error(result.error || 'Failed to save customer')
       }
     } catch (error) {
       console.error('❌ [CustomersTable] handleSave - error:', error)
@@ -214,25 +197,27 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
     const fetchCustomers = async () => {
       try {
         setIsLoadingCustomers(true)
-        const response = await fetch('/api/customers')
-        const result = await response.json()
+        console.log('🔄 [CustomersTable] Fetching customers from backend...')
         
-        if (result.success) {
-          setAllCustomers(result.data || [])
-        } else {
-          console.error('Failed to fetch customers:', result.message)
-          setAllCustomers([])
-        }
+        const customers = await customerService.getAllCustomers()
+        console.log('✅ [CustomersTable] Successfully fetched customers:', customers.length)
+        
+        setAllCustomers(customers)
       } catch (error) {
-        console.error('Error fetching customers:', error)
+        console.error('❌ [CustomersTable] Error fetching customers:', error)
         setAllCustomers([])
+        toast({
+          title: "Error",
+          description: "Failed to load customers. Please try again.",
+          variant: "destructive"
+        })
       } finally {
         setIsLoadingCustomers(false)
       }
     }
 
     fetchCustomers()
-  }, [updateTrigger])
+  }, [updateTrigger, toast])
 
   // Listen for customer events to refresh data
   useEffect(() => {
@@ -305,92 +290,95 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
         />
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Company Name</TableHead>
-              <TableHead>Company Number</TableHead>
-              <TableHead>VAT Number</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoadingCustomers ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600" />
-                    <span>Loading customers...</span>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : currentCustomers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                  {searchQuery ? (
-                    <>
-                      No customers found matching "{searchQuery}"
-                      <br />
-                      <span className="text-sm">Try adjusting your search terms</span>
-                    </>
-                  ) : (
-                    <>
-                      No customers available
-                      <br />
-                      <span className="text-sm">Click "Add Customer" to create your first customer</span>
-                    </>
-                  )}
-                </TableCell>
-              </TableRow>
-            ) : (
-              currentCustomers.map((customer) => (
-                <CustomerTableRow
-                  key={customer.id}
-                  customer={customer}
-                  isSelected={String(customer.id) === selectedCustomerId}
-                  onSelect={onCustomerSelect}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                />
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6">
-          <div className="text-sm text-gray-500">
-            Showing {startIndex + 1} to {Math.min(endIndex, filteredCustomers.length)} of {filteredCustomers.length} customers
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+      {/* Loading State */}
+      {isLoadingCustomers && (
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
+            <p className="text-gray-600">Loading customers...</p>
           </div>
         </div>
       )}
 
+      {/* Error State */}
+      {!isLoadingCustomers && allCustomers.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-gray-600 mb-4">No customers found.</p>
+          <Button 
+            onClick={() => forceUpdate()}
+            variant="outline"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Customers Table */}
+      {!isLoadingCustomers && allCustomers.length > 0 && (
+        <>
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Company Name</TableHead>
+                  <TableHead>Company Number</TableHead>
+                  <TableHead>VAT Number</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Customer Type</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentCustomers.map((customer) => (
+                  <CustomerTableRow
+                    key={customer.id}
+                    customer={customer}
+                    isSelected={selectedRows.includes(String(customer.id))}
+                    onSelect={() => toggleRowSelection(String(customer.id))}
+                    onEdit={() => handleEdit(customer)}
+                    onDelete={() => handleDelete(customer)}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredCustomers.length)} of {filteredCustomers.length} customers
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <span className="text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Customer Dialog */}
       <CustomerDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
@@ -404,15 +392,12 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Customer</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{customerToDelete?.companyName}"? This action cannot be undone and will remove all associated data.
+              Are you sure you want to delete "{customerToDelete?.companyName}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

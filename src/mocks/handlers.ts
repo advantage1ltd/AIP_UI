@@ -5,11 +5,11 @@ import { safeDuressWordsHandlers } from './safeDuressWordsHandlers'
 import { holidayRequestHandlers } from './holidayRequestHandlers'
 import { customerSatisfactionHandlers } from './customerSatisfactionHandlers'
 import { bankHolidayHandlers } from './bankHolidayHandlers'
-import { customerHandlers } from './customerHandlers'
+// import { customerHandlers } from './customerHandlers' // Commented out - transitioning to real backend
 import { regionsHandlers } from './regionsHandlers'
 import { sitesHandlers } from './sitesHandlers'
 import { incidentHandlers } from './incidentHandlers'
-import { userHandlers } from './userHandlers'
+import { userHandlers } from './userHandlers' // Commented out - transitioning to real backend
 import { settingsHandlers } from './settingsHandlers'
 import { headerHandlers } from './headerHandlers'
 import { dashboardHandlers } from './dashboardHandlers'
@@ -17,31 +17,32 @@ import { mysteryShopperHandlers } from './mysteryShopperHandlers'
 import { dailyActivityHandlers } from './dailyActivityHandlers'
 import { dailyActivityAnalyticsHandlers } from './dailyActivityAnalyticsHandlers'
 import { User, CustomerUser, AdvantageOneUser } from '@/types/user'
-import { employeeDiaryHandlers } from './employeeDiaryHandlers'
+// import { employeeDiaryHandlers } from './employeeDiaryHandlers' // Commented out - transitioning to real backend
 import { dailyOccurrenceBookHandlers } from './dailyOccurrenceBookHandlers'
-import { lookupTableHandlers } from './lookupTableHandlers'
+// import { employeeHandlers } from './employeeHandlers' // Commented out - transitioning to real backend
 
 
 export const handlers = [
-  ...customerHandlers,
-  ...userHandlers,
-  ...headerHandlers,
-  ...dashboardHandlers,
-  ...siteVisitHandlers,
-  ...safeDuressWordsHandlers,
-  ...holidayRequestHandlers,
-  ...customerSatisfactionHandlers,
-  ...bankHolidayHandlers,
-  ...regionsHandlers,
-  ...sitesHandlers,
-  ...incidentHandlers,
-  ...mysteryShopperHandlers,
-  ...dailyActivityHandlers,
-  ...dailyActivityAnalyticsHandlers,
-  ...settingsHandlers,
-  ...employeeDiaryHandlers,
-  ...dailyOccurrenceBookHandlers,
-  ...lookupTableHandlers
+  // All handlers commented out - transitioning to real backend
+  // ...customerHandlers,
+  // ...userHandlers,
+  // ...headerHandlers,
+  // ...dashboardHandlers,
+  // ...siteVisitHandlers,
+  // ...safeDuressWordsHandlers,
+  // ...holidayRequestHandlers,
+  // ...customerSatisfactionHandlers,
+  // ...bankHolidayHandlers,
+  // ...regionsHandlers,
+  // ...sitesHandlers,
+  // ...incidentHandlers,
+  // ...mysteryShopperHandlers,
+  // ...dailyActivityHandlers,
+  // ...dailyActivityAnalyticsHandlers,
+  // ...settingsHandlers,
+  // ...employeeDiaryHandlers,
+  // ...dailyOccurrenceBookHandlers,
+  // ...employeeHandlers
 ]
 
 // MSW Data Store with Enhanced Synchronization

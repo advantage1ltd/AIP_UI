@@ -12,50 +12,8 @@ export const initMockServiceWorker = async () => {
 
     // Start MSW with enhanced configuration
     await worker.start({
-      // Improved unhandled request handling
-      onUnhandledRequest: (request, print) => {
-        // Parse URL to get pathname
-        const url = new URL(request.url)
-        
-        // Ignore non-API requests and static assets
-        const ignoredPatterns = [
-          '/mockServiceWorker.js',
-          '/db.json',
-          '/_next/',
-          '/assets/',
-          '/static/',
-          '/src/',
-          '/node_modules/',
-          '/@vite/',
-          '/@fs/',
-          '.ico',
-          '.png',
-          '.jpg',
-          '.svg',
-          '.js',
-          '.ts',
-          '.tsx',
-          '.css',
-          '.json'
-        ]
-
-        // Ignore root path and non-API requests
-        if (url.pathname === '/' || 
-            !url.pathname.startsWith('/api/') ||
-            ignoredPatterns.some(pattern => request.url.includes(pattern))) {
-          return
-        }
-
-        // Only log unhandled API requests
-        console.warn('⚠️ [MSW] Unhandled API Request:', {
-          method: request.method,
-          url: request.url,
-          pathname: url.pathname
-        })
-
-        // Show warning in console for API requests only
-        print.warning()
-      },
+      // Bypass unhandled requests (let real backend handle them)
+      onUnhandledRequest: 'bypass',
 
       // Configure service worker with quieter logging
       serviceWorker: {

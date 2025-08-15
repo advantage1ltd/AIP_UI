@@ -4,94 +4,10 @@ import { Pencil, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { TableActions } from "./TableActions"
 import { TablePagination } from "./TablePagination"
-
-export interface Employee {
-  id: string
-  employeeId?: number
-  firstName: string
-  surname: string
-  position: string
-  employeeNumber: string
-  siaLicenceType: string
-  startDate: string
-  status: 'active' | 'inactive'
-  
-  // Basic Information
-  aipAccessLevel?: string
-  title?: string
-  
-  // Address Information
-  houseName?: string
-  numberAndStreet?: string
-  town?: string
-  county?: string
-  postCode?: string
-  region?: string
-  
-  // Employment Information
-  employeeStatus?: string
-  employmentType?: string
-  department?: string
-  
-  // Contact Information
-  email?: string
-  contactNumber?: string
-  
-  // SIA Information
-  siaLicenceExpiry?: string
-  siaLicenceNumber?: string
-  
-  // Personal Information
-  nationality?: string
-  rightToWorkCondition?: string
-  
-  // Driving License Information
-  drivingLicenceType?: string
-  dateDLChecked?: string
-  drivingLicenceCopyTaken?: boolean
-  sixMonthlyCheck?: boolean
-  
-  // Checks and References
-  graydonCheckAuthorised?: boolean
-  graydonCheckDetails?: string
-  initialOralReferencesComplete?: boolean
-  initialOralReferencesDate?: string
-  writtenRefsComplete?: boolean
-  writtenRefsCompleteDate?: string
-  quickStarterFormCompleted?: boolean
-  
-  // Employment Documentation
-  workingTimeDirective?: string
-  workingTimeDirectiveComplete?: boolean
-  contractOfEmploymentSigned?: boolean
-  photoTaken?: boolean
-  photoFile?: string
-  idCardIssued?: boolean
-  equipmentIssued?: boolean
-  uniformIssued?: boolean
-  nextOfKinDetailsComplete?: boolean
-  peopleHoursPin?: string
-  
-  // Training and Induction
-  fullRotasIssued?: string
-  inductionAndTrainingBooked?: string
-  location?: string
-  trainer?: string
-  
-  // Relationships
-  userId?: string
-  supervisorId?: number
-  supervisorName?: string
-  
-  // Audit Fields
-  createdAt?: string
-  createdBy?: string
-  updatedAt?: string
-  updatedBy?: string
-}
+import { Employee } from "@/types/employee"
 
 interface EmployeesTableProps {
-  employees: Employee[]
+  employees?: Employee[]
   onNewEmployee: () => void
   onEditEmployee: (employee: Employee) => void
   onDeleteEmployee: (employee: Employee) => void
@@ -102,8 +18,9 @@ export function EmployeesTable({ employees, onNewEmployee, onEditEmployee, onDel
   const [searchQuery, setSearchQuery] = useState("")
   const itemsPerPage = 10
 
-  const filteredEmployees = employees.filter(employee => {
-    const fullName = `${employee.firstName || ''} ${employee.lastName || ''}`.toLowerCase()
+  const employeesArray = employees || []
+  const filteredEmployees = employeesArray.filter(employee => {
+    const fullName = `${employee.firstName || ''} ${employee.surname || ''}`.toLowerCase()
     const employeeNumber = (employee.employeeNumber || '').toLowerCase()
     const searchLower = searchQuery.toLowerCase()
     
@@ -157,18 +74,22 @@ export function EmployeesTable({ employees, onNewEmployee, onEditEmployee, onDel
               {paginatedEmployees.length > 0 ? (
                 paginatedEmployees.map((employee) => (
                   <TableRow key={employee.id} className="hover:bg-purple-50/50 text-xs md:text-sm">
-                    <TableCell className="font-medium py-2 md:py-3">{`${employee.firstName || ''} ${employee.lastName || ''}`}</TableCell>
+                    <TableCell className="font-medium py-2 md:py-3">{`${employee.firstName || ''} ${employee.surname || ''}`}</TableCell>
                     <TableCell className="py-2 md:py-3">{employee.employeeNumber}</TableCell>
                     <TableCell className={`py-2 md:py-3 ${getResponsiveClasses('position')}`}>{employee.position}</TableCell>
-                    <TableCell className={`py-2 md:py-3 ${getResponsiveClasses('siaLicenceType')}`}>{employee.siaLicenceType}</TableCell>
-                    <TableCell className={`py-2 md:py-3 ${getResponsiveClasses('startDate')}`}>{employee.startDate}</TableCell>
+                    <TableCell className={`py-2 md:py-3 ${getResponsiveClasses('siaLicenceType')}`}>
+                      {employee.siaLicenceType || '-'}
+                    </TableCell>
+                    <TableCell className={`py-2 md:py-3 ${getResponsiveClasses('startDate')}`}>
+                      {employee.startDate ? new Date(employee.startDate).toLocaleDateString() : ''}
+                    </TableCell>
                     <TableCell className="py-2 md:py-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        employee.status === 'active' 
+                        employee.employeeStatus === 'Active' 
                           ? 'bg-green-100 text-green-700' 
                           : 'bg-red-100 text-red-700'
                       }`}>
-                        {employee.status}
+                        {employee.employeeStatus}
                       </span>
                     </TableCell>
                     <TableCell className="text-right py-2 md:py-3">

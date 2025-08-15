@@ -183,23 +183,21 @@ export default function LoginPage() {
           {/* Development Helper - Test Credentials */}
           {import.meta.env.DEV && (
             <div className="mt-6 p-4 bg-slate-50 rounded-lg border">
-              <h3 className="text-sm font-semibold text-slate-700 mb-2">Test Credentials (Dev Only)</h3>
+              <h3 className="text-sm font-semibold text-slate-700 mb-2">Backend Test Credentials (Dev Only)</h3>
               <div className="text-xs text-slate-600 space-y-1">
-                <div><strong>Central England COOP (ID: 21):</strong></div>
-                <div>• customerho / customer123</div>
-                <div>• customersite / site123</div>
-                <div>• central / central123</div>
-                <div className="mt-2"><strong>Heart of England (ID: 22):</strong></div>
-                <div>• heartengland / heart123</div>
-                <div>• heartsite / heartsite123</div>
-                <div className="mt-2"><strong>Midcounties COOP (ID: 23):</strong></div>
-                <div>• midcounties / mid123</div>
-                <div>• midsite / midsite123</div>
-                <div className="mt-2"><strong>Advantage One:</strong></div>
-                <div>• admin / admin123</div>
-                <div>• officer1 / officer123 (Customers: 21, 22)</div>
-                <div>• officer2 / officer456 (Customers: 22, 23)</div>
-                <div>• officer3 / officer789 (Customers: 21, 23)</div>
+                <div className="font-semibold text-green-700">✅ Backend Connected - Use These Credentials:</div>
+                <div className="mt-2"><strong>🔧 Administrator:</strong></div>
+                <div>• Email: admin@advantageone.com</div>
+                <div>• Password: Admin123!@#</div>
+                <div className="mt-2"><strong>👮 Advantage One Officer:</strong></div>
+                <div>• Email: officer@advantageone.com</div>
+                <div>• Password: Test123!@#</div>
+                <div className="mt-2"><strong>🏢 Customer Site Manager:</strong></div>
+                <div>• Email: manager@customer.com</div>
+                <div>• Password: Test123!@#</div>
+                <div className="mt-2 text-xs text-orange-600">
+                  <strong>Note:</strong> These are the new backend credentials. The old MSW credentials are no longer valid.
+                </div>
               </div>
             </div>
           )}

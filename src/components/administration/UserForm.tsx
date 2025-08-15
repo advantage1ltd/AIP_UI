@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -57,7 +57,7 @@ type FormState = {
 );
 
 export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => {
-  const { availableCustomers } = useAvailableCustomers();
+  const { availableCustomers, isLoading } = useAvailableCustomers();
   
   const [formData, setFormData] = useState<FormState>(() => {
     const baseData = {
@@ -91,24 +91,120 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
 
   const [showPassword, setShowPassword] = useState(false);
 
+  // Convert availableCustomers to Customer objects for DualListBox
+  const availableCustomersForDualList = useMemo(() => {
+    return availableCustomers.map(customer => ({
+      id: customer.id,
+      name: customer.name,
+      companyName: customer.name,
+      companyNumber: '',
+      vatNumber: '',
+      status: 'active' as const,
+      customerType: 'retail' as const,
+      address: {
+        building: '',
+        street: '',
+        village: '',
+        town: '',
+        county: '',
+        postcode: ''
+      },
+      contact: {
+        title: '',
+        forename: '',
+        surname: '',
+        position: '',
+        email: '',
+        phone: ''
+      },
+      viewConfig: {
+        id: '',
+        customerId: customer.id,
+        customerType: 'retail' as const,
+        enabledPages: [],
+        createdAt: '',
+        updatedAt: ''
+      },
+      createdAt: '',
+      updatedAt: ''
+    }));
+  }, [availableCustomers]);
+
+  // Get selected customers for DualListBox
+  const selectedCustomersForDualList = useMemo(() => {
+    if (!('assignedCustomerIds' in formData)) return [];
+    
+    return formData.assignedCustomerIds
+      .map(customerId => {
+        const customer = availableCustomers.find(c => c.id === customerId);
+        if (!customer) return null;
+        
+        return {
+          id: customer.id,
+          name: customer.name,
+          companyName: customer.name,
+          companyNumber: '',
+          vatNumber: '',
+          status: 'active' as const,
+          customerType: 'retail' as const,
+          address: {
+            building: '',
+            street: '',
+            village: '',
+            town: '',
+            county: '',
+            postcode: ''
+          },
+          contact: {
+            title: '',
+            forename: '',
+            surname: '',
+            position: '',
+            email: '',
+            phone: ''
+          },
+          viewConfig: {
+            id: '',
+            customerId: customer.id,
+            customerType: 'retail' as const,
+            enabledPages: [],
+            createdAt: '',
+            updatedAt: ''
+          },
+          createdAt: '',
+          updatedAt: ''
+        };
+      })
+      .filter(Boolean) as any[];
+  }, [formData, availableCustomers]);
+
+  // Get available customers (not yet selected) for DualListBox
+  const availableCustomersNotSelected = useMemo(() => {
+    if (!('assignedCustomerIds' in formData)) return availableCustomersForDualList;
+    
+    return availableCustomersForDualList.filter(
+      customer => !formData.assignedCustomerIds.includes(customer.id)
+    );
+  }, [availableCustomersForDualList, formData]);
+
   const handleCheckboxChange = (name: string, checked: boolean) => {
     setFormData(prev => ({ ...prev, [name]: checked }));
   };
 
-  const handleAddCustomer = (customerId: number) => {
-    if ('assignedCustomerIds' in formData && !formData.assignedCustomerIds.includes(customerId)) {
+  const handleAddCustomer = (customer: any) => {
+    if ('assignedCustomerIds' in formData && !formData.assignedCustomerIds.includes(customer.id)) {
       setFormData({
         ...formData,
-        assignedCustomerIds: [...formData.assignedCustomerIds, customerId],
+        assignedCustomerIds: [...formData.assignedCustomerIds, customer.id],
       } as FormState);
     }
   };
 
-  const handleRemoveCustomer = (customerId: number) => {
+  const handleRemoveCustomer = (customer: any) => {
     if ('assignedCustomerIds' in formData) {
       setFormData({
         ...formData,
-        assignedCustomerIds: formData.assignedCustomerIds.filter(id => id !== customerId),
+        assignedCustomerIds: formData.assignedCustomerIds.filter(id => id !== customer.id),
       } as FormState);
     }
   };
@@ -148,16 +244,44 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    console.log('🔄 [UserForm] Form submission started', {
+      isEdit: !!initialData,
+      userId: initialData?.id,
+      formData: {
+        username: formData.username,
+        email: formData.email,
+        role: formData.role,
+        assignedCustomerIds: 'assignedCustomerIds' in formData ? formData.assignedCustomerIds : 'N/A'
+      }
+    });
+    
     const { password, ...restData } = formData;
     
-    if (initialData) {
-      onSubmit({
-        id: initialData.id,
-        ...(password ? { password } : {}),
-        ...restData,
-      } as UpdateUserInput);
-    } else {
-      onSubmit(formData as CreateUserInput);
+    try {
+      if (initialData) {
+        const updateData = {
+          id: initialData.id,
+          ...(password ? { password } : {}),
+          ...restData,
+        } as UpdateUserInput;
+        
+        console.log('🔄 [UserForm] Submitting update data', updateData);
+        onSubmit(updateData);
+      } else {
+        // For new users, include confirmPassword
+        const createData = {
+          ...formData,
+          confirmPassword: formData.password || '',
+        } as CreateUserInput;
+        
+        console.log('🔄 [UserForm] Submitting create data', createData);
+        onSubmit(createData);
+      }
+      
+      console.log('✅ [UserForm] Form submission completed successfully');
+    } catch (error) {
+      console.error('❌ [UserForm] Form submission failed:', error);
     }
   };
 
@@ -213,10 +337,8 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
               required
             />
           </div>
-          <div className="relative">
-            <Label htmlFor="password">
-              Password {initialData && '(leave blank to keep unchanged)'}
-            </Label>
+          <div>
+            <Label htmlFor="password">Password</Label>
             <div className="relative">
               <Input
                 id="password"
@@ -229,8 +351,8 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
               <Button
                 type="button"
                 variant="ghost"
-                size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? (
@@ -241,26 +363,14 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Role Information Section */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <Lock className="h-5 w-5 text-primary" />
-            Role Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="role">User Role</Label>
+            <Label htmlFor="role">Role</Label>
             <Select
               value={formData.role}
               onValueChange={(value) => handleSelectChange('role', value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select role" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {USER_ROLES.map((role) => (
@@ -271,75 +381,40 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
               </SelectContent>
             </Select>
           </div>
-
-          {formData.role === 'AdvantageOneOfficer' ? (
-            <div className="md:col-span-2">
-              <Label>Customer Assignments</Label>
-              <div className="grid grid-cols-5 gap-4 mt-2">
-                {/* Available Customers List */}
-                <div className="col-span-2">
-                  <Label className="text-sm font-medium">Select customers to add to the list on the right</Label>
-                  <div className="border rounded-md p-2 h-48 overflow-y-auto bg-gray-50">
-                    {availableCustomers
-                      .filter(customer => !('assignedCustomerIds' in formData) || !formData.assignedCustomerIds.includes(customer.id))
-                      .map((customer) => (
-                        <div
-                          key={customer.id}
-                          className="p-2 hover:bg-gray-100 cursor-pointer rounded text-sm"
-                          onClick={() => handleAddCustomer(customer.id)}
-                        >
-                          {customer.name}
-                        </div>
-                      ))
-                    }
-                  </div>
-                </div>
-
-                {/* Control Buttons */}
-                <div className="flex flex-col justify-center items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="p-2 h-8 w-8"
-                    disabled={true}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="p-2 h-8 w-8"
-                    disabled={true}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Assigned Customers List */}
-                <div className="col-span-2">
-                  <Label className="text-sm font-medium">Customers this officer works at</Label>
-                  <div className="border rounded-md p-2 h-48 overflow-y-auto bg-gray-50">
-                    {'assignedCustomerIds' in formData && formData.assignedCustomerIds.map((customerId) => {
-                      const customer = availableCustomers.find(c => c.id === customerId);
-                      return customer ? (
-                        <div
-                          key={customer.id}
-                          className="p-2 hover:bg-gray-100 cursor-pointer rounded text-sm"
-                          onClick={() => handleRemoveCustomer(customer.id)}
-                        >
-                          {customer.name}
-                        </div>
-                      ) : null;
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
         </CardContent>
       </Card>
+
+      {/* Customer Assignment Section - Only for Advantage One roles */}
+      {!isCustomerRole && (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              Customer Assignments
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="text-center py-4">
+                <div className="text-sm text-gray-500">Loading customers...</div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <Label className="text-sm font-medium">Assign customers to this officer</Label>
+                <DualListBox
+                  available={availableCustomersNotSelected}
+                  selected={selectedCustomersForDualList}
+                  onAdd={handleAddCustomer}
+                  onRemove={handleRemoveCustomer}
+                />
+                <div className="text-sm text-gray-500">
+                  {selectedCustomersForDualList.length} customer(s) assigned
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Additional Information Section */}
       <Card>

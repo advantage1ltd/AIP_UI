@@ -21,19 +21,27 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { useState, useEffect } from "react"
-import { Employee } from "./EmployeesTable"
+import { Employee } from "@/types/employee"
 import { UserRole } from "@/types/user"
 import { lookupTableService, LookupTableItem } from "@/services/lookupTableService"
 import { employeeService, EmployeeRegistrationRequest } from "@/services/employeeService"
-import { Upload, User, FileText, Shield, MapPin, Briefcase, CreditCard, Camera, Calendar } from "lucide-react"
+import { mapToBackendUpdateRequest } from "@/utils/employeeMapper"
+import { Upload, User, FileText, Shield, MapPin, Briefcase, CreditCard, Camera, Calendar, Mail } from "lucide-react"
 
 const formSchema = z.object({
-  // Basic Information
-  aipAccessLevel: z.string().min(1, "AIP Access Level is required"),
-  title: z.string().optional(),
+  // Basic Information - Backend Required Fields
+  employeeNumber: z.string().min(1, "Employee number is required"),
+  title: z.string().min(1, "Title is required"),
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   surname: z.string().min(2, "Last name must be at least 2 characters"),
   startDate: z.string().min(1, "Start date is required"),
+  position: z.string().min(1, "Position is required"),
+  employeeStatus: z.string().min(1, "Employee status is required"),
+  employmentType: z.string().min(1, "Employment type is required"),
+  
+  // Optional Basic Information
+  aipAccessLevel: z.string().optional(),
+  department: z.string().optional(),
   
   // Contact Information
   email: z.string().email("Invalid email format").optional(),
@@ -41,30 +49,23 @@ const formSchema = z.object({
   
   // Address Information
   houseName: z.string().optional(),
-  numberAndStreet: z.string().min(1, "Number and street is required"),
-  town: z.string().min(1, "Town is required"),
-  county: z.string().min(1, "County is required"),
-  postCode: z.string().min(1, "Post code is required"),
-  region: z.string().min(1, "Region is required"),
+  numberAndStreet: z.string().optional(),
+  town: z.string().optional(),
+  county: z.string().optional(),
+  postCode: z.string().optional(),
+  region: z.string().optional(),
   
-  // Employment Information
-  position: z.string().min(1, "Position is required"),
-  employeeNumber: z.string().min(1, "Employee number is required"),
-  employeeStatus: z.string().optional(),
-  employmentType: z.string().optional(),
-  department: z.string().optional(),
-  
-  // SIA Information
-  siaLicenceType: z.string().min(1, "SIA Licence Type is required"),
-  siaLicenceExpiry: z.string().min(1, "SIA Licence Expiry is required"),
+  // SIA Information - Conditional based on AIP Access Level
+  siaLicenceType: z.string().optional(),
+  siaLicenceExpiry: z.string().optional(),
   siaLicenceNumber: z.string().optional(),
   
   // Personal Information
-  nationality: z.string().min(1, "Nationality is required"),
-  rightToWorkCondition: z.string().min(1, "Right to work condition is required"),
+  nationality: z.string().optional(),
+  rightToWorkCondition: z.string().optional(),
   
   // Driving License Information
-  drivingLicenceType: z.string().min(1, "Driving licence is required"),
+  drivingLicenceType: z.string().optional(),
   dateDLChecked: z.string().optional(),
   drivingLicenceCopyTaken: z.boolean().optional(),
   sixMonthlyCheck: z.boolean().optional(),
@@ -97,6 +98,23 @@ const formSchema = z.object({
   trainer: z.string().optional(),
   
   status: z.enum(["active", "inactive"]).optional(),
+}).refine((data) => {
+  // SIA fields are required only for Advantageoneofficer and AdvantageoneHOofficer (case-insensitive)
+  const requiresSIA = data.aipAccessLevel?.toLowerCase() === 'advantageoneofficer' || data.aipAccessLevel?.toLowerCase() === 'advantageonehoofficer'
+  
+  if (requiresSIA) {
+    if (!data.siaLicenceType || data.siaLicenceType.trim() === '') {
+      return false
+    }
+    if (!data.siaLicenceExpiry || data.siaLicenceExpiry.trim() === '') {
+      return false
+    }
+  }
+  
+  return true
+}, {
+  message: "SIA Licence Type and Expiry are required for Advantageoneofficer and AdvantageoneHOofficer roles",
+  path: ["siaLicenceType"] // This will show the error on the siaLicenceType field
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -131,6 +149,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
   const [isLoadingDrivingLicenceTypes, setIsLoadingDrivingLicenceTypes] = useState(false)
   const [isLoadingRightToWorkConditions, setIsLoadingRightToWorkConditions] = useState(false)
   const [workingTimeDirectives, setWorkingTimeDirectives] = useState<LookupTableItem[]>([])
+  const [isLoadingLookupData, setIsLoadingLookupData] = useState(false)
   const [isLoadingWorkingTimeDirectives, setIsLoadingWorkingTimeDirectives] = useState(false)
 
   const form = useForm<FormData>({
@@ -140,6 +159,8 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
       title: initialData?.title || "",
       firstName: initialData?.firstName || "",
       surname: initialData?.surname || "",
+      email: initialData?.email || "",
+      contactNumber: initialData?.contactNumber || "",
       startDate: initialData?.startDate ? new Date(initialData.startDate).toISOString().split('T')[0] : "",
       houseName: initialData?.houseName || "",
       numberAndStreet: initialData?.numberAndStreet || "",
@@ -149,6 +170,8 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
       region: initialData?.region || "",
       position: initialData?.position || "",
       employeeNumber: initialData?.employeeNumber || "",
+      employeeStatus: initialData?.employeeStatus || "Active",
+      employmentType: initialData?.employmentType || "Full-time",
       siaLicenceType: initialData?.siaLicenceType || "",
       siaLicenceExpiry: initialData?.siaLicenceExpiry ? new Date(initialData.siaLicenceExpiry).toISOString().split('T')[0] : "",
       nationality: initialData?.nationality || "",
@@ -180,6 +203,10 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
       status: "active",
     },
   })
+
+  // Watch AIP Access Level to conditionally show SIA fields
+  const aipAccessLevel = form.watch('aipAccessLevel')
+  const requiresSIA = aipAccessLevel?.toLowerCase() === 'advantageoneofficer' || aipAccessLevel?.toLowerCase() === 'advantageonehoofficer'
 
   const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -240,189 +267,186 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
      }
    }
 
-   // Load lookup data on component mount
-   useEffect(() => {
-     const loadLookupData = async () => {
-       // Load trainers
-       setIsLoadingTrainers(true)
-       try {
-         const trainersData = await lookupTableService.getTrainers()
-         setTrainers(trainersData)
-       } catch (error) {
-         console.error('Failed to load trainers:', error)
-       } finally {
-         setIsLoadingTrainers(false)
-       }
+     // Load lookup data and employee data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      // Load employee data if editing
+      if (initialData?.id) {
+        try {
+          const employeeData = await employeeService.getEmployeeById(Number(initialData.id))
+          // Update form with loaded data
+          form.reset({
+            aipAccessLevel: employeeData.aipAccessLevel || "",
+            title: employeeData.title || "",
+            firstName: employeeData.firstName || "",
+            surname: employeeData.surname || "",
+            startDate: employeeData.startDate ? new Date(employeeData.startDate).toISOString().split('T')[0] : "",
+            email: employeeData.email || "",
+            contactNumber: employeeData.contactNumber || "",
+            houseName: employeeData.houseName || "",
+            numberAndStreet: employeeData.numberAndStreet || "",
+            town: employeeData.town || "",
+            county: employeeData.county || "",
+            postCode: employeeData.postCode || "",
+            region: employeeData.region || "",
+            position: employeeData.position || "",
+            employeeNumber: employeeData.employeeNumber || "",
+            employeeStatus: employeeData.employeeStatus || "",
+            employmentType: employeeData.employmentType || "",
+            department: employeeData.department || "",
+            siaLicenceType: employeeData.siaLicenceType || "",
+            siaLicenceExpiry: employeeData.siaLicenceExpiry ? new Date(employeeData.siaLicenceExpiry).toISOString().split('T')[0] : "",
+            siaLicenceNumber: employeeData.siaLicenceNumber || "",
+            nationality: employeeData.nationality || "",
+            rightToWorkCondition: employeeData.rightToWorkCondition || "",
+            drivingLicenceType: employeeData.drivingLicenceType || "",
+            dateDLChecked: employeeData.dateDLChecked ? new Date(employeeData.dateDLChecked).toISOString().split('T')[0] : "",
+            drivingLicenceCopyTaken: employeeData.drivingLicenceCopyTaken || false,
+            sixMonthlyCheck: employeeData.sixMonthlyCheck || false,
+            graydonCheckAuthorised: employeeData.graydonCheckAuthorised || false,
+            graydonCheckDetails: employeeData.graydonCheckDetails || "",
+            initialOralReferencesComplete: employeeData.initialOralReferencesComplete || false,
+            initialOralReferencesDate: employeeData.initialOralReferencesDate ? new Date(employeeData.initialOralReferencesDate).toISOString().split('T')[0] : "",
+            writtenRefsComplete: employeeData.writtenRefsComplete || false,
+            writtenRefsCompleteDate: employeeData.writtenRefsCompleteDate ? new Date(employeeData.writtenRefsCompleteDate).toISOString().split('T')[0] : "",
+            quickStarterFormCompleted: employeeData.quickStarterFormCompleted || false,
+            workingTimeDirective: employeeData.workingTimeDirective || "",
+            workingTimeDirectiveComplete: employeeData.workingTimeDirectiveComplete || false,
+            contractOfEmploymentSigned: employeeData.contractOfEmploymentSigned || false,
+            photoTaken: employeeData.photoTaken || false,
+            photoFile: employeeData.photoFile || "",
+            idCardIssued: employeeData.idCardIssued || false,
+            equipmentIssued: employeeData.equipmentIssued || false,
+            uniformIssued: employeeData.uniformIssued || false,
+            nextOfKinDetailsComplete: employeeData.nextOfKinDetailsComplete || false,
+            peopleHoursPin: employeeData.peopleHoursPin || "",
+            fullRotasIssued: employeeData.fullRotasIssued ? new Date(employeeData.fullRotasIssued).toISOString().split('T')[0] : "",
+            inductionAndTrainingBooked: employeeData.inductionAndTrainingBooked ? new Date(employeeData.inductionAndTrainingBooked).toISOString().split('T')[0] : "",
+            location: employeeData.location || "",
+            trainer: employeeData.trainer || "",
+            status: employeeData.employeeStatus === "Active" ? "active" : "inactive",
+          })
+          
+          // Update photo preview
+          if (employeeData.photoFile) {
+            setPhotoPreview(employeeData.photoFile)
+          }
+        } catch (error) {
+          console.error('Failed to load employee data:', error)
+        }
+      }
 
-       // Load counties
-       setIsLoadingCounties(true)
-       try {
-         const countiesData = await lookupTableService.getByCategory('Counties')
-         setCounties(countiesData)
-       } catch (error) {
-         console.error('Failed to load counties:', error)
-       } finally {
-         setIsLoadingCounties(false)
-       }
+      // Load all lookup table data in parallel for better performance
+      const requiredCategories = [
+        'Trainers',
+        'UK_Counties', 
+        'UK_Regions',
+        'User_Roles',
+        'Positions',
+        'SIA_Licence_Types',
+        'Driving_Licence_Types',
+        'Right_To_Work_Conditions',
+        'Working_Time_Directive'
+      ]
 
-       // Load regions
-       setIsLoadingRegions(true)
-       try {
-         const regionsData = await lookupTableService.getByCategory('Regions')
-         setRegions(regionsData)
-       } catch (error) {
-         console.error('Failed to load regions:', error)
-       } finally {
-         setIsLoadingRegions(false)
-       }
+      console.log('Loading lookup table data in parallel...')
+      setIsLoadingLookupData(true)
+      
+      try {
+        const lookupData = await lookupTableService.getByCategories(requiredCategories)
+        
+        // Set all the data at once
+        setTrainers(lookupData['Trainers'] || [])
+        setCounties(lookupData['UK_Counties'] || [])
+        setRegions(lookupData['UK_Regions'] || [])
+        setUserRoles(lookupData['User_Roles'] || [])
+        setPositions(lookupData['Positions'] || [])
+        setSiaLicenceTypes(lookupData['SIA_Licence_Types'] || [])
+        setDrivingLicenceTypes(lookupData['Driving_Licence_Types'] || [])
+        setRightToWorkConditions(lookupData['Right_To_Work_Conditions'] || [])
+        setWorkingTimeDirectives(lookupData['Working_Time_Directive'] || [])
+        
+        console.log('All lookup table data loaded successfully')
+      } catch (error) {
+        console.error('Failed to load lookup table data:', error)
+      } finally {
+        setIsLoadingLookupData(false)
+      }
+    }
 
-       // Load user roles
-       setIsLoadingUserRoles(true)
-       try {
-         const userRolesData = await lookupTableService.getByCategory('UserRoles')
-         setUserRoles(userRolesData)
-       } catch (error) {
-         console.error('Failed to load user roles:', error)
-       } finally {
-         setIsLoadingUserRoles(false)
-       }
-
-       // Load positions
-       setIsLoadingPositions(true)
-       try {
-         const positionsData = await lookupTableService.getByCategory('Positions')
-         setPositions(positionsData)
-       } catch (error) {
-         console.error('Failed to load positions:', error)
-       } finally {
-         setIsLoadingPositions(false)
-       }
-
-       // Load SIA licence types
-       setIsLoadingSiaLicenceTypes(true)
-       try {
-         const siaLicenceTypesData = await lookupTableService.getByCategory('SiaLicenceTypes')
-         setSiaLicenceTypes(siaLicenceTypesData)
-       } catch (error) {
-         console.error('Failed to load SIA licence types:', error)
-       } finally {
-         setIsLoadingSiaLicenceTypes(false)
-       }
-
-       // Load driving licence types
-       setIsLoadingDrivingLicenceTypes(true)
-       try {
-         const drivingLicenceTypesData = await lookupTableService.getByCategory('DrivingLicenceTypes')
-         setDrivingLicenceTypes(drivingLicenceTypesData)
-       } catch (error) {
-         console.error('Failed to load driving licence types:', error)
-       } finally {
-         setIsLoadingDrivingLicenceTypes(false)
-       }
-
-       // Load right to work conditions
-       setIsLoadingRightToWorkConditions(true)
-       try {
-         const rightToWorkConditionsData = await lookupTableService.getByCategory('RightToWorkConditions')
-         setRightToWorkConditions(rightToWorkConditionsData)
-       } catch (error) {
-         console.error('Failed to load right to work conditions:', error)
-       } finally {
-         setIsLoadingRightToWorkConditions(false)
-       }
-
-       // Load working time directives
-       setIsLoadingWorkingTimeDirectives(true)
-       try {
-         const workingTimeDirectivesData = await lookupTableService.getByCategory('WorkingTimeDirectives')
-         setWorkingTimeDirectives(workingTimeDirectivesData)
-       } catch (error) {
-         console.error('Failed to load working time directives:', error)
-       } finally {
-         setIsLoadingWorkingTimeDirectives(false)
-       }
-     }
-
-     loadLookupData()
-   }, [])
+    loadData()
+  }, [initialData?.id])
 
   const handleSubmit = async (data: FormData) => {
+    console.log('🚀 [EmployeeForm] Starting form submission...')
+    console.log('📝 [EmployeeForm] Form data received:', data)
+    
+    // Validate required fields before submission
+    const requiredFields = ['employeeNumber', 'title', 'firstName', 'surname', 'startDate', 'position', 'employeeStatus', 'employmentType']
+    const missingFields = requiredFields.filter(field => !data[field as keyof FormData])
+    
+    if (missingFields.length > 0) {
+      console.error('❌ [EmployeeForm] Missing required fields:', missingFields)
+      setSubmitError(`Please fill in all required fields: ${missingFields.join(', ')}`)
+      setIsSubmitting(false)
+      return
+    }
+    
     setIsSubmitting(true)
     setSubmitError(null)
     
     try {
       if (onSubmit) {
+        console.log('🔄 [EmployeeForm] Using custom onSubmit')
         // Use custom onSubmit if provided
         await onSubmit(data)
       } else {
-        // Use real API service
-        const employeeData: EmployeeRegistrationRequest = {
-          aipAccessLevel: data.aipAccessLevel,
-          title: data.title,
-          firstName: data.firstName,
-          surname: data.surname,
-          startDate: data.startDate,
-          email: data.email,
-          contactNumber: data.contactNumber,
-          houseName: data.houseName,
-          numberAndStreet: data.numberAndStreet,
-          town: data.town,
-          county: data.county,
-          postCode: data.postCode,
-          region: data.region,
-          position: data.position,
-          employeeNumber: data.employeeNumber,
-          employeeStatus: data.employeeStatus,
-          employmentType: data.employmentType,
-          department: data.department,
-          siaLicenceType: data.siaLicenceType,
-          siaLicenceExpiry: data.siaLicenceExpiry,
-          siaLicenceNumber: data.siaLicenceNumber,
-          nationality: data.nationality,
-          rightToWorkCondition: data.rightToWorkCondition,
-          drivingLicenceType: data.drivingLicenceType,
-          dateDLChecked: data.dateDLChecked,
-          drivingLicenceCopyTaken: data.drivingLicenceCopyTaken,
-          sixMonthlyCheck: data.sixMonthlyCheck,
-          graydonCheckAuthorised: data.graydonCheckAuthorised,
-          graydonCheckDetails: data.graydonCheckDetails,
-          initialOralReferencesComplete: data.initialOralReferencesComplete,
-          initialOralReferencesDate: data.initialOralReferencesDate,
-          writtenRefsComplete: data.writtenRefsComplete,
-          writtenRefsCompleteDate: data.writtenRefsCompleteDate,
-          quickStarterFormCompleted: data.quickStarterFormCompleted,
-          workingTimeDirective: data.workingTimeDirective,
-          workingTimeDirectiveComplete: data.workingTimeDirectiveComplete,
-          contractOfEmploymentSigned: data.contractOfEmploymentSigned,
-          photoTaken: data.photoTaken,
-          photoFile: data.photoFile,
-          idCardIssued: data.idCardIssued,
-          equipmentIssued: data.equipmentIssued,
-          uniformIssued: data.uniformIssued,
-          nextOfKinDetailsComplete: data.nextOfKinDetailsComplete,
-          peopleHoursPin: data.peopleHoursPin,
-          fullRotasIssued: data.fullRotasIssued,
-          inductionAndTrainingBooked: data.inductionAndTrainingBooked,
-          location: data.location,
-          trainer: data.trainer,
-          status: data.status
-        }
+        console.log('🔄 [EmployeeForm] Using real API service')
+        // Use real API service with frontend data format
+        console.log('📤 [EmployeeForm] Using frontend data format for API call')
 
         if (initialData?.id) {
-          // Update existing employee
-          await employeeService.updateEmployee(Number(initialData.id), employeeData)
+          console.log('🔄 [EmployeeForm] Updating existing employee with ID:', initialData.id)
+          // Update existing employee - convert form data to Employee format
+          const employeeData: Partial<Employee> = {
+            ...data,
+            startDate: data.startDate ? new Date(data.startDate) : undefined,
+            siaLicenceExpiry: data.siaLicenceExpiry ? new Date(data.siaLicenceExpiry) : undefined,
+            dateDLChecked: data.dateDLChecked ? new Date(data.dateDLChecked) : undefined,
+            initialOralReferencesDate: data.initialOralReferencesDate ? new Date(data.initialOralReferencesDate) : undefined,
+            writtenRefsCompleteDate: data.writtenRefsCompleteDate ? new Date(data.writtenRefsCompleteDate) : undefined,
+          }
+          const result = await employeeService.updateEmployee(Number(initialData.id), employeeData)
+          console.log('✅ [EmployeeForm] Employee update successful:', result)
         } else {
-          // Create new employee
-          await employeeService.registerEmployee(employeeData)
+          console.log('🆕 [EmployeeForm] Creating new employee')
+          // Create new employee - convert form data to Employee format
+          const employeeData: Partial<Employee> = {
+            ...data,
+            startDate: data.startDate ? new Date(data.startDate) : undefined,
+            siaLicenceExpiry: data.siaLicenceExpiry ? new Date(data.siaLicenceExpiry) : undefined,
+            dateDLChecked: data.dateDLChecked ? new Date(data.dateDLChecked) : undefined,
+            initialOralReferencesDate: data.initialOralReferencesDate ? new Date(data.initialOralReferencesDate) : undefined,
+            writtenRefsCompleteDate: data.writtenRefsCompleteDate ? new Date(data.writtenRefsCompleteDate) : undefined,
+          }
+          const result = await employeeService.registerEmployeeFromFrontend(employeeData)
+          console.log('✅ [EmployeeForm] Employee creation successful:', result)
         }
       }
       
+      console.log('✅ [EmployeeForm] Form submission completed successfully')
       // Close form or show success message
       onCancel()
     } catch (error) {
-      console.error('Error submitting employee form:', error)
+      console.error('❌ [EmployeeForm] Error submitting employee form:', error)
+      console.error('❌ [EmployeeForm] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        error: error
+      })
       setSubmitError(error instanceof Error ? error.message : 'An error occurred while saving the employee')
     } finally {
+      console.log('🏁 [EmployeeForm] Form submission process finished')
       setIsSubmitting(false)
     }
   }
@@ -449,7 +473,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={isLoadingUserRoles ? "Loading roles..." : "Select access level"} />
+                        <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select access level"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -537,6 +561,45 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
           </CardContent>
         </Card>
 
+        {/* Contact Information Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Contact Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email Address</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="john.doe@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="contactNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Contact Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="+44 123 456 7890" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+
         {/* Address Information Section */}
         <Card>
           <CardHeader>
@@ -597,7 +660,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={isLoadingCounties ? "Loading counties..." : "Select county"} />
+                        <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select county"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -636,7 +699,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={isLoadingRegions ? "Loading regions..." : "Select region"} />
+                        <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select region"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -672,7 +735,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={isLoadingPositions ? "Loading positions..." : "Select position"} />
+                        <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select position"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -681,6 +744,55 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                           {position.value}
                         </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="employeeStatus"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Employee Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
+                      <SelectItem value="Suspended">Suspended</SelectItem>
+                      <SelectItem value="Terminated">Terminated</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="employmentType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Employment Type</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Full-time">Full-time</SelectItem>
+                      <SelectItem value="Part-time">Part-time</SelectItem>
+                      <SelectItem value="Contract">Contract</SelectItem>
+                      <SelectItem value="Temporary">Temporary</SelectItem>
+                      <SelectItem value="Casual">Casual</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -729,55 +841,73 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
           </CardContent>
         </Card>
 
-        {/* SIA Information Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              SIA Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="siaLicenceType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>SIA Licence Type</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={isLoadingSiaLicenceTypes ? "Loading licence types..." : "Select licence type"} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {siaLicenceTypes.map((type) => (
-                        <SelectItem key={type.lookupId} value={type.value}>
-                          {type.value}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+        {/* SIA Information Section - Only show for Advantageoneofficer and AdvantageoneHOofficer */}
+        {requiresSIA && (
+          <>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> SIA information is required for Advantageoneofficer and AdvantageoneHOofficer roles.
+              </p>
+            </div>
+          </>
+        )}
+        {!requiresSIA && aipAccessLevel && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-gray-600">
+              <strong>Note:</strong> SIA information is not required for the selected role ({aipAccessLevel}).
+            </p>
+          </div>
+        )}
+        {requiresSIA && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                SIA Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="siaLicenceType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SIA Licence Type *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select licence type"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {siaLicenceTypes.map((type) => (
+                          <SelectItem key={type.lookupId} value={type.value}>
+                            {type.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="siaLicenceExpiry"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>SIA Licence Expiry</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </CardContent>
-        </Card>
+              <FormField
+                control={form.control}
+                name="siaLicenceExpiry"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SIA Licence Expiry *</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Driving License Information Section */}
         <Card>
@@ -1114,7 +1244,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                      </div>
                     
                     <p className="text-xs text-gray-500">
-                      Upload a professional headshot (JPG, PNG, max 5MB)
+                      Upload a professional headshot (JPG, PNG, max 5MB). Photos will be saved after employee registration.
                     </p>
                   </div>
                   <FormMessage />
@@ -1258,7 +1388,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                      <FormControl>
                        <SelectTrigger>
-                         <SelectValue placeholder={isLoadingTrainers ? "Loading trainers..." : "Select trainer"} />
+                         <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select trainer"} />
                        </SelectTrigger>
                      </FormControl>
                      <SelectContent>

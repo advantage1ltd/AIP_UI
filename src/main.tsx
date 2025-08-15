@@ -6,6 +6,7 @@ import { Provider } from 'react-redux'
 import { store } from './store/store'
 
 async function startApp() {
+  // Enable MSW for development to provide page access API
   if (import.meta.env.DEV) {
     try {
       const { initMockServiceWorker } = await import('./mocks/browser')
@@ -30,6 +31,8 @@ async function startApp() {
       console.error('❌ Failed to initialize Mock Service Worker:', error)
     }
   }
+
+  console.log('🚀 Starting application with MSW enabled for development...')
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

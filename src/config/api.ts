@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // Base API URL that will be used across the application
 // Update this to point to your real backend when ready
-export const BASE_API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+export const BASE_API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5128/api'
 
 export const api = axios.create({
   baseURL: BASE_API_URL,
@@ -16,24 +16,62 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken')
+    console.log('🔄 [API Interceptor] Making request', { 
+      url: config.url, 
+      method: config.method,
+      hasToken: !!token,
+      tokenLength: token ? token.length : 0,
+      tokenStart: token ? token.substring(0, 20) + '...' : 'none',
+      data: config.data
+    })
+    
+    // Skip authentication for test endpoints
+    if (config.url?.includes('/test')) {
+      console.log('🔓 [API Interceptor] Skipping authentication for test endpoint')
+      return config
+    }
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
   },
   (error) => {
+    console.error('❌ [API Interceptor] Request error:', error)
     return Promise.reject(error)
   }
 )
 
 // Add response interceptor for error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('✅ [API Interceptor] Response received', { 
+      url: response.config.url, 
+      status: response.status,
+      data: response.data
+    })
+    return response
+  },
   (error) => {
+    console.error('❌ [API Interceptor] Response error:', { 
+      url: error.config?.url, 
+      status: error.response?.status,
+      message: error.message,
+      responseData: error.response?.data,
+      requestData: error.config?.data,
+      error: error
+    })
+    
     if (error.response?.status === 401) {
-      // Handle unauthorized access
-      localStorage.removeItem('authToken')
-      window.location.href = '/login'
+      console.warn('⚠️ [API Interceptor] Unauthorized access detected')
+      console.log('🔍 [API Interceptor] Current auth token:', localStorage.getItem('authToken'))
+      
+      // Only redirect to login if we're not already on the login page
+      if (!window.location.pathname.includes('/login')) {
+        console.warn('⚠️ [API Interceptor] Redirecting to login')
+        localStorage.removeItem('authToken')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }
@@ -78,6 +116,16 @@ export const SITE_VISIT_ENDPOINTS = {
   CREATE: '/site-visits',
   UPDATE: (id: string) => `/site-visits/${id}`,
   DELETE: (id: string) => `/site-visits/${id}`,
+} as const
+
+// Action Calendar endpoints
+export const ACTION_CALENDAR_ENDPOINTS = {
+  LIST: '/ActionCalendar',
+  DETAIL: (id: string) => `/ActionCalendar/${id}`,
+  CREATE: '/ActionCalendar',
+  UPDATE: (id: string) => `/ActionCalendar/${id}`,
+  DELETE: (id: string) => `/ActionCalendar/${id}`,
+  STATISTICS: '/ActionCalendar/statistics',
 } as const
 
 // Mystery Shopper endpoints

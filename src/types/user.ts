@@ -103,7 +103,7 @@ export interface AuthResponse {
   success: boolean;
   data?: {
     user: Omit<User, 'password'>;
-    token: string;
+    accessToken: string; // Changed from 'token' to 'accessToken' to match backend
   };
   message?: string;
 }
@@ -142,7 +142,9 @@ export const USER_COMPANIES = [
   'Heart of England'
 ] as const;
 
-export interface CreateUserInput extends Omit<User, 'id' | 'createdAt' | 'updatedAt'> {}
+export interface CreateUserInput extends Omit<User, 'id' | 'createdAt' | 'updatedAt'> {
+  confirmPassword?: string;
+}
 export interface UpdateUserInput extends Partial<Omit<User, 'createdAt' | 'updatedAt'>> {
   id: string;
 }

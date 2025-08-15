@@ -102,7 +102,19 @@ export function UserForm({ mode, user, onSubmit, onCancel }: UserFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Submitting form with assigned customers:', assignedCustomers)
+    
+    // Enhanced logging for debugging
+    console.log('🔄 [UserForm] Form submission started', {
+      mode,
+      userId: user?.id,
+      formData: {
+        username: formData.username,
+        email: formData.email,
+        role: formData.role,
+        assignedCustomerIds: assignedCustomers
+      }
+    })
+    
     const submitData = {
       ...formData,
       assignedCustomerIds: assignedCustomers
@@ -119,7 +131,12 @@ export function UserForm({ mode, user, onSubmit, onCancel }: UserFormProps) {
         : []
     })
     
-    onSubmit(submitData)
+    try {
+      onSubmit(submitData)
+      console.log('✅ [UserForm] Form submission completed successfully')
+    } catch (error) {
+      console.error('❌ [UserForm] Form submission failed:', error)
+    }
   }
 
   return (

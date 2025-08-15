@@ -1,195 +1,268 @@
 import type { Customer } from "@/types/customer"
-import { DUMMY_CUSTOMERS } from "@/data/customers"
+import { api, CUSTOMER_ENDPOINTS, ApiResponse } from "@/config/api"
 
-// Dynamic available customers management
-let dynamicAvailableCustomers: Array<{ id: number; name: string }> = [];
+// Helper function to map backend customer data to frontend Customer type
+const mapBackendCustomerToFrontend = (backendCustomer: any): Customer => {
+  return {
+    id: backendCustomer.customerId,
+    companyName: backendCustomer.companyName,
+    companyNumber: backendCustomer.companyNumber,
+    vatNumber: backendCustomer.vatNumber || '',
+    status: backendCustomer.status as 'active' | 'inactive',
+    customerType: (backendCustomer.customerType || 'retail') as any,
+    address: {
+      building: backendCustomer.building || '',
+      street: backendCustomer.street || '',
+      village: backendCustomer.village || '',
+      town: backendCustomer.town || '',
+      county: backendCustomer.county || '',
+      postcode: backendCustomer.postcode || ''
+    },
+    contact: {
+      title: backendCustomer.contactTitle || '',
+      forename: backendCustomer.contactForename || '',
+      surname: backendCustomer.contactSurname || '',
+      position: backendCustomer.contactPosition || '',
+      email: backendCustomer.contactEmail || '',
+      phone: backendCustomer.contactPhone || ''
+    },
+    viewConfig: {
+      id: `vc${backendCustomer.customerId}`,
+      customerId: backendCustomer.customerId,
+      customerType: (backendCustomer.customerType || 'retail') as any,
+      enabledPages: [], // Will be populated from pageAssignments if needed
+      createdAt: backendCustomer.createdAt,
+      updatedAt: backendCustomer.updatedAt || backendCustomer.createdAt
+    },
+    pageAssignments: backendCustomer.pageAssignments ? JSON.parse(backendCustomer.pageAssignments) : {},
+    createdAt: backendCustomer.createdAt,
+    updatedAt: backendCustomer.updatedAt || backendCustomer.createdAt
+  }
+}
 
-// Initialize from existing customers
-const initializeAvailableCustomers = () => {
-  dynamicAvailableCustomers = DUMMY_CUSTOMERS.map(customer => ({
-    id: parseInt(customer.id),
-    name: customer.companyName
-  }));
-};
-
-// Initialize on module load
-initializeAvailableCustomers();
+// Helper function to map frontend Customer type to backend format
+const mapFrontendCustomerToBackend = (frontendCustomer: Customer): any => {
+  return {
+    companyName: frontendCustomer.companyName,
+    companyNumber: frontendCustomer.companyNumber,
+    vatNumber: frontendCustomer.vatNumber,
+    status: frontendCustomer.status,
+    customerType: frontendCustomer.customerType,
+    region: frontendCustomer.address?.county || null,
+    
+    // Address fields
+    building: frontendCustomer.address?.building || null,
+    street: frontendCustomer.address?.street || null,
+    village: frontendCustomer.address?.village || null,
+    town: frontendCustomer.address?.town || null,
+    county: frontendCustomer.address?.county || null,
+    postcode: frontendCustomer.address?.postcode || null,
+    
+    // Contact fields
+    contactTitle: frontendCustomer.contact?.title || null,
+    contactForename: frontendCustomer.contact?.forename || null,
+    contactSurname: frontendCustomer.contact?.surname || null,
+    contactPosition: frontendCustomer.contact?.position || null,
+    contactEmail: frontendCustomer.contact?.email || null,
+    contactPhone: frontendCustomer.contact?.phone || null,
+    
+    // Page assignments as JSON string
+    pageAssignments: frontendCustomer.pageAssignments ? JSON.stringify(frontendCustomer.pageAssignments) : null
+  }
+}
 
 export const customerService = {
-  // Update a customer in the DUMMY_CUSTOMERS array
-  updateCustomer: (updatedCustomer: Customer): { success: boolean; customer?: Customer; isNew?: boolean; error?: string } => {
+  // Get all customers from backend
+  getAllCustomers: async (): Promise<Customer[]> => {
     try {
-      const customerIndex = DUMMY_CUSTOMERS.findIndex(c => c.id === updatedCustomer.id)
+      console.log('🔄 [CustomerService] Fetching customers from backend')
+      const response = await api.get<ApiResponse<{ customers: any[] }>>(CUSTOMER_ENDPOINTS.LIST)
       
-      if (customerIndex !== -1) {
-        // Update existing customer
-        DUMMY_CUSTOMERS[customerIndex] = {
-          ...updatedCustomer,
-          updatedAt: new Date().toISOString()
-        }
-        console.log('Updated customer:', updatedCustomer)
-        
-        // Update available customers list
-        const availableCustomerIndex = dynamicAvailableCustomers.findIndex(c => c.id === parseInt(updatedCustomer.id));
-        if (availableCustomerIndex !== -1) {
-          dynamicAvailableCustomers[availableCustomerIndex] = {
-            id: parseInt(updatedCustomer.id),
-            name: updatedCustomer.companyName
-          };
-        }
-        
-        return { success: true, customer: DUMMY_CUSTOMERS[customerIndex], isNew: false }
+      if (response.data.success && response.data.data?.customers) {
+        const customers = response.data.data.customers.map(mapBackendCustomerToFrontend)
+        console.log('✅ [CustomerService] Successfully fetched customers:', customers.length)
+        return customers
       } else {
-        // Add new customer
-        const newCustomer = {
-          ...updatedCustomer,
-          createdAt: updatedCustomer.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-        DUMMY_CUSTOMERS.push(newCustomer)
-        
-        // Add to available customers list
-        dynamicAvailableCustomers.push({
-          id: parseInt(newCustomer.id),
-          name: newCustomer.companyName
-        });
-        
-        console.log('Added new customer:', newCustomer)
-        console.log('Updated available customers:', dynamicAvailableCustomers)
-        
-        return { success: true, customer: newCustomer, isNew: true }
+        console.error('❌ [CustomerService] Failed to fetch customers:', response.data.message)
+        return []
       }
     } catch (error) {
-      console.error('Error updating customer:', error)
-      return { success: false, error: 'Failed to save customer data' }
+      console.error('❌ [CustomerService] Error fetching customers:', error)
+      return []
     }
   },
 
-  // Get a customer by ID
-  getCustomer: (id: string): Customer | undefined => {
-    return DUMMY_CUSTOMERS.find(c => c.id === id)
-  },
-
-  // Get all customers
-  getAllCustomers: (): Customer[] => {
-    return DUMMY_CUSTOMERS
-  },
-
-  // Delete a customer
-  deleteCustomer: (customerId: string): { success: boolean; customerName?: string; error?: string } => {
+  // Get a customer by ID from backend
+  getCustomer: async (id: string): Promise<Customer | undefined> => {
     try {
-      const customerIndex = DUMMY_CUSTOMERS.findIndex(c => c.id === customerId)
+      console.log('🔄 [CustomerService] Fetching customer by ID:', id)
+      const response = await api.get<ApiResponse<any>>(`${CUSTOMER_ENDPOINTS.LIST}/${id}`)
       
-      if (customerIndex === -1) {
-        return { success: false, error: 'Customer not found' }
+      if (response.data.success && response.data.data) {
+        const customer = mapBackendCustomerToFrontend(response.data.data)
+        console.log('✅ [CustomerService] Successfully fetched customer:', customer.companyName)
+        return customer
+      } else {
+        console.error('❌ [CustomerService] Failed to fetch customer:', response.data.message)
+        return undefined
       }
-
-      const deletedCustomer = DUMMY_CUSTOMERS[customerIndex]
-      DUMMY_CUSTOMERS.splice(customerIndex, 1)
-      
-      // Remove from available customers list
-      const availableCustomerIndex = dynamicAvailableCustomers.findIndex(c => c.id === parseInt(customerId));
-      if (availableCustomerIndex !== -1) {
-        dynamicAvailableCustomers.splice(availableCustomerIndex, 1);
-      }
-      
-      console.log('Deleted customer:', deletedCustomer)
-      console.log('Updated available customers:', dynamicAvailableCustomers)
-      
-      return { success: true, customerName: deletedCustomer.companyName }
     } catch (error) {
-      console.error('Error deleting customer:', error)
+      console.error('❌ [CustomerService] Error fetching customer:', error)
+      return undefined
+    }
+  },
+
+  // Create a new customer via backend
+  createCustomer: async (customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'viewConfig' | 'pageAssignments'>): Promise<{ success: boolean; customer?: Customer; error?: string }> => {
+    try {
+      console.log('🔄 [CustomerService] Creating new customer:', customerData.companyName)
+      
+      const backendData = mapFrontendCustomerToBackend({
+        ...customerData,
+        id: 0, // Will be set by backend
+        createdAt: '',
+        updatedAt: '',
+        viewConfig: {} as any,
+        pageAssignments: {}
+      })
+      
+      const response = await api.post<ApiResponse<any>>(CUSTOMER_ENDPOINTS.LIST, backendData)
+      
+      if (response.data.success && response.data.data) {
+        const customer = mapBackendCustomerToFrontend(response.data.data)
+        console.log('✅ [CustomerService] Successfully created customer:', customer.companyName)
+        return { success: true, customer }
+      } else {
+        console.error('❌ [CustomerService] Failed to create customer:', response.data.message)
+        return { success: false, error: response.data.message || 'Failed to create customer' }
+      }
+    } catch (error) {
+      console.error('❌ [CustomerService] Error creating customer:', error)
+      return { success: false, error: 'Failed to create customer' }
+    }
+  },
+
+  // Update a customer via backend
+  updateCustomer: async (customerData: Customer): Promise<{ success: boolean; customer?: Customer; error?: string }> => {
+    try {
+      console.log('🔄 [CustomerService] Updating customer:', customerData.companyName)
+      
+      const backendData = mapFrontendCustomerToBackend(customerData)
+      
+      const response = await api.put<ApiResponse<any>>(`${CUSTOMER_ENDPOINTS.LIST}/${customerData.id}`, backendData)
+      
+      if (response.data.success && response.data.data) {
+        const customer = mapBackendCustomerToFrontend(response.data.data)
+        console.log('✅ [CustomerService] Successfully updated customer:', customer.companyName)
+        return { success: true, customer }
+      } else {
+        console.error('❌ [CustomerService] Failed to update customer:', response.data.message)
+        return { success: false, error: response.data.message || 'Failed to update customer' }
+      }
+    } catch (error) {
+      console.error('❌ [CustomerService] Error updating customer:', error)
+      return { success: false, error: 'Failed to update customer' }
+    }
+  },
+
+  // Delete a customer via backend
+  deleteCustomer: async (customerId: string): Promise<{ success: boolean; customerName?: string; error?: string }> => {
+    try {
+      console.log('🔄 [CustomerService] Deleting customer:', customerId)
+      
+      const response = await api.delete<ApiResponse<any>>(`${CUSTOMER_ENDPOINTS.LIST}/${customerId}`)
+      
+      if (response.data.success) {
+        console.log('✅ [CustomerService] Successfully deleted customer')
+        return { success: true }
+      } else {
+        console.error('❌ [CustomerService] Failed to delete customer:', response.data.message)
+        return { success: false, error: response.data.message || 'Failed to delete customer' }
+      }
+    } catch (error) {
+      console.error('❌ [CustomerService] Error deleting customer:', error)
       return { success: false, error: 'Failed to delete customer' }
     }
   },
 
-  // Update customer page assignments specifically
-  updateCustomerPageAssignments: (customerId: string, pageAssignments: Record<string, any>): Customer | null => {
-    const customerIndex = DUMMY_CUSTOMERS.findIndex(c => c.id === customerId)
-    
-    if (customerIndex === -1) {
+  // Update customer page assignments via backend
+  updateCustomerPageAssignments: async (customerId: string, pageAssignments: Record<string, any>): Promise<Customer | null> => {
+    try {
+      console.log('🔄 [CustomerService] Updating page assignments for customer:', customerId)
+      
+      const response = await api.put<ApiResponse<any>>(`${CUSTOMER_ENDPOINTS.LIST}/${customerId}/page-assignments`, {
+        pageAssignments: JSON.stringify(pageAssignments)
+      })
+      
+      if (response.data.success && response.data.data) {
+        const customer = mapBackendCustomerToFrontend(response.data.data)
+        console.log('✅ [CustomerService] Successfully updated page assignments')
+        return customer
+      } else {
+        console.error('❌ [CustomerService] Failed to update page assignments:', response.data.message)
+        return null
+      }
+    } catch (error) {
+      console.error('❌ [CustomerService] Error updating page assignments:', error)
       return null
     }
+  },
 
-    // Update page assignments and sync with viewConfig.enabledPages
-    const enabledPages = Object.keys(pageAssignments).filter(pageId => pageAssignments[pageId].enabled)
-    
-    DUMMY_CUSTOMERS[customerIndex] = {
-      ...DUMMY_CUSTOMERS[customerIndex],
-      pageAssignments,
-      viewConfig: {
-        ...DUMMY_CUSTOMERS[customerIndex].viewConfig,
-        enabledPages,
-        updatedAt: new Date().toISOString()
-      },
-      updatedAt: new Date().toISOString()
+  // Get available customers for dropdowns (simplified version)
+  getAvailableCustomers: async (): Promise<Array<{ id: number; name: string }>> => {
+    try {
+      const customers = await customerService.getAllCustomers()
+      return customers.map(customer => ({
+        id: customer.id,
+        name: customer.companyName
+      }))
+    } catch (error) {
+      console.error('❌ [CustomerService] Error getting available customers:', error)
+      return []
     }
-
-    console.log('Updated customer page assignments:', DUMMY_CUSTOMERS[customerIndex])
-    return DUMMY_CUSTOMERS[customerIndex]
   },
 
-  // Get dynamic available customers (replaces AVAILABLE_CUSTOMERS constant)
-  getAvailableCustomers: (): Array<{ id: number; name: string }> => {
-    return [...dynamicAvailableCustomers];
-  },
-
-  // Generate next available customer ID
+  // Generate next available customer ID (not needed with backend, but kept for compatibility)
   generateNextCustomerId: (): string => {
-    const existingIds = DUMMY_CUSTOMERS.map(c => parseInt(c.id)).filter(id => !isNaN(id));
-    const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 20;
-    return (maxId + 1).toString();
+    return Date.now().toString()
   },
 
   // Create a new customer with auto-generated ID and proper page assignments
-  createNewCustomer: (customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'viewConfig' | 'pageAssignments'>): { success: boolean; customer?: Customer; error?: string } => {
+  createNewCustomer: async (customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'viewConfig' | 'pageAssignments'>): Promise<{ success: boolean; customer?: Customer; error?: string }> => {
     try {
-      const newId = customerService.generateNextCustomerId();
-      const now = new Date().toISOString();
+      console.log('🔄 [CustomerService] Creating new customer with page assignments')
       
       // Get pages for customer type
-      const { getPagesByCustomerType } = require('@/config/customerPages');
-      const availablePages = getPagesByCustomerType(customerData.customerType);
+      const { getPagesByCustomerType } = require('@/config/customerPages')
+      const availablePages = getPagesByCustomerType(customerData.customerType)
       
       // Create page assignments
-      const pageAssignments: Record<string, any> = {};
-      const enabledPageIds: string[] = [];
+      const pageAssignments: Record<string, any> = {}
+      const now = new Date().toISOString()
       
       availablePages.forEach(page => {
         const pageKey = Object.keys(require('@/config/customerPages').CUSTOMER_PAGES).find(
           key => require('@/config/customerPages').CUSTOMER_PAGES[key].id === page.id
-        );
+        )
         if (pageKey) {
           pageAssignments[pageKey] = {
             enabled: true,
             customized: false,
             lastModified: now,
             modifiedBy: "system"
-          };
-          enabledPageIds.push(pageKey);
+          }
         }
-      });
+      })
 
-      const newCustomer: Customer = {
+      const customerWithAssignments = {
         ...customerData,
-        id: newId,
-        viewConfig: {
-          id: `vc${newId}`,
-          customerId: newId,
-          customerType: customerData.customerType,
-          enabledPages: enabledPageIds,
-          createdAt: now,
-          updatedAt: now
-        },
-        pageAssignments,
-        createdAt: now,
-        updatedAt: now
-      };
-
-      return customerService.updateCustomer(newCustomer);
+        pageAssignments
+      }
+      
+      return await customerService.createCustomer(customerWithAssignments)
     } catch (error) {
-      console.error('Error creating new customer:', error);
-      return { success: false, error: 'Failed to create new customer' };
+      console.error('❌ [CustomerService] Error creating new customer:', error)
+      return { success: false, error: 'Failed to create new customer' }
     }
   }
 } 

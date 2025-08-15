@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check for existing session
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     const storedUser = localStorage.getItem('user');
     
     if (token && storedUser) {
@@ -48,46 +48,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(`${BASE_API_URL}/login`, {
+      const response = await fetch(`${BASE_API_URL}/Auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ 
+          email: username, // Backend expects 'email' field
+          password: password 
+        }),
       });
 
+      console.log('🔍 [AuthContext] Response status:', response.status);
+      console.log('🔍 [AuthContext] Response headers:', Object.fromEntries(response.headers.entries()));
+
       const data: AuthResponse = await response.json();
+
+      console.log('🔍 [AuthContext] Backend response:', data);
+      console.log('🔍 [AuthContext] Data object:', data.data);
+      console.log('🔍 [AuthContext] Data object keys:', Object.keys(data.data || {}));
 
       if (!response.ok) {
         throw new Error(data.message || 'Login failed');
       }
 
-      localStorage.setItem('auth_token', data.data.token);
-      localStorage.setItem('user', JSON.stringify(data.data.user));
-      // Set userRole in localStorage
-      localStorage.setItem('userRole', data.data.user.role);
-      
-      const userData = data.data.user;
-      const isAdvantageOneRole = ['AdvantageOneOfficer', 'AdvantageOneHOOfficer', 'Administrator'].includes(userData.role);
-      
-      // NEW: Update unified auth service
-      authService.setCurrentUser(userData);
-      
-      // Type-safe user assignment
-      if (isAdvantageOneRole) {
-        setUser({
-          ...userData,
-          role: userData.role as 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator',
-          assignedCustomerIds: (userData as any).assignedCustomerIds || []
-        });
+      // Handle real backend response format
+      if (data.success && data.data) {
+        // The backend returns a nested structure where data.data contains the actual response
+        const loginData = data.data;
+        const accessToken = loginData.accessToken;
+        const userData = loginData.user;
+        
+        console.log('🔍 [AuthContext] User data:', userData);
+        
+        if (!userData) {
+          throw new Error('User data is missing from response');
+        }
+        
+        // Type-safe user assignment based on role
+        const userRole = userData.Role || userData.role || userData.Roles?.[0] || 'CustomerSiteManager';
+        const isAdvantageOneRole = ['AdvantageOneOfficer', 'AdvantageOneHOOfficer', 'Administrator'].includes(userRole);
+        
+        console.log('🔍 [AuthContext] Extracted role:', userRole);
+        console.log('🔍 [AuthContext] Is AdvantageOne role:', isAdvantageOneRole);
+        
+        localStorage.setItem('authToken', accessToken);
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('userRole', userRole);
+        
+        // Update unified auth service
+        authService.setCurrentUser(userData);
+        
+        if (isAdvantageOneRole) {
+          setUser({
+            ...userData,
+            role: userRole as 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator',
+            assignedCustomerIds: (userData as any).AssignedCustomerIds || (userData as any).assignedCustomerIds || []
+          });
+        } else {
+          // For customer users, use customerId only
+          const customerId = (userData as any).CustomerId || (userData as any).customerId;
+          setUser({
+            ...userData,
+            role: userRole as 'CustomerSiteManager' | 'CustomerHOManager',
+            customerId: customerId
+          });
+        }
       } else {
-        // For customer users, use customerId only
-        const customerId = (userData as any).customerId;
-        setUser({
-          ...userData,
-          role: userData.role as 'CustomerSiteManager' | 'CustomerHOManager',
-          customerId: customerId
-        });
+        throw new Error(data.message || 'Invalid response from server');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -98,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('auth_token');
+    localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     localStorage.removeItem('userRole'); // Also remove userRole on logout
     

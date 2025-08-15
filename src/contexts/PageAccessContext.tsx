@@ -97,17 +97,42 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       // If in test mode, check access based on test role
       const roleToCheck = isTestMode && testRole ? testRole : currentRole;
       
-      if (!roleToCheck) return false;
+      // Only log in development and for specific paths to reduce noise
+      if (import.meta.env.DEV && (path.includes('/customer/') || path.includes('/administration/'))) {
+        console.log('🔍 [PageAccess] Checking access for path:', path, 'role:', roleToCheck);
+      }
+      
+      if (!roleToCheck) {
+        console.log('❌ [PageAccess] No role to check');
+        return false;
+      }
+      
+      // If page access data is not loaded yet, allow access to prevent redirect loops
+      if (Object.keys(pageAccessByRole).length === 0) {
+        console.log('⚠️ [PageAccess] Page access data not loaded yet, allowing access to prevent redirect loops');
+        return true;
+      }
       
       // Get the allowed page IDs for the role
       const allowedPageIds = pageAccessByRole[roleToCheck];
       if (!allowedPageIds) {
-        console.warn(`No page access defined for role: ${roleToCheck}`);
+        console.warn(`❌ [PageAccess] No page access defined for role: ${roleToCheck}`);
         return false;
+      }
+      
+      // Only log in development and for specific paths to reduce noise
+      if (import.meta.env.DEV && (path.includes('/customer/') || path.includes('/administration/'))) {
+        console.log('🔍 [PageAccess] Allowed pages for role:', roleToCheck, 'count:', allowedPageIds.length);
       }
 
       // Fix for take-test path - ensure it's properly matched
       const requestedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+      
+      // If availablePages is not loaded yet, allow access to prevent redirect loops
+      if (availablePages.length === 0) {
+        console.warn('Available pages not loaded yet, allowing access to prevent redirect loops');
+        return true;
+      }
       
       // Look for matching page, handle special cases for dynamic routes
       const page = availablePages.find(p => {
@@ -278,7 +303,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         let validatedRole: string | null = null;
         
         if (storedRole) {
-          console.log('🔄 Initializing currentRole from localStorage:', storedRole);
+          console.log('🔄 [PageAccess] Initializing currentRole from localStorage:', storedRole);
           
           // Check if there are saved settings in localStorage first
           const savedSettings = localStorage.getItem('db_pageAccess_settings');
@@ -289,14 +314,24 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             const parsedSettings = JSON.parse(savedSettings);
             
             // Still need to get availablePages from the API
+            console.log('🔍 [PageAccess] Fetching availablePages from API...');
             const apiData = await pageAccessApi.getSettings();
             data = {
               pageAccessByRole: parsedSettings.pageAccessByRole,
               availablePages: apiData.availablePages
             };
+            console.log('✅ [PageAccess] Combined data loaded:', {
+              roles: Object.keys(data.pageAccessByRole),
+              pages: data.availablePages.length
+            });
           } else {
             // Fetch page access data from API
+            console.log('🔍 [PageAccess] No saved settings, fetching from API...');
             data = await pageAccessApi.getSettings();
+            console.log('✅ [PageAccess] API data loaded:', {
+              roles: Object.keys(data.pageAccessByRole),
+              pages: data.availablePages.length
+            });
           }
           
           const validRoles = Object.keys(data.pageAccessByRole);
@@ -319,12 +354,17 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setAvailablePages(data.availablePages);
           setCurrentRole(validatedRole);
         }
-      } catch (error) {
-        console.error('Error initializing access:', error);
-      } finally {
-        setIsLoading(false);
-        setHasInitialized(true);
-      }
+              } catch (error) {
+          console.error('Error initializing access:', error);
+          // Even if there's an error, we should still set the role and mark as initialized
+          // to prevent the app from getting stuck
+          if (storedRole) {
+            setCurrentRole(storedRole);
+          }
+        } finally {
+          setIsLoading(false);
+          setHasInitialized(true);
+        }
     };
 
     initializeAccess();
@@ -370,7 +410,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Effect to redirect if user doesn't have access to current page
   useEffect(() => {
     try {
-      if (!currentRole || isLoading) return;
+      if (!currentRole || isLoading || !hasInitialized) return;
 
       const currentPath = window.location.pathname;
       
@@ -386,14 +426,17 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return;
       }
       
-      if (!hasAccess(currentPath)) {
-        console.warn(`User with role ${currentRole} does not have access to ${currentPath}, redirecting to dashboard`);
-        navigate('/dashboard');
+      // Only redirect if we have page access data loaded
+      if (Object.keys(pageAccessByRole).length > 0 && availablePages.length > 0) {
+        if (!hasAccess(currentPath)) {
+          console.warn(`User with role ${currentRole} does not have access to ${currentPath}, redirecting to dashboard`);
+          navigate('/dashboard');
+        }
       }
     } catch (error) {
       console.error('Error in redirect effect:', error);
     }
-  }, [currentRole, pageAccessByRole, testRole, isTestMode, isLoading]);
+  }, [currentRole, pageAccessByRole, testRole, isTestMode, isLoading, hasInitialized, availablePages]);
 
   // Toggle test mode when URL has ?test=true
   useEffect(() => {

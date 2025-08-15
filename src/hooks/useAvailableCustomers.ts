@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
+import { api, CUSTOMER_ENDPOINTS, ApiResponse } from '@/config/api';
 
 interface AvailableCustomer {
   id: number;
   name: string;
 }
 
-// Custom hook to manage available customers dynamically
+// Custom hook to manage available customers dynamically (real backend)
 export const useAvailableCustomers = () => {
   const [availableCustomers, setAvailableCustomers] = useState<AvailableCustomer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -13,21 +14,24 @@ export const useAvailableCustomers = () => {
   const refreshCustomers = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/customers');
-      const result = await response.json();
+      console.log('🔄 [useAvailableCustomers] Fetching customers from backend');
       
-      if (result.success) {
-        const customers = result.data.map((c: any) => ({
-          id: c.id,
-          name: c.companyName
+      const response = await api.get<ApiResponse<{ customers: any[] }>>(CUSTOMER_ENDPOINTS.LIST);
+      
+      if (response.data.success && response.data.data?.customers) {
+        const customers = response.data.data.customers.map((c: any) => ({
+          id: Number(c.customerId || c.id || c.Id),
+          name: c.companyName || c.CompanyName || 'Unnamed Company'
         }));
+        
+        console.log('✅ [useAvailableCustomers] Successfully fetched customers:', customers.length);
         setAvailableCustomers(customers);
       } else {
-        console.error('Failed to fetch customers:', result.message);
+        console.error('❌ [useAvailableCustomers] Failed to fetch customers:', response.data.message);
         setAvailableCustomers([]);
       }
     } catch (error) {
-      console.error('Error fetching available customers:', error);
+      console.error('❌ [useAvailableCustomers] Error fetching customers:', error);
       setAvailableCustomers([]);
     } finally {
       setIsLoading(false);
@@ -37,8 +41,8 @@ export const useAvailableCustomers = () => {
   useEffect(() => {
     refreshCustomers();
 
-    // Listen for customer events to refresh the list
     const handleCustomerEvent = () => {
+      console.log('🔄 [useAvailableCustomers] Customer event detected, refreshing list');
       refreshCustomers();
     };
 
@@ -60,30 +64,47 @@ export const useAvailableCustomers = () => {
   };
 };
 
-// Utility function to get available customers asynchronously (for components that can't use hooks)
 export const getAvailableCustomers = async (): Promise<AvailableCustomer[]> => {
   try {
-    const response = await fetch('/api/customers');
-    const result = await response.json();
+    console.log('🔄 [getAvailableCustomers] Fetching customers from backend');
     
-    if (result.success) {
-      return result.data.map((c: any) => ({
-        id: c.id,
-        name: c.companyName
+    const response = await api.get<ApiResponse<{ customers: any[] }>>(CUSTOMER_ENDPOINTS.LIST);
+    
+    if (response.data.success && response.data.data?.customers) {
+      const customers = response.data.data.customers.map((c: any) => ({
+        id: Number(c.customerId || c.id || c.Id),
+        name: c.companyName || c.CompanyName || 'Unnamed Company'
       }));
+      
+      console.log('✅ [getAvailableCustomers] Successfully fetched customers:', customers.length);
+      return customers;
     } else {
-      console.error('Failed to fetch customers:', result.message);
+      console.error('❌ [getAvailableCustomers] Failed to fetch customers:', response.data.message);
       return [];
     }
   } catch (error) {
-    console.error('Error fetching available customers:', error);
+    console.error('❌ [getAvailableCustomers] Error fetching customers:', error);
     return [];
   }
 };
 
-// Utility function to find customer by ID
 export const findCustomerById = async (id: number | string): Promise<AvailableCustomer | undefined> => {
-  const customers = await getAvailableCustomers();
-  const searchId = typeof id === 'string' ? parseInt(id) : id;
-  return customers.find(c => c.id === searchId);
+  try {
+    console.log('🔄 [findCustomerById] Looking for customer with ID:', id);
+    
+    const customers = await getAvailableCustomers();
+    const searchId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const customer = customers.find(c => c.id === searchId);
+    
+    if (customer) {
+      console.log('✅ [findCustomerById] Found customer:', customer.name);
+    } else {
+      console.log('⚠️ [findCustomerById] Customer not found for ID:', searchId);
+    }
+    
+    return customer;
+  } catch (error) {
+    console.error('❌ [findCustomerById] Error finding customer:', error);
+    return undefined;
+  }
 }; 

@@ -1,7 +1,7 @@
 import { User, AuthResponse, AdvantageOneUser, CustomerUser } from '@/types/user';
 import { BASE_API_URL } from '@/config/api';
 
-const TOKEN_KEY = 'auth_token';
+const TOKEN_KEY = 'authToken';
 const USER_KEY = 'user';
 
 interface LoginCredentials {

@@ -19,7 +19,7 @@ interface AuthState {
   isAuthenticated: boolean;
 }
 
-const TOKEN_KEY = 'auth_token';
+const TOKEN_KEY = 'authToken';
 const USER_KEY = 'user';
 
 export const useAuth = () => {

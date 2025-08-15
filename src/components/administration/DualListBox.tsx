@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Customer } from '@/types/user';
+import { Customer } from '@/types/customer';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 
 interface DualListBoxProps {
@@ -32,7 +32,7 @@ export const DualListBox = ({
                 onClick={() => onAdd(customer)}
                 className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded-md text-sm transition-colors flex items-center justify-between group"
               >
-                <span>{customer.name}</span>
+                <span>{customer.companyName}</span>
                 <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500" />
               </button>
             ))}
@@ -89,7 +89,7 @@ export const DualListBox = ({
                 className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded-md text-sm transition-colors flex items-center justify-between group"
               >
                 <ChevronLeft className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500" />
-                <span>{customer.name}</span>
+                <span>{customer.companyName}</span>
               </button>
             ))}
             {selected.length === 0 && (

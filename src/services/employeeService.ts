@@ -1,56 +1,60 @@
 import { api, EMPLOYEE_ENDPOINTS, ApiResponse, handleApiError } from '@/config/api'
 import { Employee } from '@/types/employee'
+import { mapToBackendRequest, mapFromBackendResponse, mapFromBackendResponseArray, mapFromListResponseArray, mapToBackendUpdateRequest } from '@/utils/employeeMapper'
 
 export interface EmployeeRegistrationRequest {
-  aipAccessLevel: string
-  title?: string
-  firstName: string
-  surname: string
-  startDate: string
-  email?: string
-  contactNumber?: string
-  houseName?: string
-  numberAndStreet: string
-  town: string
-  county: string
-  postCode: string
-  region: string
-  position: string
-  employeeNumber: string
-  employeeStatus?: string
-  employmentType?: string
-  department?: string
-  siaLicenceType: string
-  siaLicenceExpiry: string
-  siaLicenceNumber?: string
-  nationality: string
-  rightToWorkCondition: string
-  drivingLicenceType: string
-  dateDLChecked?: string
-  drivingLicenceCopyTaken?: boolean
-  sixMonthlyCheck?: boolean
-  graydonCheckAuthorised?: boolean
-  graydonCheckDetails?: string
-  initialOralReferencesComplete?: boolean
-  initialOralReferencesDate?: string
-  writtenRefsComplete?: boolean
-  writtenRefsCompleteDate?: string
-  quickStarterFormCompleted?: boolean
-  workingTimeDirective?: string
-  workingTimeDirectiveComplete?: boolean
-  contractOfEmploymentSigned?: boolean
-  photoTaken?: boolean
-  photoFile?: string
-  idCardIssued?: boolean
-  equipmentIssued?: boolean
-  uniformIssued?: boolean
-  nextOfKinDetailsComplete?: boolean
-  peopleHoursPin?: string
-  fullRotasIssued?: string
-  inductionAndTrainingBooked?: string
-  location?: string
-  trainer?: string
-  status?: 'active' | 'inactive'
+  // Required fields
+  EmployeeNumber: string
+  Title: string
+  FirstName: string
+  Surname: string
+  StartDate: Date
+  Position: string
+  EmployeeStatus: string
+  EmploymentType: string
+  
+  // Optional fields
+  AipAccessLevel?: string
+  Department?: string
+  Region?: string
+  Email?: string
+  ContactNumber?: string
+  HouseName?: string
+  NumberAndStreet?: string
+  Town?: string
+  County?: string
+  PostCode?: string
+  SiaLicenceType?: string
+  SiaLicenceExpiry?: Date | null
+  SiaLicenceNumber?: string
+  Nationality?: string
+  RightToWorkCondition?: string
+  DrivingLicenceType?: string
+  DateDLChecked?: Date | null
+  DrivingLicenceCopyTaken?: boolean
+  SixMonthlyCheck?: boolean
+  GraydonCheckAuthorised?: boolean
+  GraydonCheckDetails?: string
+  InitialOralReferencesComplete?: boolean
+  InitialOralReferencesDate?: Date | null
+  WrittenRefsComplete?: boolean
+  WrittenRefsCompleteDate?: Date | null
+  QuickStarterFormCompleted?: boolean
+  WorkingTimeDirective?: string
+  WorkingTimeDirectiveComplete?: boolean
+  ContractOfEmploymentSigned?: boolean
+  PhotoTaken?: boolean
+  PhotoFile?: string
+  IdCardIssued?: boolean
+  EquipmentIssued?: boolean
+  UniformIssued?: boolean
+  NextOfKinDetailsComplete?: boolean
+  PeopleHoursPin?: string
+  FullRotasIssued?: string
+  InductionAndTrainingBooked?: string
+  Location?: string
+  Trainer?: string
+  SupervisorId?: number
 }
 
 export interface EmployeeRegistrationResponse {
@@ -66,39 +70,42 @@ export interface EmployeeRegistrationResponse {
 
 export interface EmployeeDetailResponse {
   id: number
-  aipAccessLevel: string
+  employeeNumber: string
   title?: string
   firstName: string
   surname: string
-  startDate: string
+  fullName?: string
+  startDate: Date
+  position: string
+  employeeStatus?: string
+  employmentType?: string
+  aipAccessLevel?: string
+  department?: string
+  region?: string
   email?: string
   contactNumber?: string
   houseName?: string
-  numberAndStreet: string
-  town: string
-  county: string
-  postCode: string
-  region: string
-  position: string
-  employeeNumber: string
-  employeeStatus?: string
-  employmentType?: string
-  department?: string
-  siaLicenceType: string
-  siaLicenceExpiry: string
+  numberAndStreet?: string
+  town?: string
+  county?: string
+  postCode?: string
+  siaLicenceType?: string
+  siaLicenceExpiry?: Date | null
   siaLicenceNumber?: string
-  nationality: string
-  rightToWorkCondition: string
-  drivingLicenceType: string
-  dateDLChecked?: string
+  isSiaLicenceExpired?: boolean
+  isSiaLicenceExpiringSoon?: boolean
+  nationality?: string
+  rightToWorkCondition?: string
+  drivingLicenceType?: string
+  dateDLChecked?: Date | null
   drivingLicenceCopyTaken?: boolean
   sixMonthlyCheck?: boolean
   graydonCheckAuthorised?: boolean
   graydonCheckDetails?: string
   initialOralReferencesComplete?: boolean
-  initialOralReferencesDate?: string
+  initialOralReferencesDate?: Date | null
   writtenRefsComplete?: boolean
-  writtenRefsCompleteDate?: string
+  writtenRefsCompleteDate?: Date | null
   quickStarterFormCompleted?: boolean
   workingTimeDirective?: string
   workingTimeDirectiveComplete?: boolean
@@ -114,10 +121,13 @@ export interface EmployeeDetailResponse {
   inductionAndTrainingBooked?: string
   location?: string
   trainer?: string
-  status?: 'active' | 'inactive'
-  createdAt: string
-  updatedAt: string
+  userId?: string
+  username?: string
+  supervisorId?: number
+  supervisorName?: string
+  createdAt: Date
   createdBy?: string
+  updatedAt?: Date | null
   updatedBy?: string
 }
 
@@ -135,15 +145,54 @@ class EmployeeService {
    * Register a new employee
    */
   async registerEmployee(data: EmployeeRegistrationRequest): Promise<EmployeeRegistrationResponse> {
+    console.log('🚀 [EmployeeService] Starting employee registration...')
+    console.log('📤 [EmployeeService] Request data:', JSON.stringify(data, null, 2))
+    console.log('🌐 [EmployeeService] Endpoint:', EMPLOYEE_ENDPOINTS.REGISTER)
+    
     try {
+      console.log('📡 [EmployeeService] Making API request...')
       const response = await api.post<ApiResponse<EmployeeRegistrationResponse>>(
         EMPLOYEE_ENDPOINTS.REGISTER,
         data
       )
+      console.log('✅ [EmployeeService] API response received:', response.data)
+      console.log('📥 [EmployeeService] Response data:', response.data.data)
       return response.data.data
     } catch (error) {
+      console.error('❌ [EmployeeService] Registration failed:', error)
+      console.error('❌ [EmployeeService] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        response: (error as any)?.response?.data,
+        status: (error as any)?.response?.status,
+        error: error
+      })
+      console.error('❌ [EmployeeService] Backend error response:', JSON.stringify((error as any)?.response?.data, null, 2))
+      console.error('❌ [EmployeeService] Backend error message:', (error as any)?.response?.data?.message)
+      console.error('❌ [EmployeeService] Backend error errors:', (error as any)?.response?.data?.errors)
       throw new Error(handleApiError(error))
     }
+  }
+
+  /**
+   * Register a new employee using frontend Employee interface
+   */
+  async registerEmployeeFromFrontend(employee: Partial<Employee>): Promise<EmployeeRegistrationResponse> {
+    console.log('🚀 [EmployeeService] Starting employee registration from frontend data...')
+    console.log('📤 [EmployeeService] Frontend data:', employee)
+    
+    // Check for required fields before mapping
+    const requiredFields = ['employeeNumber', 'title', 'firstName', 'surname', 'startDate', 'position', 'employeeStatus', 'employmentType']
+    const missingFields = requiredFields.filter(field => !employee[field as keyof Employee])
+    
+    if (missingFields.length > 0) {
+      console.error('❌ [EmployeeService] Missing required fields:', missingFields)
+      throw new Error(`Missing required fields: ${missingFields.join(', ')}`)
+    }
+    
+    const backendRequest = mapToBackendRequest(employee)
+    console.log('🔄 [EmployeeService] Mapped to backend request:', backendRequest)
+    
+    return this.registerEmployee(backendRequest)
   }
 
   /**
@@ -156,17 +205,45 @@ class EmployeeService {
     status?: 'active' | 'inactive'
     position?: string
     region?: string
-  }): Promise<{ employees: EmployeeDetailResponse[]; total: number; page: number; pageSize: number }> {
+  }): Promise<{ employees: any[]; total: number; page: number; pageSize: number }> {
     try {
       const response = await api.get<ApiResponse<{
-        employees: EmployeeDetailResponse[]
-        total: number
-        page: number
+        items: EmployeeDetailResponse[]
+        totalCount: number
+        pageNumber: number
         pageSize: number
       }>>(EMPLOYEE_ENDPOINTS.LIST, { params })
-      return response.data.data
+      
+      // Transform backend PaginatedResponseDto to expected format
+      return {
+        employees: response.data.data.items,
+        total: response.data.data.totalCount,
+        page: response.data.data.pageNumber,
+        pageSize: response.data.data.pageSize
+      }
     } catch (error) {
+      console.error('❌ [EmployeeService] Failed to fetch employees:', error)
       throw new Error(handleApiError(error))
+    }
+  }
+
+  /**
+   * Get all employees as frontend Employee interface
+   */
+  async getEmployeesAsFrontendInterface(params?: {
+    page?: number
+    pageSize?: number
+    search?: string
+    status?: 'active' | 'inactive'
+    position?: string
+    region?: string
+  }): Promise<{ employees: Employee[]; total: number; page: number; pageSize: number }> {
+    const result = await this.getEmployees(params)
+    return {
+      employees: mapFromListResponseArray(result.employees),
+      total: result.total,
+      page: result.page,
+      pageSize: result.pageSize
     }
   }
 
@@ -185,16 +262,28 @@ class EmployeeService {
   }
 
   /**
+   * Get employee by ID as frontend Employee interface
+   */
+  async getEmployeeByIdAsFrontendInterface(id: number): Promise<Employee> {
+    const response = await this.getEmployeeById(id)
+    return mapFromBackendResponse(response)
+  }
+
+  /**
    * Update employee
    */
-  async updateEmployee(id: number, data: Partial<EmployeeRegistrationRequest>): Promise<EmployeeDetailResponse> {
+  async updateEmployee(id: number, data: Partial<Employee>): Promise<EmployeeDetailResponse> {
     try {
+      const updateRequest = mapToBackendUpdateRequest(data)
+      console.log('🔄 [EmployeeService] Update request data:', updateRequest)
+      
       const response = await api.put<ApiResponse<EmployeeDetailResponse>>(
         EMPLOYEE_ENDPOINTS.UPDATE(id.toString()),
-        data
+        updateRequest
       )
       return response.data.data
     } catch (error) {
+      console.error('❌ [EmployeeService] Update failed:', error)
       throw new Error(handleApiError(error))
     }
   }
@@ -206,6 +295,7 @@ class EmployeeService {
     try {
       await api.delete(EMPLOYEE_ENDPOINTS.DELETE(id.toString()))
     } catch (error) {
+      console.error('❌ [EmployeeService] Delete failed:', error)
       throw new Error(handleApiError(error))
     }
   }

@@ -69,6 +69,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination'
+import { userService } from '@/services/userService'
 
 const UserSetup = () => {
   const dispatch = useAppDispatch()
@@ -82,57 +83,66 @@ const UserSetup = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize] = useState(10)
 
+  // Check authentication on component mount
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token')
+    const user = localStorage.getItem('user')
+    
+    console.log('🔍 [UserSetup] Authentication check:', { 
+      hasToken: !!token, 
+      hasUser: !!user,
+      currentPath: window.location.pathname 
+    })
+    
+    if (!token || !user) {
+      console.warn('⚠️ [UserSetup] No authentication found, redirecting to login')
+      window.location.href = '/login'
+      return
+    }
+    
+    console.log('✅ [UserSetup] Authentication verified')
+  }, [])
+
   // Get users and loading state from Redux store
   const { users, loading, error } = useAppSelector((state: RootState) => state.users)
 
-  // Fetch users on mount
+  // Fetch users on mount and when pagination/search changes
   useEffect(() => {
-    dispatch(fetchUsers())
-  }, [dispatch])
+    dispatch(fetchUsers({
+      page: currentPage,
+      pageSize,
+      searchTerm: searchQuery || undefined
+    }))
+  }, [dispatch, currentPage, pageSize, searchQuery])
 
-  const filteredUsers = useMemo(() => {
-    const query = searchQuery.toLowerCase()
-    return users.filter(user => {
-      const fullName = `${user.firstName} ${user.lastName}`.toLowerCase()
-      const email = user.email.toLowerCase()
-      const company = user.userCompany?.toLowerCase() || ''
+  // Use users directly since backend handles filtering and pagination
+  const displayUsers = users
 
-      switch (filterType) {
-        case 'name':
-          return fullName.includes(query)
-        case 'email':
-          return email.includes(query)
-        case 'company':
-          return company.includes(query)
-        default:
-          return fullName.includes(query) || 
-                 email.includes(query) || 
-                 company.includes(query)
-      }
-    })
-  }, [users, searchQuery, filterType])
-
-  // Pagination calculations
-  const totalUsers = filteredUsers.length
+  // Pagination calculations (these will be updated when we get the full response)
+  const totalUsers = users.length // This will be updated when we get pagination info
   const totalPages = Math.ceil(totalUsers / pageSize)
   const startIndex = (currentPage - 1) * pageSize
   const endIndex = startIndex + pageSize
-  const paginatedUsers = filteredUsers.slice(startIndex, endIndex)
 
-  // Reset to first page when search/filter changes
+  // Reset to first page when search changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, filterType])
+  }, [searchQuery])
 
   const handleCreateUser = async (data: CreateUserInput) => {
+    console.log('🔄 [UserSetup] Creating user started', { data })
+    
     try {
-      await dispatch(createUser(data)).unwrap()
+      const result = await dispatch(createUser(data)).unwrap()
+      console.log('✅ [UserSetup] User created successfully', { result })
+      
       setShowUserDialog(false)
       toast({
         title: 'Success',
         description: 'New user has been created successfully.',
       })
     } catch (error) {
+      console.error('❌ [UserSetup] User creation failed:', error)
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to create user',
@@ -142,8 +152,12 @@ const UserSetup = () => {
   }
 
   const handleUpdateUser = async (data: UpdateUserInput) => {
+    console.log('🔄 [UserSetup] Updating user started', { data })
+    
     try {
-      await dispatch(updateUserAsync(data)).unwrap()
+      const result = await dispatch(updateUserAsync(data)).unwrap()
+      console.log('✅ [UserSetup] User updated successfully', { result })
+      
       setShowUserDialog(false)
       setSelectedUser(undefined)
       toast({
@@ -151,6 +165,7 @@ const UserSetup = () => {
         description: 'User has been updated successfully.',
       })
     } catch (error) {
+      console.error('❌ [UserSetup] User update failed:', error)
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to update user',
@@ -190,9 +205,48 @@ const UserSetup = () => {
     }
   }, [error, toast])
 
-  const openEditDialog = (user: User) => {
+  const openEditDialog = async (user: User) => {
+    try {
+      const detail = await userService.getUserById(user.id)
+
+      const role = ((detail as any).role ?? (detail as any).Role) as UserRole
+      const base = {
+        id: (detail as any).id ?? (detail as any).Id,
+        username: (detail as any).username ?? (detail as any).Username,
+        firstName: (detail as any).firstName ?? (detail as any).FirstName,
+        lastName: (detail as any).lastName ?? (detail as any).LastName,
+        email: (detail as any).email ?? (detail as any).Email,
+        role,
+        pageAccessRole: ((detail as any).pageAccessRole ?? (detail as any).PageAccessRole ?? role) as UserRole,
+        signature: (detail as any).signature ?? (detail as any).Signature,
+        signatureCode: (detail as any).signatureCode ?? (detail as any).SignatureCode,
+        jobTitle: (detail as any).jobTitle ?? (detail as any).JobTitle,
+        userCompany: (detail as any).userCompany ?? (detail as any).UserCompany,
+        recordIsDeleted: (detail as any).recordIsDeleted ?? (detail as any).RecordIsDeleted ?? false,
+        createdAt: (detail as any).createdAt ?? (detail as any).CreatedAt ?? new Date().toISOString(),
+        updatedAt: (detail as any).updatedAt ?? (detail as any).UpdatedAt ?? new Date().toISOString(),
+      }
+
+      let normalized: User
+      if (role === 'CustomerSiteManager' || role === 'CustomerHOManager') {
+        const customerId = Number((detail as any).customerId ?? (detail as any).CustomerId)
+        normalized = { ...(base as any), role, customerId } as User
+      } else {
+        const assignedCustomerIds = ((detail as any).assignedCustomerIds ?? (detail as any).AssignedCustomerIds ?? []).map((id: any) => Number(id))
+        normalized = { ...(base as any), role, assignedCustomerIds } as User
+      }
+
+      setSelectedUser(normalized)
+      setShowUserDialog(true)
+    } catch (err) {
+      console.error('Failed to load user details for edit', err)
     setSelectedUser(user)
     setShowUserDialog(true)
+      toast({
+        title: 'Warning',
+        description: 'Could not load full user details. Some fields may be missing.',
+      })
+    }
   }
 
   const openDeleteDialog = (user: User) => {
@@ -240,7 +294,7 @@ const UserSetup = () => {
   }
 
   // Stats (using all filtered users, not paginated)
-  const totalFilteredUsers = filteredUsers.length
+  const totalFilteredUsers = displayUsers.length
   const activeStatusList = [
     'AdvantageOneOfficer',
     'AdvantageOneHOOfficer',
@@ -248,37 +302,39 @@ const UserSetup = () => {
     'CustomerSiteManager',
     'CustomerHOManager'
   ]
-  const activeUsers = filteredUsers.filter(u => activeStatusList.includes(u.role)).length
-  const adminUsers = filteredUsers.filter(u => u.role === 'Administrator').length
+  const activeUsers = displayUsers.filter(u => activeStatusList.includes(u.role)).length
+  const adminUsers = displayUsers.filter(u => u.role === 'Administrator').length
   const adminPercent = totalFilteredUsers > 0 ? ((adminUsers / totalFilteredUsers) * 100).toFixed(1) : '0.0'
-  const officerUsers = filteredUsers.filter(u => u.role === 'AdvantageOneOfficer').length
+  const officerUsers = displayUsers.filter(u => u.role === 'AdvantageOneOfficer').length
 
   return (
     <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-indigo-100/80 via-purple-50/80 to-pink-100/80">
-      <div className="container mx-auto px-2 md:px-6 lg:px-8 py-4 md:py-6 lg:py-8 space-y-4 md:space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
+      <div className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-4 md:py-6 lg:py-8 space-y-3 sm:space-y-4 md:space-y-6">
+        {/* Header Section */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 sm:gap-3 md:gap-4">
           <div className="space-y-1">
-            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
               User Management
             </h1>
-            <p className="text-sm md:text-base text-gray-500">
+            <p className="text-xs sm:text-sm md:text-base text-gray-500">
               Manage your team members and their account permissions here
             </p>
           </div>
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <div className="relative flex-1 md:flex-none">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+              <div className="flex flex-none w-auto">
+                <div className="relative flex-none w-auto">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
                 <Input
                   placeholder="Search users..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 min-w-[240px]"
+                    className="pl-8 w-[200px] sm:w-[250px] h-8 sm:h-9 text-xs sm:text-sm"
                 />
               </div>
               <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Filter by" />
+                  <SelectTrigger className="w-[100px] sm:w-[120px] ml-2 h-8 sm:h-9 text-xs sm:text-sm">
+                    <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
@@ -288,52 +344,53 @@ const UserSetup = () => {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={() => setShowUserDialog(true)} className="w-full md:w-auto">
+            </div>
+            <Button onClick={() => setShowUserDialog(true)} className="w-[auto] sm:w-auto h-9 sm:h-10 text-sm sm:text-base">
               <UserPlus className="h-4 w-4 mr-2" />
               Add User
             </Button>
           </div>
         </div>
 
-        {/* Stats Section - full width, modern cards */}
-        <div className="w-full mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+        {/* Stats Section */}
+        <div className="w-full mb-4 sm:mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-6 w-full">
             {/* Total Users */}
-            <div className="rounded-xl overflow-hidden shadow bg-gradient-to-br from-blue-500 to-blue-700 flex items-stretch">
-              <div className="flex-1 flex flex-col justify-center px-6 py-6">
-                <span className="text-white text-base font-medium mb-1">Total Users</span>
-                <span className="text-3xl font-bold text-white">{totalFilteredUsers}</span>
-                <span className="text-white/80 text-sm mt-1">{activeUsers} active</span>
+            <div className="rounded-xl width-[350px] overflow-hidden shadow bg-gradient-to-br from-blue-500 to-blue-700 flex items-stretch min-h-[80px] sm:min-h-[100px]">
+              <div className="flex-1 flex flex-col justify-center px-3  sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
+                <span className="text-white text-xs sm:text-sm md:text-base font-medium mb-1 leading-tight">Total Users</span>
+                <span className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-none">{totalFilteredUsers}</span>
+                <span className="text-white/80 text-xs mt-1 leading-tight">{activeUsers} active</span>
               </div>
-              <div className="flex items-center pr-6">
-                <span className="bg-white/20 rounded-full p-3 flex items-center justify-center">
-                  <Users className="h-7 w-7 text-white/80" />
+              <div className="flex items-center  pr-2 sm:pr-3 md:pr-6">
+                <span className="bg-white/20 rounded-full p-1.5 sm:p-2 md:p-3 flex items-center justify-center">
+                  <Users className="h-3 w-3 sm:h-4 sm:w-4 md:h-6 md:w-6 text-white/80" />
                 </span>
               </div>
             </div>
             {/* Admin Users */}
-            <div className="rounded-xl overflow-hidden shadow bg-gradient-to-br from-purple-500 to-purple-700 flex items-stretch">
-              <div className="flex-1 flex flex-col justify-center px-6 py-6">
-                <span className="text-white text-base font-medium mb-1">Admin Users</span>
-                <span className="text-3xl font-bold text-white">{adminUsers}</span>
-                <span className="text-white/80 text-sm mt-1">{adminPercent}% of total</span>
+            <div className="rounded-xl overflow-hidden shadow bg-gradient-to-br from-purple-500 to-purple-700 flex items-stretch min-h-[80px] sm:min-h-[100px]">
+              <div className="flex-1 flex flex-col justify-center px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
+                <span className="text-white text-xs sm:text-sm md:text-base font-medium mb-1 leading-tight">Admin Users</span>
+                <span className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-none">{adminUsers}</span>
+                <span className="text-white/80 text-xs mt-1 leading-tight">{adminPercent}% of total</span>
               </div>
-              <div className="flex items-center pr-6">
-                <span className="bg-white/20 rounded-full p-3 flex items-center justify-center">
-                  <Shield className="h-7 w-7 text-white/80" />
+              <div className="flex items-center pr-2 sm:pr-3 md:pr-6">
+                <span className="bg-white/20 rounded-full p-1.5 sm:p-2 md:p-3 flex items-center justify-center">
+                  <Shield className="h-3 w-3 sm:h-4 sm:w-4 md:h-6 md:w-6 text-white/80" />
                 </span>
               </div>
             </div>
             {/* Advantage One Officer Users */}
-            <div className="rounded-xl overflow-hidden shadow bg-gradient-to-br from-green-500 to-green-700 flex items-stretch">
-              <div className="flex-1 flex flex-col justify-center px-6 py-6">
-                <span className="text-white text-base font-medium mb-1">Advantage One Officer Users</span>
-                <span className="text-3xl font-bold text-white">{officerUsers}</span>
-                <span className="text-white/80 text-sm mt-1">Advantage One Officer</span>
+            <div className="rounded-xl overflow-hidden shadow bg-gradient-to-br from-green-500 to-green-700 flex items-stretch min-h-[80px] sm:min-h-[100px] sm:col-span-2 lg:col-span-1">
+              <div className="flex-1 flex flex-col justify-center px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
+                <span className="text-white text-xs sm:text-sm md:text-base font-medium mb-1 leading-tight">Advantage One Officer Users</span>
+                <span className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-none">{officerUsers}</span>
+                <span className="text-white/80 text-xs mt-1 leading-tight">Advantage One Officer</span>
               </div>
-              <div className="flex items-center pr-6">
-                <span className="bg-white/20 rounded-full p-3 flex items-center justify-center">
-                  <Users className="h-7 w-7 text-white/80" />
+              <div className="flex items-center pr-2 sm:pr-3 md:pr-6">
+                <span className="bg-white/20 rounded-full p-1.5 sm:p-2 md:p-3 flex items-center justify-center">
+                  <Users className="h-3 w-3 sm:h-4 sm:w-4 md:h-6 md:w-6 text-white/80" />
                 </span>
               </div>
             </div>
@@ -341,70 +398,71 @@ const UserSetup = () => {
         </div>
 
         {/* Users Table */}
-        <div className="rounded-lg border bg-white shadow-sm">
+        <div className="rounded-lg border bg-white shadow-sm overflow-x-auto">
+          <div className="min-w-full">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Job Title</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Officer Type</TableHead>
-                <TableHead>Assigned Customers</TableHead>
-                <TableHead className="w-[160px]">Actions</TableHead>
+                  <TableHead className="text-xs sm:text-sm">Name</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Email</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden md:table-cell">Job Title</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Company</TableHead>
+                  <TableHead className="text-xs sm:text-sm">Status</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden md:table-cell">Officer Type</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Assigned Customers</TableHead>
+                  <TableHead className="w-[120px] sm:w-[160px] text-xs sm:text-sm">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedUsers.map((user) => (
+              {displayUsers.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell>
+                    <TableCell className="py-2 sm:py-3">
                     <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-medium">
+                        <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-medium text-xs sm:text-sm">
                         {user.firstName[0]}{user.lastName[0]}
                       </div>
-                      <div>
-                        <div className="font-medium">{user.firstName} {user.lastName}</div>
-                        <div className="text-sm text-gray-500">{user.username}</div>
-                      </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-xs sm:text-sm truncate">{user.firstName} {user.lastName}</div>
+                          <div className="text-xs text-gray-500 truncate">{user.username}</div>
+                        </div>
                     </div>
                   </TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <div className="text-sm text-gray-600">
+                    <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{user.email}</TableCell>
+                    <TableCell className="text-xs sm:text-sm hidden md:table-cell">
+                      <div className="text-xs sm:text-sm text-gray-600">
                       {user.jobTitle || 'N/A'}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="text-sm text-gray-600">
+                    <TableCell className="text-xs sm:text-sm hidden lg:table-cell">
+                      <div className="text-xs sm:text-sm text-gray-600">
                       {user.userCompany || 'N/A'}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Badge className={`${getStatusColor(user.role)} flex items-center gap-1.5`}>
-                      {getStatusIcon(user.role)}
-                      {user.role}
+                    <TableCell className="py-2 sm:py-3">
+                      <Badge className={`${getStatusColor(user.role)} flex items-center gap-1 sm:gap-1.5 text-xs`}>
+                        <span className="hidden sm:inline">{getStatusIcon(user.role)}</span>
+                        <span className="truncate">{user.role}</span>
                     </Badge>
                   </TableCell>
-                  <TableCell>{user.role}</TableCell>
-                  <TableCell>
+                    <TableCell className="text-xs sm:text-sm hidden md:table-cell">{user.role}</TableCell>
+                    <TableCell className="hidden lg:table-cell">
                     <div className="flex items-center gap-1">
-                      <Users className="h-5 w-5 text-gray-500" />
-                      <span className="font-medium text-base">
+                        <Users className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
+                        <span className="font-medium text-xs sm:text-sm">
                         {'assignedCustomerIds' in user ? user.assignedCustomerIds?.length || 0 : 0}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(user)} className="h-8 w-8 p-0 hover:bg-blue-50">
-                        <Pencil className="h-5 w-5 text-blue-600" />
+                    <TableCell className="py-2 sm:py-3">
+                      <div className="flex justify-end gap-1 sm:gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(user)} className="h-6 w-6 sm:h-8 sm:w-8 p-0 hover:bg-blue-50">
+                          <Pencil className="h-3 w-3 sm:h-5 sm:w-5 text-blue-600" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(user)} className="h-8 w-8 p-0 hover:bg-red-50">
-                        <Trash2 className="h-5 w-5 text-red-600" />
+                        <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(user)} className="h-6 w-6 sm:h-8 sm:w-8 p-0 hover:bg-red-50">
+                          <Trash2 className="h-3 w-3 sm:h-5 sm:w-5 text-red-600" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleViewUser(user)} className="h-8 w-8 p-0 hover:bg-green-50">
-                        <Eye className="h-5 w-5 text-green-600" />
+                        <Button variant="ghost" size="icon" onClick={() => handleViewUser(user)} className="h-6 w-6 sm:h-8 sm:w-8 p-0 hover:bg-green-50">
+                          <Eye className="h-3 w-3 sm:h-5 sm:w-5 text-green-600" />
                       </Button>
                     </div>
                   </TableCell>
@@ -414,25 +472,26 @@ const UserSetup = () => {
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8">
                     <div className="flex flex-col items-center gap-2 text-gray-500">
-                      <UserX className="h-8 w-8" />
-                      <div>No users found</div>
-                      <div className="text-sm">Try adjusting your search or filter</div>
+                        <UserX className="h-6 w-6 sm:h-8 sm:w-8" />
+                        <div className="text-sm sm:text-base">No users found</div>
+                        <div className="text-xs sm:text-sm">Try adjusting your search or filter</div>
                     </div>
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
+          </div>
         </div>
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-500">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4">
+            <div className="text-xs sm:text-sm text-gray-500 text-center sm:text-left">
               Showing {startIndex + 1} to {Math.min(endIndex, totalFilteredUsers)} of {totalFilteredUsers} results
             </div>
             <Pagination>
-              <PaginationContent>
+              <PaginationContent className="flex-wrap">
                 <PaginationItem>
                   <PaginationPrevious 
                     href="#"
@@ -447,14 +506,12 @@ const UserSetup = () => {
                 </PaginationItem>
                 
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                  // Show first page, last page, current page, and pages around current page
                   const shouldShow = 
                     page === 1 || 
                     page === totalPages || 
                     Math.abs(page - currentPage) <= 1
                   
                   if (!shouldShow && page !== 2 && page !== totalPages - 1) {
-                    // Show ellipsis for gaps
                     if (page === 2 && currentPage > 4) {
                       return (
                         <PaginationItem key={`ellipsis-${page}`}>
@@ -481,6 +538,7 @@ const UserSetup = () => {
                           setCurrentPage(page)
                         }}
                         isActive={page === currentPage}
+                        className="text-xs sm:text-sm"
                       >
                         {page}
                       </PaginationLink>
