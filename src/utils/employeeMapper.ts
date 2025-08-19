@@ -1,5 +1,6 @@
 import { Employee } from '@/types/employee'
 import { EmployeeRegistrationRequest, EmployeeDetailResponse } from '@/services/employeeService'
+import { run } from 'node:test'
 
 /**
  * Maps frontend Employee interface to backend EmployeeRegistrationRequest
@@ -19,7 +20,6 @@ export const mapToBackendRequest = (employee: Partial<Employee>): EmployeeRegist
     
     // Optional fields
     AipAccessLevel: employee.aipAccessLevel,
-    Department: employee.department,
     Region: employee.region,
     Email: employee.email,
     ContactNumber: employee.contactNumber,
@@ -34,7 +34,6 @@ export const mapToBackendRequest = (employee: Partial<Employee>): EmployeeRegist
     // SIA License Information
     SiaLicenceType: employee.siaLicenceType,
     SiaLicenceExpiry: employee.siaLicenceExpiry ? new Date(employee.siaLicenceExpiry) : null,
-    SiaLicenceNumber: employee.siaLicenceNumber,
     
     // Personal Information
     Nationality: employee.nationality,
@@ -68,8 +67,8 @@ export const mapToBackendRequest = (employee: Partial<Employee>): EmployeeRegist
     PeopleHoursPin: employee.peopleHoursPin,
     
     // Training and Induction
-    FullRotasIssued: employee.fullRotasIssued,
-    InductionAndTrainingBooked: employee.inductionAndTrainingBooked,
+    FullRotasIssued: employee.fullRotasIssued ? new Date(employee.fullRotasIssued) : null,
+    InductionAndTrainingBooked: employee.inductionAndTrainingBooked ? new Date(employee.inductionAndTrainingBooked) : null,
     Location: employee.location,
     Trainer: employee.trainer,
   }
@@ -96,7 +95,6 @@ export const mapFromBackendResponse = (response: EmployeeDetailResponse): Employ
     
     // Optional Fields
     aipAccessLevel: response.aipAccessLevel,
-    department: response.department,
     region: response.region,
     email: response.email,
     contactNumber: response.contactNumber,
@@ -111,7 +109,6 @@ export const mapFromBackendResponse = (response: EmployeeDetailResponse): Employ
     // SIA License Information
     siaLicenceType: response.siaLicenceType,
     siaLicenceExpiry: response.siaLicenceExpiry,
-    siaLicenceNumber: response.siaLicenceNumber,
     
     // Personal Information
     nationality: response.nationality,
@@ -152,8 +149,6 @@ export const mapFromBackendResponse = (response: EmployeeDetailResponse): Employ
     
     // Relationships
     userId: response.userId,
-    supervisorId: response.supervisorId,
-    supervisorName: response.supervisorName,
     
     // Audit Fields
     createdAt: response.createdAt,
@@ -193,7 +188,6 @@ export const mapFromListResponse = (response: any): Employee => {
     position: response.position,
     employeeStatus: response.employeeStatus,
     employmentType: response.employmentType,
-    department: response.department,
     email: response.email,
     
     // Default values for fields not in list response
@@ -205,9 +199,8 @@ export const mapFromListResponse = (response: any): Employee => {
     town: '',
     county: '',
     postCode: '',
-    siaLicenceType: '',
+    siaLicenceType: response.siaLicenceType || '',
     siaLicenceExpiry: response.siaLicenceExpiry ? new Date(response.siaLicenceExpiry) : null,
-    siaLicenceNumber: '',
     nationality: '',
     rightToWorkCondition: '',
     drivingLicenceType: '',
@@ -231,13 +224,11 @@ export const mapFromListResponse = (response: any): Employee => {
     uniformIssued: false,
     nextOfKinDetailsComplete: false,
     peopleHoursPin: '',
-    fullRotasIssued: '',
-    inductionAndTrainingBooked: '',
+    fullRotasIssued: null,
+    inductionAndTrainingBooked: null,
     location: '',
     trainer: '',
     userId: response.userId,
-    supervisorId: null,
-    supervisorName: '',
     createdAt: response.createdAt ? new Date(response.createdAt) : new Date(),
     createdBy: '',
     updatedAt: null,
@@ -262,6 +253,7 @@ export const mapFromListResponseArray = (responses: any[]): Employee[] => {
 export const mapToBackendUpdateRequest = (employee: Partial<Employee>): any => {
   return {
     // Only include defined values for update
+    ...(employee.employeeNumber && { EmployeeNumber: employee.employeeNumber }),
     ...(employee.title && { Title: employee.title }),
     ...(employee.aipAccessLevel && { AipAccessLevel: employee.aipAccessLevel }),
     ...(employee.firstName && { FirstName: employee.firstName }),
@@ -270,7 +262,6 @@ export const mapToBackendUpdateRequest = (employee: Partial<Employee>): any => {
     ...(employee.position && { Position: employee.position }),
     ...(employee.employeeStatus && { EmployeeStatus: employee.employeeStatus }),
     ...(employee.employmentType && { EmploymentType: employee.employmentType }),
-    ...(employee.department && { Department: employee.department }),
     ...(employee.region && { Region: employee.region }),
     ...(employee.email && { Email: employee.email }),
     ...(employee.contactNumber && { ContactNumber: employee.contactNumber }),
@@ -281,7 +272,6 @@ export const mapToBackendUpdateRequest = (employee: Partial<Employee>): any => {
     ...(employee.postCode && { PostCode: employee.postCode }),
     ...(employee.siaLicenceType && { SiaLicenceType: employee.siaLicenceType }),
     ...(employee.siaLicenceExpiry && { SiaLicenceExpiry: new Date(employee.siaLicenceExpiry) }),
-    ...(employee.siaLicenceNumber && { SiaLicenceNumber: employee.siaLicenceNumber }),
     ...(employee.nationality && { Nationality: employee.nationality }),
     ...(employee.rightToWorkCondition && { RightToWorkCondition: employee.rightToWorkCondition }),
     ...(employee.drivingLicenceType && { DrivingLicenceType: employee.drivingLicenceType }),
@@ -305,11 +295,10 @@ export const mapToBackendUpdateRequest = (employee: Partial<Employee>): any => {
     ...(employee.uniformIssued !== undefined && { UniformIssued: employee.uniformIssued }),
     ...(employee.nextOfKinDetailsComplete !== undefined && { NextOfKinDetailsComplete: employee.nextOfKinDetailsComplete }),
     ...(employee.peopleHoursPin && { PeopleHoursPin: employee.peopleHoursPin }),
-    ...(employee.fullRotasIssued && { FullRotasIssued: employee.fullRotasIssued }),
-    ...(employee.inductionAndTrainingBooked && { InductionAndTrainingBooked: employee.inductionAndTrainingBooked }),
+    ...(employee.fullRotasIssued && { FullRotasIssued: new Date(employee.fullRotasIssued) }),
+    ...(employee.inductionAndTrainingBooked && { InductionAndTrainingBooked: new Date(employee.inductionAndTrainingBooked) }),
     ...(employee.location && { Location: employee.location }),
     ...(employee.trainer && { Trainer: employee.trainer }),
-    ...(employee.supervisorId && { SupervisorId: employee.supervisorId }),
   }
 }
 

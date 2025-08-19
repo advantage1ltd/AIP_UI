@@ -72,8 +72,8 @@ export function EmployeesTable({ employees, onNewEmployee, onEditEmployee, onDel
             </TableHeader>
             <TableBody>
               {paginatedEmployees.length > 0 ? (
-                paginatedEmployees.map((employee) => (
-                  <TableRow key={employee.id} className="hover:bg-purple-50/50 text-xs md:text-sm">
+                paginatedEmployees.map((employee, index) => (
+                  <TableRow key={employee.id || `employee-${index}`} className="hover:bg-purple-50/50 text-xs md:text-sm">
                     <TableCell className="font-medium py-2 md:py-3">{`${employee.firstName || ''} ${employee.surname || ''}`}</TableCell>
                     <TableCell className="py-2 md:py-3">{employee.employeeNumber}</TableCell>
                     <TableCell className={`py-2 md:py-3 ${getResponsiveClasses('position')}`}>{employee.position}</TableCell>

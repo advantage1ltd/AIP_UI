@@ -34,14 +34,21 @@ const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   surname: z.string().min(2, "Last name must be at least 2 characters"),
-  startDate: z.string().min(1, "Start date is required"),
+  startDate: z.string().min(1, "Start date is required").refine((date) => {
+    if (!date) return false
+    const selectedDate = new Date(date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Reset time to start of day
+    return selectedDate <= today
+  }, {
+    message: "Start date cannot be in the future"
+  }),
   position: z.string().min(1, "Position is required"),
   employeeStatus: z.string().min(1, "Employee status is required"),
   employmentType: z.string().min(1, "Employment type is required"),
   
   // Optional Basic Information
   aipAccessLevel: z.string().optional(),
-  department: z.string().optional(),
   
   // Contact Information
   email: z.string().email("Invalid email format").optional(),
@@ -57,8 +64,15 @@ const formSchema = z.object({
   
   // SIA Information - Conditional based on AIP Access Level
   siaLicenceType: z.string().optional(),
-  siaLicenceExpiry: z.string().optional(),
-  siaLicenceNumber: z.string().optional(),
+  siaLicenceExpiry: z.string().optional().refine((date) => {
+    if (!date) return true // Optional field
+    const selectedDate = new Date(date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Reset time to start of day
+    return selectedDate >= today
+  }, {
+    message: "SIA licence expiry date cannot be in the past"
+  }),
   
   // Personal Information
   nationality: z.string().optional(),
@@ -92,8 +106,20 @@ const formSchema = z.object({
   
   // Training and Induction
   peopleHoursPin: z.string().optional(),
-  fullRotasIssued: z.string().optional(),
-  inductionAndTrainingBooked: z.string().optional(),
+  fullRotasIssued: z.string().optional().refine((date) => {
+    if (!date) return true // Optional field
+    const selectedDate = new Date(date)
+    return !isNaN(selectedDate.getTime())
+  }, {
+    message: "Please enter a valid date"
+  }),
+  inductionAndTrainingBooked: z.string().optional().refine((date) => {
+    if (!date) return true // Optional field
+    const selectedDate = new Date(date)
+    return !isNaN(selectedDate.getTime())
+  }, {
+    message: "Please enter a valid date"
+  }),
   location: z.string().optional(),
   trainer: z.string().optional(),
   
@@ -188,6 +214,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
       writtenRefsCompleteDate: initialData?.writtenRefsCompleteDate ? new Date(initialData.writtenRefsCompleteDate).toISOString().split('T')[0] : "",
       quickStarterFormCompleted: initialData?.quickStarterFormCompleted || false,
       workingTimeDirective: initialData?.workingTimeDirective || "",
+      workingTimeDirectiveComplete: initialData?.workingTimeDirectiveComplete || false,
       contractOfEmploymentSigned: initialData?.contractOfEmploymentSigned || false,
       photoTaken: initialData?.photoTaken || false,
       photoFile: initialData?.photoFile || "",
@@ -196,10 +223,10 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
       uniformIssued: initialData?.uniformIssued || false,
       nextOfKinDetailsComplete: initialData?.nextOfKinDetailsComplete || false,
              peopleHoursPin: initialData?.peopleHoursPin || "",
-       fullRotasIssued: initialData?.fullRotasIssued ? new Date(initialData.fullRotasIssued).toISOString().split('T')[0] : "",
-       inductionAndTrainingBooked: initialData?.inductionAndTrainingBooked ? new Date(initialData.inductionAndTrainingBooked).toISOString().split('T')[0] : "",
-       location: initialData?.location || "",
-       trainer: initialData?.trainer || "",
+      fullRotasIssued: initialData?.fullRotasIssued ? new Date(initialData.fullRotasIssued).toISOString().split('T')[0] : "",
+      inductionAndTrainingBooked: initialData?.inductionAndTrainingBooked ? new Date(initialData.inductionAndTrainingBooked).toISOString().split('T')[0] : "",
+      location: initialData?.location || "",
+      trainer: initialData?.trainer || "",
       status: "active",
     },
   })
@@ -214,129 +241,94 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
       // Validate file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
         alert('File size must be less than 5MB')
+        event.target.value = '' // Clear the input
         return
       }
 
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        alert('Please select a valid image file')
+        alert('Please select a valid image file (JPEG, PNG, GIF)')
+        event.target.value = '' // Clear the input
         return
       }
 
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        // Create a canvas to resize and compress the image
-        const img = new Image()
-        img.onload = () => {
-          const canvas = document.createElement('canvas')
-          const ctx = canvas.getContext('2d')
-          
-          // Set canvas size for optimal display (256x256 for good quality)
-          const maxSize = 256
-          let { width, height } = img
-          
-          // Calculate new dimensions maintaining aspect ratio
-          if (width > height) {
-            if (width > maxSize) {
-              height = (height * maxSize) / width
-              width = maxSize
-            }
-          } else {
-            if (height > maxSize) {
-              width = (width * maxSize) / height
-              height = maxSize
+      // Show loading state
+      setPhotoPreview('loading...')
+
+              const reader = new FileReader()
+        reader.onloadend = () => {
+          // Create a canvas to resize and compress the image
+          const img = new Image()
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas')
+              const ctx = canvas.getContext('2d')
+              
+              if (!ctx) {
+                throw new Error('Could not get canvas context')
+              }
+              
+              // Set canvas size for optimal display (256x256 for good quality)
+              const maxSize = 256
+              let { width, height } = img
+              
+              // Calculate new dimensions maintaining aspect ratio
+              if (width > height) {
+                if (width > maxSize) {
+                  height = (height * maxSize) / width
+                  width = maxSize
+                }
+              } else {
+                if (height > maxSize) {
+                  width = (width * maxSize) / height
+                  height = maxSize
+                }
+              }
+              
+              canvas.width = width
+              canvas.height = height
+              
+              // Draw and compress the image
+              ctx.drawImage(img, 0, 0, width, height)
+              
+              // Convert to base64 with better quality
+              const compressedImage = canvas.toDataURL('image/jpeg', 0.8)
+              
+              setPhotoPreview(compressedImage)
+              form.setValue('photoFile', compressedImage)
+              form.setValue('photoTaken', true)
+            } catch (error) {
+              console.error('Error processing image:', error)
+              alert('Error processing image. Please try again.')
+              setPhotoPreview(null)
+              form.setValue('photoFile', '')
+              form.setValue('photoTaken', false)
             }
           }
-          
-          canvas.width = width
-          canvas.height = height
-          
-          // Draw and compress the image
-          ctx?.drawImage(img, 0, 0, width, height)
-          
-          // Convert to base64 with better quality
-          const compressedImage = canvas.toDataURL('image/jpeg', 0.8)
-          
-          setPhotoPreview(compressedImage)
-          form.setValue('photoFile', compressedImage)
-          form.setValue('photoTaken', true)
+          img.onerror = () => {
+            console.error('Error loading image')
+            alert('Error loading image. Please try again.')
+            setPhotoPreview(null)
+            form.setValue('photoFile', '')
+            form.setValue('photoTaken', false)
+          }
+          img.src = reader.result as string
         }
-        img.src = reader.result as string
-      }
-             reader.readAsDataURL(file)
+        reader.onerror = () => {
+          console.error('Error reading file')
+          alert('Error reading file. Please try again.')
+          setPhotoPreview(null)
+          form.setValue('photoFile', '')
+          form.setValue('photoTaken', false)
+        }
+        reader.readAsDataURL(file)
      }
    }
 
      // Load lookup data and employee data on component mount
   useEffect(() => {
     const loadData = async () => {
-      // Load employee data if editing
-      if (initialData?.id) {
-        try {
-          const employeeData = await employeeService.getEmployeeById(Number(initialData.id))
-          // Update form with loaded data
-          form.reset({
-            aipAccessLevel: employeeData.aipAccessLevel || "",
-            title: employeeData.title || "",
-            firstName: employeeData.firstName || "",
-            surname: employeeData.surname || "",
-            startDate: employeeData.startDate ? new Date(employeeData.startDate).toISOString().split('T')[0] : "",
-            email: employeeData.email || "",
-            contactNumber: employeeData.contactNumber || "",
-            houseName: employeeData.houseName || "",
-            numberAndStreet: employeeData.numberAndStreet || "",
-            town: employeeData.town || "",
-            county: employeeData.county || "",
-            postCode: employeeData.postCode || "",
-            region: employeeData.region || "",
-            position: employeeData.position || "",
-            employeeNumber: employeeData.employeeNumber || "",
-            employeeStatus: employeeData.employeeStatus || "",
-            employmentType: employeeData.employmentType || "",
-            department: employeeData.department || "",
-            siaLicenceType: employeeData.siaLicenceType || "",
-            siaLicenceExpiry: employeeData.siaLicenceExpiry ? new Date(employeeData.siaLicenceExpiry).toISOString().split('T')[0] : "",
-            siaLicenceNumber: employeeData.siaLicenceNumber || "",
-            nationality: employeeData.nationality || "",
-            rightToWorkCondition: employeeData.rightToWorkCondition || "",
-            drivingLicenceType: employeeData.drivingLicenceType || "",
-            dateDLChecked: employeeData.dateDLChecked ? new Date(employeeData.dateDLChecked).toISOString().split('T')[0] : "",
-            drivingLicenceCopyTaken: employeeData.drivingLicenceCopyTaken || false,
-            sixMonthlyCheck: employeeData.sixMonthlyCheck || false,
-            graydonCheckAuthorised: employeeData.graydonCheckAuthorised || false,
-            graydonCheckDetails: employeeData.graydonCheckDetails || "",
-            initialOralReferencesComplete: employeeData.initialOralReferencesComplete || false,
-            initialOralReferencesDate: employeeData.initialOralReferencesDate ? new Date(employeeData.initialOralReferencesDate).toISOString().split('T')[0] : "",
-            writtenRefsComplete: employeeData.writtenRefsComplete || false,
-            writtenRefsCompleteDate: employeeData.writtenRefsCompleteDate ? new Date(employeeData.writtenRefsCompleteDate).toISOString().split('T')[0] : "",
-            quickStarterFormCompleted: employeeData.quickStarterFormCompleted || false,
-            workingTimeDirective: employeeData.workingTimeDirective || "",
-            workingTimeDirectiveComplete: employeeData.workingTimeDirectiveComplete || false,
-            contractOfEmploymentSigned: employeeData.contractOfEmploymentSigned || false,
-            photoTaken: employeeData.photoTaken || false,
-            photoFile: employeeData.photoFile || "",
-            idCardIssued: employeeData.idCardIssued || false,
-            equipmentIssued: employeeData.equipmentIssued || false,
-            uniformIssued: employeeData.uniformIssued || false,
-            nextOfKinDetailsComplete: employeeData.nextOfKinDetailsComplete || false,
-            peopleHoursPin: employeeData.peopleHoursPin || "",
-            fullRotasIssued: employeeData.fullRotasIssued ? new Date(employeeData.fullRotasIssued).toISOString().split('T')[0] : "",
-            inductionAndTrainingBooked: employeeData.inductionAndTrainingBooked ? new Date(employeeData.inductionAndTrainingBooked).toISOString().split('T')[0] : "",
-            location: employeeData.location || "",
-            trainer: employeeData.trainer || "",
-            status: employeeData.employeeStatus === "Active" ? "active" : "inactive",
-          })
-          
-          // Update photo preview
-          if (employeeData.photoFile) {
-            setPhotoPreview(employeeData.photoFile)
-          }
-        } catch (error) {
-          console.error('Failed to load employee data:', error)
-        }
-      }
-
-      // Load all lookup table data in parallel for better performance
+      // Load all lookup table data first
       const requiredCategories = [
         'Trainers',
         'UK_Counties', 
@@ -367,6 +359,81 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
         setWorkingTimeDirectives(lookupData['Working_Time_Directive'] || [])
         
         console.log('All lookup table data loaded successfully')
+        
+        // Now load employee data if editing (after lookup data is loaded)
+        if (initialData?.id) {
+          try {
+            const employeeData = await employeeService.getEmployeeById(Number(initialData.id))
+            
+            // Helper function to find matching lookup value or use original value
+            const findLookupValue = (originalValue: string, lookupArray: LookupTableItem[]) => {
+              if (!originalValue) return ""
+              const found = lookupArray.find(item => 
+                item.value.toLowerCase() === originalValue.toLowerCase() ||
+                item.value === originalValue
+              )
+              return found ? found.value : originalValue
+            }
+            
+            // Update form with loaded data, ensuring dropdown values match lookup data
+            form.reset({
+              aipAccessLevel: findLookupValue(employeeData.aipAccessLevel, lookupData['User_Roles'] || []),
+              title: employeeData.title || "",
+              firstName: employeeData.firstName || "",
+              surname: employeeData.surname || "",
+              startDate: employeeData.startDate ? new Date(employeeData.startDate).toISOString().split('T')[0] : "",
+              email: employeeData.email || "",
+              contactNumber: employeeData.contactNumber || "",
+              houseName: employeeData.houseName || "",
+              numberAndStreet: employeeData.numberAndStreet || "",
+              town: employeeData.town || "",
+              county: findLookupValue(employeeData.county, lookupData['UK_Counties'] || []),
+              postCode: employeeData.postCode || "",
+              region: findLookupValue(employeeData.region, lookupData['UK_Regions'] || []),
+              position: findLookupValue(employeeData.position, lookupData['Positions'] || []),
+              employeeNumber: employeeData.employeeNumber || "",
+              employeeStatus: employeeData.employeeStatus || "",
+              employmentType: employeeData.employmentType || "",
+              siaLicenceType: findLookupValue(employeeData.siaLicenceType, lookupData['SIA_Licence_Types'] || []),
+              siaLicenceExpiry: employeeData.siaLicenceExpiry ? new Date(employeeData.siaLicenceExpiry).toISOString().split('T')[0] : "",
+              nationality: employeeData.nationality || "",
+              rightToWorkCondition: findLookupValue(employeeData.rightToWorkCondition, lookupData['Right_To_Work_Conditions'] || []),
+              drivingLicenceType: findLookupValue(employeeData.drivingLicenceType, lookupData['Driving_Licence_Types'] || []),
+              dateDLChecked: employeeData.dateDLChecked ? new Date(employeeData.dateDLChecked).toISOString().split('T')[0] : "",
+              drivingLicenceCopyTaken: employeeData.drivingLicenceCopyTaken || false,
+              sixMonthlyCheck: employeeData.sixMonthlyCheck || false,
+              graydonCheckAuthorised: employeeData.graydonCheckAuthorised || false,
+              graydonCheckDetails: employeeData.graydonCheckDetails || "",
+              initialOralReferencesComplete: employeeData.initialOralReferencesComplete || false,
+              initialOralReferencesDate: employeeData.initialOralReferencesDate ? new Date(employeeData.initialOralReferencesDate).toISOString().split('T')[0] : "",
+              writtenRefsComplete: employeeData.writtenRefsComplete || false,
+              writtenRefsCompleteDate: employeeData.writtenRefsCompleteDate ? new Date(employeeData.writtenRefsCompleteDate).toISOString().split('T')[0] : "",
+              quickStarterFormCompleted: employeeData.quickStarterFormCompleted || false,
+              workingTimeDirective: findLookupValue(employeeData.workingTimeDirective, lookupData['Working_Time_Directive'] || []),
+              workingTimeDirectiveComplete: employeeData.workingTimeDirectiveComplete || false,
+              contractOfEmploymentSigned: employeeData.contractOfEmploymentSigned || false,
+              photoTaken: employeeData.photoTaken || false,
+              photoFile: employeeData.photoFile || "",
+              idCardIssued: employeeData.idCardIssued || false,
+              equipmentIssued: employeeData.equipmentIssued || false,
+              uniformIssued: employeeData.uniformIssued || false,
+              nextOfKinDetailsComplete: employeeData.nextOfKinDetailsComplete || false,
+              peopleHoursPin: employeeData.peopleHoursPin || "",
+              fullRotasIssued: employeeData.fullRotasIssued ? new Date(employeeData.fullRotasIssued).toISOString().split('T')[0] : "",
+              inductionAndTrainingBooked: employeeData.inductionAndTrainingBooked ? new Date(employeeData.inductionAndTrainingBooked).toISOString().split('T')[0] : "",
+              location: employeeData.location || "",
+              trainer: findLookupValue(employeeData.trainer, lookupData['Trainers'] || []),
+              status: employeeData.employeeStatus === "Active" ? "active" : "inactive",
+            })
+            
+            // Update photo preview
+            if (employeeData.photoFile) {
+              setPhotoPreview(employeeData.photoFile)
+            }
+          } catch (error) {
+            console.error('Failed to load employee data:', error)
+          }
+        }
       } catch (error) {
         console.error('Failed to load lookup table data:', error)
       } finally {
@@ -376,6 +443,24 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
 
     loadData()
   }, [initialData?.id])
+
+  // Reset form when initialData changes to null (when switching from edit to create mode)
+  useEffect(() => {
+    if (!initialData) {
+      form.reset()
+      form.clearErrors()
+      setPhotoPreview(null)
+    }
+  }, [initialData, form])
+
+  // Cleanup form state when component unmounts
+  useEffect(() => {
+    return () => {
+      form.reset()
+      form.clearErrors()
+      setPhotoPreview(null)
+    }
+  }, [form])
 
   const handleSubmit = async (data: FormData) => {
     console.log('🚀 [EmployeeForm] Starting form submission...')
@@ -404,6 +489,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
         console.log('🔄 [EmployeeForm] Using real API service')
         // Use real API service with frontend data format
         console.log('📤 [EmployeeForm] Using frontend data format for API call')
+        console.log('📤 [EmployeeForm] Form data being sent:', JSON.stringify(data, null, 2))
 
         if (initialData?.id) {
           console.log('🔄 [EmployeeForm] Updating existing employee with ID:', initialData.id)
@@ -415,6 +501,8 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
             dateDLChecked: data.dateDLChecked ? new Date(data.dateDLChecked) : undefined,
             initialOralReferencesDate: data.initialOralReferencesDate ? new Date(data.initialOralReferencesDate) : undefined,
             writtenRefsCompleteDate: data.writtenRefsCompleteDate ? new Date(data.writtenRefsCompleteDate) : undefined,
+            fullRotasIssued: data.fullRotasIssued ? new Date(data.fullRotasIssued) : undefined,
+            inductionAndTrainingBooked: data.inductionAndTrainingBooked ? new Date(data.inductionAndTrainingBooked) : undefined,
           }
           const result = await employeeService.updateEmployee(Number(initialData.id), employeeData)
           console.log('✅ [EmployeeForm] Employee update successful:', result)
@@ -428,6 +516,8 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
             dateDLChecked: data.dateDLChecked ? new Date(data.dateDLChecked) : undefined,
             initialOralReferencesDate: data.initialOralReferencesDate ? new Date(data.initialOralReferencesDate) : undefined,
             writtenRefsCompleteDate: data.writtenRefsCompleteDate ? new Date(data.writtenRefsCompleteDate) : undefined,
+            fullRotasIssued: data.fullRotasIssued ? new Date(data.fullRotasIssued) : undefined,
+            inductionAndTrainingBooked: data.inductionAndTrainingBooked ? new Date(data.inductionAndTrainingBooked) : undefined,
           }
           const result = await employeeService.registerEmployeeFromFrontend(employeeData)
           console.log('✅ [EmployeeForm] Employee creation successful:', result)
@@ -435,6 +525,12 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
       }
       
       console.log('✅ [EmployeeForm] Form submission completed successfully')
+      
+      // Reset form state to clear any cached data and validation errors
+      form.reset()
+      form.clearErrors()
+      setSubmitError(null)
+      
       // Close form or show success message
       onCancel()
     } catch (error) {
@@ -444,7 +540,22 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
         stack: error instanceof Error ? error.stack : undefined,
         error: error
       })
-      setSubmitError(error instanceof Error ? error.message : 'An error occurred while saving the employee')
+      
+      // Extract specific error message from backend response
+      let errorMessage = 'An error occurred while saving the employee'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'object' && error !== null) {
+        // Handle Axios error response
+        const axiosError = error as any
+        if (axiosError.response?.data?.message) {
+          errorMessage = axiosError.response.data.message
+        } else if (axiosError.message) {
+          errorMessage = axiosError.message
+        }
+      }
+      
+      setSubmitError(errorMessage)
     } finally {
       console.log('🏁 [EmployeeForm] Form submission process finished')
       setIsSubmitting(false)
@@ -470,7 +581,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>AIP Access Level</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select access level"} />
@@ -538,7 +649,11 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                 <FormItem>
                   <FormLabel>Start Date</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input 
+                      type="date" 
+                      max={new Date().toISOString().split('T')[0]}
+                      {...field} 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -657,7 +772,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>County</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select county"} />
@@ -696,7 +811,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Region</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select region"} />
@@ -732,7 +847,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Position</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select position"} />
@@ -757,7 +872,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Employee Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select status" />
@@ -781,7 +896,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Employment Type</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select type" />
@@ -820,7 +935,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Right to Work Condition</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={isLoadingRightToWorkConditions ? "Loading conditions..." : "Select condition"} />
@@ -873,7 +988,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>SIA Licence Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select licence type"} />
@@ -924,7 +1039,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Driving Licence</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={isLoadingDrivingLicenceTypes ? "Loading licence types..." : "Select licence type"} />
@@ -1137,7 +1252,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Working Time Directive</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={isLoadingWorkingTimeDirectives ? "Loading options..." : "Select option"} />
@@ -1152,6 +1267,21 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                     </SelectContent>
                   </Select>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="workingTimeDirectiveComplete"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Working Time Directive Complete?</FormLabel>
+                  </div>
                 </FormItem>
               )}
             />
@@ -1205,34 +1335,43 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                                          {/* Photo Preview/Placeholder */}
                      <div className="flex items-center justify-center">
                        {photoPreview ? (
-                         <div className="relative group">
-                                                         <div className="w-33 h-30 rounded-lg border-2 border-gray-200 shadow-sm overflow-hidden bg-gray-50 flex items-center justify-center">
-                              <img
-                                src={photoPreview}
-                                alt="Employee photo"
-                                className="w-full h-full object-cover"
-                                style={{ imageRendering: 'auto' }}
-                              />
-                            </div>
-                           <button
-                             type="button"
-                             onClick={() => {
-                               setPhotoPreview(null)
-                               form.setValue('photoFile', '')
-                               form.setValue('photoTaken', false)
-                             }}
-                             className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors shadow-sm"
-                             title="Remove photo"
-                           >
-                             ×
-                           </button>
-                           {/* Hover overlay for better UX */}
-                           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg flex items-center justify-center">
-                             <span className="text-white opacity-0 group-hover:opacity-100 text-xs font-medium transition-opacity duration-200">
-                               Click to remove
-                             </span>
+                         photoPreview === 'loading...' ? (
+                           <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center bg-gray-50">
+                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
+                             <p className="text-xs text-gray-500 text-center px-2">
+                               Processing image...
+                             </p>
                            </div>
-                         </div>
+                         ) : (
+                           <div className="relative group">
+                             <div className="w-32 h-32 rounded-lg border-2 border-gray-200 shadow-sm overflow-hidden bg-gray-50 flex items-center justify-center">
+                               <img
+                                 src={photoPreview}
+                                 alt="Employee photo"
+                                 className="w-full h-full object-cover"
+                                 style={{ imageRendering: 'auto' }}
+                               />
+                             </div>
+                             <button
+                               type="button"
+                               onClick={() => {
+                                 setPhotoPreview(null)
+                                 form.setValue('photoFile', '')
+                                 form.setValue('photoTaken', false)
+                               }}
+                               className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors shadow-sm"
+                               title="Remove photo"
+                             >
+                               ×
+                             </button>
+                             {/* Hover overlay for better UX */}
+                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg flex items-center justify-center">
+                               <span className="text-white opacity-0 group-hover:opacity-100 text-xs font-medium transition-opacity duration-200">
+                                 Click to remove
+                               </span>
+                             </div>
+                           </div>
+                         )
                        ) : (
                          <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center bg-gray-50 hover:border-gray-400 transition-colors">
                            <Camera className="h-8 w-8 text-gray-400 mb-2" />
@@ -1385,7 +1524,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                render={({ field }) => (
                  <FormItem>
                    <FormLabel>Trainer</FormLabel>
-                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                   <Select onValueChange={field.onChange} value={field.value}>
                      <FormControl>
                        <SelectTrigger>
                          <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select trainer"} />

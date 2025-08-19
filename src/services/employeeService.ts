@@ -15,7 +15,6 @@ export interface EmployeeRegistrationRequest {
   
   // Optional fields
   AipAccessLevel?: string
-  Department?: string
   Region?: string
   Email?: string
   ContactNumber?: string
@@ -26,7 +25,6 @@ export interface EmployeeRegistrationRequest {
   PostCode?: string
   SiaLicenceType?: string
   SiaLicenceExpiry?: Date | null
-  SiaLicenceNumber?: string
   Nationality?: string
   RightToWorkCondition?: string
   DrivingLicenceType?: string
@@ -50,11 +48,10 @@ export interface EmployeeRegistrationRequest {
   UniformIssued?: boolean
   NextOfKinDetailsComplete?: boolean
   PeopleHoursPin?: string
-  FullRotasIssued?: string
-  InductionAndTrainingBooked?: string
+  FullRotasIssued?: Date | null
+  InductionAndTrainingBooked?: Date | null
   Location?: string
   Trainer?: string
-  SupervisorId?: number
 }
 
 export interface EmployeeRegistrationResponse {
@@ -80,7 +77,6 @@ export interface EmployeeDetailResponse {
   employeeStatus?: string
   employmentType?: string
   aipAccessLevel?: string
-  department?: string
   region?: string
   email?: string
   contactNumber?: string
@@ -91,7 +87,6 @@ export interface EmployeeDetailResponse {
   postCode?: string
   siaLicenceType?: string
   siaLicenceExpiry?: Date | null
-  siaLicenceNumber?: string
   isSiaLicenceExpired?: boolean
   isSiaLicenceExpiringSoon?: boolean
   nationality?: string
@@ -117,14 +112,12 @@ export interface EmployeeDetailResponse {
   uniformIssued?: boolean
   nextOfKinDetailsComplete?: boolean
   peopleHoursPin?: string
-  fullRotasIssued?: string
-  inductionAndTrainingBooked?: string
+  fullRotasIssued?: Date | null
+  inductionAndTrainingBooked?: Date | null
   location?: string
   trainer?: string
   userId?: string
   username?: string
-  supervisorId?: number
-  supervisorName?: string
   createdAt: Date
   createdBy?: string
   updatedAt?: Date | null

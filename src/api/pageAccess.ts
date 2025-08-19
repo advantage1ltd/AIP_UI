@@ -94,6 +94,14 @@ export const pageAccessApi = {
       { id: 'crm-tasks', title: 'CRM Tasks', path: '/crm/tasks' },
 
       // Customer pages
+      { id: 'daily-activity-report', title: 'Daily Activity Report', path: '/customer/daily-activity-report' },
+      { id: 'incident-graph', title: 'Incident Graph', path: '/customer/incident-graph' },
+      { id: 'customer-incident-report', title: 'Customer Incident Report', path: '/customer/incident-report' },
+      { id: 'satisfaction-reports', title: 'Satisfaction Reports', path: '/customer/satisfaction-report' },
+      { id: 'be-safe-be-secure-graph', title: 'Daily Activity Graphs', path: '/customer/be-safe-be-secure' },
+      { id: 'daily-occurrence-book', title: 'Daily Occurrence Book (DOB)', path: '/customer/daily-occurrence-book' },
+      { id: 'customer-officer-support', title: 'Customer Officer Support', path: '/customer/officer-support' },
+      { id: 'customer-views-config', title: 'Customer Views Config', path: '/customer/views-config' },
       ...Object.values(CUSTOMER_PAGES).map(page => ({
         id: page.id,
         title: page.title,

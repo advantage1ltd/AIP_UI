@@ -156,6 +156,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       
       if (!page) {
         console.warn(`No page found for path: ${requestedPath}`);
+        console.debug('Available pages:', availablePages.map(p => ({ id: p.id, path: p.path })));
         return false;
       }
       

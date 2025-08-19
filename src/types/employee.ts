@@ -14,7 +14,6 @@ export interface Employee {
   
   // Optional Fields
   aipAccessLevel?: string
-  department?: string
   region?: string
   email?: string
   contactNumber?: string
@@ -29,7 +28,6 @@ export interface Employee {
   // SIA License Information
   siaLicenceType?: string
   siaLicenceExpiry?: Date | null
-  siaLicenceNumber?: string
   
   // Personal Information
   nationality?: string
@@ -63,15 +61,13 @@ export interface Employee {
   peopleHoursPin?: string
   
   // Training and Induction
-  fullRotasIssued?: string
-  inductionAndTrainingBooked?: string
+  fullRotasIssued?: Date | null
+  inductionAndTrainingBooked?: Date | null
   location?: string
   trainer?: string
   
   // Relationships
   userId?: string
-  supervisorId?: number
-  supervisorName?: string
   
   // Audit Fields
   createdAt?: Date

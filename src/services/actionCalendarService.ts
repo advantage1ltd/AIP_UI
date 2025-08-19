@@ -84,7 +84,7 @@ class ActionCalendarService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken');
     
     const config: RequestInit = {
       headers: {
