@@ -839,7 +839,12 @@ export default function CustomerDailyOccurrenceBook() {
       </Dialog>
 
       {/* Edit Occurrence Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+      <Dialog open={editDialogOpen} onOpenChange={(open) => {
+        setEditDialogOpen(open)
+        if (!open) {
+          setSelectedOccurrence(null)
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Occurrence</DialogTitle>

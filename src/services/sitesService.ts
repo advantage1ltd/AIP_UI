@@ -18,9 +18,9 @@ class SitesService {
     }
   }
 
-  async getSitesByCustomer(customerId: string): Promise<{ success: boolean; data: Site[] }> {
+  async getSitesByCustomer(customerId: number): Promise<{ success: boolean; data: Site[] }> {
     try {
-      const customerSites = this.sites.filter(site => site.customerId === customerId);
+      const customerSites = this.sites.filter(site => site.fkCustomerID === customerId);
       return {
         success: true,
         data: customerSites
@@ -33,9 +33,9 @@ class SitesService {
     }
   }
 
-  async getSitesByRegion(regionId: string): Promise<{ success: boolean; data: Site[] }> {
+  async getSitesByRegion(regionId: number): Promise<{ success: boolean; data: Site[] }> {
     try {
-      const regionSites = this.sites.filter(site => site.regionId === regionId);
+      const regionSites = this.sites.filter(site => site.fkRegionID === regionId);
       return {
         success: true,
         data: regionSites
@@ -48,13 +48,13 @@ class SitesService {
     }
   }
 
-  async createSite(siteData: Omit<Site, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ success: boolean; data?: Site; message?: string }> {
+  async createSite(siteData: Omit<Site, 'siteID' | 'dateCreated' | 'dateModified'>): Promise<{ success: boolean; data?: Site; message?: string }> {
     try {
       const newSite: Site = {
         ...siteData,
-        id: `s${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        siteID: Date.now(), // Simple ID generation
+        dateCreated: new Date().toISOString(),
+        dateModified: undefined
       };
 
       this.sites.push(newSite);
@@ -71,9 +71,9 @@ class SitesService {
     }
   }
 
-  async updateSite(id: string, updates: Partial<Omit<Site, 'id' | 'createdAt'>>): Promise<{ success: boolean; data?: Site; message?: string }> {
+  async updateSite(id: number, updates: Partial<Omit<Site, 'siteID' | 'dateCreated'>>): Promise<{ success: boolean; data?: Site; message?: string }> {
     try {
-      const siteIndex = this.sites.findIndex(site => site.id === id);
+      const siteIndex = this.sites.findIndex(site => site.siteID === id);
       
       if (siteIndex === -1) {
         return {
@@ -85,7 +85,7 @@ class SitesService {
       const updatedSite: Site = {
         ...this.sites[siteIndex],
         ...updates,
-        updatedAt: new Date().toISOString()
+        dateModified: new Date().toISOString()
       };
 
       this.sites[siteIndex] = updatedSite;
@@ -102,9 +102,9 @@ class SitesService {
     }
   }
 
-  async deleteSite(id: string): Promise<{ success: boolean; message?: string }> {
+  async deleteSite(id: number): Promise<{ success: boolean; message?: string }> {
     try {
-      const siteIndex = this.sites.findIndex(site => site.id === id);
+      const siteIndex = this.sites.findIndex(site => site.siteID === id);
       
       if (siteIndex === -1) {
         return {

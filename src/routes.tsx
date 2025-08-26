@@ -61,6 +61,7 @@ const DailyActivityReportGraphs = lazy(() => import('./pages/customer/DailyActiv
 const CustomerMysteryShopperReport = lazy(() => import('./pages/customer/CustomerMysteryShopperReport'));
 const CustomerSiteVisitReport = lazy(() => import('./pages/customer/CustomerSiteVisitReport'));
 const CustomerDailyOccurrenceBook = lazy(() => import('./pages/customer/CustomerDailyOccurrenceBook'));
+const CustomerOfficerSupportPage = lazy(() => import('./pages/customer/CustomerOfficerSupportPage'));
 
 const CustomerViewsConfig = lazy(() => import('./pages/customer/CustomerViewsConfig'));
 
@@ -364,6 +365,14 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
                 <CustomerViewsConfig />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/officer-support',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+                <CustomerOfficerSupportPage />
               </ProtectedRoute>
             ),
           },

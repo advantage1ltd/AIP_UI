@@ -4,7 +4,7 @@ const now = new Date().toISOString()
 
 export const mockCustomers: Customer[] = [
   {
-    id: "COOP001",
+    id: "21", // Changed from "COOP001" to "21" to match regions/sites
     companyName: "Central England COOP",
     companyNumber: "IP00141R",
     vatNumber: "GB123456789",
@@ -26,8 +26,8 @@ export const mockCustomers: Customer[] = [
       phone: "0116 123 4567"
     },
     viewConfig: {
-      id: "vc-COOP001",
-      customerId: "COOP001",
+      id: "vc-21",
+      customerId: "21", // Updated to match customer ID
       customerType: "retail",
       enabledPages: [
         "incident-report",
@@ -89,8 +89,8 @@ export const mockCustomers: Customer[] = [
     updatedAt: now
   },
   {
-    id: "COOP002",
-    companyName: "Midcounties COOP",
+    id: "22", // Changed from "COOP002" to "22" to match regions/sites
+    companyName: "Heart of England",
     companyNumber: "IP00141S",
     vatNumber: "GB987654321",
     status: "active",
@@ -103,23 +103,83 @@ export const mockCustomers: Customer[] = [
       postcode: "CV34 6DA"
     },
     contact: {
-      title: "Mrs",
+      title: "Ms",
       forename: "Sarah",
-      surname: "Thompson",
-      position: "Security Director",
-      email: "sarah.thompson@midcounties.coop",
-      phone: "01926 123 4567"
+      surname: "Johnson",
+      position: "Security Manager",
+      email: "sarah.johnson@heartofengland.coop",
+      phone: "01926 456 789"
     },
     viewConfig: {
-      id: "vc-COOP002",
-      customerId: "COOP002",
+      id: "vc-22",
+      customerId: "22", // Updated to match customer ID
+      customerType: "retail",
+      enabledPages: [
+        "incident-report",
+        "daily-activity",
+        "customer-satisfaction"
+      ],
+      createdAt: now,
+      updatedAt: now
+    },
+    pageAssignments: [
+      {
+        pageId: "incident-report",
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      {
+        pageId: "daily-activity",
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      },
+      {
+        pageId: "customer-satisfaction",
+        enabled: true,
+        customized: false,
+        lastModified: now,
+        modifiedBy: "system"
+      }
+    ],
+    assignedOfficers: ["1", "4"],
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    id: "23", // Changed from "COOP003" to "23" to match regions/sites
+    companyName: "Midcounties COOP",
+    companyNumber: "IP00141T",
+    vatNumber: "GB456789123",
+    status: "active",
+    customerType: "retail",
+    address: {
+      building: "Midcounties House",
+      street: "Warwick Technology Park",
+      town: "Warwick",
+      county: "Warwickshire",
+      postcode: "CV34 6DA"
+    },
+    contact: {
+      title: "Mr",
+      forename: "Michael",
+      surname: "Brown",
+      position: "Operations Director",
+      email: "michael.brown@midcounties.coop",
+      phone: "01926 789 123"
+    },
+    viewConfig: {
+      id: "vc-23",
+      customerId: "23", // Updated to match customer ID
       customerType: "retail",
       enabledPages: [
         "incident-report",
         "daily-activity",
         "customer-satisfaction",
-        "be-safe-be-secure",
-        "incident-graph"
+        "be-safe-be-secure"
       ],
       createdAt: now,
       updatedAt: now
@@ -152,93 +212,9 @@ export const mockCustomers: Customer[] = [
         customized: false,
         lastModified: now,
         modifiedBy: "system"
-      },
-      {
-        pageId: "incident-graph",
-        enabled: true,
-        customized: false,
-        lastModified: now,
-        modifiedBy: "system"
       }
     ],
-    assignedOfficers: ["2"],
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: "COOP003",
-    companyName: "Heart of England COOP",
-    companyNumber: "IP00141T",
-    vatNumber: "GB456789123",
-    status: "active",
-    customerType: "static",
-    address: {
-      building: "22",
-      street: "Abbey Street",
-      town: "Nuneaton",
-      county: "Warwickshire",
-      postcode: "CV11 5BU"
-    },
-    contact: {
-      title: "Mr",
-      forename: "David",
-      surname: "Brown",
-      position: "Security Manager",
-      email: "david.brown@heartofengland.coop",
-      phone: "024 7638 2331"
-    },
-    viewConfig: {
-      id: "vc-COOP003",
-      customerId: "COOP003",
-      customerType: "static",
-      enabledPages: [
-        "incident-report",
-        "daily-activity",
-        "be-safe-be-secure",
-        "site-visit-reports",
-        "officer-support"
-      ],
-      createdAt: now,
-      updatedAt: now
-    },
-    pageAssignments: [
-      {
-        pageId: "incident-report",
-        enabled: true,
-        customized: false,
-        lastModified: now,
-        modifiedBy: "system"
-      },
-      {
-        pageId: "daily-activity",
-        enabled: true,
-        customized: false,
-        lastModified: now,
-        modifiedBy: "system"
-      },
-      {
-        pageId: "be-safe-be-secure",
-        enabled: true,
-        customized: false,
-        lastModified: now,
-        modifiedBy: "system"
-      },
-      {
-        pageId: "site-visit-reports",
-        enabled: true,
-        customized: false,
-        lastModified: now,
-        modifiedBy: "system"
-      },
-      {
-        pageId: "officer-support",
-        enabled: true,
-        customized: false,
-        lastModified: now,
-        modifiedBy: "system"
-      }
-    ],
-    assignedOfficers: ["3"],
+    assignedOfficers: ["2", "5"],
     createdAt: now,
     updatedAt: now
   }

@@ -1,9 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Building2, MapPin, Users, Star, TrendingUp, Shield } from "lucide-react"
-import { DUMMY_REGIONS } from "@/data/mockRegions"
-import { DUMMY_SITES } from "@/data/mockSites"
 import { useMemo, useState, useEffect } from "react"
-import type { Customer } from "@/types/customer"
+import type { Customer, Region, Site } from "@/types/customer"
+import { customerService } from "@/services/customerService"
+import { regionService } from "@/services/regionService"
+import { siteService } from "@/services/siteService"
 
 interface CustomerStatsProps {
   selectedCustomerId: string | null
@@ -12,46 +13,84 @@ interface CustomerStatsProps {
 
 export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerStatsProps) {
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [regions, setRegions] = useState<Region[]>([])
+  const [sites, setSites] = useState<Site[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const fetchCustomers = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch('/api/customers')
-        const result = await response.json()
+        console.log('🔍 [CustomerStats] Fetching data...')
         
-        if (result.success) {
-          setCustomers(result.data || [])
+        // Fetch customers
+        const customersResult = await customerService.getAllCustomers()
+        if (customersResult && customersResult.length > 0) {
+          setCustomers(customersResult)
+          console.log('✅ [CustomerStats] Successfully fetched customers:', customersResult.length)
         } else {
-          console.error('Failed to fetch customers:', result.message)
+          console.error('❌ [CustomerStats] Failed to fetch customers')
           setCustomers([])
         }
+
+        // Fetch regions
+        if (selectedCustomerId) {
+          // Fetch regions for specific customer
+          const regionsResult = await regionService.getRegionsByCustomer(parseInt(selectedCustomerId))
+          if (regionsResult.success) {
+            setRegions(regionsResult.data || [])
+            console.log('✅ [CustomerStats] Successfully fetched regions for customer:', regionsResult.data?.length || 0)
+          } else {
+            console.error('❌ [CustomerStats] Failed to fetch regions')
+            setRegions([])
+          }
+        } else {
+          // Fetch all regions for totals
+          const regionsResult = await regionService.getRegions()
+          if (regionsResult.success) {
+            setRegions(regionsResult.data || [])
+            console.log('✅ [CustomerStats] Successfully fetched all regions:', regionsResult.data?.length || 0)
+          } else {
+            console.error('❌ [CustomerStats] Failed to fetch all regions')
+            setRegions([])
+          }
+        }
+
+        // Fetch sites
+        if (selectedCustomerId) {
+          // Fetch sites for specific customer
+          const sitesResult = await siteService.getSitesByCustomer(parseInt(selectedCustomerId))
+          if (sitesResult.success) {
+            setSites(sitesResult.data || [])
+            console.log('✅ [CustomerStats] Successfully fetched sites for customer:', sitesResult.data?.length || 0)
+          } else {
+            console.error('❌ [CustomerStats] Failed to fetch sites')
+            setSites([])
+          }
+        } else {
+          // Fetch all sites for totals
+          const sitesResult = await siteService.getSites()
+          if (sitesResult.success) {
+            setSites(sitesResult.data || [])
+            console.log('✅ [CustomerStats] Successfully fetched all sites:', sitesResult.data?.length || 0)
+          } else {
+            console.error('❌ [CustomerStats] Failed to fetch all sites')
+            setSites([])
+          }
+        }
+        
       } catch (error) {
-        console.error('Error fetching customers:', error)
+        console.error('❌ [CustomerStats] Error fetching data:', error)
         setCustomers([])
+        setRegions([])
+        setSites([])
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchCustomers()
-
-    // Listen for customer events to refresh data
-    const handleCustomerEvent = () => {
-      fetchCustomers()
-    }
-
-    window.addEventListener('customer-created', handleCustomerEvent)
-    window.addEventListener('customer-updated', handleCustomerEvent)
-    window.addEventListener('customer-deleted', handleCustomerEvent)
-    
-    return () => {
-      window.removeEventListener('customer-created', handleCustomerEvent)
-      window.removeEventListener('customer-updated', handleCustomerEvent)
-      window.removeEventListener('customer-deleted', handleCustomerEvent)
-    }
-  }, [updateTrigger])
+    fetchData()
+  }, [selectedCustomerId, updateTrigger])
 
   // Get dynamic data from API and recalculate when data changes
   const statsData = useMemo(() => {
@@ -60,18 +99,9 @@ export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerSta
       ? customers.filter(customer => String(customer.id) === selectedCustomerId)
       : customers
 
-    const customerIdNum = selectedCustomerId ? parseInt(selectedCustomerId) : null
-    const regions = customerIdNum 
-      ? DUMMY_REGIONS.filter(region => region.customerId === customerIdNum)
-      : DUMMY_REGIONS
-
-    const sites = customerIdNum
-      ? DUMMY_SITES.filter(site => site.customerId === customerIdNum)
-      : DUMMY_SITES
-
     const activeCustomers = filteredCustomers.filter(customer => customer.status === 'active')
-    const coreSites = sites.filter(site => site.isCoreSite)
-    const customerTypes = [...new Set(filteredCustomers.map(c => c.customerType))].length
+    const coreSites = sites.filter(site => site.coreSiteYN)
+    const customerTypes = selectedCustomerId ? 1 : [...new Set(filteredCustomers.map(c => c.customerType))].length
 
     return {
       customers: filteredCustomers,
@@ -81,37 +111,45 @@ export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerSta
       coreSites,
       customerTypes
     }
-  }, [customers, selectedCustomerId])
+  }, [customers, regions, sites, selectedCustomerId])
 
   const stats = [
     {
-      title: "Total Customers",
+      title: selectedCustomerId ? "Selected Customer" : "Total Customers",
       value: statsData.customers.length,
-      description: `${statsData.activeCustomers.length} active customers`,
+      description: selectedCustomerId 
+        ? `${statsData.activeCustomers.length} active` 
+        : `${statsData.activeCustomers.length} active customers`,
       icon: Users,
       gradient: "from-blue-600 to-blue-800",
       iconColor: "text-blue-100"
     },
     {
-      title: "Customer Types",
+      title: selectedCustomerId ? "Customer Type" : "Customer Types",
       value: statsData.customerTypes,
-      description: "Different service types",
+      description: selectedCustomerId 
+        ? "Service type" 
+        : "Different service types",
       icon: TrendingUp,
       gradient: "from-purple-600 to-purple-800",
       iconColor: "text-purple-100"
     },
     {
-      title: "Total Regions",
+      title: selectedCustomerId ? "Customer Regions" : "Total Regions",
       value: statsData.regions.length,
-      description: "Coverage areas managed",
+      description: selectedCustomerId 
+        ? "Coverage areas" 
+        : "Coverage areas managed",
       icon: MapPin,
       gradient: "from-green-600 to-green-800",
       iconColor: "text-green-100"
     },
     {
-      title: "Core Sites",
-      value: statsData.coreSites.length,
-      description: `${statsData.sites.length} total sites`,
+      title: selectedCustomerId ? "Customer Sites" : "Core Sites",
+      value: selectedCustomerId ? statsData.sites.length : statsData.coreSites.length,
+      description: selectedCustomerId 
+        ? `${statsData.coreSites.length} core sites` 
+        : `${statsData.sites.length} total sites`,
       icon: Shield,
       gradient: "from-orange-600 to-orange-800",
       iconColor: "text-orange-100"

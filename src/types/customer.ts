@@ -18,7 +18,7 @@ export interface Contact {
 
 export interface ViewConfig {
   id: string
-  customerId: number
+  customerId: string // Changed from number to string to match mock data
   customerType: CustomerType
   enabledPages: string[]
   createdAt: string
@@ -28,6 +28,7 @@ export interface ViewConfig {
 export type CustomerType = 'retail' | 'static' | 'gatehouse' | 'mobile-patrol' | 'keyholding-alarm-response' | 'event'
 
 export interface CustomerPageAssignment {
+  pageId?: string // Added for array structure
   enabled: boolean
   customized: boolean
   lastModified: string
@@ -35,7 +36,7 @@ export interface CustomerPageAssignment {
 }
 
 export interface Customer {
-  id: number
+  id: string // Changed from number to string to match mock data
   companyName: string
   companyNumber: string
   vatNumber: string
@@ -44,38 +45,56 @@ export interface Customer {
   address: Address
   contact: Contact
   viewConfig: ViewConfig
-  pageAssignments?: Record<string, CustomerPageAssignment>
+  pageAssignments?: CustomerPageAssignment[] // Changed from Record to array to match mock data
   assignedOfficers?: string[]
   createdAt: string
   updatedAt: string
 }
 
 export interface Region {
-  id: string
-  name: string
-  customerId: number
-  manager: string
-  status: 'active' | 'inactive'
-  createdAt: string
-  updatedAt: string
+  regionID: number
+  fkCustomerID: number
+  regionName: string
+  regionDescription?: string
+  recordIsDeletedYN: boolean
+  dateCreated: string
+  createdBy: string
+  dateModified?: string
+  modifiedBy?: string
+  // Navigation properties
+  customer?: Customer
+  sites?: Site[]
 }
 
 export interface Site {
-  id: string
+  siteID: number
+  fkCustomerID: number
+  fkRegionID: number
+  coreSiteYN: boolean
   locationName: string
-  regionId: string
-  customerId: number
-  buildingName: string
-  street: string
-  town: string
-  county: string
-  postcode: string
-  isCoreSite: boolean
-  sinNumber: string
-  telephone: string
-  status: 'active' | 'inactive'
-  createdAt: string
-  updatedAt: string
+  locationType?: string
+  sinNumber?: string
+  buildingName?: string
+  numberandStreet?: string
+  villageOrSuburb?: string
+  town?: string
+  county?: string
+  postcode?: string
+  telephoneNumber?: string
+  contractStartDate?: string
+  contractEndDate?: string
+  details?: string
+  siteSurveyComplete?: string
+  assignmentInstructionsIssued?: string
+  riskAssessmentIssued?: string
+  recordIsDeletedYN: boolean
+  dateCreated: string
+  createdBy: string
+  dateModified?: string
+  modifiedBy?: string
+  // Navigation properties
+  customer?: Customer
+  region?: Region
 }
 
 export interface CustomerPage {

@@ -381,7 +381,12 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
       {/* Customer Dialog */}
       <CustomerDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) {
+            setSelectedCustomer(undefined)
+          }
+        }}
         customer={selectedCustomer}
         onSave={handleSave}
       />

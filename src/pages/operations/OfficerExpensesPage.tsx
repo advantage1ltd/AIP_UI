@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -44,6 +44,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { useToast } from "@/hooks/use-toast";
 
 // Types
 interface ExpenseEntry {
@@ -91,191 +92,215 @@ const DAYS_OF_WEEK = [
 const MILEAGE_RATE = 0.25;
 const FREE_MILEAGE_ALLOWANCE = 25;
 
-// Mock data for initial page load
-const MOCK_EXPENSE_CLAIMS: ExpenseClaim[] = [
-  {
-    id: "1",
-    officerName: "John Smith",
-    homePostcode: "M1 1AA",
-    weekNumber: 23,
-    wcDate: "2023-06-05",
-    entries: [
-      { day: "Monday", date: "2023-06-05", sitePostcode: "M15 6BH", mileage: 45, busRailFare: 0, carShare: false },
-      { day: "Tuesday", date: "2023-06-06", sitePostcode: "M15 6BH", mileage: 42, busRailFare: 0, carShare: true },
-      { day: "Wednesday", date: "2023-06-07", sitePostcode: "M3 3JL", mileage: 38, busRailFare: 0, carShare: false },
-      { day: "Thursday", date: "2023-06-08", sitePostcode: "M3 3JL", mileage: 38, busRailFare: 0, carShare: false },
-      { day: "Friday", date: "2023-06-09", sitePostcode: "M15 6BH", mileage: 43, busRailFare: 0, carShare: true },
-      { day: "Saturday", date: "2023-06-10", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
-      { day: "Sunday", date: "2023-06-11", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
-    ],
-    totalMilesClaimed: 206,
-    totalExpensesClaim: 45.25,
-    submittedAt: "2023-06-12T09:30:00Z",
-    status: "approved"
-  },
-  {
-    id: "2",
-    officerName: "Sarah Johnson",
-    homePostcode: "M4 2BB",
-    weekNumber: 24,
-    wcDate: "2023-06-12",
-    entries: [
-      { day: "Monday", date: "2023-06-12", sitePostcode: "M20 4BX", mileage: 28, busRailFare: 0, carShare: false },
-      { day: "Tuesday", date: "2023-06-13", sitePostcode: "M20 4BX", mileage: 28, busRailFare: 0, carShare: false },
-      { day: "Wednesday", date: "2023-06-14", sitePostcode: "SK1 3GF", mileage: 0, busRailFare: 5.60, carShare: false },
-      { day: "Thursday", date: "2023-06-15", sitePostcode: "SK1 3GF", mileage: 0, busRailFare: 5.60, carShare: false },
-      { day: "Friday", date: "2023-06-16", sitePostcode: "M20 4BX", mileage: 28, busRailFare: 0, carShare: false },
-      { day: "Saturday", date: "2023-06-17", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
-      { day: "Sunday", date: "2023-06-18", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
-    ],
-    totalMilesClaimed: 84,
-    totalExpensesClaim: 22.20,
-    submittedAt: "2023-06-19T14:15:00Z",
-    status: "pending"
-  },
-  {
-    id: "3",
-    officerName: "David Wilson",
-    homePostcode: "M16 8FH",
-    weekNumber: 25,
-    wcDate: "2023-06-19",
-    entries: [
-      { day: "Monday", date: "2023-06-19", sitePostcode: "M8 5SR", mileage: 15, busRailFare: 0, carShare: true },
-      { day: "Tuesday", date: "2023-06-20", sitePostcode: "M8 5SR", mileage: 15, busRailFare: 0, carShare: true },
-      { day: "Wednesday", date: "2023-06-21", sitePostcode: "M8 5SR", mileage: 15, busRailFare: 0, carShare: false },
-      { day: "Thursday", date: "2023-06-22", sitePostcode: "M16 0DR", mileage: 8, busRailFare: 0, carShare: false },
-      { day: "Friday", date: "2023-06-23", sitePostcode: "M16 0DR", mileage: 8, busRailFare: 0, carShare: false },
-      { day: "Saturday", date: "2023-06-24", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
-      { day: "Sunday", date: "2023-06-25", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
-    ],
-    totalMilesClaimed: 61,
-    totalExpensesClaim: 0,
-    submittedAt: "2023-06-26T10:20:00Z",
-    status: "rejected"
-  }
-];
+const OfficerExpensesPage = () => {
+  const [expenseClaims, setExpenseClaims] = useState<ExpenseClaim[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [updateTrigger, setUpdateTrigger] = useState(0);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingClaim, setEditingClaim] = useState<ExpenseClaim | null>(null);
+  const [deletingClaim, setDeletingClaim] = useState<ExpenseClaim | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const { toast } = useToast();
 
-// Component for page header
-const PageHeader = ({ onAddClick }) => (
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4 mb-4 md:mb-6">
-    <div className="flex items-center gap-2 md:gap-4">
-      <div className="bg-blue-100 p-2 rounded-lg">
-        <PoundSterling className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
-      </div>
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Officer Expenses</h1>
-        <p className="text-sm text-gray-500">Manage and submit expense claims</p>
-      </div>
-    </div>
-    <Button
-      onClick={onAddClick}
-      className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 h-9 md:h-10"
-    >
-      <Plus className="w-4 h-4" />
-      Add New Claim
-    </Button>
-  </div>
-);
+  // Function to trigger data refresh
+  const refreshData = useCallback(() => {
+    setUpdateTrigger(prev => prev + 1);
+  }, []);
 
-// Component for stats card
-const StatsCard = ({ title, value, icon, color }) => {
-  const colors = {
-    blue: {
-      bg: "bg-gradient-to-br from-blue-800 to-blue-900",
-      border: "border-blue-700",
-      iconBg: "bg-blue-700/50"
-    },
-    green: {
-      bg: "bg-gradient-to-br from-green-800 to-green-900",
-      border: "border-green-700",
-      iconBg: "bg-green-700/50"
-    },
-    purple: {
-      bg: "bg-gradient-to-br from-purple-800 to-purple-900",
-      border: "border-purple-700",
-      iconBg: "bg-purple-700/50"
+  // Fetch expense claims (simulating API call)
+  const fetchExpenseClaims = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Mock data - in real implementation, this would be an API call
+      const mockData: ExpenseClaim[] = [
+        {
+          id: "1",
+          officerName: "John Smith",
+          homePostcode: "M1 1AA",
+          weekNumber: 23,
+          wcDate: "2023-06-05",
+          entries: [
+            { day: "Monday", date: "2023-06-05", sitePostcode: "M15 6BH", mileage: 45, busRailFare: 0, carShare: false },
+            { day: "Tuesday", date: "2023-06-06", sitePostcode: "M15 6BH", mileage: 42, busRailFare: 0, carShare: true },
+            { day: "Wednesday", date: "2023-06-07", sitePostcode: "M3 3JL", mileage: 38, busRailFare: 0, carShare: false },
+            { day: "Thursday", date: "2023-06-08", sitePostcode: "M3 3JL", mileage: 38, busRailFare: 0, carShare: false },
+            { day: "Friday", date: "2023-06-09", sitePostcode: "M15 6BH", mileage: 43, busRailFare: 0, carShare: true },
+            { day: "Saturday", date: "2023-06-10", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
+            { day: "Sunday", date: "2023-06-11", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
+          ],
+          totalMilesClaimed: 206,
+          totalExpensesClaim: 45.25,
+          submittedAt: "2023-06-12T09:30:00Z",
+          status: "approved"
+        },
+        {
+          id: "2",
+          officerName: "Sarah Johnson",
+          homePostcode: "M4 2BB",
+          weekNumber: 24,
+          wcDate: "2023-06-12",
+          entries: [
+            { day: "Monday", date: "2023-06-12", sitePostcode: "M20 4BX", mileage: 28, busRailFare: 0, carShare: false },
+            { day: "Tuesday", date: "2023-06-13", sitePostcode: "M20 4BX", mileage: 28, busRailFare: 0, carShare: false },
+            { day: "Wednesday", date: "2023-06-14", sitePostcode: "SK1 3GF", mileage: 0, busRailFare: 5.60, carShare: false },
+            { day: "Thursday", date: "2023-06-15", sitePostcode: "SK1 3GF", mileage: 0, busRailFare: 5.60, carShare: false },
+            { day: "Friday", date: "2023-06-16", sitePostcode: "M20 4BX", mileage: 28, busRailFare: 0, carShare: false },
+            { day: "Saturday", date: "2023-06-17", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
+            { day: "Sunday", date: "2023-06-18", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
+          ],
+          totalMilesClaimed: 84,
+          totalExpensesClaim: 22.20,
+          submittedAt: "2023-06-19T14:15:00Z",
+          status: "pending"
+        },
+        {
+          id: "3",
+          officerName: "David Wilson",
+          homePostcode: "M16 8FH",
+          weekNumber: 25,
+          wcDate: "2023-06-19",
+          entries: [
+            { day: "Monday", date: "2023-06-19", sitePostcode: "M8 5SR", mileage: 15, busRailFare: 0, carShare: true },
+            { day: "Tuesday", date: "2023-06-20", sitePostcode: "M8 5SR", mileage: 15, busRailFare: 0, carShare: true },
+            { day: "Wednesday", date: "2023-06-21", sitePostcode: "M8 5SR", mileage: 15, busRailFare: 0, carShare: false },
+            { day: "Thursday", date: "2023-06-22", sitePostcode: "M16 0DR", mileage: 8, busRailFare: 0, carShare: false },
+            { day: "Friday", date: "2023-06-23", sitePostcode: "M16 0DR", mileage: 8, busRailFare: 0, carShare: false },
+            { day: "Saturday", date: "2023-06-24", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
+            { day: "Sunday", date: "2023-06-25", sitePostcode: "", mileage: 0, busRailFare: 0, carShare: false },
+          ],
+          totalMilesClaimed: 61,
+          totalExpensesClaim: 0,
+          submittedAt: "2023-06-26T10:20:00Z",
+          status: "rejected"
+        }
+      ];
+      
+      setExpenseClaims(mockData);
+      console.log('✅ [OfficerExpensesPage] Successfully fetched expense claims:', mockData.length);
+    } catch (error) {
+      console.error('❌ [OfficerExpensesPage] Error fetching expense claims:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load expense claims",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
+  }, [toast]);
+
+  // Fetch data on mount and when updateTrigger changes
+  useEffect(() => {
+    fetchExpenseClaims();
+  }, [fetchExpenseClaims, updateTrigger]);
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  // Utility function to calculate totals
+  const calculateTotals = (entries: ExpenseEntry[]) => {
+    const totalMiles = entries.reduce((sum, entry) => sum + (entry.mileage || 0), 0);
+    const totalExpenses = entries.reduce((sum, entry) => {
+      const mileageExpense = Math.max(0, (entry.mileage - FREE_MILEAGE_ALLOWANCE)) * MILEAGE_RATE;
+      const busRailExpense = entry.busRailFare || 0;
+      return sum + mileageExpense + busRailExpense;
+    }, 0);
+    return { totalMiles, totalExpenses };
   };
-  
-  const colorStyle = colors[color];
-  
-  return (
-    <Card className={`${colorStyle.bg} ${colorStyle.border} border h-full`}>
-      <div className="p-3 md:p-4">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs md:text-sm font-medium text-white truncate pr-2">{title}</p>
-          <div className={`${colorStyle.iconBg} p-1.5 rounded-full shrink-0`}>
-            {React.cloneElement(icon, { className: "h-4 w-4 text-white" })}
+
+  // Component for page header
+  const PageHeader = ({ onAddClick }: { onAddClick: () => void }) => (
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4 mb-4 md:mb-6">
+      <div className="flex items-center gap-2 md:gap-4">
+        <div className="bg-blue-100 p-2 rounded-lg">
+          <PoundSterling className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
+        </div>
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Officer Expenses</h1>
+          <p className="text-sm text-gray-500">Manage and submit expense claims</p>
+        </div>
+      </div>
+      <Button
+        onClick={onAddClick}
+        className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 h-9 md:h-10"
+      >
+        <Plus className="w-4 h-4" />
+        Add New Claim
+      </Button>
+    </div>
+  );
+
+  // Component for stats card
+  const StatsCard = ({ title, value, icon, color }: { title: string; value: string | number; icon: React.ReactElement; color: 'blue' | 'green' | 'purple' }) => {
+    const colors = {
+      blue: {
+        bg: "bg-gradient-to-br from-blue-800 to-blue-900",
+        border: "border-blue-700",
+        iconBg: "bg-blue-700/50"
+      },
+      green: {
+        bg: "bg-gradient-to-br from-green-800 to-green-900",
+        border: "border-green-700",
+        iconBg: "bg-green-700/50"
+      },
+      purple: {
+        bg: "bg-gradient-to-br from-purple-800 to-purple-900",
+        border: "border-purple-700",
+        iconBg: "bg-purple-700/50"
+      }
+    };
+    
+    const colorStyle = colors[color];
+    
+    return (
+      <Card className={`${colorStyle.bg} ${colorStyle.border} border h-full`}>
+        <div className="p-3 md:p-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs md:text-sm font-medium text-white truncate pr-2">{title}</p>
+            <div className={`${colorStyle.iconBg} p-1.5 rounded-full shrink-0`}>
+              {React.cloneElement(icon, { className: "h-4 w-4 text-white" })}
+            </div>
+          </div>
+          <div className="flex items-baseline gap-1 overflow-hidden">
+            <p className="text-base sm:text-lg md:text-2xl font-bold text-white truncate">
+              {typeof value === 'number' ? value.toLocaleString() : value}
+            </p>
           </div>
         </div>
-        <div className="flex items-baseline gap-1 overflow-hidden">
-          <p className="text-base sm:text-lg md:text-2xl font-bold text-white truncate">
-            {typeof value === 'number' ? value.toLocaleString() : value}
-          </p>
-        </div>
-      </div>
-    </Card>
+      </Card>
+    );
+  };
+
+  // Component for empty state
+  const EmptyState = ({ onAddClick }: { onAddClick: () => void }) => (
+    <TableRow>
+      <TableCell colSpan={6} className="text-center py-8">
+        <p className="text-gray-500">No expense claims found</p>
+        <Button
+          variant="link"
+          onClick={onAddClick}
+          className="text-blue-600 hover:text-blue-700 mt-2"
+        >
+          Submit your first claim
+        </Button>
+      </TableCell>
+    </TableRow>
   );
-};
 
-// Component for table actions
-const TableActions = ({ onEdit, onDelete }) => (
-  <div className="flex items-center justify-end gap-2">
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={onEdit}
-      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-    >
-      <Edit2 className="w-4 h-4" />
-    </Button>
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={onDelete}
-      className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-    >
-      <Trash2 className="w-4 h-4" />
-    </Button>
-  </div>
-);
+  // Component for a form field with label
+  const FormField = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      {children}
+    </div>
+  );
 
-// Component for a form field with label
-const FormField = ({ label, children }) => (
-  <div className="space-y-2">
-    <Label>{label}</Label>
-    {children}
-  </div>
-);
-
-// Utility function to calculate totals
-const calculateTotals = (entries) => {
-  const totalMiles = entries.reduce((sum, entry) => sum + (entry.mileage || 0), 0);
-  const totalExpenses = entries.reduce((sum, entry) => {
-    const mileageExpense = Math.max(0, (entry.mileage - FREE_MILEAGE_ALLOWANCE)) * MILEAGE_RATE;
-    const busRailExpense = entry.busRailFare || 0;
-    return sum + mileageExpense + busRailExpense;
-  }, 0);
-  return { totalMiles, totalExpenses };
-};
-
-// Component for empty state
-const EmptyState = ({ onAddClick }) => (
-  <TableRow>
-    <TableCell colSpan={6} className="text-center py-8">
-      <p className="text-gray-500">No expense claims found</p>
-      <Button
-        variant="link"
-        onClick={onAddClick}
-        className="text-blue-600 hover:text-blue-700 mt-2"
-      >
-        Submit your first claim
-      </Button>
-    </TableCell>
-  </TableRow>
-);
-
-const OfficerExpensesPage: React.FC = () => {
   // CSS for custom date input styling
   const dateInputStyles = `
     /* Ensure date inputs display correctly across browsers */
@@ -313,11 +338,8 @@ const OfficerExpensesPage: React.FC = () => {
   `;
   
   // State
-  const [claims, setClaims] = useState<ExpenseClaim[]>(MOCK_EXPENSE_CLAIMS);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedClaim, setSelectedClaim] = useState<ExpenseClaim | null>(null);
-  const [editingClaim, setEditingClaim] = useState<ExpenseClaim | null>(null);
   const [formData, setFormData] = useState({
     officerName: '',
     homePostcode: '',
@@ -343,13 +365,13 @@ const OfficerExpensesPage: React.FC = () => {
         totalExpensesClaim: totalExpenses,
       };
 
-      setClaims(prev => prev.map(claim => 
+      setExpenseClaims(prev => prev.map(claim => 
         claim.id === editingClaim.id ? updatedClaim : claim
       ));
     } else {
       // Create new claim
       const newClaim: ExpenseClaim = {
-        id: (claims.length + 1).toString(),
+        id: (expenseClaims.length + 1).toString(),
         officerName: formData.officerName,
         homePostcode: formData.homePostcode,
         weekNumber: formData.weekNumber,
@@ -385,19 +407,20 @@ const OfficerExpensesPage: React.FC = () => {
         console.error('Failed to send email notification:', error);
       }
 
-      setClaims(prev => [newClaim, ...prev]);
+      setExpenseClaims(prev => [newClaim, ...prev]);
     }
 
     resetForm();
-  }, [formData, claims, editingClaim]);
+    refreshData(); // Trigger UI update
+  }, [formData, expenseClaims, editingClaim, refreshData]);
 
   const handleDelete = useCallback(() => {
-    if (!selectedClaim) return;
+    if (!deletingClaim) return;
     
-    setClaims(prev => prev.filter(claim => claim.id !== selectedClaim.id));
-    setShowDeleteDialog(false);
-    setSelectedClaim(null);
-  }, [selectedClaim]);
+    setExpenseClaims(prev => prev.filter(claim => claim.id !== deletingClaim.id));
+    setDeletingClaim(null);
+    refreshData(); // Trigger UI update
+  }, [deletingClaim, refreshData]);
 
   const handleEntryChange = useCallback((index: number, field: keyof ExpenseEntry, value: any) => {
     setFormData(prev => ({
@@ -433,9 +456,9 @@ const OfficerExpensesPage: React.FC = () => {
   }, []);
 
   // Stats calculations
-  const totalClaims = claims.length;
-  const totalMiles = claims.reduce((sum, claim) => sum + claim.totalMilesClaimed, 0);
-  const totalExpenses = claims.reduce((sum, claim) => sum + claim.totalExpensesClaim, 0);
+  const totalClaims = expenseClaims.length;
+  const totalMiles = expenseClaims.reduce((sum, claim) => sum + claim.totalMilesClaimed, 0);
+  const totalExpenses = expenseClaims.reduce((sum, claim) => sum + claim.totalExpensesClaim, 0);
 
   // Formatted values for display
   const formattedExpenses = `£${totalExpenses.toFixed(2)}`;
@@ -515,8 +538,8 @@ const OfficerExpensesPage: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {claims.length > 0 ? (
-                    claims.map((claim) => (
+                  {expenseClaims.length > 0 ? (
+                    expenseClaims.map((claim) => (
                       <TableRow 
                         key={claim.id}
                         className="hover:bg-gray-50 transition-colors"
@@ -557,7 +580,7 @@ const OfficerExpensesPage: React.FC = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                setSelectedClaim(claim);
+                                setDeletingClaim(claim);
                                 setShowDeleteDialog(true);
                               }}
                               className="h-7 w-7 md:h-8 md:w-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 p-0 flex items-center justify-center"

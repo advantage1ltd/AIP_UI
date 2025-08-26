@@ -453,6 +453,19 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
     }
   }, [initialData, form])
 
+  // Force form reset when employee ID changes (for switching between employees)
+  useEffect(() => {
+    console.log('🔄 [EmployeeForm] Employee ID changed:', initialData?.id)
+    if (initialData?.id) {
+      // Reset form immediately when switching to a different employee
+      console.log('🔄 [EmployeeForm] Resetting form for employee ID:', initialData.id)
+      form.reset()
+      form.clearErrors()
+      setPhotoPreview(null)
+      setSubmitError(null)
+    }
+  }, [initialData?.id, form])
+
   // Cleanup form state when component unmounts
   useEffect(() => {
     return () => {
@@ -465,10 +478,15 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
   const handleSubmit = async (data: FormData) => {
     console.log('🚀 [EmployeeForm] Starting form submission...')
     console.log('📝 [EmployeeForm] Form data received:', data)
+    console.log('🆔 [EmployeeForm] Current employee ID:', initialData?.id)
     
     // Validate required fields before submission
     const requiredFields = ['employeeNumber', 'title', 'firstName', 'surname', 'startDate', 'position', 'employeeStatus', 'employmentType']
     const missingFields = requiredFields.filter(field => !data[field as keyof FormData])
+    
+    console.log('🔍 [EmployeeForm] Form validation - Required fields:', requiredFields)
+    console.log('🔍 [EmployeeForm] Form validation - Missing fields:', missingFields)
+    console.log('🔍 [EmployeeForm] Form validation - Employee number:', data.employeeNumber)
     
     if (missingFields.length > 0) {
       console.error('❌ [EmployeeForm] Missing required fields:', missingFields)
@@ -531,6 +549,12 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
       form.clearErrors()
       setSubmitError(null)
       
+      // Force a complete form reset by resetting all state
+      setTimeout(() => {
+        form.reset()
+        form.clearErrors()
+      }, 0)
+      
       // Close form or show success message
       onCancel()
     } catch (error) {
@@ -563,7 +587,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
   }
 
   return (
-    <Form {...form}>
+    <Form {...form} key={initialData?.id || 'new-employee'}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
         
         {/* Basic Information Section */}

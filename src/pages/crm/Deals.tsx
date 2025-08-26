@@ -306,7 +306,12 @@ export default function Deals() {
         {/* Deal Dialog */}
         <DealDialog
           open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
+          onOpenChange={(open) => {
+            setIsDialogOpen(open)
+            if (!open) {
+              setSelectedDeal(undefined)
+            }
+          }}
           deal={selectedDeal}
           onSubmit={selectedDeal ? handleUpdateDeal : handleCreateDeal}
         />

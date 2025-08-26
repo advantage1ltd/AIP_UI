@@ -158,7 +158,12 @@ const Vetting = () => {
 
         <VettingDialog
           open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
+          onOpenChange={(open) => {
+            setIsDialogOpen(open)
+            if (!open) {
+              setSelectedCandidate(null)
+            }
+          }}
           candidate={selectedCandidate}
         />
       </div>

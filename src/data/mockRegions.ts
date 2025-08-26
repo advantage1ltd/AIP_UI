@@ -2,58 +2,76 @@ import type { Region } from "@/types/customer"
 
 const now = new Date().toISOString()
 
-const baseRegion = {
-  status: 'active' as const,
-  createdAt: now,
-  updatedAt: now
-}
-
 export const DUMMY_REGIONS: Region[] = [
   // Central England COOP Regions
   {
-    ...baseRegion,
-    id: "r1",
-    name: "East Midlands",
-    customerId: 21,
-    manager: "David Thompson"
+    regionID: 1,
+    fkCustomerID: 21,
+    regionName: "East Midlands",
+    regionDescription: "East Midlands region for Central England COOP",
+    recordIsDeletedYN: false,
+    dateCreated: now,
+    createdBy: "system",
+    dateModified: undefined,
+    modifiedBy: undefined
   },
   {
-    ...baseRegion,
-    id: "r2",
-    name: "West Midlands",
-    customerId: 21,
-    manager: "Sarah Parker"
+    regionID: 2,
+    fkCustomerID: 21,
+    regionName: "West Midlands",
+    regionDescription: "West Midlands region for Central England COOP",
+    recordIsDeletedYN: false,
+    dateCreated: now,
+    createdBy: "system",
+    dateModified: undefined,
+    modifiedBy: undefined
   },
 
   // Midcounties COOP Regions
   {
-    ...baseRegion,
-    id: "r3",
-    name: "Oxfordshire & Gloucestershire",
-    customerId: 23,
-    manager: "Michael Roberts"
+    regionID: 3,
+    fkCustomerID: 23,
+    regionName: "Oxfordshire & Gloucestershire",
+    regionDescription: "Oxfordshire & Gloucestershire region for Midcounties COOP",
+    recordIsDeletedYN: false,
+    dateCreated: now,
+    createdBy: "system",
+    dateModified: undefined,
+    modifiedBy: undefined
   },
   {
-    ...baseRegion,
-    id: "r4",
-    name: "Wiltshire & Somerset",
-    customerId: 23,
-    manager: "Emma Hughes"
+    regionID: 4,
+    fkCustomerID: 23,
+    regionName: "Wiltshire & Somerset",
+    regionDescription: "Wiltshire & Somerset region for Midcounties COOP",
+    recordIsDeletedYN: false,
+    dateCreated: now,
+    createdBy: "system",
+    dateModified: undefined,
+    modifiedBy: undefined
   },
 
   // Heart of England COOP Regions
   {
-    ...baseRegion,
-    id: "r5",
-    name: "Coventry & Warwickshire",
-    customerId: 22,
-    manager: "John Davies"
+    regionID: 5,
+    fkCustomerID: 22,
+    regionName: "Coventry & Warwickshire",
+    regionDescription: "Coventry & Warwickshire region for Heart of England COOP",
+    recordIsDeletedYN: false,
+    dateCreated: now,
+    createdBy: "system",
+    dateModified: undefined,
+    modifiedBy: undefined
   },
   {
-    ...baseRegion,
-    id: "r6",
-    name: "Leicestershire & Northamptonshire",
-    customerId: 22,
-    manager: "Rachel Wilson"
+    regionID: 6,
+    fkCustomerID: 22,
+    regionName: "Leicestershire & Northamptonshire",
+    regionDescription: "Leicestershire & Northamptonshire region for Heart of England COOP",
+    recordIsDeletedYN: false,
+    dateCreated: now,
+    createdBy: "system",
+    dateModified: undefined,
+    modifiedBy: undefined
   }
 ] 

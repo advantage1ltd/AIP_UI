@@ -5,13 +5,21 @@ import { CustomersTable } from "@/components/customer-setup/CustomersTable"
 import { RegionsTable } from "@/components/customer-setup/RegionsTable"
 import { SitesTable } from "@/components/customer-setup/SitesTable"
 import { CustomerStats } from "@/components/customer-setup/CustomerStats"
-import { RefreshCw } from "lucide-react"
+import { RegionDialog } from "@/components/customer-setup/RegionDialog"
+import { SiteDialog } from "@/components/customer-setup/SiteDialog"
 import { usePageAccess } from "@/contexts/PageAccessContext"
+import type { Region, Site } from "@/types/customer"
 
 export default function CustomerSetup() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("customers")
+  const [regionDialogOpen, setRegionDialogOpen] = useState(false)
+  const [siteDialogOpen, setSiteDialogOpen] = useState(false)
+  const [selectedRegion, setSelectedRegion] = useState<Region | undefined>()
+  const [selectedSite, setSelectedSite] = useState<Site | undefined>()
   const [statsUpdateTrigger, setStatsUpdateTrigger] = useState(0)
+  const [regionsUpdateTrigger, setRegionsUpdateTrigger] = useState(0)
+  const [sitesUpdateTrigger, setSitesUpdateTrigger] = useState(0)
   const { clearCacheAndReload } = usePageAccess()
 
   // Function to trigger stats update
@@ -24,50 +32,34 @@ export default function CustomerSetup() {
     updateStats() // Update stats when customer selection changes
   }, [updateStats])
 
-  // Function to clear cache and reload
-  const handleClearCache = async () => {
-    try {
-      await clearCacheAndReload()
-      
-      // Also clear customer store cache
-      if ((window as any).customerDebug) {
-        await (window as any).customerDebug.forceRefresh()
-      }
-      
-      console.log('✅ Cache cleared and data reloaded')
-    } catch (error) {
-      console.error('❌ Error clearing cache:', error)
-    }
+  const handleRegionSuccess = useCallback(() => {
+    // Refresh regions list
+    console.log('🔧 [CustomerSetup] Region updated, refreshing list')
+    setRegionsUpdateTrigger(prev => prev + 1)
+    updateStats()
+  }, [updateStats])
+
+  const handleSiteSuccess = useCallback(() => {
+    // Refresh sites list
+    console.log('🔧 [CustomerSetup] Site updated, refreshing list')
+    setSitesUpdateTrigger(prev => prev + 1)
+    updateStats()
+  }, [updateStats])
+
+  const handleEditRegion = (region: Region) => {
+    setSelectedRegion(region)
+    setRegionDialogOpen(true)
+  }
+
+  const handleEditSite = (site: Site) => {
+    setSelectedSite(site)
+    setSiteDialogOpen(true)
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Customer Setup</h1>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if ((window as any).customerDebug) {
-                (window as any).customerDebug.listAllCustomers()
-              }
-            }}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Debug Store
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleClearCache}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Clear Cache
-          </Button>
-        </div>
       </div>
 
       <CustomerStats 
@@ -95,13 +87,85 @@ export default function CustomerSetup() {
         </TabsContent>
 
         <TabsContent value="regions">
-          <RegionsTable selectedCustomerId={selectedCustomerId} />
+          {selectedCustomerId ? (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold">Regions</h2>
+                <Button
+                  onClick={() => {
+                    setSelectedRegion(undefined)
+                    setRegionDialogOpen(true)
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  Add Region
+                </Button>
+              </div>
+              <RegionsTable 
+                customerId={parseInt(selectedCustomerId) || 0}
+                onEdit={handleEditRegion}
+                onDataChange={handleRegionSuccess}
+                updateTrigger={regionsUpdateTrigger}
+              />
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              Please select a customer to view regions
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="sites">
-          <SitesTable selectedCustomerId={selectedCustomerId} />
+          {selectedCustomerId ? (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold">Sites</h2>
+                <Button
+                  onClick={() => {
+                    setSelectedSite(undefined)
+                    setSiteDialogOpen(true)
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  Add Site
+                </Button>
+              </div>
+              <SitesTable 
+                customerId={parseInt(selectedCustomerId) || 0}
+                onEdit={handleEditSite}
+                onDataChange={handleSiteSuccess}
+                updateTrigger={sitesUpdateTrigger}
+              />
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              Please select a customer to view sites
+            </div>
+          )}
         </TabsContent>
       </Tabs>
+
+      {/* Region Dialog */}
+      {selectedCustomerId && (
+        <RegionDialog
+          open={regionDialogOpen}
+          onOpenChange={setRegionDialogOpen}
+          region={selectedRegion}
+          selectedCustomerId={selectedCustomerId}
+          onSuccess={handleRegionSuccess}
+        />
+      )}
+
+      {/* Site Dialog */}
+      {selectedCustomerId && (
+        <SiteDialog
+          open={siteDialogOpen}
+          onOpenChange={setSiteDialogOpen}
+          site={selectedSite}
+          selectedCustomerId={parseInt(selectedCustomerId) || 0}
+          onSuccess={handleSiteSuccess}
+        />
+      )}
     </div>
   )
 }

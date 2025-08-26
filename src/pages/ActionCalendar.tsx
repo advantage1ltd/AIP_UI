@@ -1,5 +1,5 @@
 // src/pages/ActionCalendar.tsx
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -28,7 +28,6 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
-import { actionCalendarService, ActionCalendarTask } from "@/services/actionCalendarService"
 
 export type Task = {
   id: string
@@ -44,44 +43,12 @@ export type Task = {
 const ActionCalendar = () => {
   const [date, setDate] = useState<Date>(new Date())
   const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<string>("day")
   const { toast } = useToast()
   const { currentRole } = usePageAccess()
   const isAdmin = currentRole === 'Administrator'
 
-  // Load tasks from backend
-  const loadTasks = async () => {
-    try {
-      setLoading(true)
-      const response = await actionCalendarService.getTasks()
-      if (response.success) {
-        const convertedTasks = response.data.map(task => actionCalendarService.convertToFrontendFormat(task))
-        setTasks(convertedTasks)
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || "Failed to load tasks",
-          variant: "destructive"
-        })
-      }
-    } catch (error) {
-      console.error('Error loading tasks:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load tasks from server",
-        variant: "destructive"
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadTasks()
-  }, [])
-
-  const handleAddTask = async (newTask: Omit<Task, 'id' | 'status'>) => {
+  const handleAddTask = (newTask: Omit<Task, 'id' | 'status'>) => {
     if (!isAdmin) {
       toast({
         title: "Access Denied",
@@ -91,39 +58,19 @@ const ActionCalendar = () => {
       return
     }
 
-    try {
-      const backendTask = actionCalendarService.convertToBackendFormat({
-        ...newTask,
-        status: 'pending'
-      })
-
-      const response = await actionCalendarService.createTask(backendTask)
-      
-      if (response.success) {
-        const convertedTask = actionCalendarService.convertToFrontendFormat(response.data)
-        setTasks([...tasks, convertedTask])
-        toast({
-          title: "Task Added",
-          description: "Your task has been successfully created.",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || "Failed to create task",
-          variant: "destructive"
-        })
-      }
-    } catch (error) {
-      console.error('Error creating task:', error)
-      toast({
-        title: "Error",
-        description: "Failed to create task",
-        variant: "destructive"
-      })
+    const task: Task = {
+      ...newTask,
+      id: Math.random().toString(36).substr(2, 9),
+      status: 'pending' as const,
     }
+    setTasks([...tasks, task])
+    toast({
+      title: "Task Added",
+      description: "Your task has been successfully created.",
+    })
   }
 
-  const handleUpdateTaskStatus = async (taskId: string, newStatus: Task['status'], notes?: string) => {
+  const handleUpdateTaskStatus = (taskId: string, newStatus: Task['status'], notes?: string) => {
     if (!isAdmin) {
       toast({
         title: "Access Denied",
@@ -133,43 +80,16 @@ const ActionCalendar = () => {
       return
     }
 
-    try {
-      const task = tasks.find(t => t.id === taskId)
-      if (!task) return
-
-      const backendTask = actionCalendarService.convertToBackendFormat({
-        ...task,
-        status: newStatus,
-        description: notes || task.description
-      })
-
-      const response = await actionCalendarService.updateTask(parseInt(taskId), backendTask)
-      
-      if (response.success) {
-        const updatedTask = actionCalendarService.convertToFrontendFormat(response.data)
-        setTasks(tasks.map(t => t.id === taskId ? updatedTask : t))
-        toast({
-          title: "Task Updated",
-          description: "Task status has been successfully updated.",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || "Failed to update task",
-          variant: "destructive"
-        })
-      }
-    } catch (error) {
-      console.error('Error updating task:', error)
-      toast({
-        title: "Error",
-        description: "Failed to update task",
-        variant: "destructive"
-      })
-    }
+    setTasks(tasks.map(task =>
+      task.id === taskId ? { ...task, status: newStatus, statusNotes: notes } : task
+    ))
+    toast({
+      title: "Task Updated",
+      description: "Task status has been successfully updated.",
+    })
   }
 
-  const handleUpdateTask = async (taskId: string, updatedTask: Partial<Task>) => {
+  const handleUpdateTask = (taskId: string, updatedTask: Partial<Task>) => {
     if (!isAdmin) {
       toast({
         title: "Access Denied",
@@ -179,42 +99,12 @@ const ActionCalendar = () => {
       return
     }
 
-    try {
-      const task = tasks.find(t => t.id === taskId)
-      if (!task) return
-
-      const backendTask = actionCalendarService.convertToBackendFormat({
-        ...task,
-        ...updatedTask
-      })
-
-      const response = await actionCalendarService.updateTask(parseInt(taskId), backendTask)
-      
-      if (response.success) {
-        const updatedTask = actionCalendarService.convertToFrontendFormat(response.data)
-        setTasks(tasks.map(t => t.id === taskId ? updatedTask : t))
-        toast({
-          title: "Task Updated",
-          description: "Task has been successfully updated.",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || "Failed to update task",
-          variant: "destructive"
-        })
-      }
-    } catch (error) {
-      console.error('Error updating task:', error)
-      toast({
-        title: "Error",
-        description: "Failed to update task",
-        variant: "destructive"
-      })
-    }
+    setTasks(tasks.map(task =>
+      task.id === taskId ? { ...task, ...updatedTask } : task
+    ))
   }
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleDeleteTask = (taskId: string) => {
     if (!isAdmin) {
       toast({
         title: "Access Denied",
@@ -224,30 +114,7 @@ const ActionCalendar = () => {
       return
     }
 
-    try {
-      const response = await actionCalendarService.deleteTask(parseInt(taskId))
-      
-      if (response.success) {
-        setTasks(tasks.filter(task => task.id !== taskId))
-        toast({
-          title: "Task Deleted",
-          description: "Task has been successfully deleted.",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || "Failed to delete task",
-          variant: "destructive"
-        })
-      }
-    } catch (error) {
-      console.error('Error deleting task:', error)
-      toast({
-        title: "Error",
-        description: "Failed to delete task",
-        variant: "destructive"
-      })
-    }
+    setTasks(tasks.filter(task => task.id !== taskId))
   }
 
   // Task statistics
@@ -278,154 +145,93 @@ const ActionCalendar = () => {
                 }
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" className="gap-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900">
-                <Filter className="h-4 w-4" />
-                <span>Filter</span>
-              </Button>
-              {isAdmin ? (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="gap-2 bg-[#1a1a1a] hover:bg-[#333333]">
-                      <Plus className="h-4 w-4" />
-                      <span>Create Task</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[550px]">
-                    <DialogHeader>
-                      <DialogTitle>Create New Task</DialogTitle>
-                    </DialogHeader>
-                    <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
-                  </DialogContent>
-                </Dialog>
-              ) : (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Lock className="h-4 w-4" />
-                  <span>Read Only</span>
-                </div>
-              )}
-            </div>
+                          <div className="flex items-center gap-3">
+                <Button variant="outline" size="sm" className="gap-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900">
+                  <Filter className="h-4 w-4" />
+                  <span>Filter</span>
+                </Button>
+                {isAdmin ? (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-2 bg-[#1a1a1a] hover:bg-[#333333]">
+                        <Plus className="h-4 w-4" />
+                        <span>Create Task</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[550px]">
+                      <DialogHeader>
+                        <DialogTitle>Create New Task</DialogTitle>
+                      </DialogHeader>
+                      <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
+                    </DialogContent>
+                  </Dialog>
+                ) : (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="gap-2 border-gray-200 text-gray-500 cursor-not-allowed"
+                    disabled
+                  >
+                    <Lock className="h-4 w-4" />
+                    <span>Create Task</span>
+                  </Button>
+                )}
+              </div>
           </div>
         </div>
       </div>
 
-      {/* Loading State */}
-      {loading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-2 text-sm text-gray-500">Loading tasks...</p>
-          </div>
-        </div>
-      )}
-
       {/* Main Content */}
-      {!loading && (
-        <div className="max-w-[1600px] mx-auto px-6 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Statistics Cards */}
-            <div className="lg:col-span-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                <Card className="border-0 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <ListTodo className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Total</p>
-                        <p className="text-2xl font-bold text-gray-900">{taskStats.total}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+      <div className="px-3 sm:px-4 md:px-6 py-4">
+        <div className="max-w-[1600px] mx-auto">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+            <Card className="border-0 shadow-sm bg-blue-600 text-white">
+              <CardContent className="p-3 sm:p-4 flex flex-col">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs sm:text-sm font-medium text-blue-100">Total Tasks</p>
+                  <ListTodo className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-100" />
+                </div>
+                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{taskStats.total}</p>
+                <p className="text-[10px] sm:text-xs text-blue-100 mt-0.5 sm:mt-1">All time</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-sm bg-green-600 text-white">
+              <CardContent className="p-3 sm:p-4 flex flex-col">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs sm:text-sm font-medium text-green-100">Completed</p>
+                  <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-100" />
+                </div>
+                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{taskStats.completed}</p>
+                <p className="text-[10px] sm:text-xs text-green-100 mt-0.5 sm:mt-1">{taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0}% of total</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-sm bg-amber-600 text-white">
+              <CardContent className="p-3 sm:p-4 flex flex-col">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs sm:text-sm font-medium text-amber-100">In Progress</p>
+                  <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-100" />
+                </div>
+                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{taskStats.inProgress}</p>
+                <p className="text-[10px] sm:text-xs text-amber-100 mt-0.5 sm:mt-1">{taskStats.total > 0 ? Math.round((taskStats.inProgress / taskStats.total) * 100) : 0}% of total</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-sm bg-red-600 text-white">
+              <CardContent className="p-3 sm:p-4 flex flex-col">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs sm:text-sm font-medium text-red-100">Due Today</p>
+                  <CalendarIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-100" />
+                </div>
+                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{taskStats.dueToday}</p>
+                <p className="text-[10px] sm:text-xs text-red-100 font-medium mt-0.5 sm:mt-1">Urgent</p>
+              </CardContent>
+            </Card>
+          </div>
 
-                <Card className="border-0 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Completed</p>
-                        <p className="text-2xl font-bold text-gray-900">{taskStats.completed}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-0 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-yellow-100 rounded-lg">
-                        <Clock className="h-4 w-4 text-yellow-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">In Progress</p>
-                        <p className="text-2xl font-bold text-gray-900">{taskStats.inProgress}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-0 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gray-100 rounded-lg">
-                        <AlertCircle className="h-4 w-4 text-gray-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Pending</p>
-                        <p className="text-2xl font-bold text-gray-900">{taskStats.pending}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-0 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-red-100 rounded-lg">
-                        <AlertCircle className="h-4 w-4 text-red-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Blocked</p>
-                        <p className="text-2xl font-bold text-gray-900">{taskStats.blocked}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-0 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-orange-100 rounded-lg">
-                        <ArrowUpCircle className="h-4 w-4 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">High Priority</p>
-                        <p className="text-2xl font-bold text-gray-900">{taskStats.highPriority}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-0 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-purple-100 rounded-lg">
-                        <CalendarDays className="h-4 w-4 text-purple-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Due Today</p>
-                        <p className="text-2xl font-bold text-gray-900">{taskStats.dueToday}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
+          <div className="grid gap-4 sm:gap-6 md:grid-cols-12">
             {/* Calendar Card */}
             <div className=" md:col-span-7 lg:col-span-4 order-2 md:order-1">
               <div className="flex items-center justify-between mb-2">
@@ -722,7 +528,7 @@ const ActionCalendar = () => {
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

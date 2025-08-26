@@ -2,8 +2,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PageAccess, pageAccessApi } from '@/api/pageAccess';
 import { useAuth } from '@/hooks/useAuth';
-import { customerOperations } from '@/mocks/customerStore';
-import type { Customer } from '@/types/customer';
 
 interface PageAccessContextType {
   hasAccess: (path: string) => boolean;
@@ -12,16 +10,9 @@ interface PageAccessContextType {
   pageAccessByRole: Record<string, string[]>;
   setPageAccessByRole: (access: Record<string, string[]>) => void;
   availablePages: PageAccess[];
-  isTestMode: boolean;
-  setIsTestMode: (mode: boolean) => void;
-  testRole: string | null;
-  setTestRole: (role: string | null) => void;
   isLoading: boolean;
   refreshSettings: () => Promise<void>;
   clearCacheAndReload: () => Promise<void>;
-  getCustomerSpecificPages: (customerId?: number) => Promise<string[]>;
-  customerSpecificPages: string[];
-  refreshCustomerSpecificPages: () => Promise<void>;
 }
 
 const PageAccessContext = createContext<PageAccessContextType | undefined>(undefined);
@@ -38,144 +29,49 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [currentRole, setCurrentRole] = useState<string | null>(null);
   const [pageAccessByRole, setPageAccessByRole] = useState<Record<string, string[]>>({});
   const [availablePages, setAvailablePages] = useState<PageAccess[]>([]);
-  const [isTestMode, setIsTestMode] = useState(false);
-  const [testRole, setTestRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasInitialized, setHasInitialized] = useState(false);
-  const [customerSpecificPages, setCustomerSpecificPages] = useState<string[]>([]);
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
 
-  // Function to get customer-specific enabled pages from customer store
-  const getCustomerSpecificPages = async (customerId?: number): Promise<string[]> => {
-    try {
-      if (!customerId) {
-        console.log('🔧 [PageAccess] No customerId provided for customer-specific pages');
-        return [];
-      }
-
-      // Load customer data from customer store (which uses cached data)
-      const customer = await customerOperations.getById(customerId);
-      
-      if (!customer) {
-        console.log('🔧 [PageAccess] Customer not found in store:', customerId);
-        return [];
-      }
-
-      // Get enabled pages from customer's pageAssignments
-      if (customer.pageAssignments) {
-        const enabledPages = Object.entries(customer.pageAssignments)
-          .filter(([_, assignment]) => (assignment as any).enabled)
-          .map(([pageId]) => pageId);
-        
-        console.log('🔧 [PageAccess] Customer-specific enabled pages from store:', {
-          customerId,
-          customerName: customer.companyName,
-          enabledPages
-        });
-        
-        return enabledPages;
-      }
-
-      // Fallback to viewConfig if pageAssignments not available
-      if (customer.viewConfig?.enabledPages) {
-        console.log('🔧 [PageAccess] Using viewConfig fallback for customer:', customerId);
-        return customer.viewConfig.enabledPages;
-      }
-
-      console.log('🔧 [PageAccess] No page assignments found for customer:', customerId);
-      return [];
-    } catch (error) {
-      console.error('❌ [PageAccess] Error getting customer-specific pages:', error);
-      return [];
-    }
-  };
-
   const hasAccess = (path: string): boolean => {
     try {
-      // If in test mode, check access based on test role
-      const roleToCheck = isTestMode && testRole ? testRole : currentRole;
-      
-      // Only log in development and for specific paths to reduce noise
-      if (import.meta.env.DEV && (path.includes('/customer/') || path.includes('/administration/'))) {
-        console.log('🔍 [PageAccess] Checking access for path:', path, 'role:', roleToCheck);
-      }
-      
-      if (!roleToCheck) {
-        console.log('❌ [PageAccess] No role to check');
+      if (!currentRole) {
         return false;
       }
       
       // If page access data is not loaded yet, allow access to prevent redirect loops
       if (Object.keys(pageAccessByRole).length === 0) {
-        console.log('⚠️ [PageAccess] Page access data not loaded yet, allowing access to prevent redirect loops');
         return true;
       }
       
       // Get the allowed page IDs for the role
-      const allowedPageIds = pageAccessByRole[roleToCheck];
+      const allowedPageIds = pageAccessByRole[currentRole];
       if (!allowedPageIds) {
-        console.warn(`❌ [PageAccess] No page access defined for role: ${roleToCheck}`);
         return false;
       }
       
-      // Only log in development and for specific paths to reduce noise
-      if (import.meta.env.DEV && (path.includes('/customer/') || path.includes('/administration/'))) {
-        console.log('🔍 [PageAccess] Allowed pages for role:', roleToCheck, 'count:', allowedPageIds.length);
-      }
-
-      // Fix for take-test path - ensure it's properly matched
-      const requestedPath = path.endsWith('/') ? path.slice(0, -1) : path;
-      
       // If availablePages is not loaded yet, allow access to prevent redirect loops
       if (availablePages.length === 0) {
-        console.warn('Available pages not loaded yet, allowing access to prevent redirect loops');
         return true;
       }
       
-      // Look for matching page, handle special cases for dynamic routes
-      const page = availablePages.find(p => {
-        // Handle 'take-test' path aliases
-        if (p.id === 'take-test') {
-          return requestedPath === '/take-test' || requestedPath === '/recruitment/take-test';
-        }
-        
-        // Handle test-session dynamic routes
-        if (p.id === 'test-session' && requestedPath.startsWith('/recruitment/test-session/')) {
-          return true;
-        }
-        
-        // Handle dynamic customer routes
-        if (p.path.includes(':customerId') && requestedPath.match(/\/customer\/\d+/)) {
-          return true;
-        }
-        
-        return p.path === requestedPath;
-      });
+      // Look for matching page
+      const requestedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+      const page = availablePages.find(p => p.path === requestedPath);
       
       if (!page) {
-        console.warn(`No page found for path: ${requestedPath}`);
-        console.debug('Available pages:', availablePages.map(p => ({ id: p.id, path: p.path })));
         return false;
       }
       
       // Administrator should have access to ALL pages
-      if (roleToCheck === 'Administrator') {
+      if (currentRole === 'Administrator') {
         return true;
       }
       
-      // For customer roles and AdvantageOneOfficer roles, check customer-specific page assignments
-      if ((roleToCheck.startsWith('Customer') || roleToCheck === 'AdvantageOneOfficer') && user?.customerId) {
-        const hasCustomerAccess = customerSpecificPages.includes(page.id);
-        console.debug(`${roleToCheck} access check (customer ${user.customerId}) to ${page.id}: ${hasCustomerAccess}`);
-        return hasCustomerAccess;
-      }
-      
-      // For other roles, use global page access
-      const hasAccess = allowedPageIds.includes(page.id);
-      console.debug(`Global access check for ${roleToCheck} to ${page.id}: ${hasAccess}`);
-      return hasAccess;
+      // Check if the role has access to this page
+      return allowedPageIds.includes(page.id);
     } catch (error) {
       console.error('Error checking access:', error);
       return false;
@@ -236,8 +132,6 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setAvailablePages(data.availablePages);
       
       console.log('🔄 [PageAccess] Reloaded fresh settings from db.json');
-      console.log('🔍 [PageAccess] Available roles:', Object.keys(data.pageAccessByRole));
-      console.log('🔍 [PageAccess] Administrator pages:', data.pageAccessByRole.Administrator?.length || 0);
     } catch (error) {
       console.error('Error clearing cache and reloading:', error);
     } finally {
@@ -273,22 +167,6 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         console.error('Error loading page access data for role:', error);
       } finally {
         setIsLoading(false);
-      }
-    }
-  };
-
-  /**
-   * Refresh customer-specific pages when page assignments are updated
-   */
-  const refreshCustomerSpecificPages = async () => {
-    if ((currentRole?.startsWith('Customer') || currentRole === 'AdvantageOneOfficer') && user?.customerId) {
-      try {
-        console.log('🔧 [PageAccess] Refreshing customer-specific pages for customer:', user.customerId);
-        const pages = await getCustomerSpecificPages(user.customerId);
-        setCustomerSpecificPages(pages);
-        console.log('🔧 [PageAccess] Refreshed customer-specific pages:', pages);
-      } catch (error) {
-        console.error('❌ [PageAccess] Error refreshing customer-specific pages:', error);
       }
     }
   };
@@ -355,17 +233,17 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setAvailablePages(data.availablePages);
           setCurrentRole(validatedRole);
         }
-              } catch (error) {
-          console.error('Error initializing access:', error);
-          // Even if there's an error, we should still set the role and mark as initialized
-          // to prevent the app from getting stuck
-          if (storedRole) {
-            setCurrentRole(storedRole);
-          }
-        } finally {
-          setIsLoading(false);
-          setHasInitialized(true);
+      } catch (error) {
+        console.error('Error initializing access:', error);
+        // Even if there's an error, we should still set the role and mark as initialized
+        // to prevent the app from getting stuck
+        if (storedRole) {
+          setCurrentRole(storedRole);
         }
+      } finally {
+        setIsLoading(false);
+        setHasInitialized(true);
+      }
     };
 
     initializeAccess();
@@ -437,59 +315,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch (error) {
       console.error('Error in redirect effect:', error);
     }
-  }, [currentRole, pageAccessByRole, testRole, isTestMode, isLoading, hasInitialized, availablePages]);
-
-  // Toggle test mode when URL has ?test=true
-  useEffect(() => {
-    try {
-      const searchParams = new URLSearchParams(location.search);
-      setIsTestMode(searchParams.get('test') === 'true');
-      
-      // If test parameter is present, set test role
-      const testRoleParam = searchParams.get('role');
-      if (testRoleParam && Object.keys(pageAccessByRole).includes(testRoleParam)) {
-        setTestRole(testRoleParam);
-      }
-    } catch (error) {
-      console.error('Error setting test mode:', error);
-    }
-  }, [location, pageAccessByRole]);
-
-  // Effect to load customer-specific pages when user or role changes
-  useEffect(() => {
-    const loadCustomerSpecificPages = async () => {
-      // Load customer-specific pages for Customer roles and AdvantageOneOfficer roles
-      if ((currentRole?.startsWith('Customer') || currentRole === 'AdvantageOneOfficer') && user?.customerId) {
-        try {
-          console.log('🔧 [PageAccess] Loading customer-specific pages for customer:', user.customerId);
-          const pages = await getCustomerSpecificPages(user.customerId);
-          setCustomerSpecificPages(pages);
-          console.log('🔧 [PageAccess] Loaded customer-specific pages:', pages);
-        } catch (error) {
-          console.error('❌ [PageAccess] Error loading customer-specific pages:', error);
-          setCustomerSpecificPages([]);
-        }
-      } else {
-        setCustomerSpecificPages([]);
-      }
-    };
-
-    loadCustomerSpecificPages();
-  }, [currentRole, user?.customerId]);
-
-  // Effect to listen for customer data updates
-  useEffect(() => {
-    const handleCustomerDataUpdate = (event: CustomEvent) => {
-      console.log('🔧 [PageAccess] Customer data updated, refreshing pages');
-      refreshCustomerSpecificPages();
-    };
-
-    window.addEventListener('customer-data-updated', handleCustomerDataUpdate as EventListener);
-    
-    return () => {
-      window.removeEventListener('customer-data-updated', handleCustomerDataUpdate as EventListener);
-    };
-  }, [currentRole, user?.customerId]);
+  }, [currentRole, pageAccessByRole, isLoading, hasInitialized, availablePages]);
 
   return (
     <PageAccessContext.Provider value={{
@@ -499,16 +325,9 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       pageAccessByRole,
       setPageAccessByRole,
       availablePages,
-      isTestMode,
-      setIsTestMode,
-      testRole,
-      setTestRole,
       isLoading,
       refreshSettings,
-      clearCacheAndReload,
-      getCustomerSpecificPages,
-      customerSpecificPages,
-      refreshCustomerSpecificPages: refreshCustomerSpecificPages
+      clearCacheAndReload
     }}>
       {children}
     </PageAccessContext.Provider>

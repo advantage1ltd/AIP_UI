@@ -1,14 +1,15 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Plus, Search } from "lucide-react"
+import { Plus, Search, AlertTriangle } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { StockItem } from "@/types/stock"
 import { StockTable } from "@/components/stock/StockTable"
 import { StockItemForm } from "@/components/stock/StockItemForm"
 import { StockStats } from "@/components/stock/StockStats"
+import { stockService } from "@/services/stockService"
 
 const ITEMS_PER_PAGE = 10
 
@@ -21,50 +22,53 @@ const StockControl = () => {
   }>({ key: 'name', direction: 'asc' })
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null)
+  const [stockItems, setStockItems] = useState<StockItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [updateTrigger, setUpdateTrigger] = useState(0)
+  const [lowStockItems, setLowStockItems] = useState<StockItem[]>([])
+  const [isLowStockDialogOpen, setIsLowStockDialogOpen] = useState(false)
   const { toast } = useToast()
 
-  const [stockItems, setStockItems] = useState<StockItem[]>([
-    { 
-      id: 1, 
-      name: "Security Camera - HD", 
-      sku: "SEC-CAM-001", 
-      quantity: 45,
-      minimumStock: 10,
-      category: "Cameras", 
-      status: "In Stock",
-      unitPrice: 239.99,
-      description: "High-definition security camera with night vision capabilities"
-    },
-    { 
-      id: 2, 
-      name: "Motion Sensor", 
-      sku: "SNS-MOT-002", 
-      quantity: 12,
-      minimumStock: 15,
-      category: "Sensors", 
-      status: "Low Stock",
-      unitPrice: 39.99,
-      description: "Advanced motion detection sensor with adjustable sensitivity"
-    },
-    { 
-      id: 3, 
-      name: "Door Lock - Smart", 
-      sku: "LCK-SMT-003", 
-      quantity: 0,
-      minimumStock: 5,
-      category: "Locks", 
-      status: "Out of Stock",
-      unitPrice: 127.99,
-      description: "Smart door lock with fingerprint and PIN access"
-    },
-  ])
+  // Function to trigger data refresh
+  const refreshData = useCallback(() => {
+    setUpdateTrigger(prev => prev + 1)
+  }, [])
+
+  // Fetch stock items from API
+  const fetchStockItems = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const data = await stockService.list()
+      setStockItems(data)
+      console.log('✅ [StockControl] Successfully fetched stock items:', data.length)
+    } catch (error) {
+      console.error('❌ [StockControl] Error fetching stock items:', error)
+      toast({
+        title: "Error",
+        description: (error as Error).message || "Failed to load stock items",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [toast])
+
+  // Fetch data on mount and when updateTrigger changes
+  useEffect(() => {
+    fetchStockItems()
+  }, [fetchStockItems, updateTrigger])
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   const filteredItems = useMemo(() => {
     return stockItems.filter(item => 
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase())
+      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.issuedBy.toLowerCase().includes(searchQuery.toLowerCase())
     )
   }, [stockItems, searchQuery])
 
@@ -104,34 +108,38 @@ const StockControl = () => {
     setCurrentPage(page)
   }
 
-  const handleAddItem = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
-    const newItem: StockItem = {
-      id: stockItems.length + 1,
-      name: formData.get('name') as string,
-      sku: formData.get('sku') as string,
-      quantity: Number(formData.get('quantity')),
-      minimumStock: Number(formData.get('minimumStock')),
-      category: formData.get('category') as string,
-      status: Number(formData.get('quantity')) === 0 
-        ? "Out of Stock" 
-        : Number(formData.get('quantity')) <= Number(formData.get('minimumStock'))
-        ? "Low Stock"
-        : "In Stock",
-      unitPrice: Number(formData.get('unitPrice')),
-      description: formData.get('description') as string,
-    }
     
-    setStockItems([...stockItems, newItem])
-    setIsAddDialogOpen(false)
-    toast({
-      title: "Success",
-      description: "New item has been added to inventory",
-    })
+    const quantity = Number(formData.get('quantity'))
+    const minimumStock = Number(formData.get('minimumStock'))
+    const status = quantity === 0 ? 'Out of Stock' : quantity <= minimumStock ? 'Low Stock' : 'In Stock'
+
+    try {
+      const created = await stockService.create({
+        name: formData.get('name') as string,
+        quantity,
+        minimumStock,
+        category: formData.get('category') as string,
+        description: formData.get('description') as string,
+        numberAdded: Number(formData.get('numberAdded')),
+        date: (formData.get('date') as string) || new Date().toISOString().slice(0,10),
+        numberIssued: Number(formData.get('numberIssued')),
+        issuedBy: (formData.get('issuedBy') as string) || ''
+      })
+      // If API does not compute status, compute client-side for display
+      const normalized: StockItem = { ...created, status }
+      setStockItems([...stockItems, normalized])
+      setIsAddDialogOpen(false)
+      refreshData()
+      toast({ title: 'Success', description: 'New item has been added to inventory' })
+    } catch (error) {
+      toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' })
+    }
   }
 
-  const handleEditItem = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleEditItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!selectedItem) return
 
@@ -139,62 +147,105 @@ const StockControl = () => {
     const quantity = Number(formData.get('quantity'))
     const minimumStock = Number(formData.get('minimumStock'))
     
-    const updatedItem: StockItem = {
-      ...selectedItem,
-      name: formData.get('name') as string,
-      sku: formData.get('sku') as string,
-      quantity,
-      minimumStock,
-      category: formData.get('category') as string,
-      status: quantity === 0 
-        ? "Out of Stock" 
-        : quantity <= minimumStock
-        ? "Low Stock"
-        : "In Stock",
-      unitPrice: Number(formData.get('unitPrice')),
-      description: formData.get('description') as string,
+    try {
+      const updated = await stockService.update(selectedItem.id, {
+        name: formData.get('name') as string,
+        quantity,
+        minimumStock,
+        category: formData.get('category') as string,
+        description: formData.get('description') as string,
+        numberAdded: Number(formData.get('numberAdded')),
+        date: (formData.get('date') as string) || selectedItem.date,
+        numberIssued: Number(formData.get('numberIssued')),
+        issuedBy: (formData.get('issuedBy') as string) || selectedItem.issuedBy
+      })
+      const status = quantity === 0 ? 'Out of Stock' : quantity <= minimumStock ? 'Low Stock' : 'In Stock'
+      const normalized: StockItem = { ...updated, status }
+      setStockItems(stockItems.map(item => item.id === selectedItem.id ? normalized : item))
+      setSelectedItem(null)
+      refreshData()
+      toast({ title: 'Success', description: 'Item has been updated' })
+    } catch (error) {
+      toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' })
     }
-
-    setStockItems(stockItems.map(item => 
-      item.id === selectedItem.id ? updatedItem : item
-    ))
-    setSelectedItem(null)
-    toast({
-      title: "Success",
-      description: "Item has been updated",
-    })
   }
 
-  const handleDeleteItem = (id: number) => {
-    setStockItems(stockItems.filter(item => item.id !== id))
-    toast({
-      title: "Success",
-      description: "Item has been deleted",
-    })
+  const handleDeleteItem = async (id: number) => {
+    try {
+      await stockService.remove(id)
+      setStockItems(stockItems.filter(item => item.id !== id))
+      refreshData()
+      toast({ title: 'Success', description: 'Item has been deleted' })
+    } catch (error) {
+      toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' })
+    }
+  }
+
+  const handleCheckLowStock = async () => {
+    try {
+      await stockService.checkLowStock()
+      const lowStock = await stockService.getLowStockItems()
+      setLowStockItems(lowStock)
+      setIsLowStockDialogOpen(true)
+      toast({ 
+        title: 'Low Stock Check Complete', 
+        description: `Found ${lowStock.length} items with low stock levels. Notifications sent to ops@advantage1.co.uk` 
+      })
+    } catch (error) {
+      toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' })
+    }
+  }
+
+  const handleTestEmail = async () => {
+    try {
+      await stockService.testEmail()
+      toast({ 
+        title: 'Test Email Sent', 
+        description: 'Test email notifications sent. Check the backend logs for details.' 
+      })
+    } catch (error) {
+      toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' })
+    }
   }
 
   return (
     <div className="w-full max-w-[100vw] overflow-x-hidden px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
         <h1 className="text-2xl sm:text-3xl font-bold text-[#303D51]">Stock Control</h1>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              className="bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-600 hover:to-slate-700 text-white w-full sm:w-auto"
-            >
-              <Plus className="mr-2 h-4 w-4" /> Add New
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="w-[calc(100%-2rem)] sm:w-auto max-w-md mx-auto">
-            <DialogHeader>
-              <DialogTitle>Add New Item</DialogTitle>
-              <DialogDescription>
-                Add a new item to your inventory. Fill in all the required fields below.
-              </DialogDescription>
-            </DialogHeader>
-            <StockItemForm onSubmit={handleAddItem} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button 
+            variant="outline"
+            onClick={handleTestEmail}
+            className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 w-full sm:w-auto"
+          >
+            <AlertTriangle className="mr-2 h-4 w-4" /> Test Email
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={handleCheckLowStock}
+            className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 w-full sm:w-auto"
+          >
+            <AlertTriangle className="mr-2 h-4 w-4" /> Check Low Stock
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                className="bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-600 hover:to-slate-700 text-white w-full sm:w-auto"
+              >
+                <Plus className="mr-2 h-4 w-4" /> Add New
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="w-[calc(100%-2rem)] sm:w-auto max-w-md mx-auto">
+              <DialogHeader>
+                <DialogTitle>Add New Item</DialogTitle>
+                <DialogDescription>
+                  Add a new item to your inventory. Fill in all the required fields below.
+                </DialogDescription>
+              </DialogHeader>
+              <StockItemForm onSubmit={handleAddItem} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <StockStats items={stockItems} />
@@ -222,6 +273,7 @@ const StockControl = () => {
               onSort={handleSort}
               onEdit={setSelectedItem}
               onDelete={handleDeleteItem}
+              onStockUpdated={refreshData}
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={handlePageChange}
@@ -241,6 +293,44 @@ const StockControl = () => {
           {selectedItem && (
             <StockItemForm item={selectedItem} onSubmit={handleEditItem} />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Low Stock Dialog */}
+      <Dialog open={isLowStockDialogOpen} onOpenChange={setIsLowStockDialogOpen}>
+        <DialogContent className="w-[calc(100%-2rem)] sm:w-auto max-w-4xl mx-auto">
+          <DialogHeader>
+            <DialogTitle>Low Stock Items</DialogTitle>
+            <DialogDescription>
+              Items with low stock levels. Notifications have been sent to ops@advantage1.co.uk
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-96 overflow-y-auto">
+            {lowStockItems.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No items with low stock levels found.</p>
+            ) : (
+              <div className="space-y-2">
+                {lowStockItems.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <h4 className="font-medium">{item.name}</h4>
+                      <p className="text-sm text-gray-600">{item.category}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-medium ${
+                        item.quantity === 0 ? 'text-red-600' : 'text-orange-600'
+                      }`}>
+                        {item.quantity} / {item.minimumStock}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {item.quantity === 0 ? 'Out of Stock' : 'Low Stock'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

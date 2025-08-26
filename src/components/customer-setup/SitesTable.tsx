@@ -3,10 +3,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useState, useEffect } from "react"
-import { sitesService } from "@/services/sitesService"
+import { siteService } from "@/services/siteService"
 import type { Site } from "@/types/customer"
-import { SiteDialog } from "./SiteDialog"
-import { Pencil, Trash2, Search, ChevronLeft, ChevronRight, Shield } from "lucide-react"
+import { Pencil, Trash2, Search, ChevronLeft, ChevronRight, Shield, CheckCircle, XCircle } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,63 +19,55 @@ import {
 import { useToast } from "@/hooks/use-toast"
 
 interface SitesTableProps {
-  selectedCustomerId: string | null
+  customerId: number | null
+  onEdit: (site: Site) => void
+  onDataChange: () => void
+  updateTrigger?: number
 }
 
-export function SitesTable({ selectedCustomerId }: SitesTableProps) {
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [selectedSite, setSelectedSite] = useState<Site | undefined>()
+export function SitesTable({ customerId, onEdit, onDataChange, updateTrigger }: SitesTableProps) {
+  const [sites, setSites] = useState<Site[]>([])
+  const [isFetchingSites, setIsFetchingSites] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [sites, setSites] = useState<Site[]>([])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [siteToDelete, setSiteToDelete] = useState<Site | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
   const itemsPerPage = 10
 
-  // Load sites data
-  const loadSites = async () => {
-    setIsLoading(true)
+  // Fetch sites from service
+  const fetchSites = async () => {
+    if (!customerId || isFetchingSites) return
+    
+    setIsFetchingSites(true)
     try {
-      const result = await sitesService.getSites()
+      console.log('🔧 [SitesTable] Fetching sites for customer:', customerId)
+      const result = await siteService.getSitesByCustomer(customerId)
       if (result.success) {
+        console.log('🔧 [SitesTable] Successfully fetched sites:', result.data.length)
         setSites(result.data)
       } else {
-        toast({
-          title: "Error",
-          description: "Failed to load sites",
-          variant: "destructive",
-        })
+        console.log('🔧 [SitesTable] Failed to fetch sites')
+        setSites([])
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while loading sites",
-        variant: "destructive",
-      })
+      console.log('🔧 [SitesTable] Error fetching sites:', error)
+      setSites([])
     } finally {
-      setIsLoading(false)
+      setIsFetchingSites(false)
     }
   }
 
+  // Fetch sites when customer changes or onDataChange is called
   useEffect(() => {
-    loadSites()
-  }, [])
+    if (customerId) {
+      fetchSites()
+    }
+  }, [customerId, onDataChange, updateTrigger])
 
-  const currentSites = selectedCustomerId
-    ? sites.filter(site => site.customerId === selectedCustomerId)
-    : []
-
-  const handleEdit = (site: Site) => {
-    setSelectedSite(site)
-    setDialogOpen(true)
-  }
-
-  const handleNewSite = () => {
-    setSelectedSite(undefined)
-    setDialogOpen(true)
-  }
+  // Ensure sites is always an array
+  const safeSites = sites || []
 
   const handleDeleteClick = (site: Site) => {
     setSiteToDelete(site)
@@ -86,15 +77,16 @@ export function SitesTable({ selectedCustomerId }: SitesTableProps) {
   const handleDeleteConfirm = async () => {
     if (!siteToDelete) return
 
+    setIsLoading(true)
     try {
-      const result = await sitesService.deleteSite(siteToDelete.id)
+      const result = await siteService.deleteSite(siteToDelete.siteID)
       
       if (result.success) {
         toast({
           title: "Success",
           description: "Site deleted successfully",
         })
-        await loadSites() // Refresh the data
+        onDataChange() // Refresh the data
       } else {
         toast({
           title: "Error",
@@ -109,25 +101,23 @@ export function SitesTable({ selectedCustomerId }: SitesTableProps) {
         variant: "destructive",
       })
     } finally {
+      setIsLoading(false)
       setDeleteDialogOpen(false)
       setSiteToDelete(null)
     }
   }
 
-  const handleDialogSuccess = async () => {
-    await loadSites() // Refresh the data after successful creation/update
-  }
-
   // Filter by search query
-  const filteredSites = currentSites.filter(site => {
+  const filteredSites = safeSites.filter(site => {
     const searchLower = searchQuery.toLowerCase()
     return (
       site.locationName.toLowerCase().includes(searchLower) ||
-      site.buildingName.toLowerCase().includes(searchLower) ||
-      site.town.toLowerCase().includes(searchLower) ||
-      site.county.toLowerCase().includes(searchLower) ||
-      site.postcode.toLowerCase().includes(searchLower) ||
-      site.sinNumber.toLowerCase().includes(searchLower)
+              (site.sinNumber?.toLowerCase().includes(searchLower) || false) ||
+      (site.buildingName?.toLowerCase().includes(searchLower) || false) ||
+      (site.town?.toLowerCase().includes(searchLower) || false) ||
+      (site.county?.toLowerCase().includes(searchLower) || false) ||
+      (site.postcode?.toLowerCase().includes(searchLower) || false) ||
+      (site.locationType?.toLowerCase().includes(searchLower) || false)
     )
   })
 
@@ -148,14 +138,12 @@ export function SitesTable({ selectedCustomerId }: SitesTableProps) {
         return 'hidden md:table-cell'
       case 'telephone':
         return 'hidden lg:table-cell'
-      case 'sin':
-        return 'hidden xl:table-cell'
       default:
         return ''
     }
   }
 
-  if (!selectedCustomerId) {
+  if (!customerId) {
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
@@ -170,17 +158,12 @@ export function SitesTable({ selectedCustomerId }: SitesTableProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Sites</h2>
-        <Button onClick={handleNewSite}>Add Site</Button>
-      </div>
-
       {/* Search */}
       <div className="flex items-center space-x-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search sites..."
+            placeholder="Search sites by name, SIN number, address..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-8"
@@ -188,9 +171,9 @@ export function SitesTable({ selectedCustomerId }: SitesTableProps) {
         </div>
       </div>
 
-      {isLoading ? (
+      {isFetchingSites ? (
         <div className="text-center py-8 text-gray-500">Loading sites...</div>
-      ) : currentSites.length === 0 ? (
+      ) : safeSites.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           No sites found for this customer. Click "Add Site" to create one.
         </div>
@@ -205,51 +188,61 @@ export function SitesTable({ selectedCustomerId }: SitesTableProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Location</TableHead>
+                  <TableHead>SIN Number</TableHead>
                   <TableHead className={getResponsiveClasses('address')}>Address</TableHead>
-                  <TableHead className={getResponsiveClasses('sin')}>SIN</TableHead>
                   <TableHead className={getResponsiveClasses('telephone')}>Telephone</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {currentSitesTable.map((site) => (
-                  <TableRow key={site.id}>
+                  <TableRow key={site.siteID}>
                     <TableCell>
                       <div>
                         <div className="font-medium">{site.locationName}</div>
-                        <div className="text-sm text-gray-500">{site.buildingName}</div>
+                        {site.buildingName && (
+                          <div className="text-sm text-gray-500">{site.buildingName}</div>
+                        )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">{site.sinNumber || "No SIN Number"}</span>
                     </TableCell>
                     <TableCell className={getResponsiveClasses('address')}>
                       <div className="text-sm">
-                        <div>{site.street}</div>
-                        <div className="text-gray-500">{site.town}, {site.county}</div>
-                        <div className="text-gray-500">{site.postcode}</div>
+                        <div>{site.numberandStreet || "No street address"}</div>
+                        <div className="text-gray-500">
+                          {[site.villageOrSuburb, site.town, site.county].filter(Boolean).join(", ")}
+                        </div>
+                        <div className="text-gray-500">{site.postcode || "No postcode"}</div>
                       </div>
                     </TableCell>
-                    <TableCell className={getResponsiveClasses('sin')}>
-                      <span className="font-mono text-sm">{site.sinNumber}</span>
-                    </TableCell>
                     <TableCell className={getResponsiveClasses('telephone')}>
-                      <span className="text-sm">{site.telephone}</span>
+                      <span className="text-sm">{site.telephoneNumber || "No telephone"}</span>
                     </TableCell>
                     <TableCell>
-                      {site.isCoreSite ? (
-                        <Badge variant="default" className="bg-purple-600">
-                          <Shield className="h-3 w-3 mr-1" />
-                          Core Site
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">Regular</Badge>
-                      )}
+                      <Badge variant={site.coreSiteYN ? "default" : "secondary"} className={site.coreSiteYN ? "bg-purple-600" : ""}>
+                        {site.coreSiteYN ? "Core Site" : "Site"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={site.recordIsDeletedYN ? "destructive" : "default"} className={site.recordIsDeletedYN ? "bg-red-600" : "bg-green-600"}>
+                        {site.recordIsDeletedYN ? "Inactive" : "Active"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(site.dateCreated).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEdit(site)}
+                          onClick={() => onEdit(site)}
+                          disabled={site.recordIsDeletedYN}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -258,6 +251,7 @@ export function SitesTable({ selectedCustomerId }: SitesTableProps) {
                           size="sm"
                           onClick={() => handleDeleteClick(site)}
                           className="text-red-600 hover:text-red-700"
+                          disabled={isLoading}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -303,14 +297,6 @@ export function SitesTable({ selectedCustomerId }: SitesTableProps) {
         </>
       )}
 
-      <SiteDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        site={selectedSite}
-        selectedCustomerId={selectedCustomerId}
-        onSuccess={handleDialogSuccess}
-      />
-
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -324,8 +310,9 @@ export function SitesTable({ selectedCustomerId }: SitesTableProps) {
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               className="bg-red-600 hover:bg-red-700"
+              disabled={isLoading}
             >
-              Delete
+              {isLoading ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

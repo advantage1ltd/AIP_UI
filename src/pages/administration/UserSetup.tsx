@@ -85,7 +85,7 @@ const UserSetup = () => {
 
   // Check authentication on component mount
   useEffect(() => {
-    const token = localStorage.getItem('auth_token')
+    const token = localStorage.getItem('authToken')
     const user = localStorage.getItem('user')
     
     console.log('🔍 [UserSetup] Authentication check:', { 
@@ -566,7 +566,12 @@ const UserSetup = () => {
         {/* User Dialog */}
         <UserDialog
           open={showUserDialog}
-          onOpenChange={setShowUserDialog}
+          onOpenChange={(open) => {
+            setShowUserDialog(open)
+            if (!open) {
+              setSelectedUser(null)
+            }
+          }}
           user={selectedUser}
           onSubmit={(data) => {
             if ('id' in data) {

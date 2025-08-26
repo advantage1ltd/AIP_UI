@@ -18,9 +18,9 @@ class RegionsService {
     }
   }
 
-  async getRegionsByCustomer(customerId: string): Promise<{ success: boolean; data: Region[] }> {
+  async getRegionsByCustomer(customerId: number): Promise<{ success: boolean; data: Region[] }> {
     try {
-      const customerRegions = this.regions.filter(region => region.customerId === customerId);
+      const customerRegions = this.regions.filter(region => region.fkCustomerID === customerId);
       return {
         success: true,
         data: customerRegions
@@ -33,13 +33,13 @@ class RegionsService {
     }
   }
 
-  async createRegion(regionData: Omit<Region, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ success: boolean; data?: Region; message?: string }> {
+  async createRegion(regionData: Omit<Region, 'regionID' | 'dateCreated' | 'dateModified'>): Promise<{ success: boolean; data?: Region; message?: string }> {
     try {
       const newRegion: Region = {
         ...regionData,
-        id: `r${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        regionID: Date.now(), // Simple ID generation
+        dateCreated: new Date().toISOString(),
+        dateModified: undefined
       };
 
       this.regions.push(newRegion);
@@ -56,9 +56,9 @@ class RegionsService {
     }
   }
 
-  async updateRegion(id: string, updates: Partial<Omit<Region, 'id' | 'createdAt'>>): Promise<{ success: boolean; data?: Region; message?: string }> {
+  async updateRegion(id: number, updates: Partial<Omit<Region, 'regionID' | 'dateCreated'>>): Promise<{ success: boolean; data?: Region; message?: string }> {
     try {
-      const regionIndex = this.regions.findIndex(region => region.id === id);
+      const regionIndex = this.regions.findIndex(region => region.regionID === id);
       
       if (regionIndex === -1) {
         return {
@@ -70,7 +70,7 @@ class RegionsService {
       const updatedRegion: Region = {
         ...this.regions[regionIndex],
         ...updates,
-        updatedAt: new Date().toISOString()
+        dateModified: new Date().toISOString()
       };
 
       this.regions[regionIndex] = updatedRegion;
@@ -87,9 +87,9 @@ class RegionsService {
     }
   }
 
-  async deleteRegion(id: string): Promise<{ success: boolean; message?: string }> {
+  async deleteRegion(id: number): Promise<{ success: boolean; message?: string }> {
     try {
-      const regionIndex = this.regions.findIndex(region => region.id === id);
+      const regionIndex = this.regions.findIndex(region => region.regionID === id);
       
       if (regionIndex === -1) {
         return {

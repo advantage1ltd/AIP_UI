@@ -41,7 +41,7 @@ export const pageAccessApi = {
       console.warn('❌ [PageAccess API] Request failed, using default settings:', error);
     }
 
-    // Define available pages first
+    // Define available pages first - aligned with backend PageAccess model
     const availablePages: PageAccess[] = [
       { id: 'dashboard', title: 'Dashboard', path: '/dashboard' },
       { id: 'action-calendar', title: 'Action Calendar', path: '/action-calendar' },
@@ -65,25 +65,27 @@ export const pageAccessApi = {
       { id: 'safe-duress-words', title: 'Safe Duress Words', path: '/operations/safe-duress-words' },
       { id: 'officer-support', title: 'Officer Support', path: '/operations/officer-support' },
       { id: 'officer-expenses', title: 'Officer Expenses', path: '/operations/officer-expenses' },
-      { id: 'uniform-equipment', title: 'Uniform Equipment', path: '/operations/uniform-equipment' },
-      { id: 'disciplinary', title: 'Disciplinary', path: '/operations/disciplinary' },
-      { id: 'diary', title: 'Diary', path: '/operations/diary' },
-      { id: 'customer-reporting', title: 'Customer Reporting', path: '/operations/customer-reporting' },
-      { id: 'manager-support', title: 'Manager Support', path: '/operations/manager-support' },
-      { id: 'incidents-report', title: 'Incidents Report', path: '/operations/incidents-report' },
-      { id: 'officer-performance', title: 'Officer Performance', path: '/operations/officer-performance' },
+
+      // Employee
+      { id: 'uniform-equipment', title: 'Uniform Equipment', path: '/employee/uniform-equipment' },
+      { id: 'disciplinary', title: 'Disciplinary', path: '/employee/disciplinary' },
+      { id: 'diary', title: 'Diary', path: '/employee/diary' },
+
+      // Management
+      { id: 'customer-reporting', title: 'Customer Reporting', path: '/management/customer-reporting' },
+      { id: 'manager-support', title: 'Manager Support', path: '/management/manager-support' },
+      { id: 'incidents-report', title: 'Incidents Report', path: '/management/incidents-report' },
+      { id: 'officer-performance', title: 'Officer Performance', path: '/management/officer-performance' },
 
       // Compliance
       { id: 'contract-renewal', title: 'Contract Renewal', path: '/compliance/contract-renewal' },
       { id: 'password-register', title: 'Password Register', path: '/compliance/password-register' },
       { id: 'asset-register', title: 'Asset Register', path: '/compliance/asset-register' },
-      { id: 'guard-certification', title: 'Guard Certification', path: '/compliance/guard-certification' },
 
       // Recruitment
       { id: 'vetting', title: 'Vetting', path: '/recruitment/vetting' },
       { id: 'cbt', title: 'CBT', path: '/recruitment/cbt' },
       { id: 'take-test', title: 'Take Test', path: '/recruitment/take-test' },
-      { id: 'test-session', title: 'Test Session', path: '/recruitment/test-session' },
 
       // CRM
       { id: 'crm-dashboard', title: 'CRM Dashboard', path: '/crm/dashboard' },
@@ -102,6 +104,8 @@ export const pageAccessApi = {
       { id: 'daily-occurrence-book', title: 'Daily Occurrence Book (DOB)', path: '/customer/daily-occurrence-book' },
       { id: 'customer-officer-support', title: 'Customer Officer Support', path: '/customer/officer-support' },
       { id: 'customer-views-config', title: 'Customer Views Config', path: '/customer/views-config' },
+      { id: 'customer-mystery-shopper-report', title: 'Mystery Shopper Report', path: '/customer/mystery-shopper-report' },
+      { id: 'customer-site-visit-reports', title: 'Site Visit Reports', path: '/customer/site-visit-reports' },
       ...Object.values(CUSTOMER_PAGES).map(page => ({
         id: page.id,
         title: page.title,
@@ -119,8 +123,9 @@ export const pageAccessApi = {
         'officer-support', 'officer-expenses', 'uniform-equipment', 'disciplinary',
         'diary', 'customer-reporting', 'manager-support', 'incidents-report',
         'officer-performance', 'contract-renewal', 'password-register', 'asset-register',
-        'vetting', 'cbt', 'take-test', 'test-session', 'crm-dashboard', 'crm-contacts',
-        'crm-leads', 'crm-deals', 'crm-pipeline', 'crm-tasks'
+        'vetting', 'cbt', 'take-test', 'crm-dashboard', 'crm-contacts',
+        'crm-leads', 'crm-deals', 'crm-pipeline', 'crm-tasks',
+        'customer-mystery-shopper-report', 'customer-site-visit-reports'
       ],
       AdvantageOneOfficer: [
         'dashboard', 'action-calendar', 'profile',
@@ -129,22 +134,25 @@ export const pageAccessApi = {
         'officer-support', 'officer-expenses', 'uniform-equipment', 'disciplinary',
         'diary', 'customer-reporting', 'manager-support', 'incidents-report',
         'officer-performance', 'contract-renewal', 'password-register', 'asset-register',
-        'vetting', 'cbt', 'take-test', 'test-session', 'crm-dashboard', 'crm-contacts',
-        'crm-leads', 'crm-deals', 'crm-pipeline', 'crm-tasks'
+        'vetting', 'cbt', 'take-test', 'crm-dashboard', 'crm-contacts',
+        'crm-leads', 'crm-deals', 'crm-pipeline', 'crm-tasks',
+        'daily-activity-report', 'incident-graph', 'customer-incident-report',
+        'satisfaction-reports', 'be-safe-be-secure-graph', 'daily-occurrence-book',
+        'customer-views-config'
       ],
       CustomerHOManager: [
         'dashboard', 'action-calendar', 'profile',
         'customer-reporting', 'customer-views-config', 'customer-incident-report',
-        'customer-satisfaction-report', 'customer-be-safe-be-secure',
-        'customer-daily-activity-report', 'customer-incident-graph',
-        'customer-officer-support', 'customer-reporting'
+        'satisfaction-reports', 'be-safe-be-secure-graph',
+        'daily-activity-report', 'incident-graph',
+        'customer-officer-support', 'daily-occurrence-book'
       ],
       CustomerSiteManager: [
         'dashboard', 'action-calendar', 'profile',
         'customer-reporting', 'customer-views-config', 'customer-incident-report',
-        'customer-satisfaction-report', 'customer-be-safe-be-secure',
-        'customer-daily-activity-report', 'customer-incident-graph',
-        'customer-officer-support', 'customer-reporting'
+        'satisfaction-reports', 'be-safe-be-secure-graph',
+        'daily-activity-report', 'incident-graph',
+        'customer-officer-support', 'daily-occurrence-book'
       ]
     };
 

@@ -99,6 +99,27 @@ export const CUSTOMER_ENDPOINTS = {
   PAGE_ASSIGNMENTS: (id: string) => `/customer/${id}/page-assignments`,
 } as const
 
+// Region endpoints
+export const REGION_ENDPOINTS = {
+  LIST: '/region',
+  DETAIL: (id: string) => `/region/${id}`,
+  CREATE: '/region',
+  UPDATE: (id: string) => `/region/${id}`,
+  DELETE: (id: string) => `/region/${id}`,
+  BY_CUSTOMER: (customerId: string) => `/region/customer/${customerId}`,
+} as const
+
+// Site endpoints
+export const SITE_ENDPOINTS = {
+  LIST: '/site',
+  DETAIL: (id: string) => `/site/${id}`,
+  CREATE: '/site',
+  UPDATE: (id: string) => `/site/${id}`,
+  DELETE: (id: string) => `/site/${id}`,
+  BY_CUSTOMER: (customerId: string) => `/site/customer/${customerId}`,
+  BY_REGION: (regionId: string) => `/site/region/${regionId}`,
+} as const
+
 // User endpoints
 export const USER_ENDPOINTS = {
   LIST: '/user',
@@ -116,6 +137,20 @@ export const SITE_VISIT_ENDPOINTS = {
   CREATE: '/site-visits',
   UPDATE: (id: string) => `/site-visits/${id}`,
   DELETE: (id: string) => `/site-visits/${id}`,
+} as const
+
+// Stock endpoints
+export const STOCK_ENDPOINTS = {
+  LIST: '/Stock',
+  DETAIL: (id: string) => `/Stock/${id}`,
+  CREATE: '/Stock',
+  UPDATE: (id: string) => `/Stock/${id}`,
+  DELETE: (id: string) => `/Stock/${id}`,
+  ISSUE: (id: string) => `/Stock/${id}/issue`,
+  ADD: (id: string) => `/Stock/${id}/add`,
+  LOW_STOCK: '/Stock/low-stock',
+  CHECK_LOW_STOCK: '/Stock/check-low-stock',
+  TEST_EMAIL: '/Stock/test-email',
 } as const
 
 // Action Calendar endpoints

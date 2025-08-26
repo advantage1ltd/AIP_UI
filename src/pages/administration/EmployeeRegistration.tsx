@@ -92,6 +92,8 @@ export default function EmployeeRegistration() {
           description: `${created.firstName} ${created.surname} has been created`,
         })
       }
+      // Clear selected employee and close dialog
+      setSelectedEmployee(null)
       setIsDialogOpen(false)
     } catch (error) {
       toast({
@@ -147,7 +149,12 @@ export default function EmployeeRegistration() {
         </div>
 
         {/* Employee Form Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open)
+          if (!open) {
+            setSelectedEmployee(null)
+          }
+        }}>
           <DialogContent className="max-w-[95vw] sm:max-w-[500px] xl:max-w-[800px] p-4 sm:p-6 xl:p-8 max-h-[95vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-lg md:text-xl xl:text-2xl 2xl:text-3xl">
@@ -161,7 +168,10 @@ export default function EmployeeRegistration() {
             </DialogHeader>
             <EmployeeForm
               onSubmit={handleSubmit}
-              onCancel={() => setIsDialogOpen(false)}
+              onCancel={() => {
+                setIsDialogOpen(false)
+                setSelectedEmployee(null)
+              }}
               initialData={selectedEmployee || undefined}
               isLoading={isLoading}
             />

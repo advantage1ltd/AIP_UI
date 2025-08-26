@@ -1,17 +1,10 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useState, useEffect } from "react"
-import { regionsService } from "@/services/regionsService"
+import { useState, useEffect, useCallback } from "react"
+import { regionService } from "@/services/regionService"
 import type { Region } from "@/types/customer"
-import { RegionDialog } from "./RegionDialog"
 import { Pencil, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,63 +18,25 @@ import {
 import { useToast } from "@/hooks/use-toast"
 
 interface RegionsTableProps {
-  selectedCustomerId: string | null
+  customerId: number | null
+  onEdit: (region: Region) => void
+  onDataChange: () => void
+  updateTrigger?: number
 }
 
-export function RegionsTable({ selectedCustomerId }: RegionsTableProps) {
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [selectedRegion, setSelectedRegion] = useState<Region | undefined>()
+export function RegionsTable({ customerId, onEdit, onDataChange, updateTrigger }: RegionsTableProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [regions, setRegions] = useState<Region[]>([])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [regionToDelete, setRegionToDelete] = useState<Region | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isFetchingRegions, setIsFetchingRegions] = useState(false)
+  const [regions, setRegions] = useState<Region[]>([])
   const { toast } = useToast()
   const itemsPerPage = 10
 
-  // Load regions data
-  const loadRegions = async () => {
-    setIsLoading(true)
-    try {
-      const result = await regionsService.getRegions()
-      if (result.success) {
-        setRegions(result.data)
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to load regions",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while loading regions",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadRegions()
-  }, [])
-
-  const currentRegions = selectedCustomerId
-    ? regions.filter(region => region.customerId === selectedCustomerId)
-    : []
-
-  const handleEdit = (region: Region) => {
-    setSelectedRegion(region)
-    setDialogOpen(true)
-  }
-
-  const handleNewRegion = () => {
-    setSelectedRegion(undefined)
-    setDialogOpen(true)
-  }
+  // Ensure regions is always an array
+  const safeRegions = regions || []
 
   const handleDeleteClick = (region: Region) => {
     setRegionToDelete(region)
@@ -91,15 +46,16 @@ export function RegionsTable({ selectedCustomerId }: RegionsTableProps) {
   const handleDeleteConfirm = async () => {
     if (!regionToDelete) return
 
+    setIsLoading(true)
     try {
-      const result = await regionsService.deleteRegion(regionToDelete.id)
+      const result = await regionService.deleteRegion(regionToDelete.regionID)
       
       if (result.success) {
         toast({
           title: "Success",
           description: "Region deleted successfully",
         })
-        await loadRegions() // Refresh the data
+        onDataChange() // Refresh the data
       } else {
         toast({
           title: "Error",
@@ -114,22 +70,18 @@ export function RegionsTable({ selectedCustomerId }: RegionsTableProps) {
         variant: "destructive",
       })
     } finally {
+      setIsLoading(false)
       setDeleteDialogOpen(false)
       setRegionToDelete(null)
     }
   }
 
-  const handleDialogSuccess = async () => {
-    await loadRegions() // Refresh the data after successful creation/update
-  }
-
   // Filter by search query
-  const filteredRegions = currentRegions.filter(region => {
+  const filteredRegions = safeRegions.filter(region => {
     const searchLower = searchQuery.toLowerCase()
     return (
-      region.name.toLowerCase().includes(searchLower) ||
-      region.manager.toLowerCase().includes(searchLower) ||
-      region.status.toLowerCase().includes(searchLower)
+      region.regionName.toLowerCase().includes(searchLower) ||
+      (region.regionDescription?.toLowerCase().includes(searchLower) || false)
     )
   })
 
@@ -139,12 +91,54 @@ export function RegionsTable({ selectedCustomerId }: RegionsTableProps) {
   const endIndex = startIndex + itemsPerPage
   const currentRegionsTable = filteredRegions.slice(startIndex, endIndex)
 
+  // Fetch regions when customerId changes or onDataChange is called
+  const fetchRegions = useCallback(async () => {
+    if (!customerId) {
+      setRegions([])
+      return
+    }
+
+    setIsFetchingRegions(true)
+    try {
+      console.log('🔄 [RegionsTable] Fetching regions for customer:', customerId)
+      const result = await regionService.getRegionsByCustomer(customerId)
+      
+      if (result.success) {
+        console.log('✅ [RegionsTable] Successfully fetched regions:', result.data.length)
+        setRegions(result.data)
+      } else {
+        console.error('❌ [RegionsTable] Failed to fetch regions:', result.data)
+        setRegions([])
+        toast({
+          title: "Error",
+          description: "Failed to load regions",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('❌ [RegionsTable] Error fetching regions:', error)
+      setRegions([])
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while loading regions",
+        variant: "destructive",
+      })
+    } finally {
+      setIsFetchingRegions(false)
+    }
+  }, [customerId, toast])
+
+  // Fetch regions when customerId changes or component mounts
+  useEffect(() => {
+    fetchRegions()
+  }, [fetchRegions, onDataChange, updateTrigger])
+
   // Reset page when search changes
   useEffect(() => {
     setCurrentPage(1)
   }, [searchQuery])
 
-  if (!selectedCustomerId) {
+  if (!customerId) {
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
@@ -159,11 +153,6 @@ export function RegionsTable({ selectedCustomerId }: RegionsTableProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Regions</h2>
-        <Button onClick={handleNewRegion}>Add Region</Button>
-      </div>
-
       {/* Search */}
       <div className="flex items-center space-x-2">
         <div className="relative flex-1 max-w-sm">
@@ -177,9 +166,11 @@ export function RegionsTable({ selectedCustomerId }: RegionsTableProps) {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="text-center py-8 text-gray-500">Loading regions...</div>
-      ) : currentRegions.length === 0 ? (
+      {isFetchingRegions ? (
+        <div className="text-center py-8 text-gray-500">
+          Loading regions...
+        </div>
+      ) : safeRegions.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           No regions found for this customer. Click "Add Region" to create one.
         </div>
@@ -193,32 +184,39 @@ export function RegionsTable({ selectedCustomerId }: RegionsTableProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Manager</TableHead>
+                  <TableHead>Region Name</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {currentRegionsTable.map((region) => (
-                  <TableRow key={region.id}>
-                    <TableCell className="font-medium">{region.name}</TableCell>
-                    <TableCell>{region.manager}</TableCell>
+                  <TableRow key={region.regionID}>
+                    <TableCell className="font-medium">{region.regionName}</TableCell>
+                    <TableCell className="max-w-xs truncate">
+                      {region.regionDescription || "No description"}
+                    </TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs ${
-                        region.status === 'active' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
+                        region.recordIsDeletedYN 
+                          ? 'bg-red-100 text-red-800' 
+                          : 'bg-green-100 text-green-800'
                       }`}>
-                        {region.status}
+                        {region.recordIsDeletedYN ? 'Deleted' : 'Active'}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(region.dateCreated).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEdit(region)}
+                          onClick={() => onEdit(region)}
+                          disabled={region.recordIsDeletedYN}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -227,6 +225,7 @@ export function RegionsTable({ selectedCustomerId }: RegionsTableProps) {
                           size="sm"
                           onClick={() => handleDeleteClick(region)}
                           className="text-red-600 hover:text-red-700"
+                          disabled={isLoading}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -272,20 +271,12 @@ export function RegionsTable({ selectedCustomerId }: RegionsTableProps) {
         </>
       )}
 
-      <RegionDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        region={selectedRegion}
-        selectedCustomerId={selectedCustomerId}
-        onSuccess={handleDialogSuccess}
-      />
-
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Region</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{regionToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to delete "{regionToDelete?.regionName}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -293,8 +284,9 @@ export function RegionsTable({ selectedCustomerId }: RegionsTableProps) {
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               className="bg-red-600 hover:bg-red-700"
+              disabled={isLoading}
             >
-              Delete
+              {isLoading ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
