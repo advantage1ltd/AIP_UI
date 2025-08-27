@@ -210,11 +210,12 @@ const UserSetup = () => {
       const detail = await userService.getUserById(user.id)
 
       const role = ((detail as any).role ?? (detail as any).Role) as UserRole
+      
       const base = {
         id: (detail as any).id ?? (detail as any).Id,
         username: (detail as any).username ?? (detail as any).Username,
-        firstName: (detail as any).firstName ?? (detail as any).FirstName,
-        lastName: (detail as any).lastName ?? (detail as any).LastName,
+        firstName: (detail as any).firstName ?? (detail as any).FirstName ?? '',
+        lastName: (detail as any).lastName ?? (detail as any).LastName ?? '',
         email: (detail as any).email ?? (detail as any).Email,
         role,
         pageAccessRole: ((detail as any).pageAccessRole ?? (detail as any).PageAccessRole ?? role) as UserRole,
@@ -225,6 +226,8 @@ const UserSetup = () => {
         recordIsDeleted: (detail as any).recordIsDeleted ?? (detail as any).RecordIsDeleted ?? false,
         createdAt: (detail as any).createdAt ?? (detail as any).CreatedAt ?? new Date().toISOString(),
         updatedAt: (detail as any).updatedAt ?? (detail as any).UpdatedAt ?? new Date().toISOString(),
+        employeeId: (detail as any).employeeId ?? (detail as any).EmployeeId,
+        employeeName: (detail as any).employeeName ?? (detail as any).EmployeeName,
       }
 
       let normalized: User
@@ -419,10 +422,10 @@ const UserSetup = () => {
                     <TableCell className="py-2 sm:py-3">
                     <div className="flex items-center gap-2">
                         <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-medium text-xs sm:text-sm">
-                        {user.firstName[0]}{user.lastName[0]}
+                        {(user.firstName?.[0] || 'U')}{(user.lastName?.[0] || '')}
                       </div>
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium text-xs sm:text-sm truncate">{user.firstName} {user.lastName}</div>
+                          <div className="font-medium text-xs sm:text-sm truncate">{user.firstName || 'Unknown'} {user.lastName || ''}</div>
                           <div className="text-xs text-gray-500 truncate">{user.username}</div>
                         </div>
                     </div>
@@ -451,6 +454,11 @@ const UserSetup = () => {
                         <span className="font-medium text-xs sm:text-sm">
                         {'assignedCustomerIds' in user ? user.assignedCustomerIds?.length || 0 : 0}
                       </span>
+                      {('assignedCustomerNames' in user && user.assignedCustomerNames && user.assignedCustomerNames.length > 0) && (
+                        <div className="text-xs text-gray-500 truncate max-w-[200px]" title={user.assignedCustomerNames.join(', ')}>
+                          {user.assignedCustomerNames.join(', ')}
+                        </div>
+                      )}
                     </div>
                   </TableCell>
                     <TableCell className="py-2 sm:py-3">
@@ -624,11 +632,11 @@ const UserSetup = () => {
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <div className="text-xs text-gray-500 mb-1">First Name</div>
-                      <div className="font-medium text-base">{viewUser.firstName}</div>
+                      <div className="font-medium text-base">{viewUser.firstName || 'N/A'}</div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Last Name</div>
-                      <div className="font-medium text-base">{viewUser.lastName}</div>
+                      <div className="font-medium text-base">{viewUser.lastName || 'N/A'}</div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Username</div>

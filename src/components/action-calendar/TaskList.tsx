@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
@@ -232,6 +232,9 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
         <DialogContent className="w-[95vw] max-w-[425px] p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Update Task Status</DialogTitle>
+            <DialogDescription>
+              Change the task status and add any relevant notes about the update.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2 sm:py-4">
             <div className="space-y-2">
@@ -270,6 +273,9 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
         <DialogContent className="w-[95vw] max-w-[500px] p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Edit Task</DialogTitle>
+            <DialogDescription>
+              Update the task details below. All fields are required.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2 sm:py-4">
             <div className="space-y-2">

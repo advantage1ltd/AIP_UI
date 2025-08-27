@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -62,10 +62,13 @@ export function VettingDialog({ open, onOpenChange, candidate, onSubmit }: Vetti
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>
+          <DialogHeader>
+            <DialogTitle>
             {candidate ? "Edit Candidate" : "Add New Candidate"}
           </DialogTitle>
+            <DialogDescription>
+              Enter the vetting details below. All required fields must be completed.
+            </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

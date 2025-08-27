@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -686,6 +686,9 @@ export default function CustomerDailyOccurrenceBook() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Occurrence</DialogTitle>
+            <DialogDescription>
+              Enter the occurrence details below. All required fields must be completed.
+            </DialogDescription>
           </DialogHeader>
           
           <div className="grid gap-4">
@@ -848,6 +851,9 @@ export default function CustomerDailyOccurrenceBook() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Occurrence</DialogTitle>
+            <DialogDescription>
+              Update the occurrence details below. All required fields must be completed.
+            </DialogDescription>
           </DialogHeader>
           
           <div className="grid gap-4">
@@ -1006,6 +1012,9 @@ export default function CustomerDailyOccurrenceBook() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Occurrence Details</DialogTitle>
+            <DialogDescription>
+              View the complete details of this occurrence below.
+            </DialogDescription>
           </DialogHeader>
           
           {selectedOccurrence && (

@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription
 } from '@/components/ui/dialog'
 import { UserForm } from './UserForm'
 import { User, CreateUserInput, UpdateUserInput } from '@/types/user'
@@ -24,10 +25,13 @@ export const UserDialog = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
+          <DialogHeader>
+            <DialogTitle>
             {user ? 'Edit User' : 'Create New User'}
           </DialogTitle>
+            <DialogDescription>
+              Enter the user details below. All required fields must be completed.
+            </DialogDescription>
         </DialogHeader>
         <UserForm
           initialData={user}

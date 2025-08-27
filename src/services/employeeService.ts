@@ -241,6 +241,21 @@ class EmployeeService {
   }
 
   /**
+   * Get all active employees for assignment
+   */
+  async getActiveEmployees(): Promise<Employee[]> {
+    try {
+      const response = await api.get<ApiResponse<EmployeeDetailResponse[]>>(
+        EMPLOYEE_ENDPOINTS.ACTIVE
+      )
+      return mapFromListResponseArray(response.data.data)
+    } catch (error) {
+      console.error('❌ [EmployeeService] Failed to fetch active employees:', error)
+      throw new Error(handleApiError(error))
+    }
+  }
+
+  /**
    * Get employee by ID
    */
   async getEmployeeById(id: number): Promise<EmployeeDetailResponse> {

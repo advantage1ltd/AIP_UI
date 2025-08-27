@@ -1,9 +1,9 @@
 // src/pages/ActionCalendar.tsx
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Calendar } from "@/components/ui/calendar"
 import { AddTaskForm } from "@/components/action-calendar/AddTaskForm"
 import { TaskList } from "@/components/action-calendar/TaskList"
@@ -20,7 +20,8 @@ import {
   ArrowDownCircle,
   Calendar as CalendarIcon,
   Filter,
-  Lock
+  Lock,
+  Loader2
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { startOfWeek, endOfWeek, isSameWeek, isSameDay, isSameMonth, format, isToday } from "date-fns"
@@ -28,6 +29,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { actionCalendarService, ActionCalendarTask } from "@/services/actionCalendarService"
 
 export type Task = {
   id: string
@@ -43,12 +45,65 @@ export type Task = {
 const ActionCalendar = () => {
   const [date, setDate] = useState<Date>(new Date())
   const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [statistics, setStatistics] = useState({
+    total: 0,
+    completed: 0,
+    inProgress: 0,
+    pending: 0,
+    blocked: 0,
+    highPriority: 0,
+    dueToday: 0,
+    overdue: 0
+  })
   const [activeTab, setActiveTab] = useState<string>("day")
   const { toast } = useToast()
   const { currentRole } = usePageAccess()
   const isAdmin = currentRole === 'Administrator'
 
-  const handleAddTask = (newTask: Omit<Task, 'id' | 'status'>) => {
+  // Load tasks from backend
+  const loadTasks = async () => {
+    try {
+      setLoading(true)
+      const response = await actionCalendarService.getTasks()
+      if (response.success) {
+        const convertedTasks = response.data.map(task => actionCalendarService.convertToFrontendFormat(task))
+        setTasks(convertedTasks)
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to load tasks",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error loading tasks:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load tasks from server",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Load statistics from backend
+  const loadStatistics = async () => {
+    try {
+      const stats = await actionCalendarService.getStatistics()
+      setStatistics(stats)
+    } catch (error) {
+      console.error('Error loading statistics:', error)
+    }
+  }
+
+  useEffect(() => {
+    loadTasks()
+    loadStatistics()
+  }, [])
+
+  const handleAddTask = async (newTask: Omit<Task, 'id' | 'status'>) => {
     if (!isAdmin) {
       toast({
         title: "Access Denied",
@@ -58,19 +113,40 @@ const ActionCalendar = () => {
       return
     }
 
-    const task: Task = {
-      ...newTask,
-      id: Math.random().toString(36).substr(2, 9),
-      status: 'pending' as const,
+    try {
+      const backendTask = actionCalendarService.convertToBackendFormat({
+        ...newTask,
+        status: 'pending'
+      })
+
+      const response = await actionCalendarService.createTask(backendTask)
+      
+      if (response.success) {
+        const convertedTask = actionCalendarService.convertToFrontendFormat(response.data)
+        setTasks([...tasks, convertedTask])
+        await loadStatistics() // Refresh statistics
+        toast({
+          title: "Task Added",
+          description: "Your task has been successfully created.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to create task",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error creating task:', error)
+      toast({
+        title: "Error",
+        description: "Failed to create task",
+        variant: "destructive"
+      })
     }
-    setTasks([...tasks, task])
-    toast({
-      title: "Task Added",
-      description: "Your task has been successfully created.",
-    })
   }
 
-  const handleUpdateTaskStatus = (taskId: string, newStatus: Task['status'], notes?: string) => {
+  const handleUpdateTaskStatus = async (taskId: string, newStatus: Task['status'], notes?: string) => {
     if (!isAdmin) {
       toast({
         title: "Access Denied",
@@ -80,16 +156,44 @@ const ActionCalendar = () => {
       return
     }
 
-    setTasks(tasks.map(task =>
-      task.id === taskId ? { ...task, status: newStatus, statusNotes: notes } : task
-    ))
-    toast({
-      title: "Task Updated",
-      description: "Task status has been successfully updated.",
-    })
+    try {
+      const task = tasks.find(t => t.id === taskId)
+      if (!task) return
+
+      const backendTask = actionCalendarService.convertToBackendFormat({
+        ...task,
+        status: newStatus,
+        description: notes || task.description
+      })
+
+      const response = await actionCalendarService.updateTask(parseInt(taskId), backendTask)
+      
+      if (response.success) {
+        const updatedTask = actionCalendarService.convertToFrontendFormat(response.data)
+        setTasks(tasks.map(t => t.id === taskId ? updatedTask : t))
+        await loadStatistics() // Refresh statistics
+        toast({
+          title: "Task Updated",
+          description: "Task status has been successfully updated.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to update task",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error updating task:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update task",
+        variant: "destructive"
+      })
+    }
   }
 
-  const handleUpdateTask = (taskId: string, updatedTask: Partial<Task>) => {
+  const handleUpdateTask = async (taskId: string, updatedTask: Partial<Task>) => {
     if (!isAdmin) {
       toast({
         title: "Access Denied",
@@ -99,12 +203,43 @@ const ActionCalendar = () => {
       return
     }
 
-    setTasks(tasks.map(task =>
-      task.id === taskId ? { ...task, ...updatedTask } : task
-    ))
+    try {
+      const task = tasks.find(t => t.id === taskId)
+      if (!task) return
+
+      const backendTask = actionCalendarService.convertToBackendFormat({
+        ...task,
+        ...updatedTask
+      })
+
+      const response = await actionCalendarService.updateTask(parseInt(taskId), backendTask)
+      
+      if (response.success) {
+        const updatedTask = actionCalendarService.convertToFrontendFormat(response.data)
+        setTasks(tasks.map(t => t.id === taskId ? updatedTask : t))
+        await loadStatistics() // Refresh statistics
+        toast({
+          title: "Task Updated",
+          description: "Task has been successfully updated.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to update task",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error updating task:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update task",
+        variant: "destructive"
+      })
+    }
   }
 
-  const handleDeleteTask = (taskId: string) => {
+  const handleDeleteTask = async (taskId: string) => {
     if (!isAdmin) {
       toast({
         title: "Access Denied",
@@ -114,18 +249,62 @@ const ActionCalendar = () => {
       return
     }
 
-    setTasks(tasks.filter(task => task.id !== taskId))
+    try {
+      const response = await actionCalendarService.deleteTask(parseInt(taskId))
+      
+      if (response.success) {
+        setTasks(tasks.filter(task => task.id !== taskId))
+        await loadStatistics() // Refresh statistics
+        toast({
+          title: "Task Deleted",
+          description: "Task has been successfully deleted.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to delete task",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete task",
+        variant: "destructive"
+      })
+    }
   }
 
-  // Task statistics
-  const taskStats = {
-    total: tasks.length,
-    completed: tasks.filter(task => task.status === 'completed').length,
-    inProgress: tasks.filter(task => task.status === 'in-progress').length,
-    pending: tasks.filter(task => task.status === 'pending').length,
-    blocked: tasks.filter(task => task.status === 'blocked').length,
-    highPriority: tasks.filter(task => task.priority === 'high').length,
-    dueToday: tasks.filter(task => isSameDay(new Date(task.date), new Date())).length,
+  // Loading state
+  if (loading) {
+    return (
+      <div className="w-full h-full bg-gray-50">
+        <div className="bg-white border-b">
+          <div className="px-6 py-4 max-w-[1600px] mx-auto">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+                  Action Calendar
+                </h1>
+                <p className="text-sm text-gray-500 mt-1">
+                  {isAdmin 
+                    ? "Plan, organize, and assign tasks efficiently"
+                    : "View your assigned tasks and their status"
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500 mx-auto mb-4" />
+            <p className="text-sm text-gray-500">Loading tasks...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -159,9 +338,12 @@ const ActionCalendar = () => {
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[550px]">
-                      <DialogHeader>
-                        <DialogTitle>Create New Task</DialogTitle>
-                      </DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Create New Task</DialogTitle>
+            <DialogDescription>
+              Fill in the details below to create a new task. All fields are required.
+            </DialogDescription>
+          </DialogHeader>
                       <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
                     </DialogContent>
                   </Dialog>
@@ -192,7 +374,7 @@ const ActionCalendar = () => {
                   <p className="text-xs sm:text-sm font-medium text-blue-100">Total Tasks</p>
                   <ListTodo className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-100" />
                 </div>
-                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{taskStats.total}</p>
+                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{statistics.total}</p>
                 <p className="text-[10px] sm:text-xs text-blue-100 mt-0.5 sm:mt-1">All time</p>
               </CardContent>
             </Card>
@@ -203,8 +385,8 @@ const ActionCalendar = () => {
                   <p className="text-xs sm:text-sm font-medium text-green-100">Completed</p>
                   <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-100" />
                 </div>
-                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{taskStats.completed}</p>
-                <p className="text-[10px] sm:text-xs text-green-100 mt-0.5 sm:mt-1">{taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0}% of total</p>
+                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{statistics.completed}</p>
+                <p className="text-[10px] sm:text-xs text-green-100 mt-0.5 sm:mt-1">{statistics.total > 0 ? Math.round((statistics.completed / statistics.total) * 100) : 0}% of total</p>
               </CardContent>
             </Card>
             
@@ -214,8 +396,8 @@ const ActionCalendar = () => {
                   <p className="text-xs sm:text-sm font-medium text-amber-100">In Progress</p>
                   <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-100" />
                 </div>
-                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{taskStats.inProgress}</p>
-                <p className="text-[10px] sm:text-xs text-amber-100 mt-0.5 sm:mt-1">{taskStats.total > 0 ? Math.round((taskStats.inProgress / taskStats.total) * 100) : 0}% of total</p>
+                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{statistics.inProgress}</p>
+                <p className="text-[10px] sm:text-xs text-amber-100 mt-0.5 sm:mt-1">{statistics.total > 0 ? Math.round((statistics.inProgress / statistics.total) * 100) : 0}% of total</p>
               </CardContent>
             </Card>
             
@@ -225,7 +407,7 @@ const ActionCalendar = () => {
                   <p className="text-xs sm:text-sm font-medium text-red-100">Due Today</p>
                   <CalendarIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-100" />
                 </div>
-                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{taskStats.dueToday}</p>
+                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{statistics.dueToday}</p>
                 <p className="text-[10px] sm:text-xs text-red-100 font-medium mt-0.5 sm:mt-1">Urgent</p>
               </CardContent>
             </Card>
@@ -296,7 +478,7 @@ const ActionCalendar = () => {
                           <span className="text-sm sm:text-md text-gray-700">High Priority</span>
                         </div>
                         <Badge variant="outline" className="text-sm sm:text-md bg-white text-gray-700 border-gray-200">
-                          {taskStats.highPriority}
+                          {statistics.highPriority}
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between p-3 sm:p-4 bg-white rounded-lg border border-gray-100">
@@ -409,8 +591,11 @@ const ActionCalendar = () => {
                                   </Button>
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-[550px]">
-                                  <DialogHeader>
-                                    <DialogTitle>Create New Task</DialogTitle>
+          <DialogHeader>
+            <DialogTitle>Create New Task</DialogTitle>
+            <DialogDescription>
+              Fill in the details below to create a new task. All fields are required.
+            </DialogDescription>
                                   </DialogHeader>
                                   <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
                                 </DialogContent>
@@ -460,8 +645,11 @@ const ActionCalendar = () => {
                                   </Button>
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-[550px]">
-                                  <DialogHeader>
-                                    <DialogTitle>Create New Task</DialogTitle>
+          <DialogHeader>
+            <DialogTitle>Create New Task</DialogTitle>
+            <DialogDescription>
+              Fill in the details below to create a new task. All fields are required.
+            </DialogDescription>
                                   </DialogHeader>
                                   <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
                                 </DialogContent>
@@ -511,8 +699,11 @@ const ActionCalendar = () => {
                                   </Button>
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-[550px]">
-                                  <DialogHeader>
-                                    <DialogTitle>Create New Task</DialogTitle>
+          <DialogHeader>
+            <DialogTitle>Create New Task</DialogTitle>
+            <DialogDescription>
+              Fill in the details below to create a new task. All fields are required.
+            </DialogDescription>
                                   </DialogHeader>
                                   <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
                                 </DialogContent>

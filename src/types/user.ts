@@ -73,6 +73,8 @@ export interface BaseUser {
   recordIsDeleted?: boolean;
   createdAt: string;
   updatedAt: string;
+  employeeId?: number;
+  employeeName?: string;
 }
 
 export interface CustomerUser extends BaseUser {
@@ -83,6 +85,7 @@ export interface CustomerUser extends BaseUser {
 export interface AdvantageOneUser extends BaseUser {
   role: Extract<UserRole, 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator'>;
   assignedCustomerIds?: number[];
+  assignedCustomerNames?: string[];
 }
 
 export type User = CustomerUser | AdvantageOneUser;

@@ -162,14 +162,14 @@ class ActionCalendarService {
   convertToBackendFormat(task: any): CreateActionCalendarTask {
     return {
       taskTitle: task.title,
-      taskDescription: task.description,
+      taskDescription: task.description || '',
       taskStatus: task.status,
       priorityLevel: task.priority,
       assignTo: task.assignee,
       dueDate: task.date instanceof Date ? task.date.toISOString() : task.date,
-      email: task.email,
+      email: task.email || '',
       isRecurring: task.isRecurring || false,
-      reminderDate: task.reminderDate,
+      reminderDate: task.reminderDate ? (task.reminderDate instanceof Date ? task.reminderDate.toISOString() : task.reminderDate) : undefined,
     };
   }
 

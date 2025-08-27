@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription
 } from '@/components/ui/dialog'
 import {
   Form,
@@ -60,8 +61,11 @@ export function LicenseForm({ open, onClose, onSubmit, initialData }: LicenseFor
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>{initialData ? 'Edit License' : 'Add New License'}</DialogTitle>
+          <DialogHeader>
+            <DialogTitle>{initialData ? 'Edit License' : 'Add New License'}</DialogTitle>
+            <DialogDescription>
+              Enter the license details below. All required fields must be completed.
+            </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

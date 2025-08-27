@@ -22,7 +22,9 @@ api.interceptors.request.use(
       hasToken: !!token,
       tokenLength: token ? token.length : 0,
       tokenStart: token ? token.substring(0, 20) + '...' : 'none',
-      data: config.data
+      data: config.data,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`
     })
     
     // Skip authentication for test endpoints
@@ -33,6 +35,9 @@ api.interceptors.request.use(
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+      console.log('🔑 [API Interceptor] Added Authorization header:', `Bearer ${token.substring(0, 20)}...`)
+    } else {
+      console.warn('⚠️ [API Interceptor] No auth token found for request:', config.url)
     }
     return config
   },
@@ -59,12 +64,15 @@ api.interceptors.response.use(
       message: error.message,
       responseData: error.response?.data,
       requestData: error.config?.data,
+      headers: error.config?.headers,
+      authHeader: error.config?.headers?.Authorization ? 'Present' : 'Missing',
       error: error
     })
     
     if (error.response?.status === 401) {
       console.warn('⚠️ [API Interceptor] Unauthorized access detected')
       console.log('🔍 [API Interceptor] Current auth token:', localStorage.getItem('authToken'))
+      console.log('🔍 [API Interceptor] Request headers:', error.config?.headers)
       
       // Only redirect to login if we're not already on the login page
       if (!window.location.pathname.includes('/login')) {
@@ -86,6 +94,7 @@ export const EMPLOYEE_ENDPOINTS = {
   DELETE: (id: string) => `/employee/${id}`,
   REGISTER: '/employee',
   STATISTICS: '/employee/statistics',
+  ACTIVE: '/employee/active',
 } as const
 
 // Customer endpoints

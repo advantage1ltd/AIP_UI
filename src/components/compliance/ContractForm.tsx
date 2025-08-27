@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription
 } from '@/components/ui/dialog'
 import {
   Form,
@@ -65,8 +66,11 @@ export function ContractForm({ open, onClose, onSubmit, initialData }: ContractF
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>{initialData ? 'Edit Contract' : 'Add New Contract'}</DialogTitle>
+          <DialogHeader>
+            <DialogTitle>{initialData ? 'Edit Contract' : 'Add New Contract'}</DialogTitle>
+            <DialogDescription>
+              Enter the contract details below. All required fields must be completed.
+            </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

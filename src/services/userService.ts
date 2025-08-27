@@ -1,29 +1,19 @@
-import { User, CreateUserInput, UpdateUserInput } from '@/types/user'
-import { api, USER_ENDPOINTS, ApiResponse, handleApiError } from '@/config/api'
+import { api } from '@/config/api'
+import { User, CreateUserInput, UpdateUserInput, UsersResponse, CustomerUser, AdvantageOneUser, UserRole } from '@/types/user'
 
-export interface UserCreateRequest {
+export interface CreateUserRequest {
   username: string
   email: string
-  firstName: string
-  lastName: string
+  password?: string
   role: string
-  pageAccessRole: string
-  signature?: string
-  signatureCode?: string
-  jobTitle?: string
+  employeeId?: number
+  phoneNumber?: string
   userCompany?: string
-  isActive?: boolean
-  password: string
-  confirmPassword: string
   assignedCustomerIds?: number[]
-  customerId?: number
 }
 
-export interface UserUpdateRequest extends Partial<UserCreateRequest> {
-  id: string
-}
-
-export interface UserDetailResponse {
+// Backend response interfaces
+export interface BackendUserResponse {
   id: string
   username: string
   firstName: string
@@ -35,405 +25,381 @@ export interface UserDetailResponse {
   signatureCode?: string
   jobTitle?: string
   userCompany?: string
+  recordIsDeleted: boolean
   isActive: boolean
-  assignedCustomerIds?: number[]
-  customerId?: number
   createdAt: string
-  updatedAt: string
+  updatedAt?: string
   createdBy?: string
   updatedBy?: string
+  lastLoginAt?: string
+  phoneNumber?: string
+  emailConfirmed: boolean
+  employeeId?: number
+  employeeName?: string
+  assignedCustomerIds?: number[] | string // Can be array or JSON string
+  assignedCustomerNames?: string[]
 }
 
-export interface UserListResponse {
-  items: UserDetailResponse[]
+export interface BackendUserListResponse {
+  users: BackendUserResponse[]
   totalCount: number
-  pageNumber: number
+  page: number
   pageSize: number
-  totalPages: number
-  hasPreviousPage: boolean
-  hasNextPage: boolean
-}
-
-export interface UserStatistics {
-  totalUsers: number
-  activeUsers: number
-  inactiveUsers: number
-  usersByRole: Record<string, number>
-  newUsersThisMonth: number
 }
 
 class UserService {
+  private baseUrl = '/User'
+
+  // Helper function to parse assignedCustomerIds
+  private parseAssignedCustomerIds(customerIds: any): number[] {
+    if (!customerIds) return [];
+    if (Array.isArray(customerIds)) return customerIds;
+    if (typeof customerIds === 'string') {
+      try {
+        const parsed = JSON.parse(customerIds);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        console.error('Error parsing assignedCustomerIds:', error);
+        return [];
+      }
+    }
+    return [];
+  }
+
   /**
-   * Create a new user
+   * Creates a new user account with optional employee linking
    */
-  async createUser(userData: UserCreateRequest): Promise<UserDetailResponse> {
-    console.log('🔄 [UserService] Creating user via real API', { 
-      username: userData.username, 
-      role: userData.role,
-      assignedCustomerIds: userData.assignedCustomerIds 
-    })
-    
+  async createUser(userData: CreateUserRequest): Promise<User> {
     try {
-      const response = await api.post<ApiResponse<UserDetailResponse>>(
-        USER_ENDPOINTS.CREATE,
-        userData
-      )
+      console.log('🔄 [UserService] Creating user:', userData)
+      const response = await api.post(`${this.baseUrl}/create`, userData)
+      console.log('✅ [UserService] User created successfully:', response.data)
       
-      console.log('✅ [UserService] User created successfully via real API', { 
-        id: response.data.data.id,
-        username: response.data.data.username 
-      })
-      
-      return response.data.data
+      // Transform backend response to frontend format
+      const backendUser = response.data as BackendUserResponse
+      return {
+        id: backendUser.id,
+        username: backendUser.username,
+        firstName: backendUser.firstName,
+        lastName: backendUser.lastName,
+        email: backendUser.email,
+        role: backendUser.role as UserRole,
+        pageAccessRole: backendUser.pageAccessRole as UserRole,
+        signature: backendUser.signature,
+        signatureCode: backendUser.signatureCode,
+        jobTitle: backendUser.jobTitle,
+        userCompany: backendUser.userCompany as any,
+        recordIsDeleted: backendUser.recordIsDeleted,
+        createdAt: backendUser.createdAt,
+        updatedAt: backendUser.updatedAt || backendUser.createdAt,
+        employeeId: backendUser.employeeId,
+        employeeName: backendUser.employeeName,
+        assignedCustomerIds: this.parseAssignedCustomerIds(backendUser.assignedCustomerIds),
+        assignedCustomerNames: backendUser.assignedCustomerNames || [],
+        phoneNumber: backendUser.phoneNumber,
+        emailConfirmed: backendUser.emailConfirmed,
+        lastLoginAt: backendUser.lastLoginAt
+      } as User
     } catch (error) {
-      console.error('❌ [UserService] User creation failed via real API:', error)
-      throw new Error(handleApiError(error))
+      console.error('❌ [UserService] Error creating user:', error)
+      throw new Error('Failed to create user account')
     }
   }
 
   /**
-   * Update user
+   * Gets all users with pagination
    */
-  async updateUser(userData: UserUpdateRequest): Promise<UserDetailResponse> {
-    console.log('🔄 [UserService] Updating user via real API', { 
-      id: userData.id,
-      role: userData.role,
-      assignedCustomerIds: userData.assignedCustomerIds 
-    })
-    
+  async getUsers(params?: { page?: number; pageSize?: number; searchTerm?: string }): Promise<UsersResponse> {
     try {
-      const response = await api.put<ApiResponse<UserDetailResponse>>(
-        USER_ENDPOINTS.UPDATE(userData.id),
-        userData
-      )
+      console.log('🔄 [UserService] Fetching users with params:', params)
+      const response = await api.get(`${this.baseUrl}/list`, {
+        params: { 
+          page: params?.page || 1, 
+          pageSize: params?.pageSize || 10 
+        }
+      })
+      console.log('✅ [UserService] Raw backend response:', response.data)
       
-      console.log('✅ [UserService] User updated successfully via real API', { 
-        id: response.data.data.id,
-        username: response.data.data.username 
+      // Transform backend response to frontend format
+      const backendResponse = response.data as BackendUserListResponse
+      console.log('✅ [UserService] Backend response users:', backendResponse.users)
+      
+      const transformedUsers = backendResponse.users.map(user => {
+        const baseUser = {
+          id: user.id,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role as UserRole,
+          pageAccessRole: user.pageAccessRole as UserRole,
+          signature: user.signature,
+          signatureCode: user.signatureCode,
+          jobTitle: user.jobTitle,
+          userCompany: user.userCompany as any,
+          recordIsDeleted: user.recordIsDeleted,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt || user.createdAt,
+          employeeId: user.employeeId,
+          employeeName: user.employeeName,
+          phoneNumber: user.phoneNumber,
+          emailConfirmed: user.emailConfirmed,
+          lastLoginAt: user.lastLoginAt
+        };
+
+        // Handle union type based on role
+        if (user.role === 'CustomerSiteManager' || user.role === 'CustomerHOManager') {
+          return {
+            ...baseUser,
+            role: user.role as 'CustomerSiteManager' | 'CustomerHOManager',
+            customerId: 0 // Default value, should be set properly
+          } as CustomerUser;
+        } else {
+          return {
+            ...baseUser,
+            role: user.role as 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator',
+            assignedCustomerIds: this.parseAssignedCustomerIds(user.assignedCustomerIds),
+            assignedCustomerNames: user.assignedCustomerNames || []
+          } as AdvantageOneUser;
+        }
       })
       
-      return response.data.data
+      console.log('✅ [UserService] Transformed users:', transformedUsers)
+      return {
+        success: true,
+        data: transformedUsers,
+        pagination: {
+          currentPage: backendResponse.page,
+          totalPages: Math.ceil(backendResponse.totalCount / backendResponse.pageSize),
+          pageSize: backendResponse.pageSize,
+          totalCount: backendResponse.totalCount
+        }
+      }
     } catch (error) {
-      console.error('❌ [UserService] User update failed via real API:', error)
-      throw new Error(handleApiError(error))
+      console.error('❌ [UserService] Error getting users:', error)
+      throw new Error('Failed to get users')
     }
   }
 
   /**
-   * Delete user
+   * Gets a specific user by ID
+   */
+  async getUserById(userId: string): Promise<User> {
+    try {
+      console.log('🔄 [UserService] Fetching user by ID:', userId)
+      const response = await api.get(`${this.baseUrl}/${userId}`)
+      console.log('✅ [UserService] User fetched successfully:', response.data)
+      
+      // Transform backend response to frontend format
+      const backendUser = response.data as BackendUserResponse
+      return {
+        id: backendUser.id,
+        username: backendUser.username,
+        firstName: backendUser.firstName,
+        lastName: backendUser.lastName,
+        email: backendUser.email,
+        role: backendUser.role as UserRole,
+        pageAccessRole: backendUser.pageAccessRole as UserRole,
+        signature: backendUser.signature,
+        signatureCode: backendUser.signatureCode,
+        jobTitle: backendUser.jobTitle,
+        userCompany: backendUser.userCompany as any,
+        recordIsDeleted: backendUser.recordIsDeleted,
+        createdAt: backendUser.createdAt,
+        updatedAt: backendUser.updatedAt || backendUser.createdAt,
+        employeeId: backendUser.employeeId,
+        employeeName: backendUser.employeeName,
+        assignedCustomerIds: backendUser.assignedCustomerIds || [],
+        assignedCustomerNames: backendUser.assignedCustomerNames || [],
+        phoneNumber: backendUser.phoneNumber,
+        emailConfirmed: backendUser.emailConfirmed,
+        lastLoginAt: backendUser.lastLoginAt
+      } as User
+    } catch (error) {
+      console.error('❌ [UserService] Error getting user:', error)
+      throw new Error('Failed to get user')
+    }
+  }
+
+  /**
+   * Updates a user account
+   */
+  async updateUser(userData: { id: string } & Partial<CreateUserRequest>): Promise<User> {
+    try {
+      const { id, ...updateData } = userData
+      
+      // Ensure assignedCustomerIds is included in the update data
+      if ('assignedCustomerIds' in userData) {
+        (updateData as any).assignedCustomerIds = userData.assignedCustomerIds
+      }
+      
+      console.log('🔄 [UserService] Updating user:', { id, updateData })
+      const response = await api.put(`${this.baseUrl}/${id}`, updateData)
+      console.log('✅ [UserService] User updated successfully:', response.data)
+      
+      // Transform backend response to frontend format
+      const backendUser = response.data as BackendUserResponse
+      return {
+        id: backendUser.id,
+        username: backendUser.username,
+        firstName: backendUser.firstName,
+        lastName: backendUser.lastName,
+        email: backendUser.email,
+        role: backendUser.role as UserRole,
+        pageAccessRole: backendUser.pageAccessRole as UserRole,
+        signature: backendUser.signature,
+        signatureCode: backendUser.signatureCode,
+        jobTitle: backendUser.jobTitle,
+        userCompany: backendUser.userCompany as any,
+        recordIsDeleted: backendUser.recordIsDeleted,
+        createdAt: backendUser.createdAt,
+        updatedAt: backendUser.updatedAt || backendUser.createdAt,
+        employeeId: backendUser.employeeId,
+        employeeName: backendUser.employeeName,
+        assignedCustomerIds: this.parseAssignedCustomerIds(backendUser.assignedCustomerIds),
+        assignedCustomerNames: backendUser.assignedCustomerNames || [],
+        phoneNumber: backendUser.phoneNumber,
+        emailConfirmed: backendUser.emailConfirmed,
+        lastLoginAt: backendUser.lastLoginAt
+      } as User
+    } catch (error) {
+      console.error('❌ [UserService] Error updating user:', error)
+      throw new Error('Failed to update user')
+    }
+  }
+
+  /**
+   * Deletes a user account
    */
   async deleteUser(userId: string): Promise<void> {
-    console.log('🔄 [UserService] Deleting user via real API', { userId })
-    
     try {
-      await api.delete(USER_ENDPOINTS.DELETE(userId))
-      console.log('✅ [UserService] User deleted successfully via real API', { userId })
+      console.log('🔄 [UserService] Deleting user:', userId)
+      await api.delete(`${this.baseUrl}/${userId}`)
+      console.log('✅ [UserService] User deleted successfully')
     } catch (error) {
-      console.error('❌ [UserService] User deletion failed via real API:', error)
-      throw new Error(handleApiError(error))
+      console.error('❌ [UserService] Error deleting user:', error)
+      throw new Error('Failed to delete user')
     }
   }
 
   /**
-   * Get all users with optional filtering and pagination
-   */
-  async getUsers(params?: {
-    page?: number
-    pageSize?: number
-    searchTerm?: string
-    role?: string
-    isActive?: boolean
-    sortBy?: string
-    sortDescending?: boolean
-  }): Promise<UserListResponse> {
-    console.log('🔄 [UserService] Getting users via real API', { params })
-    
-    try {
-      const response = await api.get<ApiResponse<UserListResponse>>(
-        USER_ENDPOINTS.LIST,
-        { params }
-      )
-      
-      console.log('✅ [UserService] Users retrieved successfully via real API', { 
-        totalCount: response.data.data.totalCount,
-        itemsCount: response.data.data.items.length 
-      })
-      
-      return response.data.data
-    } catch (error) {
-      console.error('❌ [UserService] Failed to get users via real API:', error)
-      throw new Error(handleApiError(error))
-    }
-  }
-
-  /**
-   * Get user by ID
-   */
-  async getUserById(id: string): Promise<UserDetailResponse> {
-    console.log('🔄 [UserService] Getting user by ID via real API', { id })
-    
-    try {
-      const response = await api.get<ApiResponse<UserDetailResponse>>(
-        USER_ENDPOINTS.DETAIL(id)
-      )
-      
-      console.log('✅ [UserService] User retrieved successfully via real API', { 
-        id: response.data.data.id,
-        username: response.data.data.username 
-      })
-      
-      return response.data.data
-    } catch (error) {
-      console.error('❌ [UserService] Failed to get user via real API:', error)
-      throw new Error(handleApiError(error))
-    }
-  }
-
-  /**
-   * Get user statistics
-   */
-  async getUserStatistics(): Promise<UserStatistics> {
-    console.log('🔄 [UserService] Getting user statistics via real API')
-    
-    try {
-      const response = await api.get<ApiResponse<UserStatistics>>(
-        `${USER_ENDPOINTS.LIST}/statistics`
-      )
-      
-      console.log('✅ [UserService] User statistics retrieved successfully via real API')
-      
-      return response.data.data
-    } catch (error) {
-      console.error('❌ [UserService] Failed to get user statistics via real API:', error)
-      throw new Error(handleApiError(error))
-    }
-  }
-
-  /**
-   * Assign customers to user
-   */
-  async assignCustomersToUser(userId: string, customerIds: number[]): Promise<UserDetailResponse> {
-    console.log('🔄 [UserService] Assigning customers to user via real API', { userId, customerIds })
-    
-    try {
-      const response = await api.post<ApiResponse<UserDetailResponse>>(
-        USER_ENDPOINTS.ASSIGN_CUSTOMERS(userId),
-        { customerIds }
-      )
-      
-      console.log('✅ [UserService] Customers assigned successfully via real API', { 
-        id: response.data.data.id,
-        assignedCustomerIds: response.data.data.assignedCustomerIds 
-      })
-      
-      return response.data.data
-    } catch (error) {
-      console.error('❌ [UserService] Failed to assign customers via real API:', error)
-      throw new Error(handleApiError(error))
-    }
-  }
-
-  /**
-   * Remove customer assignment from user
-   */
-  async removeCustomerFromUser(userId: string, customerId: number): Promise<UserDetailResponse> {
-    console.log('🔄 [UserService] Removing customer from user via real API', { userId, customerId })
-    
-    try {
-      const response = await api.delete<ApiResponse<UserDetailResponse>>(
-        `${USER_ENDPOINTS.ASSIGN_CUSTOMERS(userId)}/${customerId}`
-      )
-      
-      console.log('✅ [UserService] Customer removed successfully via real API', { 
-        id: response.data.data.id 
-      })
-      
-      return response.data.data
-    } catch (error) {
-      console.error('❌ [UserService] Failed to remove customer via real API:', error)
-      throw new Error(handleApiError(error))
-    }
-  }
-
-  /**
-   * Search users by name or email
-   */
-  async searchUsers(query: string): Promise<UserDetailResponse[]> {
-    console.log('🔄 [UserService] Searching users via real API', { query })
-    
-    try {
-      const response = await api.get<ApiResponse<UserDetailResponse[]>>(
-        `${USER_ENDPOINTS.LIST}/search`,
-        { params: { q: query } }
-      )
-      
-      console.log('✅ [UserService] User search completed via real API', { 
-        resultsCount: response.data.data.length 
-      })
-      
-      return response.data.data
-    } catch (error) {
-      console.error('❌ [UserService] Failed to search users via real API:', error)
-      throw new Error(handleApiError(error))
-    }
-  }
-
-  /**
-   * Get users by role
-   */
-  async getUsersByRole(role: string): Promise<UserDetailResponse[]> {
-    console.log('🔄 [UserService] Getting users by role via real API', { role })
-    
-    try {
-      const response = await api.get<ApiResponse<UserDetailResponse[]>>(
-        `${USER_ENDPOINTS.LIST}/by-role/${role}`
-      )
-      
-      console.log('✅ [UserService] Users by role retrieved via real API', { 
-        role,
-        count: response.data.data.length 
-      })
-      
-      return response.data.data
-    } catch (error) {
-      console.error('❌ [UserService] Failed to get users by role via real API:', error)
-      throw new Error(handleApiError(error))
-    }
-  }
-
-  /**
-   * Get users by customer assignment
-   */
-  async getUsersByCustomer(customerId: number): Promise<UserDetailResponse[]> {
-    console.log('🔄 [UserService] Getting users by customer via real API', { customerId })
-    
-    try {
-      const response = await api.get<ApiResponse<UserDetailResponse[]>>(
-        `${USER_ENDPOINTS.LIST}/by-customer/${customerId}`
-      )
-      
-      console.log('✅ [UserService] Users by customer retrieved via real API', { 
-        customerId,
-        count: response.data.data.length 
-      })
-      
-      return response.data.data
-    } catch (error) {
-      console.error('❌ [UserService] Failed to get users by customer via real API:', error)
-      throw new Error(handleApiError(error))
-    }
-  }
-
-  /**
-   * Change user password
-   */
-  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
-    console.log('🔄 [UserService] Changing user password via real API', { userId })
-    
-    try {
-      await api.post(`${USER_ENDPOINTS.DETAIL(userId)}/change-password`, {
-        currentPassword,
-        newPassword
-      })
-      
-      console.log('✅ [UserService] Password changed successfully via real API', { userId })
-    } catch (error) {
-      console.error('❌ [UserService] Failed to change password via real API:', error)
-      throw new Error(handleApiError(error))
-    }
-  }
-
-  /**
-   * Reset user password (admin only)
+   * Resets a user's password
    */
   async resetPassword(userId: string, newPassword: string): Promise<void> {
-    console.log('🔄 [UserService] Resetting user password via real API', { userId })
-    
     try {
-      await api.post(`${USER_ENDPOINTS.DETAIL(userId)}/reset-password`, {
+      await api.post(`${this.baseUrl}/${userId}/reset-password`, {
         newPassword
       })
-      
-      console.log('✅ [UserService] Password reset successfully via real API', { userId })
     } catch (error) {
-      console.error('❌ [UserService] Failed to reset password via real API:', error)
-      throw new Error(handleApiError(error))
+      console.error('Error resetting password:', error)
+      throw new Error('Failed to reset password')
     }
   }
 
   /**
-   * Activate/deactivate user
+   * Links an existing user to an employee
    */
-  async toggleUserStatus(userId: string, isActive: boolean): Promise<UserDetailResponse> {
-    console.log('🔄 [UserService] Toggling user status via real API', { userId, isActive })
-    
+  async linkToEmployee(userId: string, employeeId: number): Promise<User> {
     try {
-      const response = await api.patch<ApiResponse<UserDetailResponse>>(
-        `${USER_ENDPOINTS.DETAIL(userId)}/status`,
-        { isActive }
-      )
-      
-      console.log('✅ [UserService] User status toggled successfully via real API', { 
-        id: response.data.data.id,
-        isActive: response.data.data.isActive 
+      const response = await api.post(`${this.baseUrl}/${userId}/link-employee`, {
+        employeeId
       })
-      
-      return response.data.data
-    } catch (error) {
-      console.error('❌ [UserService] Failed to toggle user status via real API:', error)
-      throw new Error(handleApiError(error))
-    }
-  }
-
-  /**
-   * Bulk update users
-   */
-  async bulkUpdateUsers(updates: Array<{ id: string; updates: Partial<UserUpdateRequest> }>): Promise<UserDetailResponse[]> {
-    console.log('🔄 [UserService] Bulk updating users via real API', { updatesCount: updates.length })
-    
-    try {
-      const response = await api.put<ApiResponse<UserDetailResponse[]>>(
-        `${USER_ENDPOINTS.LIST}/bulk-update`,
-        { updates }
-      )
-      
-      console.log('✅ [UserService] Bulk update completed successfully via real API', { 
-        updatedCount: response.data.data.length 
-      })
-      
-      return response.data.data
-    } catch (error) {
-      console.error('❌ [UserService] Failed to bulk update users via real API:', error)
-      throw new Error(handleApiError(error))
-    }
-  }
-
-  /**
-   * Export users to CSV/Excel
-   */
-  async exportUsers(format: 'csv' | 'excel', filters?: {
-    role?: string
-    isActive?: boolean
-    dateFrom?: string
-    dateTo?: string
-  }): Promise<Blob> {
-    console.log('🔄 [UserService] Exporting users via real API', { format, filters })
-    
-    try {
-      const response = await api.get(
-        `${USER_ENDPOINTS.LIST}/export/${format}`,
-        {
-          params: filters,
-          responseType: 'blob'
-        }
-      )
-      
-      console.log('✅ [UserService] Users exported successfully via real API', { format })
-      
       return response.data
     } catch (error) {
-      console.error('❌ [UserService] Failed to export users via real API:', error)
-      throw new Error(handleApiError(error))
+      console.error('Error linking user to employee:', error)
+      throw new Error('Failed to link user to employee')
+    }
+  }
+
+  /**
+   * Unlinks a user from an employee
+   */
+  async unlinkFromEmployee(userId: string): Promise<User> {
+    try {
+      const response = await api.post(`${this.baseUrl}/${userId}/unlink-employee`)
+      return response.data
+    } catch (error) {
+      console.error('Error unlinking user from employee:', error)
+      throw new Error('Failed to unlink user from employee')
+    }
+  }
+
+  /**
+   * Gets users by role
+   */
+  async getUsersByRole(role: string): Promise<User[]> {
+    try {
+      const response = await api.get(`${this.baseUrl}/by-role/${role}`)
+      return response.data
+    } catch (error) {
+      console.error('Error getting users by role:', error)
+      throw new Error('Failed to get users by role')
+    }
+  }
+
+  /**
+   * Gets unlinked employees (employees without user accounts)
+   */
+  async getUnlinkedEmployees(): Promise<any[]> {
+    try {
+      const response = await api.get(`${this.baseUrl}/unlinked-employees`)
+      // Transform backend response to frontend format
+      return response.data.map((employee: any) => ({
+        id: employee.employeeId,
+        firstName: employee.firstName,
+        surname: employee.surname,
+        employeeNumber: employee.employeeNumber,
+        position: employee.position,
+        email: employee.email,
+        employeeStatus: employee.employeeStatus,
+        userId: employee.userId
+      }))
+    } catch (error) {
+      console.error('Error getting unlinked employees:', error)
+      throw new Error('Failed to get unlinked employees')
+    }
+  }
+
+  /**
+   * Gets linked employees (employees with user accounts)
+   */
+  async getLinkedEmployees(): Promise<any[]> {
+    try {
+      const response = await api.get(`${this.baseUrl}/linked-employees`)
+      return response.data
+    } catch (error) {
+      console.error('Error getting linked employees:', error)
+      throw new Error('Failed to get linked employees')
+    }
+  }
+
+  /**
+   * Validates if a username is available
+   */
+  async validateUsername(username: string): Promise<{ available: boolean; message?: string }> {
+    try {
+      const response = await api.get(`${this.baseUrl}/validate-username`, {
+        params: { username }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Error validating username:', error)
+      throw new Error('Failed to validate username')
+    }
+  }
+
+  /**
+   * Validates if an email is available
+   */
+  async validateEmail(email: string): Promise<{ available: boolean; message?: string }> {
+    try {
+      const response = await api.get(`${this.baseUrl}/validate-email`, {
+        params: { email }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Error validating email:', error)
+      throw new Error('Failed to validate email')
     }
   }
 }

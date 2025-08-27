@@ -6,12 +6,18 @@ interface UsersState {
   users: User[]
   loading: boolean
   error: string | null
+  userAssignments: Record<string, number[]>
+  assignmentLoading: boolean
+  assignmentError: string | null
 }
 
 const initialState: UsersState = {
   users: [],
   loading: false,
-  error: null
+  error: null,
+  userAssignments: {},
+  assignmentLoading: false,
+  assignmentError: null
 }
 
 // Normalize backend user detail (handles camelCase/PascalCase)
@@ -22,11 +28,11 @@ const mapUserDetailToUser = (detail: any): User => {
   const assignedCustomerIds = detail.assignedCustomerIds ?? detail.AssignedCustomerIds
   const customerId = detail.customerId ?? detail.CustomerId
 
-  return {
+  const mappedUser = {
     id: detail.id ?? detail.Id,
     username: detail.username ?? detail.Username,
-    firstName: detail.firstName ?? detail.FirstName,
-    lastName: detail.lastName ?? detail.LastName,
+    firstName: detail.firstName ?? detail.FirstName ?? '',
+    lastName: detail.lastName ?? detail.LastName ?? '',
     email: detail.email ?? detail.Email,
     role,
     pageAccessRole,
@@ -40,6 +46,8 @@ const mapUserDetailToUser = (detail: any): User => {
     ...(assignedCustomerIds ? { assignedCustomerIds } : {}),
     ...(customerId ? { customerId } : {}),
   }
+  
+  return mappedUser as User
 }
 
 // Async thunks
@@ -47,7 +55,7 @@ export const fetchUsers = createAsyncThunk(
   'users/fetchUsers',
   async (params?: { page?: number; pageSize?: number; searchTerm?: string }) => {
     const response = await userService.getUsers(params)
-    return response.items // Return just the users array for backward compatibility
+    return response.data // Return the users array from the backend response
   }
 )
 
@@ -62,7 +70,7 @@ export const createUser = createAsyncThunk(
 export const updateUserAsync = createAsyncThunk(
   'users/updateUser',
   async (userData: UpdateUserInput) => {
-    const response = await userService.updateUser(userData)
+    const response = await userService.updateUser(userData as any)
     return response
   }
 )
@@ -72,6 +80,45 @@ export const deleteUserAsync = createAsyncThunk(
   async (userId: string) => {
     await userService.deleteUser(userId)
     return userId
+  }
+)
+
+// Customer assignment verification thunks
+export const fetchUserCustomerAssignments = createAsyncThunk(
+  'users/fetchUserCustomerAssignments',
+  async (userId: string) => {
+    const token = localStorage.getItem('authToken')
+    const response = await fetch(`/api/CustomerAssignment/user/${userId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch user customer assignments')
+    }
+    
+    const customerIds = await response.json()
+    return { userId, customerIds }
+  }
+)
+
+export const checkUserHasCustomer = createAsyncThunk(
+  'users/checkUserHasCustomer',
+  async ({ userId, customerId }: { userId: string; customerId: number }) => {
+    const token = localStorage.getItem('authToken')
+    const response = await fetch(`/api/CustomerAssignment/user/${userId}/has/${customerId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to check user customer assignment')
+    }
+    
+    const hasCustomer = await response.json()
+    return { userId, customerId, hasCustomer }
   }
 )
 
