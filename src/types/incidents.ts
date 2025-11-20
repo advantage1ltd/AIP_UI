@@ -98,8 +98,6 @@ export interface Incident {
   value?: number; // Legacy field for graph compatibility
   valueRecovered?: number; // Legacy field for graph compatibility
   quantityRecovered?: number;
-  uniformOfficer?: number; // Value recovered by uniform officer
-  storeDetective?: number; // Value recovered by store detective
   amount?: number; // Legacy field
   total?: number; // Legacy field
 
@@ -127,6 +125,7 @@ export interface Incident {
   gender?: 'Male' | 'Female' | 'N/A or N/K';
   offenderDOB?: string | Date;
   offenderPlaceOfBirth?: string;
+  offenderMarks?: string;
   offenderAddress?: OffenderAddress;
 
   // Special fields
@@ -136,6 +135,48 @@ export interface Incident {
   viewConfig?: {
     enabledPages: string[];
   };
+}
+
+export interface RepeatOffenderIncidentSummary {
+  incidentId: string;
+  dateOfIncident: string;
+  siteName: string;
+  incidentType: string;
+  description?: string;
+  offenderMarks?: string;
+}
+
+export interface RepeatOffenderMatch {
+  offenderName: string;
+  offenderDOB?: string;
+  gender?: string;
+  offenderMarks?: string;
+  offenderPlaceOfBirth?: string;
+  offenderAddress?: OffenderAddress;
+  incidentCount: number;
+  recentIncidents: RepeatOffenderIncidentSummary[];
+}
+
+export interface RepeatOffenderSearchResponse {
+  success: boolean;
+  message?: string;
+  data: RepeatOffenderMatch[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    pageSize: number;
+    totalCount: number;
+    hasPrevious: boolean;
+    hasNext: boolean;
+  };
+}
+
+export interface RepeatOffenderSearchPayload {
+  name?: string;
+  dateOfBirth?: string;
+  marks?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface IncidentStats {

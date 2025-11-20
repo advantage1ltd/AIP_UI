@@ -56,6 +56,7 @@ import {
 import BarcodeScanner from '@/components/BarcodeScanner'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { incidentsApi } from "@/services/api/incidents"
+import { productService } from "@/services/productService"
 import { Toaster } from '@/components/ui/toaster'
 
 interface IncidentReportPageProps {
@@ -207,69 +208,126 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     try {
       setIsLoadingProduct(true)
       
-      // TODO: Replace with real product API call when barcode database is available
-      // Example implementation:
-      // const productResponse = await fetch(`/api/products/barcode/${barcode}`)
-      // const productData = await productResponse.json()
-      // if (!productResponse.ok) {
-      //   throw new Error('Product not found in database')
-      // }
+      // Call product API to fetch product details by EAN/barcode
+      const productData = await productService.getProductByEAN(barcode)
       
-      // Mock product data instead of API call (remove when real API is ready)
-      const mockProduct = {
-        name: `Product ${barcode}`,
-        category: 'Electronics',
-        price: 99.99,
-        description: 'Mock product description'
+      if (!productData) {
+        toast({
+          title: 'Product Not Found',
+          description: `No product found with barcode ${barcode}. Please enter product details manually.`,
+          variant: 'destructive',
+        })
+        return
       }
       
-      // Create stolen item from barcode data
-      // TODO: When real API is implemented, use actual product data:
-      // const newItem: StolenItem = {
-      //   id: Date.now().toString(),
-      //   category: productData.category.toLowerCase(),
-      //   description: productData.description,
-      //   productName: productData.name,
-      //   cost: productData.price,
-      //   quantity: 1,
-      //   totalAmount: productData.price,
-      //   barcode: barcode // Add barcode to item for reference
-      // }
+      // Create stolen item from product data
+      // Map Excel categories (Fresh, Non Food, Ambient, etc.) to form categories
+      const categoryMap: Record<string, string> = {
+        // Direct matches
+        'alcohol': 'alcohol',
+        'tobacco': 'tobacco',
+        'meat': 'meat',
+        'fish': 'fish',
+        'dairy': 'dairy',
+        'confectionery': 'confectionery',
+        'health-beauty': 'health-beauty',
+        'household': 'household',
+        'grocery': 'grocery',
+        'frozen': 'frozen',
+        'produce': 'produce',
+        'bakery': 'bakery',
+        // Excel category mappings
+        'fresh': 'produce', // Fresh category from Excel -> Produce in form
+        'non food': 'household', // Non Food from Excel -> Household in form
+        'ambient': 'grocery', // Ambient from Excel -> Grocery in form
+        'non-food': 'household',
+        'nonfood': 'household',
+      }
       
-      const newItem: StolenItem = {
-        id: Date.now().toString(),
-        category: mockProduct.category.toLowerCase(),
-        description: mockProduct.description,
-        productName: mockProduct.name,
-        cost: mockProduct.price,
-        quantity: 1,
-        totalAmount: mockProduct.price
+      // Try to map the category from Excel to form category
+      let mappedCategory = productData.category?.toLowerCase().trim() || ''
+      
+      if (mappedCategory) {
+        // Check for direct match first
+        if (categoryMap[mappedCategory]) {
+          mappedCategory = categoryMap[mappedCategory]
+        } else {
+          // Try to find a partial match (case-insensitive)
+          const matchedKey = Object.keys(categoryMap).find(key => 
+            mappedCategory.includes(key.toLowerCase()) || key.toLowerCase().includes(mappedCategory)
+          )
+          if (matchedKey) {
+            mappedCategory = categoryMap[matchedKey]
+          } else {
+            // Default to 'other' if no match found
+            mappedCategory = 'other'
+          }
+        }
+      } else {
+        // No category provided, default to 'other'
+        mappedCategory = 'other'
       }
 
+      const newItem: StolenItem = {
+        id: Date.now().toString(),
+        category: mappedCategory,
+        productName: productData.productName || '',
+        description: '', // Empty - officer will fill this manually
+        cost: 0, // Set to 0 - officer will fill this manually
+        quantity: 1, // Default quantity is 1, officer can change
+        totalAmount: 0 // Will be calculated as cost * quantity
+      }
+
+      // Update editingIncident if it exists, or initialize a new one
       if (editingIncident) {
         setEditingIncident({
           ...editingIncident,
           stolenItems: [...(editingIncident.stolenItems || []), newItem]
         })
+      } else {
+        // Initialize a new incident object with the scanned item
+        // Open the form dialog if not already open
+        const newIncident: Incident = {
+          id: '',
+          customerId: 0,
+          customerName: '',
+          siteId: '',
+          siteName: '',
+          officerName: '',
+          officerRole: '',
+          dateOfIncident: new Date().toISOString(),
+          timeOfIncident: '',
+          incidentType: '',
+          description: '',
+          incidentInvolved: [],
+          policeInvolvement: false,
+          dutyManagerName: '',
+          status: 'pending',
+          priority: 'medium',
+          stolenItems: [newItem],
+          totalValueRecovered: 0
+        }
+        setEditingIncident(newIncident)
+        setOpen(true) // Open the form dialog
       }
       
       toast({
-        title: 'Success',
-        description: 'Product found and added to stolen items',
+        title: 'Product Added',
+        description: `${productData.productName} has been added. Category and Product Name are auto-filled. Please complete description, cost, and quantity manually.`,
       })
       
     } catch (error) {
       console.error('Error with barcode:', error)
       toast({
         title: 'Error',
-        description: 'Error processing barcode',
+        description: 'Error processing barcode. Please try again.',
         variant: 'destructive',
       })
     } finally {
       setIsLoadingProduct(false)
       setScanningBarcode(false)
     }
-  }, [editingIncident])
+  }, [editingIncident, toast])
 
   // Loading state
   if (isLoading) {
@@ -318,29 +376,101 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     )
   }
 
-  // Empty state
+  // Empty state component (will be rendered alongside dialogs)
+  const emptyStateContent = !incidentsResponse.data || incidentsResponse.data.length === 0 ? (
+    <div className="flex h-screen items-center justify-center">
+      <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-sm">
+        <div className="mb-4">
+          <FileText className="h-12 w-12 text-gray-400 mx-auto" />
+        </div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">No Incidents Found</h2>
+        <p className="text-gray-600 mb-4">
+          There are no incident reports available. Create your first incident report to get started.
+        </p>
+        <Button
+          onClick={() => {
+            setEditingIncident(null)
+            setOpen(true)
+          }}
+          className="w-full"
+        >
+          Create New Incident
+        </Button>
+      </div>
+    </div>
+  ) : null
+
+  // Show empty state if no incidents
   if (!incidentsResponse.data || incidentsResponse.data.length === 0) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-sm">
-          <div className="mb-4">
-            <FileText className="h-12 w-12 text-gray-400 mx-auto" />
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">No Incidents Found</h2>
-          <p className="text-gray-600 mb-4">
-            There are no incident reports available. Create your first incident report to get started.
-          </p>
-          <Button
-            onClick={() => {
+      <>
+        {emptyStateContent}
+        {/* Dialogs - must be rendered even in empty state */}
+        <Dialog 
+          open={open} 
+          onOpenChange={(isOpen) => {
+            setOpen(isOpen)
+            if (!isOpen) {
               setEditingIncident(null)
-              setOpen(true)
-            }}
-            className="w-full"
-          >
-            Create New Incident
-          </Button>
-        </div>
-      </div>
+            }
+          }}
+        >
+          <DialogContent className="max-w-[65vw] md:max-w-[60vw] lg:max-w-[50vw] h-[90vh] p-0">
+            <DialogHeader className="px-4 py-3 border-b">
+              <DialogTitle className="text-xl font-bold">
+                {editingIncident ? 'Edit Incident Report' : 'New Incident Report'}
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-500">
+                {editingIncident ? 'Update the incident details below' : 'Fill in the incident details below'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto">
+              <IncidentForm
+                initialData={editingIncident}
+                onSubmit={handleSubmit}
+                onCancel={() => {
+                  setOpen(false)
+                  setEditingIncident(null)
+                }}
+                onScanBarcode={() => setScanningBarcode(true)}
+                isLoading={mutation.isPending}
+                customerId={customerId}
+                siteId={siteId}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog 
+          open={!!deletingIncident} 
+          onOpenChange={(isOpen) => !isOpen && setDeletingIncident(null)}
+        >
+          <AlertDialogContent className="w-[calc(100%-32px)] max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-lg sm:text-xl">Delete Incident Report</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm">
+                Are you sure you want to delete this incident report? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:gap-0">
+              <AlertDialogCancel className="text-sm">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                className="bg-red-600 hover:bg-red-700 text-white text-sm"
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <BarcodeScanner
+          isOpen={scanningBarcode}
+          onClose={() => setScanningBarcode(false)}
+          onScan={handleBarcodeScanned}
+        />
+      </>
     )
   }
 

@@ -1,7 +1,8 @@
 import { StoreData, RegionalData, Period, UserRole, OfficerDashboardData, RecentIncident, CustomerStoreData, Region, SatisfactionDataPoint, BeSafeDataPoint, DailyActivity, Site } from '@/types/dashboard';
 import axios from 'axios';
+import { BASE_API_URL } from '@/config/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const API_BASE_URL = BASE_API_URL;
 
 class APIError extends Error {
   constructor(
@@ -16,7 +17,7 @@ class APIError extends Error {
 
 class DashboardService {
   async getOfficerDashboard(): Promise<OfficerDashboardData> {
-    const response = await fetch('/api/dashboard/officer')
+    const response = await fetch(`${BASE_API_URL}/dashboard/officer`)
     if (!response.ok) {
       throw new Error('Failed to fetch officer dashboard data')
     }
@@ -24,7 +25,7 @@ class DashboardService {
   }
 
   async getRecentIncidents(): Promise<RecentIncident[]> {
-    const response = await fetch('/api/dashboard/incidents')
+    const response = await fetch(`${BASE_API_URL}/dashboard/incidents`)
     if (!response.ok) {
       throw new Error('Failed to fetch recent incidents')
     }
@@ -122,8 +123,6 @@ export const dashboardApi = {
   }
 };
 
-const BASE_URL = '/api/dashboard';
-
 // Helper function to get customer ID from auth context
 const getCustomerIdFromAuth = () => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -136,7 +135,7 @@ const getHeaders = () => ({
 });
 
 const getSites = async (signal?: AbortSignal): Promise<Site[]> => {
-  const response = await fetch('/api/dashboard/sites', { 
+  const response = await fetch(`${BASE_API_URL}/dashboard/sites`, { 
     signal,
     headers: getHeaders()
   });
@@ -147,7 +146,7 @@ const getSites = async (signal?: AbortSignal): Promise<Site[]> => {
 };
 
 const getStores = async (signal?: AbortSignal): Promise<StoreData[]> => {
-  const response = await fetch('/api/dashboard/stores', { 
+  const response = await fetch(`${BASE_API_URL}/dashboard/stores`, { 
     signal,
     headers: getHeaders()
   });
@@ -158,7 +157,7 @@ const getStores = async (signal?: AbortSignal): Promise<StoreData[]> => {
 };
 
 const getRegions = async (signal?: AbortSignal): Promise<Region[]> => {
-  const response = await fetch('/api/dashboard/regions', { 
+  const response = await fetch(`${BASE_API_URL}/dashboard/regions`, { 
     signal,
     headers: getHeaders()
   });
@@ -169,7 +168,7 @@ const getRegions = async (signal?: AbortSignal): Promise<Region[]> => {
 };
 
 class CustomerDashboardService {
-  private baseUrl = '/api/dashboard';
+  private baseUrl = `${BASE_API_URL}/dashboard`;
 
   private getHeaders() {
     const user = JSON.parse(localStorage.getItem('user') || '{}');

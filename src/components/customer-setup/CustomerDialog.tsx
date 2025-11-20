@@ -9,11 +9,10 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
-import type { Customer, CustomerType, CustomerPageAssignment, Region, Site } from "@/types/customer"
+import type { Customer, CustomerType, Region, Site } from "@/types/customer"
 import { AddressSection } from "./dialog-sections/AddressSection"
 import { ContactSection } from "./dialog-sections/ContactSection"
 import { CompanyDetailsSection } from "./dialog-sections/CompanyDetailsSection"
-import { CustomerPageAssignment as PageAssignmentComponent } from "./CustomerPageAssignment"
 import { RegionDialog } from "./RegionDialog"
 import { SiteDialog } from "./SiteDialog"
 import { RegionsTable } from "./RegionsTable"
@@ -65,68 +64,15 @@ interface CustomerDialogProps {
 
 export function CustomerDialog({ open, onOpenChange, customer, onSave }: CustomerDialogProps) {
   const { toast } = useToast()
-  const [pageAssignments, setPageAssignments] = useState<Record<string, CustomerPageAssignment>>({})
   const [regions, setRegions] = useState<Region[]>([])
   const [sites, setSites] = useState<Site[]>([])
   const [regionDialogOpen, setRegionDialogOpen] = useState(false)
   const [siteDialogOpen, setSiteDialogOpen] = useState(false)
   const [selectedRegion, setSelectedRegion] = useState<Region | undefined>()
   const [selectedSite, setSelectedSite] = useState<Site | undefined>()
-  const [isLoadingRegions, setIsLoadingRegions] = useState(false)
-  const [isLoadingSites, setIsLoadingSites] = useState(false)
+  const [isLoadingRegions] = useState(false)
+  const [isLoadingSites] = useState(false)
 
-  // Helper function to convert array to Record
-  const convertPageAssignmentsToRecord = (assignments: CustomerPageAssignment[]): Record<string, CustomerPageAssignment> => {
-    const record: Record<string, CustomerPageAssignment> = {}
-    assignments.forEach(assignment => {
-      if (assignment.pageId) {
-        record[assignment.pageId] = assignment
-      }
-    })
-    return record
-  }
-
-  // Helper function to convert Record to array
-  const convertPageAssignmentsToArray = (assignments: Record<string, CustomerPageAssignment>): CustomerPageAssignment[] => {
-    return Object.entries(assignments).map(([pageId, assignment]) => ({
-      ...assignment,
-      pageId
-    }))
-  }
-
-  // Update pageAssignments when customer prop changes
-  useEffect(() => {
-    const loadPageAssignments = async () => {
-      if (customer?.id) {
-        try {
-          console.log('🔧 [CustomerDialog] Loading page assignments from customer store for customer:', customer.id)
-          
-          // Load customer data from customer store (which uses cached data)
-          const customerData = await customerOperations.getById(customer.id)
-          
-          if (customerData?.pageAssignments) {
-            // Convert array to Record if needed
-            const assignmentsRecord = Array.isArray(customerData.pageAssignments) 
-              ? convertPageAssignmentsToRecord(customerData.pageAssignments)
-              : customerData.pageAssignments
-            setPageAssignments(assignmentsRecord)
-            console.log('🔧 [CustomerDialog] Loaded page assignments from store:', assignmentsRecord)
-          } else {
-            setPageAssignments({})
-            console.log('🔧 [CustomerDialog] No page assignments found in store')
-          }
-        } catch (error) {
-          console.error('❌ [CustomerDialog] Error loading page assignments from store:', error)
-          setPageAssignments({})
-        }
-      } else {
-        setPageAssignments({})
-      }
-    }
-
-    loadPageAssignments()
-  }, [customer])
-  
   // Load regions and sites when customer changes
   useEffect(() => {
     const loadCustomerData = async () => {
@@ -246,15 +192,8 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
     }
   }, [customer, form])
 
-  const watchedCustomerType = form.watch("customerType") as CustomerType
-
   const onSubmit = async (data: z.infer<typeof customerSchema>) => {
     try {
-      console.log('🔧 [CustomerDialog] onSubmit - pageAssignments before processing:', pageAssignments)
-      
-      const enabledPages = Object.keys(pageAssignments).filter(pageId => pageAssignments[pageId].enabled)
-      console.log('🔧 [CustomerDialog] onSubmit - enabledPages calculated:', enabledPages)
-      
       // Ensure we don't generate new IDs for existing customers
       const isExistingCustomer = customer && customer.id && !String(customer.id).startsWith('CUST')
       const customerId = isExistingCustomer ? customer.id : (customer?.id || `CUST${Date.now()}`)
@@ -265,12 +204,9 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
         finalId: customerId
       })
       
-      // Convert pageAssignments Record to array for Customer interface
-      const pageAssignmentsArray = convertPageAssignmentsToArray(pageAssignments)
-      
       const customerData = {
         ...data,
-        pageAssignments: pageAssignmentsArray,
+        pageAssignments: customer?.pageAssignments || [],
         id: customerId,
         createdAt: customer?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -278,7 +214,7 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
           id: customer?.viewConfig?.id || `VC${Date.now()}`,
           customerId: customerId,
           customerType: data.customerType,
-          enabledPages,
+          enabledPages: customer?.viewConfig?.enabledPages || [],
           createdAt: customer?.viewConfig?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }
@@ -287,27 +223,12 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
       console.log('🔧 [CustomerDialog] onSubmit - final customerData:', {
         id: customerData.id,
         companyName: customerData.companyName,
-        pageAssignmentsCount: customerData.pageAssignments.length,
-        enabledPagesCount: customerData.viewConfig.enabledPages.length,
-        pageAssignments: customerData.pageAssignments,
-        enabledPages: customerData.viewConfig.enabledPages
+        pageAssignmentsCount: customerData.pageAssignments?.length || 0,
+        enabledPagesCount: customerData.viewConfig.enabledPages.length
       })
       
       // Save customer data first
       onSave(customerData as Customer)
-      
-      // Dispatch event to notify PageAccessContext about page assignment changes
-      if (customer?.id && Object.keys(pageAssignments).length > 0) {
-        window.dispatchEvent(new CustomEvent('customer-page-assignments-updated', {
-          detail: { 
-            customerId: customer.id,
-            customerName: customerData.companyName,
-            pageAssignments: customerData.pageAssignments,
-            enabledPages: customerData.viewConfig.enabledPages
-          }
-        }));
-        console.log('✅ [CustomerDialog] Dispatched customer-page-assignments-updated event')
-      }
       
       // Note: Success/error notifications are handled in the parent component
       // Only close dialog on successful validation
@@ -352,14 +273,14 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
             {customer ? "Edit Customer" : "New Customer"}
           </DialogTitle>
           <DialogDescription>
-            {customer ? "Update customer information, page assignments, regions, and sites" : "Create a new customer with page assignments, regions, and sites"}
+            {customer ? "Update customer information, regions, and sites" : "Create a new customer. Regions and sites can be added after saving."}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Tabs defaultValue="details" className="w-full">
-              <TabsList className={`grid w-full ${customer?.id ? 'grid-cols-4' : 'grid-cols-2'}`}>
+            <Tabs defaultValue="details" className="w-full" activationMode="manual">
+              <TabsList className={`grid w-full ${customer?.id ? 'grid-cols-3' : 'grid-cols-1'} transition-none`}>
                 <TabsTrigger value="details">Customer Details</TabsTrigger>
                 {customer?.id && (
                   <>
@@ -367,7 +288,6 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
                     <TabsTrigger value="sites">Sites</TabsTrigger>
                   </>
                 )}
-                <TabsTrigger value="pages">Page Assignments</TabsTrigger>
               </TabsList>
               
               <TabsContent value="details" className="space-y-6 mt-6">
@@ -400,78 +320,48 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
               {customer?.id && (
                 <>
                   <TabsContent value="regions" className="mt-6">
-                    {isLoadingRegions ? (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="text-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
-                          <p className="text-gray-600">Loading regions...</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <RegionsTable
-                          customerId={customer?.id ? parseInt(customer.id) || 0 : null}
-                          regions={regions}
-                          onEdit={handleEditRegion}
-                          onDataChange={handleRegionSuccess}
-                        />
-                        <div className="mt-4">
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              setSelectedRegion(undefined)
-                              setRegionDialogOpen(true)
-                            }}
-                            className="bg-purple-600 hover:bg-purple-700"
-                          >
-                            Add Region
-                          </Button>
-                        </div>
-                      </>
-                    )}
+                  <RegionsTable
+                    customerId={customer?.id ? parseInt(customer.id) || 0 : null}
+                    regions={regions}
+                    onEdit={handleEditRegion}
+                    onDataChange={handleRegionSuccess}
+                  />
+                  <div className="mt-4">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRegion(undefined)
+                        setRegionDialogOpen(true)
+                      }}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      Add Region
+                    </Button>
+                  </div>
                   </TabsContent>
                   
                   <TabsContent value="sites" className="mt-6">
-                    {isLoadingSites ? (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="text-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
-                          <p className="text-gray-600">Loading sites...</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <SitesTable
-                          customerId={customer?.id ? parseInt(customer.id) || 0 : null}
-                          sites={sites}
-                          onEdit={handleEditSite}
-                          onDataChange={handleSiteSuccess}
-                        />
-                        <div className="mt-4">
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              setSelectedSite(undefined)
-                              setSiteDialogOpen(true)
-                            }}
-                            className="bg-purple-600 hover:bg-purple-700"
-                          >
-                            Add Site
-                          </Button>
-                        </div>
-                      </>
-                    )}
+                    <SitesTable
+                      customerId={customer?.id ? parseInt(customer.id) || 0 : null}
+                      sites={sites}
+                      onEdit={handleEditSite}
+                      onDataChange={handleSiteSuccess}
+                    />
+                    <div className="mt-4">
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSite(undefined)
+                          setSiteDialogOpen(true)
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        Add Site
+                      </Button>
+                    </div>
                   </TabsContent>
                 </>
               )}
-              
-              <TabsContent value="pages" className="mt-6">
-                <PageAssignmentComponent
-                  customerType={watchedCustomerType}
-                  currentAssignments={pageAssignments}
-                  onAssignmentsChange={setPageAssignments}
-                />
-              </TabsContent>
             </Tabs>
 
             <div className="flex justify-end space-x-2 pt-4 border-t">

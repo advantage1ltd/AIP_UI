@@ -31,13 +31,6 @@ const initialConfigs: PageViewConfig[] = [
     pageName: "Operations",
     views: [
       {
-        id: "patrol-log",
-        name: "Patrol Log",
-        description: "Track and manage security patrol activities",
-        enabled: true,
-        permission: "manager"
-      },
-      {
         id: "incident-reports",
         name: "Incident Reports",
         description: "Detailed reports of security incidents",

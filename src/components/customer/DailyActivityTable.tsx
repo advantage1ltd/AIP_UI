@@ -13,6 +13,8 @@ import { CalendarIcon, Edit, Trash2, Search, Filter, Eye, Plus, X, Download, Ref
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { dailyActivityService } from '@/services/dailyActivityService';
+import { regionService } from '@/services/regionService';
+import { siteService } from '@/services/siteService';
 import type { DailyActivityReport, DailyActivityFilters } from '@/types/dailyActivity';
 import type { Region, Site } from '@/types/dashboard';
 
@@ -94,26 +96,38 @@ export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, cust
 
   // Filter sites based on selected customer (for admin)
   const filteredSites = filters.customerId
-    ? sites.filter(site => site.customerId === parseInt(filters.customerId))
+    ? sites.filter(site => site.fkCustomerID === parseInt(filters.customerId))
     : sites;
 
   const loadRegionsAndSites = async () => {
     try {
-      // Use fetch directly since we don't have proper exported service methods
-      const [regionsResponse, sitesResponse] = await Promise.all([
-        fetch('/api/dashboard/regions', {
-          headers: { 'X-Customer-Id': user?.customerId?.toString() || '21' }
-        }),
-        fetch('/api/dashboard/sites', {
-          headers: { 'X-Customer-Id': user?.customerId?.toString() || '21' }
-        })
-      ]);
-      
-      if (regionsResponse.ok && sitesResponse.ok) {
-        const regionsData = await regionsResponse.json();
-        const sitesData = await sitesResponse.json();
-        setRegions(regionsData);
-        setSites(sitesData);
+      // Determine customer ID - use prop if available (for admin with selected customer), otherwise use user's customerId
+      const targetCustomerId = customerId && !isNaN(parseInt(customerId)) 
+        ? parseInt(customerId) 
+        : (user?.customerId && typeof user.customerId === 'number' ? user.customerId : undefined);
+
+      if (!targetCustomerId && !isAdmin) {
+        // Non-admin users must have a customerId
+        return;
+      }
+
+      if (targetCustomerId) {
+        // Fetch regions and sites for specific customer
+        const [regionsResult, sitesResult] = await Promise.all([
+          regionService.getRegionsByCustomer(targetCustomerId),
+          siteService.getSitesByCustomer(targetCustomerId)
+        ]);
+
+        if (regionsResult.success) {
+          setRegions(regionsResult.data);
+        }
+        if (sitesResult.success) {
+          setSites(sitesResult.data);
+        }
+      } else if (isAdmin) {
+        // For admin users without specific customer, fetch all (or handle differently)
+        // For now, skip if no customer is selected
+        console.log('Admin user - customer ID required to load regions and sites');
       }
     } catch (err) {
       console.error('Failed to load regions and sites:', err);

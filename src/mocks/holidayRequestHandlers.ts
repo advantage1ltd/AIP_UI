@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import { BASE_API_URL } from '@/config/api';
 import { mockOfficers } from '@/data/mockOfficers';
 import { mockManagers } from '@/data/mockManagers';
 import { mockRequests } from '@/data/mockRequests';
@@ -10,7 +11,7 @@ import type {
 import { v4 as uuidv4 } from 'uuid';
 import { differenceInBusinessDays } from 'date-fns';
 
-const BASE_URL = '/api/holiday-requests';
+const BASE_URL = `${BASE_API_URL}/holiday-requests`;
 let requests = [...mockRequests];
 
 // Utility function to calculate total days

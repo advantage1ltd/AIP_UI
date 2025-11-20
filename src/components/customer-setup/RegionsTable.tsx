@@ -30,7 +30,6 @@ export function RegionsTable({ customerId, onEdit, onDataChange, updateTrigger }
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [regionToDelete, setRegionToDelete] = useState<Region | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [isFetchingRegions, setIsFetchingRegions] = useState(false)
   const [regions, setRegions] = useState<Region[]>([])
   const { toast } = useToast()
   const itemsPerPage = 10
@@ -98,7 +97,6 @@ export function RegionsTable({ customerId, onEdit, onDataChange, updateTrigger }
       return
     }
 
-    setIsFetchingRegions(true)
     try {
       console.log('🔄 [RegionsTable] Fetching regions for customer:', customerId)
       const result = await regionService.getRegionsByCustomer(customerId)
@@ -124,7 +122,7 @@ export function RegionsTable({ customerId, onEdit, onDataChange, updateTrigger }
         variant: "destructive",
       })
     } finally {
-      setIsFetchingRegions(false)
+      // noop
     }
   }, [customerId, toast])
 
@@ -166,11 +164,7 @@ export function RegionsTable({ customerId, onEdit, onDataChange, updateTrigger }
         </div>
       </div>
 
-      {isFetchingRegions ? (
-        <div className="text-center py-8 text-gray-500">
-          Loading regions...
-        </div>
-      ) : safeRegions.length === 0 ? (
+      {safeRegions.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           No regions found for this customer. Click "Add Region" to create one.
         </div>

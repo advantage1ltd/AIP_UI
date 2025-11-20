@@ -1,5 +1,5 @@
 import { useState, useCallback, memo, useEffect } from "react"
-import { Incident, IncidentType, IncidentInvolved, StolenItem } from "@/types/incidents"
+import { Incident, IncidentType, IncidentInvolved, StolenItem, RepeatOffenderMatch } from "@/types/incidents"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,8 +30,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { 
-  MOCK_CUSTOMERS, 
+import {  
   MOCK_OFFICER_ROLES 
 } from "@/data/mockDropdownData"
 import { useForm, useWatch } from "react-hook-form"
@@ -42,9 +41,17 @@ import React from "react"
 import { Badge } from "@/components/ui/badge"
 import { incidentService } from "@/services/incidentService"
 import { useAuth } from "@/hooks/useAuth"
+import { customerService } from "@/services/customerService"
+import { siteService } from "@/services/siteService"
+import { lookupTableService } from "@/services/lookupTableService"
+import type { Customer } from "@/types/customer"
+import type { Site } from "@/types/site"
+import type { LookupTableItem } from "@/services/lookupTableService"
 
 const formSchema = z.object({
+  customerId: z.string().min(1, "Customer is required"),
   customerName: z.string().min(1, "Customer name is required"),
+  siteId: z.string().optional(),
   siteName: z.string().min(1, "Site name is required"),
   officerName: z.string().min(1, "Officer name is required"),
   officerRole: z.string().min(1, "Officer role is required"),
@@ -89,6 +96,7 @@ const formSchema = z.object({
   gender: z.enum(['Male', 'Female', 'N/A or N/K']).default('N/A or N/K'),
   offenderDOB: z.date().optional(),
   offenderPlaceOfBirth: z.string().optional(),
+  offenderMarks: z.string().max(500, 'Marks must be under 500 characters').optional(),
   policeID: z.string().optional(),
   crimeRefNumber: z.string().optional(),
   arrestSaveComment: z.string().optional(),
@@ -172,63 +180,71 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   const [repeatOffenderCount, setRepeatOffenderCount] = useState(0)
   const [isSearchingOffender, setIsSearchingOffender] = useState(false)
   const [offenderHistory, setOffenderHistory] = useState<{
-    incidents: Array<{
-      date: string;
-      store: string;
-      type: string;
-    }>;
+    matches: RepeatOffenderMatch[];
+    totalCount: number;
   } | null>(null)
+  const [offenderSearchError, setOffenderSearchError] = useState<string | null>(null)
+  const [offenderMarksPreview, setOffenderMarksPreview] = useState<string>(initialData?.offenderMarks || '')
+  
+  // State for dynamic customers and sites
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [sites, setSites] = useState<Site[]>([])
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false)
+  const [isLoadingSites, setIsLoadingSites] = useState(false)
+  
+  // State for counties from lookup table
+  const [counties, setCounties] = useState<LookupTableItem[]>([])
+  const [isLoadingCounties, setIsLoadingCounties] = useState(false)
 
-  const searchOffender = async (name: string, dob?: Date) => {
+  const searchOffender = async (name: string, dob?: Date, marks?: string) => {
     setIsSearchingOffender(true);
+    setOffenderSearchError(null);
     try {
-      // Get all incidents from the service
-      const allIncidents = await incidentService.getIncidents();
+      const payload = {
+        name,
+        dateOfBirth: dob ? format(dob, 'yyyy-MM-dd') : undefined,
+        marks: marks?.trim() || undefined,
+        page: 1,
+        pageSize: 5
+      }
       
-      // Filter incidents by offender name and DOB if provided
-      const matchingIncidents = allIncidents.filter(incident => {
-        const nameMatch = incident.offenderName?.toLowerCase() === name.toLowerCase();
-        if (!nameMatch) return false;
-        
-        if (dob && incident.offenderDOB) {
-          const incidentDOB = new Date(incident.offenderDOB);
-          return incidentDOB.getTime() === dob.getTime();
-        }
-        return true;
-      });
+      const result = await incidentService.searchRepeatOffenders(payload)
 
-      if (matchingIncidents.length > 0) {
-        // Format the incidents for display
-        const history = {
-          incidents: matchingIncidents.map(incident => ({
-            date: format(new Date(incident.dateOfIncident), 'yyyy-MM-dd'),
-            store: incident.siteName,
-            type: incident.incidentType
-          }))
-        };
-        
-        setOffenderHistory(history);
-        setOffenderVerified(true);
-        setRepeatOffenderCount(history.incidents.length);
-        
-        // Auto-fill other fields if available
-        const mostRecentIncident = matchingIncidents[0];
-        if (mostRecentIncident.offenderAddress) {
-          form.setValue('offenderAddress', mostRecentIncident.offenderAddress);
-        }
-        if (mostRecentIncident.gender) {
-          form.setValue('gender', mostRecentIncident.gender);
-        }
-        if (mostRecentIncident.offenderPlaceOfBirth) {
-          form.setValue('offenderPlaceOfBirth', mostRecentIncident.offenderPlaceOfBirth);
-        }
-      } else {
-        setOffenderVerified(false);
-        setRepeatOffenderCount(0);
-        setOffenderHistory(null);
+      if (result.data.length === 0) {
+        setOffenderVerified(false)
+        setRepeatOffenderCount(0)
+        setOffenderHistory(null)
+        return
+      }
+
+      setOffenderHistory({
+        matches: result.data,
+        totalCount: result.pagination.totalCount
+      })
+
+      setRepeatOffenderCount(result.pagination.totalCount)
+      setOffenderVerified(result.data.length > 0)
+
+      const topMatch = result.data[0]
+      if (topMatch.offenderAddress) {
+        form.setValue('offenderAddress', topMatch.offenderAddress)
+      }
+      if (topMatch.gender) {
+        form.setValue('gender', topMatch.gender)
+      }
+      if (topMatch.offenderDOB) {
+        form.setValue('offenderDOB', new Date(topMatch.offenderDOB))
+      }
+      if (topMatch.offenderPlaceOfBirth) {
+        form.setValue('offenderPlaceOfBirth', topMatch.offenderPlaceOfBirth)
+      }
+      if (topMatch.offenderMarks) {
+        form.setValue('offenderMarks', topMatch.offenderMarks)
+        setOffenderMarksPreview(topMatch.offenderMarks)
       }
     } catch (error) {
       console.error('Error searching offender:', error);
+      setOffenderSearchError(error instanceof Error ? error.message : 'Unable to search repeat offenders')
       setOffenderVerified(false);
       setRepeatOffenderCount(0);
       setOffenderHistory(null);
@@ -239,8 +255,12 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    mode: "onChange", // Validate on change to update isValid state
+    reValidateMode: "onChange", // Re-validate on change
     defaultValues: {
+      customerId: initialData?.customerId?.toString() || "",
       customerName: initialData?.customerName || "",
+      siteId: initialData?.siteId || "",
       siteName: initialData?.siteName || "",
       officerName: initialData?.officerName || "",
       officerRole: initialData?.officerRole || "",
@@ -275,39 +295,86 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       gender: initialData?.gender || 'N/A or N/K',
       offenderDOB: initialData?.offenderDOB ? new Date(initialData.offenderDOB) : undefined,
       offenderPlaceOfBirth: initialData?.offenderPlaceOfBirth || "",
+      offenderMarks: initialData?.offenderMarks || "",
       policeID: initialData?.policeID || "",
       crimeRefNumber: initialData?.crimeRefNumber || "",
       arrestSaveComment: initialData?.arrestSaveComment || "",
     },
   })
 
-  // Watch customerName for cascading dropdown
-  const customerName = form.watch('customerName')
-  const selectedCustomer = MOCK_CUSTOMERS.find(c => c.name === customerName)
+  // Watch customerId for cascading dropdown
+  const customerId = form.watch('customerId')
+  const selectedCustomer = customers.find(c => c.id.toString() === customerId)
+  const offenderMarksValue = form.watch('offenderMarks')
   
-  // Create site options based on selected customer (simplified for direct mapping)
-  const getSitesForCustomer = (customerId: string): Array<{id: string, name: string}> => {
-    const sitesByCustomer: Record<string, Array<{id: string, name: string}>> = {
-      '1': [ // Central England COOP
-        { id: 'SITE001', name: 'Leicester Central' },
-        { id: 'SITE002', name: 'Birmingham Store' },
-        { id: 'SITE003', name: 'Sheffield Branch' },
-      ],
-      '2': [ // Midcounties COOP  
-        { id: 'SITE004', name: 'Oxford City Centre' },
-        { id: 'SITE005', name: 'Cheltenham Store' },
-        { id: 'SITE006', name: 'Swindon Branch' },
-      ],
-      '3': [ // Heart of England COOP
-        { id: 'SITE007', name: 'Coventry Central' },
-        { id: 'SITE008', name: 'Nuneaton Main Store' },
-        { id: 'SITE009', name: 'Rugby Store' },
-      ],
-    };
-    return sitesByCustomer[customerId] || [];
-  };
+  // Fetch customers on mount
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      setIsLoadingCustomers(true)
+      try {
+        const fetchedCustomers = await customerService.getAllCustomers()
+        setCustomers(fetchedCustomers)
+        console.log('✅ [IncidentForm] Loaded customers:', fetchedCustomers.length)
+      } catch (error) {
+        console.error('❌ [IncidentForm] Failed to load customers:', error)
+      } finally {
+        setIsLoadingCustomers(false)
+      }
+    }
+    
+    fetchCustomers()
+  }, [])
   
-  const filteredSites = selectedCustomer ? getSitesForCustomer(selectedCustomer.id) : []
+  // Fetch counties from lookup table on mount
+  useEffect(() => {
+    const fetchCounties = async () => {
+      setIsLoadingCounties(true)
+      try {
+        const fetchedCounties = await lookupTableService.getByCategory('UK_Counties')
+        setCounties(fetchedCounties)
+        console.log('✅ [IncidentForm] Loaded counties:', fetchedCounties.length)
+      } catch (error) {
+        console.error('❌ [IncidentForm] Failed to load counties:', error)
+        setCounties([])
+      } finally {
+        setIsLoadingCounties(false)
+      }
+    }
+    
+    fetchCounties()
+  }, [])
+  
+  // Fetch sites when customer changes
+  useEffect(() => {
+    const fetchSites = async () => {
+      if (!customerId) {
+        setSites([])
+        form.setValue('siteId', '')
+        form.setValue('siteName', '')
+        return
+      }
+      
+      setIsLoadingSites(true)
+      try {
+        const customerIdNum = parseInt(customerId, 10)
+        const response = await siteService.getSitesByCustomer(customerIdNum)
+        if (response.success) {
+          setSites(response.data)
+          console.log('✅ [IncidentForm] Loaded sites for customer:', response.data.length)
+          // Reset site selection when customer changes
+          form.setValue('siteId', '')
+          form.setValue('siteName', '')
+        }
+      } catch (error) {
+        console.error('❌ [IncidentForm] Failed to load sites:', error)
+        setSites([])
+      } finally {
+        setIsLoadingSites(false)
+      }
+    }
+    
+    fetchSites()
+  }, [customerId, form])
 
   // Helper functions to get pre-filled data
   const getCustomerNameFromId = (customerId: string): string => {
@@ -343,29 +410,43 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
     return siteMap[siteId] || '';
   };
 
-  // Reset site when customer changes
-  useEffect(() => {
-    if (customerName) form.setValue('siteName', '')
-  }, [customerName])
+  // Handle customer change
+  const handleCustomerChange = (customerIdValue: string) => {
+    const customer = customers.find(c => c.id.toString() === customerIdValue)
+    if (customer) {
+      form.setValue('customerId', customerIdValue)
+      form.setValue('customerName', customer.companyName)
+      // Site will be reset by the useEffect above
+    }
+  }
+  
+  // Handle site change
+  const handleSiteChange = (siteIdValue: string) => {
+    const site = sites.find(s => s.siteID?.toString() === siteIdValue)
+    if (site) {
+      form.setValue('siteId', siteIdValue)
+      form.setValue('siteName', site.locationName || '')
+    }
+  }
 
   // Pre-fill customer, site, and officer info for new incidents
   useEffect(() => {
-    if (!initialData) {
+    if (!initialData && customers.length > 0) {
       // Auto-fill customer and site when props are provided
-      if (propCustomerId && propSiteId) {
-        const customerName = getCustomerNameFromId(propCustomerId);
-        const siteName = getSiteNameFromId(propSiteId);
-        
-        if (customerName && siteName) {
-          // Set values immediately
-          form.setValue('customerName', customerName);
-          form.setValue('siteName', siteName);
+      if (propCustomerId) {
+        const customer = customers.find(c => c.id.toString() === propCustomerId)
+        if (customer) {
+          form.setValue('customerId', propCustomerId)
+          form.setValue('customerName', customer.companyName)
           
-          // Also set with a slight delay to ensure dropdowns are rendered
-          setTimeout(() => {
-            form.setValue('customerName', customerName);
-            form.setValue('siteName', siteName);
-          }, 50);
+          // If siteId is also provided, fetch sites and set the site
+          if (propSiteId && sites.length > 0) {
+            const site = sites.find(s => s.siteID?.toString() === propSiteId)
+            if (site) {
+              form.setValue('siteId', propSiteId)
+              form.setValue('siteName', site.locationName || '')
+            }
+          }
         }
       }
       
@@ -392,7 +473,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         }
       }
     }
-  }, [propCustomerId, propSiteId, initialData, form, user]);
+  }, [propCustomerId, propSiteId, initialData, form, user, customers, sites]);
 
   useEffect(() => {
     if (initialData && initialData.id) {
@@ -402,7 +483,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       
       // Reset form with the new initial data - fix date handling
       const formData = {
+        customerId: initialData.customerId?.toString() || "",
         customerName: initialData.customerName || "",
+        siteId: initialData.siteId || "",
         siteName: initialData.siteName || "",
         officerName: initialData.officerName || "",
         officerRole: initialData.officerRole || "",
@@ -437,6 +520,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         gender: initialData.gender || 'N/A or N/K',
         offenderDOB: initialData.offenderDOB ? new Date(initialData.offenderDOB) : undefined,
         offenderPlaceOfBirth: initialData.offenderPlaceOfBirth || "",
+        offenderMarks: initialData.offenderMarks || "",
         policeID: initialData.policeID || "",
         crimeRefNumber: initialData.crimeRefNumber || "",
         arrestSaveComment: initialData.arrestSaveComment || "",
@@ -446,7 +530,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       setTimeout(() => {
         form.reset(formData)
         // Force update critical fields that might not populate correctly
+        form.setValue('customerId', formData.customerId)
         form.setValue('customerName', formData.customerName)
+        form.setValue('siteId', formData.siteId)
         form.setValue('siteName', formData.siteName)
         form.setValue('officerName', formData.officerName)
         form.setValue('incidentType', formData.incidentType)
@@ -463,6 +549,20 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
     }
   }, [initialData?.id, form])
 
+  // Update stolen items when initialData.stolenItems changes (e.g., from barcode scanning)
+  useEffect(() => {
+    if (initialData?.stolenItems && initialData.stolenItems.length !== stolenItems.length) {
+      setStolenItems(initialData.stolenItems)
+    } else if (initialData?.stolenItems) {
+      // Deep comparison for array content changes
+      const currentIds = stolenItems.map(item => item.id).join(',')
+      const newIds = initialData.stolenItems.map(item => item.id).join(',')
+      if (currentIds !== newIds) {
+        setStolenItems(initialData.stolenItems)
+      }
+    }
+  }, [initialData?.stolenItems, stolenItems])
+
   // Add useEffect to update totalValueRecovered when stolen items change
   React.useEffect(() => {
     const totalValue = stolenItems.reduce((sum, item) => sum + item.totalAmount, 0);
@@ -472,8 +572,14 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   // Update incidentDetails value whenever description changes
   const descriptionValue = form.watch('description')
   React.useEffect(() => {
-    form.setValue('incidentDetails', descriptionValue, { shouldValidate: true })
+    if (descriptionValue) {
+      form.setValue('incidentDetails', descriptionValue, { shouldValidate: true })
+    }
   }, [descriptionValue, form])
+
+  React.useEffect(() => {
+    setOffenderMarksPreview(offenderMarksValue || '')
+  }, [offenderMarksValue])
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -509,10 +615,14 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       setFormErrors(errors)
       if (Object.keys(errors).length > 0) return
 
+      // Get customerId and siteId from form values or props
+      const finalCustomerId = values.customerId || propCustomerId || selectedCustomer?.id?.toString() || '0'
+      const finalSiteId = values.siteId || propSiteId || ''
+      
       const formattedData: Incident = {
         id: initialData?.id || uuidv4(),
-        customerId: parseInt(propCustomerId || selectedCustomer?.id || '0'),
-        siteId: propSiteId || '',
+        customerId: parseInt(finalCustomerId, 10),
+        siteId: finalSiteId,
         customerName: values.customerName,
         siteName: values.siteName,
         officerName: values.officerName,
@@ -545,6 +655,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         offenderName: values.offenderName,
         offenderDOB: values.offenderDOB,
         offenderPlaceOfBirth: values.offenderPlaceOfBirth,
+        offenderMarks: values.offenderMarks,
         policeID: values.policeID,
         crimeRefNumber: values.crimeRefNumber || '',
         // Additional fields
@@ -659,27 +770,34 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                 <div className="space-y-3 sm:space-y-4">
                   <FormField
                     control={form.control}
-                    name="customerName"
+                    name="customerId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Customer Name *</FormLabel>
                         {!isAdmin && propCustomerId ? (
                           <div className="flex h-11 w-full rounded-md border border-input bg-gray-50 px-3 py-2 text-sm">
-                            {field.value}
+                            {form.watch('customerName') || 'Loading...'}
                           </div>
                         ) : (
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select 
+                            onValueChange={handleCustomerChange} 
+                            value={field.value}
+                            disabled={isLoadingCustomers}
+                          >
                             <FormControl>
                               <SelectTrigger className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm">
-                                <SelectValue placeholder="Select customer" />
+                                <SelectValue placeholder={isLoadingCustomers ? "Loading customers..." : "Select customer"} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {MOCK_CUSTOMERS.map((customer) => (
-                                <SelectItem key={customer.id} value={customer.name}>
-                                  {customer.name}
+                              {customers.map((customer) => (
+                                <SelectItem key={customer.id} value={customer.id.toString()}>
+                                  {customer.companyName}
                                 </SelectItem>
                               ))}
+                              {customers.length === 0 && !isLoadingCustomers && (
+                                <SelectItem value="no-customers" disabled>No customers available</SelectItem>
+                              )}
                             </SelectContent>
                           </Select>
                         )}
@@ -690,28 +808,45 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
 
                   <FormField
                     control={form.control}
-                    name="siteName"
+                    name="siteId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Site Name *</FormLabel>
                         {!isAdmin && propSiteId ? (
                           <div className="flex h-11 w-full rounded-md border border-input bg-gray-50 px-3 py-2 text-sm">
-                            {field.value}
+                            {form.watch('siteName') || 'Loading...'}
                           </div>
                         ) : (
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select 
+                            onValueChange={handleSiteChange} 
+                            value={field.value || ''}
+                            disabled={!customerId || isLoadingSites}
+                          >
                             <FormControl>
                               <SelectTrigger className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm">
-                                <SelectValue placeholder="Select site" />
+                                <SelectValue placeholder={
+                                  !customerId 
+                                    ? "Select customer first" 
+                                    : isLoadingSites 
+                                      ? "Loading sites..." 
+                                      : "Select site"
+                                } />
                               </SelectTrigger>
                             </FormControl>
-                                                      <SelectContent>
-                            {filteredSites.map((site) => (
-                              <SelectItem key={site.id} value={site.name}>
-                                {site.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
+                            <SelectContent>
+                              {sites.map((site) => {
+                                const siteIdValue = site.siteID?.toString() || ''
+                                const siteNameValue = site.locationName || ''
+                                return (
+                                  <SelectItem key={siteIdValue} value={siteIdValue}>
+                                    {siteNameValue}
+                                  </SelectItem>
+                                )
+                              })}
+                              {sites.length === 0 && customerId && !isLoadingSites && (
+                                <SelectItem value="no-sites" disabled>No sites available for this customer</SelectItem>
+                              )}
+                            </SelectContent>
                           </Select>
                         )}
                         <FormMessage />
@@ -906,10 +1041,14 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                       <FormItem>
                         <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Type of Incident *</FormLabel>
                         <Select
-                          value={incidentType}
+                          value={field.value || ''}
                           onValueChange={value => {
-                            setIncidentType(value)
-                            if (value !== 'Arrest - Saved?') setArrestSaveComment('')
+                            field.onChange(value) // Update form field
+                            setIncidentType(value) // Update local state for UI logic
+                            if (value !== 'Arrest - Saved?') {
+                              setArrestSaveComment('')
+                              form.setValue('arrestSaveComment', '') // Clear form field too
+                            }
                           }}
                         >
                           <FormControl>
@@ -925,13 +1064,17 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                             ))}
                           </SelectContent>
                         </Select>
-                        {incidentType === 'Arrest - Saved?' && (
+                        {(field.value === 'Arrest - Saved?' || incidentType === 'Arrest - Saved?') && (
                           <div className="mt-2">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Arrest Save Comment <span className="text-red-500">*</span></label>
                             <textarea
                               className="w-full border rounded px-2 py-1 text-sm"
                               value={arrestSaveComment}
-                              onChange={e => setArrestSaveComment(e.target.value)}
+                              onChange={e => {
+                                const value = e.target.value
+                                setArrestSaveComment(value)
+                                form.setValue('arrestSaveComment', value) // Sync with form
+                              }}
                               required
                               placeholder="Did this lead to a save or was the item lost after arrest?"
                             />
@@ -1112,7 +1255,8 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                               onClick={() => {
                                 if (!field.value) return;
                                 const dob = form.getValues('offenderDOB');
-                                searchOffender(field.value, dob);
+                                const marks = form.getValues('offenderMarks');
+                                searchOffender(field.value, dob, marks || offenderMarksPreview);
                               }}
                               disabled={isSearchingOffender}
                             >
@@ -1137,18 +1281,77 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                               {offenderVerified ? 'Details Verified' : 'Details Not Verified'}
                             </Badge>
                           </div>
-                          {offenderHistory && (
-                            <div className="mt-2 p-2 bg-gray-50 rounded-md">
-                              <p className="text-sm font-medium text-gray-700 mb-1">Previous Incidents:</p>
-                              <div className="space-y-1">
-                                {offenderHistory.incidents.map((incident, index) => (
-                                  <div key={index} className="text-xs text-gray-600">
-                                    {format(new Date(incident.date), 'dd MMM yyyy')} - {incident.store} - {incident.type}
-                                  </div>
-                                ))}
-                              </div>
+                        {offenderSearchError && (
+                          <div className="mt-2 text-sm text-red-600">
+                            {offenderSearchError}
+                          </div>
+                        )}
+                        {offenderHistory && (
+                          <div className="mt-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-gray-700">Potential Matches</p>
+                              <span className="text-xs text-gray-500">
+                                Showing {offenderHistory.matches.length} of {offenderHistory.totalCount}
+                              </span>
                             </div>
-                          )}
+                            <div className="space-y-2">
+                              {offenderHistory.matches.map((match, matchIndex) => (
+                                <div key={`${match.offenderName}-${matchIndex}`} className="border border-gray-200 rounded-lg p-2 bg-gray-50">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="text-sm font-semibold text-gray-800">{match.offenderName}</p>
+                                      <p className="text-xs text-gray-600">
+                                        {match.offenderDOB ? `DOB: ${format(new Date(match.offenderDOB), 'dd MMM yyyy')}` : 'DOB: N/A'}
+                                      </p>
+                                      {match.offenderMarks && (
+                                        <p className="text-xs text-gray-600 mt-1">
+                                          Marks: {match.offenderMarks}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-blue-600 hover:text-blue-700"
+                                      onClick={() => {
+                                        form.setValue('offenderName', match.offenderName)
+                                        if (match.offenderDOB) {
+                                          form.setValue('offenderDOB', new Date(match.offenderDOB))
+                                        }
+                                        if (match.offenderAddress) {
+                                          form.setValue('offenderAddress', match.offenderAddress)
+                                        }
+                                        if (match.gender) {
+                                          form.setValue('gender', match.gender as 'Male' | 'Female' | 'N/A or N/K')
+                                        }
+                                        if (match.offenderPlaceOfBirth) {
+                                          form.setValue('offenderPlaceOfBirth', match.offenderPlaceOfBirth)
+                                        }
+                                        if (match.offenderMarks) {
+                                          form.setValue('offenderMarks', match.offenderMarks)
+                                          setOffenderMarksPreview(match.offenderMarks)
+                                        }
+                                        setOffenderVerified(true)
+                                      }}
+                                      aria-label={`Use offender details for ${match.offenderName}`}
+                                    >
+                                      Use details
+                                    </Button>
+                                  </div>
+                                  <div className="mt-2 space-y-1">
+                                    {match.recentIncidents.map((incident) => (
+                                      <div key={incident.incidentId} className="text-xs text-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-t border-dashed pt-1 first:border-none first:pt-0">
+                                        <span>{format(new Date(incident.dateOfIncident), 'dd MMM yyyy')} - {incident.siteName}</span>
+                                        <span className="text-gray-500">{incident.incidentType}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         </div>
                         <FormMessage />
                       </FormItem>
@@ -1282,6 +1485,29 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name="offenderMarks"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Distinguishing Marks / Tattoos</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe tattoos, scars, or other identifying marks"
+                            className="min-h-[80px]"
+                            {...field}
+                            onChange={(event) => {
+                              field.onChange(event)
+                              setOffenderMarksPreview(event.target.value)
+                            }}
+                          />
+                        </FormControl>
+                        <FormDescription>Include tattoos, scars, or marks that aid identification (max 500 chars).</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <div className="space-y-3 sm:space-y-4 pt-4 border-t">
@@ -1320,9 +1546,27 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm font-semibold text-gray-700 mb-2">County</FormLabel>
-                          <FormControl>
-                            <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter county" />
-                          </FormControl>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value || ''}
+                            disabled={isLoadingCounties}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm">
+                                <SelectValue placeholder={isLoadingCounties ? "Loading counties..." : "Select county"} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {counties.map((county) => (
+                                <SelectItem key={county.lookupId} value={county.value}>
+                                  {county.value}
+                                </SelectItem>
+                              ))}
+                              {counties.length === 0 && !isLoadingCounties && (
+                                <SelectItem value="no-counties" disabled>No counties available</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1580,16 +1824,38 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
             {/* Form Actions */}
             <div className="flex flex-col gap-3 pt-4">
               {/* Error Summary */}
-              {Object.keys(form.formState.errors).length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
-                  <p className="text-sm font-medium text-red-800 mb-2">Please fix the following errors:</p>
-                  <ul className="list-disc list-inside text-sm text-red-700">
-                    {Object.entries(form.formState.errors).map(([field, error]) => (
-                      <li key={field}>{error?.message as string}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {(() => {
+                const errors: Array<{ field: string; message: string }> = []
+                
+                // Flatten nested errors (e.g., offenderAddress.county)
+                const flattenErrors = (obj: any, prefix = ''): void => {
+                  Object.entries(obj).forEach(([key, value]) => {
+                    const fieldPath = prefix ? `${prefix}.${key}` : key
+                    if (value && typeof value === 'object') {
+                      if ('message' in value) {
+                        errors.push({ field: fieldPath, message: (value as any).message })
+                      } else {
+                        flattenErrors(value, fieldPath)
+                      }
+                    }
+                  })
+                }
+                
+                flattenErrors(form.formState.errors)
+                
+                return errors.length > 0 ? (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                    <p className="text-sm font-medium text-red-800 mb-2">Please fix the following errors:</p>
+                    <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                      {errors.map(({ field, message }) => (
+                        <li key={field}>
+                          <span className="font-semibold">{field}:</span> {message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null
+              })()}
               
               <div className="flex justify-end items-center gap-3">
                 <Button 
@@ -1603,11 +1869,10 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                 </Button>
                 <Button 
                   type="submit" 
-                  className="h-9 px-4 text-sm bg-green-600 hover:bg-green-700 text-white"
-                  disabled={isLoading || !form.formState.isValid}
+                  className="h-9 px-4 text-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+                  disabled={isLoading}
                 >
                   {isLoading ? "Saving..." : initialData ? "Update" : "Create"}
-                  {!form.formState.isValid && " (Please fill required fields)"}
                 </Button>
               </div>
             </div>

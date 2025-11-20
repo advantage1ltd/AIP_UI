@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { dailyActivityService } from '@/services/dailyActivityService';
+import { siteService } from '@/services/siteService';
 import type { 
   DailyActivityReport, 
   DailyActivityRequest, 
@@ -26,7 +27,7 @@ import type {
   InsecureAreasData,
   SystemsNotWorkingData 
 } from '@/types/dailyActivity';
-import type { Site } from '@/types/dashboard';
+import type { Site } from '@/types/customer';
 
 interface DailyActivityFormProps {
   open: boolean;
@@ -115,23 +116,25 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess, custo
   const loadSites = async () => {
     try {
       // Use the passed customerId if available, otherwise fall back to user's customerId
-      const targetCustomerId = propCustomerId || user?.customerId?.toString() || '21';
+      const targetCustomerId = propCustomerId 
+        ? parseInt(propCustomerId) 
+        : (user?.customerId && typeof user.customerId === 'number' ? user.customerId : undefined);
+      
+      if (!targetCustomerId) {
+        console.warn('🏢 [DailyActivityForm] No customer ID available to load sites');
+        return;
+      }
       
       console.log('🏢 [DailyActivityForm] Loading sites for customer ID:', targetCustomerId);
       
-      // Use fetch directly since we don't have a proper exported service method
-      const response = await fetch('/api/dashboard/sites', {
-        headers: {
-          'X-Customer-Id': targetCustomerId
-        }
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch sites');
-      }
-      const sitesData = await response.json();
+      const response = await siteService.getSitesByCustomer(targetCustomerId);
       
-      console.log('🏢 [DailyActivityForm] Loaded sites:', sitesData.length, 'sites for customer', targetCustomerId);
-      setSites(sitesData);
+      if (response.success) {
+        console.log('🏢 [DailyActivityForm] Loaded sites:', response.data.length, 'sites for customer', targetCustomerId);
+        setSites(response.data);
+      } else {
+        console.error('🏢 [DailyActivityForm] Failed to load sites:', response);
+      }
     } catch (err) {
       console.error('Failed to load sites:', err);
     }
@@ -167,13 +170,28 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess, custo
     setVisitorLog(report.visitorLog);
   };
 
+  const siteOptions = useMemo(() => {
+    return sites
+      .map((site, index) => {
+        const derivedId = site?.siteID !== undefined && site?.siteID !== null
+          ? String(site.siteID)
+          : `site-${index}`;
+        const trimmedName = site?.locationName?.trim();
+        return {
+          id: derivedId,
+          name: trimmedName && trimmedName.length > 0 ? trimmedName : `Site ${derivedId}`,
+        };
+      })
+      .filter((option) => option.id.length > 0);
+  }, [sites]);
+
   const resetForm = () => {
     // Pre-fill site if provided
-    const selectedSite = propSiteId ? sites.find(site => site.id === propSiteId) : null;
+    const selectedSite = propSiteId ? siteOptions.find(site => site.id === propSiteId) : null;
     
     setFormData({
       siteId: propSiteId || '',
-      siteName: selectedSite?.locationName || '',
+      siteName: selectedSite?.name || '',
       officerName: user?.username || '',
       reportDate: new Date(),
       notes: ''
@@ -218,11 +236,11 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess, custo
       return;
     }
     
-    const selectedSite = sites.find(site => site.id === siteId);
+    const selectedSite = siteOptions.find(site => site.id === siteId);
     setFormData(prev => ({
       ...prev,
       siteId,
-      siteName: selectedSite?.locationName || ''
+      siteName: selectedSite?.name || ''
     }));
   };
 
@@ -429,17 +447,17 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess, custo
                     ) : (
                       <Select value={formData.siteId} onValueChange={handleSiteChange} disabled={!isAdmin && propSiteId ? true : false}>
                         <SelectTrigger>
-                          <SelectValue placeholder={sites.length === 0 ? "No sites available for this customer" : "Select site"} />
+                          <SelectValue placeholder={siteOptions.length === 0 ? "No sites available for this customer" : "Select site"} />
                         </SelectTrigger>
                         <SelectContent>
-                          {sites.length === 0 ? (
-                            <SelectItem value="no-sites" disabled>
+                          {siteOptions.length === 0 ? (
+                            <SelectItem key="no-sites" value="no-sites" disabled>
                               No sites available for this customer
                             </SelectItem>
                           ) : (
-                            sites.map((site) => (
+                            siteOptions.map((site) => (
                               <SelectItem key={site.id} value={site.id}>
-                                {site.locationName}
+                                {site.name}
                               </SelectItem>
                             ))
                           )}

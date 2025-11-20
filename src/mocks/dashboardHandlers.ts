@@ -248,11 +248,11 @@ const calculateIncidentChartData = (customerId: number, siteIds?: string | strin
     );
     
     const uniformOfficers = dayIncidents
-      .filter(i => i.officerType === 'uniform')
+      .filter(i => i.officerRole === 'Uniform Officer')
       .reduce((sum, i) => sum + (i.value || i.amount || 0), 0);
     
     const storeDetectives = dayIncidents
-      .filter(i => i.officerType === 'detective')
+      .filter(i => i.officerRole === 'Store Detective')
       .reduce((sum, i) => sum + (i.value || i.amount || 0), 0);
 
     dailyData.push({
@@ -276,11 +276,11 @@ const calculateIncidentChartData = (customerId: number, siteIds?: string | strin
     });
     
     const uniformOfficers = weekIncidents
-      .filter(i => i.officerType === 'uniform')
+      .filter(i => i.officerRole === 'Uniform Officer')
       .reduce((sum, i) => sum + (i.value || i.amount || 0), 0);
     
     const storeDetectives = weekIncidents
-      .filter(i => i.officerType === 'detective')
+      .filter(i => i.officerRole === 'Store Detective')
       .reduce((sum, i) => sum + (i.value || i.amount || 0), 0);
 
     weeklyData.push({
@@ -301,11 +301,11 @@ const calculateIncidentChartData = (customerId: number, siteIds?: string | strin
     );
     
     const uniformOfficers = monthIncidents
-      .filter(i => i.officerType === 'uniform')
+      .filter(i => i.officerRole === 'Uniform Officer')
       .reduce((sum, i) => sum + (i.value || i.amount || 0), 0);
     
     const storeDetectives = monthIncidents
-      .filter(i => i.officerType === 'detective')
+      .filter(i => i.officerRole === 'Store Detective')
       .reduce((sum, i) => sum + (i.value || i.amount || 0), 0);
 
     monthlyData.push({
@@ -326,11 +326,11 @@ const calculateIncidentChartData = (customerId: number, siteIds?: string | strin
     );
     
     const uniformOfficers = yearIncidents
-      .filter(i => i.officerType === 'uniform')
+      .filter(i => i.officerRole === 'Uniform Officer')
       .reduce((sum, i) => sum + (i.value || i.amount || 0), 0);
     
     const storeDetectives = yearIncidents
-      .filter(i => i.officerType === 'detective')
+      .filter(i => i.officerRole === 'Store Detective')
       .reduce((sum, i) => sum + (i.value || i.amount || 0), 0);
 
     yearlyData.push({

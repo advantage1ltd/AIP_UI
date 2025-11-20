@@ -1,4 +1,4 @@
-import { Incident, IncidentStats } from '@/types/incidents'
+import { Incident, IncidentStats, RepeatOffenderSearchPayload, RepeatOffenderSearchResponse } from '@/types/incidents'
 import { getCurrentCustomerId } from '@/lib/utils'
 import { BASE_API_URL } from '@/config/api'
 
@@ -38,8 +38,6 @@ export interface IncidentGraphData {
 	valueRecovered: number
 	quantityRecovered: number
 	quantity: number
-	uniformOfficer: number
-	storeDetective: number
 	amount: number
 	total: number
 	policeInvolvement: boolean
@@ -83,7 +81,7 @@ export interface IncidentGraphResponse {
 		}
 		filters: {
 			customerId: number
-			region: string
+			regionId?: string
 			officerType: string
 			graphType: string
 			startDate?: string
@@ -109,7 +107,7 @@ export interface IncidentGraphFilters {
 	customerId: number
 	startDate?: string
 	endDate?: string
-	region?: string
+	regionId?: string
 	officerType?: string
 	graphType?: string
 }
@@ -126,7 +124,7 @@ export const fetchIncidentGraphData = async (
 	searchParams.append('customerId', filters.customerId.toString())
 	if (filters.startDate) searchParams.append('startDate', filters.startDate)
 	if (filters.endDate) searchParams.append('endDate', filters.endDate)
-	if (filters.region) searchParams.append('region', filters.region)
+	if (filters.regionId) searchParams.append('regionId', filters.regionId)
 	if (filters.officerType) searchParams.append('officerType', filters.officerType)
 	if (filters.graphType) searchParams.append('graphType', filters.graphType)
 
@@ -157,7 +155,7 @@ export const fetchIncidentTypesData = async (
 	searchParams.append('customerId', filters.customerId.toString())
 	if (filters.startDate) searchParams.append('startDate', filters.startDate)
 	if (filters.endDate) searchParams.append('endDate', filters.endDate)
-	if (filters.region) searchParams.append('region', filters.region)
+	if (filters.regionId) searchParams.append('regionId', filters.regionId)
 	if (filters.officerType) searchParams.append('officerType', filters.officerType)
 
 	const response = await fetch(`${BASE_API_URL}/incidents/types-summary?${searchParams}`, {
@@ -370,5 +368,28 @@ export const incidentService = {
 			console.error('Error deleting incident:', error)
 			throw error
 		}
+	},
+
+	async searchRepeatOffenders(payload: RepeatOffenderSearchPayload): Promise<RepeatOffenderSearchResponse> {
+		const searchParams = new URLSearchParams()
+		if (payload.name) searchParams.append('name', payload.name)
+		if (payload.dateOfBirth) searchParams.append('dateOfBirth', payload.dateOfBirth)
+		if (payload.marks) searchParams.append('marks', payload.marks)
+		if (payload.page) searchParams.append('page', payload.page.toString())
+		if (payload.pageSize) searchParams.append('pageSize', payload.pageSize.toString())
+
+		const response = await fetch(`${BASE_API_URL}/incidents/repeat-offenders?${searchParams}`, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		})
+
+		const result: RepeatOffenderSearchResponse = await response.json()
+		if (!response.ok || !result.success) {
+			throw new Error(result.message || 'Failed to search repeat offenders')
+		}
+
+		return result
 	}
 } 

@@ -1,56 +1,60 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, BookOpen, Plus, Search, Filter, Calendar, Clock, AlertTriangle, User, MapPin, Eye, Edit, Trash2 } from "lucide-react"
+import { ArrowLeft, BookOpen, Plus, Search, Calendar, Clock, User, MapPin, Eye, Edit, Trash2 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { findCustomerById } from "@/hooks/useAvailableCustomers"
 import { useToast } from "@/hooks/use-toast"
+import { siteService } from "@/services/siteService"
+import { getAuthHeaders } from "@/services/auth"
+import { BASE_API_URL } from "@/config/api"
 import type { 
-  DailyOccurrenceEntry, 
-  OccurrenceType, 
-  OccurrenceSeverity, 
-  OccurrenceStatus,
+  DailyOccurrenceEntry,
+  DailyOccurrenceBookFilters,
+  DailyOccurrenceBookStats,
   CreateOccurrenceRequest,
   UpdateOccurrenceRequest,
-  DailyOccurrenceBookFilters,
-  DailyOccurrenceBookStats
+  DailyOccurrenceCode
 } from "@/types/dailyOccurrenceBook"
 
-const OCCURRENCE_TYPES: { value: OccurrenceType; label: string }[] = [
-  { value: 'general_observation', label: 'General Observation' },
-  { value: 'security_incident', label: 'Security Incident' },
-  { value: 'safety_concern', label: 'Safety Concern' },
-  { value: 'visitor_log', label: 'Visitor Log' },
-  { value: 'maintenance_issue', label: 'Maintenance Issue' },
-  { value: 'equipment_fault', label: 'Equipment Fault' },
-  { value: 'staff_arrival_departure', label: 'Staff Arrival/Departure' },
-  { value: 'emergency_test', label: 'Emergency Test' },
-  { value: 'weather_condition', label: 'Weather Condition' },
-  { value: 'other', label: 'Other' }
+const DOB_CODES: { value: DailyOccurrenceCode; label: string; description: string }[] = [
+  { value: 'A', label: 'Arrest', description: 'Arrest' },
+  { value: 'B', label: 'Deter', description: 'Deter' },
+  { value: 'C', label: 'Theft', description: 'Theft' },
+  { value: 'D', label: 'Violent Behaviour', description: 'Violent Behaviour' },
+  { value: 'E', label: 'Abusive Behaviour', description: 'Abusive Behaviour' },
+  { value: 'F', label: 'Ban from Store', description: 'Ban from Store' },
+  { value: 'G', label: 'Criminal Damage', description: 'Criminal Damage' },
+  { value: 'H', label: 'Underage Purchase', description: 'Underage Purchase' },
+  { value: 'J', label: 'Credit Card Fraud', description: 'Credit Card Fraud' },
+  { value: 'K', label: 'Anti-Social Behaviour', description: 'Anti-Social Behaviour' },
+  { value: 'L', label: 'Suspicious Behaviour', description: 'Suspicious Behaviour' },
+  { value: 'M', label: 'Other', description: 'Other' }
 ]
 
-const SEVERITY_LEVELS: { value: OccurrenceSeverity; label: string; color: string }[] = [
-  { value: 'low', label: 'Low', color: 'bg-green-100 text-green-800' },
-  { value: 'medium', label: 'Medium', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'high', label: 'High', color: 'bg-orange-100 text-orange-800' },
-  { value: 'critical', label: 'Critical', color: 'bg-red-100 text-red-800' }
-]
+type OccurrenceFormState = Partial<CreateOccurrenceRequest> & { id?: string }
 
-const STATUS_OPTIONS: { value: OccurrenceStatus; label: string; color: string }[] = [
-  { value: 'open', label: 'Open', color: 'bg-blue-100 text-blue-800' },
-  { value: 'investigating', label: 'Investigating', color: 'bg-purple-100 text-purple-800' },
-  { value: 'resolved', label: 'Resolved', color: 'bg-green-100 text-green-800' },
-  { value: 'closed', label: 'Closed', color: 'bg-gray-100 text-gray-800' }
-]
+const getCodeMeta = (code?: string) => DOB_CODES.find((c) => c.value === code)?.label ?? code ?? 'Unknown'
+
+const ALL_SITES_OPTION = 'all-sites'
+
+const getDefaultFormState = (): OccurrenceFormState => ({
+	date: new Date().toISOString().split('T')[0],
+	time: new Date().toTimeString().slice(0, 5),
+	code: 'A' as DailyOccurrenceCode,
+	storeName: '',
+	storeNumber: '',
+	officerName: '',
+	details: '',
+	signature: ''
+})
 
 export default function CustomerDailyOccurrenceBook() {
   const navigate = useNavigate()
@@ -64,9 +68,13 @@ export default function CustomerDailyOccurrenceBook() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [customer, setCustomer] = useState<{ id: number; name: string } | null>(null)
-  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
+  const [selectedSiteId, setSelectedSiteId] = useState<string>(ALL_SITES_OPTION)
   const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null)
   const [sites, setSites] = useState<any[]>([])
+  const selectedSite = useMemo(() => {
+    if (!selectedSiteId || selectedSiteId === ALL_SITES_OPTION) return null
+    return sites.find((site) => String(site.siteID ?? site.id ?? '') === selectedSiteId) ?? null
+  }, [sites, selectedSiteId])
   
   // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -77,29 +85,75 @@ export default function CustomerDailyOccurrenceBook() {
   // Filter states
   const [filters, setFilters] = useState<DailyOccurrenceBookFilters>({})
   const [searchTerm, setSearchTerm] = useState('')
+  const hasActiveFilters = Boolean(
+    filters.storeNumber ||
+    filters.storeName ||
+    filters.officerName ||
+    (filters.code && filters.code.length) ||
+    filters.dateFrom ||
+    filters.dateTo
+  )
   
   // Form state for creating/editing occurrences
-  const [formData, setFormData] = useState<Partial<CreateOccurrenceRequest>>({
-    date: new Date().toISOString().split('T')[0],
-    time: new Date().toTimeString().slice(0, 5),
-    severity: 'low',
-    occurrenceType: 'general_observation',
-    followUpRequired: false,
-    managerNotified: false
-  })
+  const [formData, setFormData] = useState<OccurrenceFormState>(getDefaultFormState())
+
+  const siteOptions = useMemo(() => {
+    const baseOptions = sites
+      .map((site) => {
+        const derivedId = String(site.siteID ?? site.id ?? '')
+        const storeNumberRaw = site.sinNumber ?? site.storeNumber ?? site.siteID ?? derivedId
+        return {
+          id: derivedId,
+          name: site.locationName ?? `Site ${derivedId}`,
+          storeNumber: storeNumberRaw ? String(storeNumberRaw) : ''
+        }
+      })
+      .filter((option) => option.id.length > 0)
+      .sort((a, b) => a.name.localeCompare(b.name))
+
+    if (formData.siteId && !baseOptions.some((option) => option.id === formData.siteId)) {
+      baseOptions.unshift({
+        id: formData.siteId,
+        name: formData.storeName ? `${formData.storeName} (legacy)` : `Site ${formData.siteId}`,
+        storeNumber: formData.storeNumber ?? ''
+      })
+    }
+
+    return baseOptions
+  }, [sites, formData.siteId, formData.storeName, formData.storeNumber])
+
+  useEffect(() => {
+    if (!selectedSite || editDialogOpen) return
+    const derivedId = String(selectedSite.siteID ?? selectedSite.id ?? '')
+    setSelectedSiteName(selectedSite.locationName ?? null)
+    setFormData((prev) => ({
+      ...prev,
+      siteId: prev?.siteId ?? derivedId,
+      storeName: prev?.storeName && prev.storeName.length > 0 ? prev.storeName : selectedSite.locationName ?? '',
+      storeNumber: prev?.storeNumber && prev.storeNumber.length > 0
+        ? prev.storeNumber
+        : String(selectedSite.sinNumber ?? selectedSite.storeNumber ?? selectedSite.siteID ?? '')
+    }))
+  }, [selectedSite, editDialogOpen])
+
+  const handleSiteSelection = (siteId: string) => {
+    const site = sites.find((s) => String(s.siteID ?? s.id ?? '') === siteId)
+    setFormData((prev) => ({
+      ...prev,
+      siteId,
+      storeName: site?.locationName ?? prev.storeName ?? '',
+      storeNumber: site
+        ? String(site.sinNumber ?? site.storeNumber ?? site.siteID ?? '')
+        : prev.storeNumber ?? ''
+    }))
+  }
 
   // Fetch site name
   const fetchSiteName = async (customerId: number, siteId: string) => {
     try {
-      const response = await fetch('/api/dashboard/sites', {
-        headers: {
-          'X-Customer-Id': customerId.toString()
-        }
-      })
-      
-      if (response.ok) {
-        const sites = await response.json()
-        const site = sites.find((s: any) => s.id === siteId)
+      const response = await siteService.getSitesByCustomer(customerId)
+      if (response.success && response.data) {
+        const site = response.data.find((s) => String(s.siteID) === siteId)
         if (site) {
           setSelectedSiteName(site.locationName)
           console.log('CustomerDailyOccurrenceBook: Found site name:', site.locationName)
@@ -118,7 +172,7 @@ export default function CustomerDailyOccurrenceBook() {
 
         const urlCustomerId = searchParams.get('customerId')
         const urlSiteId = searchParams.get('siteId')
-        const userCustomerId = user?.customerId
+        const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined
 
         // Determine target customer ID
         const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : userCustomerId
@@ -135,7 +189,7 @@ export default function CustomerDailyOccurrenceBook() {
         }
 
         // Find customer in available customers
-        const customerData = await findCustomerById(targetCustomerId, user)
+        const customerData = await findCustomerById(targetCustomerId)
         if (!customerData) {
           setError('Customer not found or access denied')
           setLoading(false)
@@ -145,18 +199,20 @@ export default function CustomerDailyOccurrenceBook() {
         console.log('CustomerDailyOccurrenceBook: Found customer:', customerData)
 
         // Verify access
-        if (user.role === 'AdvantageOneOfficer' && user.assignedCustomerIds && !user.assignedCustomerIds.includes(targetCustomerId)) {
+        if (user && user.role === 'AdvantageOneOfficer' && 'assignedCustomerIds' in user && (user as any).assignedCustomerIds && !(user as any).assignedCustomerIds.includes(targetCustomerId)) {
           setError('Access denied: You are not assigned to this customer')
           setLoading(false)
           return
         }
 
         console.log('CustomerDailyOccurrenceBook: Access granted - setting customer')
-        setCustomer({ id: targetCustomerId, name: customerData.companyName })
+        setCustomer({ id: targetCustomerId, name: customerData.name })
         
         if (urlSiteId) {
           setSelectedSiteId(urlSiteId)
           await fetchSiteName(targetCustomerId, urlSiteId)
+        } else {
+          setSelectedSiteId(ALL_SITES_OPTION)
         }
 
       } catch (err) {
@@ -176,15 +232,9 @@ export default function CustomerDailyOccurrenceBook() {
       if (!customer) return
 
       try {
-        const response = await fetch('/api/dashboard/sites', {
-          headers: {
-            'X-Customer-Id': customer.id.toString()
-          }
-        })
-        
-        if (response.ok) {
-          const sitesData = await response.json()
-          setSites(sitesData)
+        const response = await siteService.getSitesByCustomer(customer.id)
+        if (response.success && response.data) {
+          setSites(response.data)
         }
       } catch (error) {
         console.error('Failed to fetch sites:', error)
@@ -194,6 +244,12 @@ export default function CustomerDailyOccurrenceBook() {
     fetchSites()
   }, [customer])
 
+  useEffect(() => {
+    if (selectedSiteId === ALL_SITES_OPTION) {
+      setSelectedSiteName(null)
+    }
+  }, [selectedSiteId])
+
   // Fetch occurrences data
   const fetchOccurrences = async () => {
     if (!customer) return
@@ -202,16 +258,48 @@ export default function CustomerDailyOccurrenceBook() {
       setLoading(true)
       const queryParams = new URLSearchParams({
         customerId: customer.id.toString(),
-        ...(selectedSiteId && { siteId: selectedSiteId }),
+        ...(selectedSiteId && selectedSiteId !== ALL_SITES_OPTION && { siteId: selectedSiteId }),
         ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
         ...(filters.dateTo && { dateTo: filters.dateTo }),
-        ...(filters.occurrenceType?.length && { occurrenceType: filters.occurrenceType.join(',') }),
-        ...(filters.severity?.length && { severity: filters.severity.join(',') }),
-        ...(filters.status?.length && { status: filters.status.join(',') }),
+        ...(filters.storeNumber && { storeNumber: filters.storeNumber }),
+        ...(filters.storeName && { storeName: filters.storeName }),
+        ...(filters.officerName && { officerName: filters.officerName }),
+        ...(filters.code?.length && { code: filters.code.join(',') }),
         ...(searchTerm && { search: searchTerm })
       })
 
-      const response = await fetch(`/api/customers/${customer.id}/daily-occurrence-book?${queryParams}`)
+      const url = `${BASE_API_URL}/customers/${customer.id}/daily-occurrence-book?${queryParams}`
+      const headers = getAuthHeaders()
+      const authHeaders = headers as Record<string, string>
+      
+      console.log('Fetching occurrences:', { url, hasAuth: !!authHeaders.Authorization })
+      
+      const response = await fetch(url, {
+        headers: headers
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('API Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          body: errorText.substring(0, 500)
+        })
+        throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`)
+      }
+      
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text()
+        console.error('Expected JSON but got:', {
+          contentType: contentType,
+          url: url,
+          preview: text.substring(0, 500)
+        })
+        throw new Error('Server returned non-JSON response. Check if the API endpoint exists.')
+      }
+      
       const result = await response.json()
 
       if (result.success) {
@@ -234,32 +322,55 @@ export default function CustomerDailyOccurrenceBook() {
 
   // Handle form submission for creating/updating occurrences
   const handleSubmit = async (isEdit = false) => {
-    if (!customer || !selectedSiteId) {
+    if (!customer) {
       toast({
-        title: "Error",
-        description: "Customer and site must be selected",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Customer must be selected',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    const resolvedSiteId = formData.siteId ?? selectedSiteId
+
+    if (!resolvedSiteId) {
+      toast({
+        title: 'Missing site',
+        description: 'Please select a site for this occurrence',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    if (!formData.storeName || !formData.storeNumber || !formData.officerName || !formData.code || !formData.details || !formData.signature) {
+      toast({
+        title: 'Missing information',
+        description: 'Store details, officer name, code, details, and signature are required.',
+        variant: 'destructive'
       })
       return
     }
 
     try {
+      const { dateCommenced, ...restFormData } = formData as OccurrenceFormState & { dateCommenced?: string }
+
       const requestData = {
-        ...formData,
+        ...restFormData,
         customerId: customer.id,
-        siteId: selectedSiteId,
+        siteId: resolvedSiteId,
         ...(isEdit && selectedOccurrence && { id: selectedOccurrence.id })
       }
 
       const url = isEdit 
-        ? `/api/customers/${customer.id}/daily-occurrence-book/${selectedOccurrence?.id}`
-        : `/api/customers/${customer.id}/daily-occurrence-book`
+        ? `${BASE_API_URL}/customers/${customer.id}/daily-occurrence-book/${selectedOccurrence?.id}`
+        : `${BASE_API_URL}/customers/${customer.id}/daily-occurrence-book`
       
       const method = isEdit ? 'PUT' : 'POST'
 
       const response = await fetch(url, {
         method,
         headers: {
+          ...getAuthHeaders(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestData)
@@ -276,14 +387,7 @@ export default function CustomerDailyOccurrenceBook() {
         
         setCreateDialogOpen(false)
         setEditDialogOpen(false)
-        setFormData({
-          date: new Date().toISOString().split('T')[0],
-          time: new Date().toTimeString().slice(0, 5),
-          severity: 'low',
-          occurrenceType: 'general_observation',
-          followUpRequired: false,
-          managerNotified: false
-        })
+        setFormData(getDefaultFormState())
         setSelectedOccurrence(null)
         
         await fetchOccurrences()
@@ -305,8 +409,9 @@ export default function CustomerDailyOccurrenceBook() {
     if (!customer) return
 
     try {
-      const response = await fetch(`/api/customers/${customer.id}/daily-occurrence-book/${occurrence.id}`, {
-        method: 'DELETE'
+      const response = await fetch(`${BASE_API_URL}/customers/${customer.id}/daily-occurrence-book/${occurrence.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
       })
 
       const result = await response.json()
@@ -332,15 +437,142 @@ export default function CustomerDailyOccurrenceBook() {
     }
   }
 
-  // Get severity badge color
-  const getSeverityColor = (severity: OccurrenceSeverity) => {
-    return SEVERITY_LEVELS.find(s => s.value === severity)?.color || 'bg-gray-100 text-gray-800'
-  }
+  const renderOccurrenceForm = (prefix: string) => (
+    <div className="grid gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor={`${prefix}-store-name`}>Store</Label>
+          <Select
+            value={formData.siteId ?? ''}
+            onValueChange={handleSiteSelection}
+            disabled={siteOptions.length === 0}
+          >
+            <SelectTrigger id={`${prefix}-store-name`}>
+              <SelectValue placeholder={siteOptions.length ? 'Select a site' : 'No sites available'} />
+            </SelectTrigger>
+            <SelectContent>
+              {siteOptions.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {formData.storeName && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Selected: {formData.storeName}
+            </p>
+          )}
+        </div>
+        <div>
+          <Label htmlFor={`${prefix}-store-number`}>Store Number</Label>
+          <Input
+            id={`${prefix}-store-number`}
+            value={formData.storeNumber ?? ''}
+            onChange={(event) => setFormData({ ...formData, storeNumber: event.target.value })}
+            placeholder="Store number"
+          />
+        </div>
+      </div>
 
-  // Get status badge color
-  const getStatusColor = (status: OccurrenceStatus) => {
-    return STATUS_OPTIONS.find(s => s.value === status)?.color || 'bg-gray-100 text-gray-800'
-  }
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor={`${prefix}-date`}>Date</Label>
+          <Input
+            id={`${prefix}-date`}
+            type="date"
+            value={formData.date}
+            onChange={(event) => setFormData({ ...formData, date: event.target.value })}
+          />
+        </div>
+        <div>
+          <Label htmlFor={`${prefix}-time`}>Time</Label>
+          <Input
+            id={`${prefix}-time`}
+            type="time"
+            value={formData.time}
+            onChange={(event) => setFormData({ ...formData, time: event.target.value })}
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor={`${prefix}-officer`}>Officer Name</Label>
+        <Input
+          id={`${prefix}-officer`}
+          value={formData.officerName ?? ''}
+          onChange={(event) => setFormData({ ...formData, officerName: event.target.value })}
+          placeholder="Officer full name"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor={`${prefix}-code`}>Incident Code</Label>
+          <Select
+            value={formData.code ?? 'A'}
+            onValueChange={(value) => setFormData({ ...formData, code: value as DailyOccurrenceCode })}
+          >
+            <SelectTrigger id={`${prefix}-code`}>
+              <SelectValue placeholder="Select code" />
+            </SelectTrigger>
+            <SelectContent>
+              {DOB_CODES.map((code) => (
+                <SelectItem key={code.value} value={code.value}>
+                  {code.value} — {code.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor={`${prefix}-signature`}>Signature</Label>
+          <Input
+            id={`${prefix}-signature`}
+            value={formData.signature ?? ''}
+            onChange={(event) => setFormData({ ...formData, signature: event.target.value })}
+            placeholder="Officer signature"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor={`${prefix}-crime-date`}>Crime Report Sent to HO (Date)</Label>
+          <Input
+            id={`${prefix}-crime-date`}
+            type="date"
+            value={formData.crimeReportCompletedDate ?? ''}
+            onChange={(event) =>
+              setFormData({ ...formData, crimeReportCompletedDate: event.target.value || undefined })
+            }
+          />
+        </div>
+        <div>
+          <Label htmlFor={`${prefix}-crime-time`}>Crime Report Sent to HO (Time)</Label>
+          <Input
+            id={`${prefix}-crime-time`}
+            type="time"
+            value={formData.crimeReportCompletedTime ?? ''}
+            onChange={(event) =>
+              setFormData({ ...formData, crimeReportCompletedTime: event.target.value || undefined })
+            }
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor={`${prefix}-details`}>Details</Label>
+        <Textarea
+          id={`${prefix}-details`}
+          value={formData.details ?? ''}
+          onChange={(event) => setFormData({ ...formData, details: event.target.value })}
+          placeholder="Detailed description of the occurrence"
+          rows={5}
+        />
+      </div>
+    </div>
+  )
 
   if (loading && !customer) {
     return (
@@ -361,31 +593,38 @@ export default function CustomerDailyOccurrenceBook() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
           <Button 
             variant="outline" 
             onClick={() => navigate('/management/customer-reporting')}
+            className="w-full sm:w-auto"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Customer Reporting
+            <span className="hidden sm:inline">Back to Customer Reporting</span>
+            <span className="sm:hidden">Back</span>
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <BookOpen className="h-6 w-6" />
-              Daily Occurrence Book (DOB)
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+              <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <span className="truncate">Daily Occurrence Book (DOB)</span>
             </h1>
-            <p className="text-muted-foreground">
-              {customer.name} {selectedSiteName && `- ${selectedSiteName}`}
+            <p className="text-sm sm:text-base text-muted-foreground truncate">
+              {customer.name} {selectedSiteId === ALL_SITES_OPTION ? ' - All Sites' : (selectedSiteName ? `- ${selectedSiteName}` : '')}
             </p>
           </div>
         </div>
         
-        <Button onClick={() => setCreateDialogOpen(true)} disabled={!selectedSiteId}>
+        <Button 
+          onClick={() => setCreateDialogOpen(true)} 
+          disabled={!selectedSiteId || selectedSiteId === ALL_SITES_OPTION}
+          className="w-full sm:w-auto"
+        >
           <Plus className="h-4 w-4 mr-2" />
-          Add Occurrence
+          <span className="hidden sm:inline">Add Occurrence</span>
+          <span className="sm:hidden">Add</span>
         </Button>
       </div>
 
@@ -399,13 +638,16 @@ export default function CustomerDailyOccurrenceBook() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Select value={selectedSiteId || ''} onValueChange={setSelectedSiteId}>
+            <Select value={selectedSiteId} onValueChange={setSelectedSiteId}>
               <SelectTrigger className="w-full md:w-[300px]">
                 <SelectValue placeholder="Select a site to view occurrences" />
               </SelectTrigger>
               <SelectContent>
-                {sites.map((site) => (
-                  <SelectItem key={site.id} value={site.id}>
+                <SelectItem value={ALL_SITES_OPTION}>
+                  All Sites
+                </SelectItem>
+                {sites.map((site, index) => (
+                  <SelectItem key={site.siteID || site.id || `site-${index}`} value={String(site.siteID || site.id || '')}>
                     {site.locationName}
                   </SelectItem>
                 ))}
@@ -415,16 +657,7 @@ export default function CustomerDailyOccurrenceBook() {
         </Card>
       )}
 
-      {!selectedSiteId ? (
-        <div className="text-center py-12">
-          <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Select a Site</h3>
-          <p className="text-muted-foreground">
-            Please select a site above to view and manage daily occurrence records.
-          </p>
-        </div>
-      ) : (
-        <>
+      <>
           {/* Stats Cards */}
           {stats && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -444,10 +677,10 @@ export default function CustomerDailyOccurrenceBook() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Open Occurrences</p>
-                      <p className="text-2xl font-bold">{stats.openOccurrences}</p>
+                      <p className="text-sm text-muted-foreground">Entries This Week</p>
+                      <p className="text-2xl font-bold">{stats.entriesThisWeek}</p>
                     </div>
-                    <AlertTriangle className="h-8 w-8 text-orange-500" />
+                    <Calendar className="h-8 w-8 text-emerald-500" />
                   </div>
                 </CardContent>
               </Card>
@@ -456,8 +689,8 @@ export default function CustomerDailyOccurrenceBook() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Follow-ups Pending</p>
-                      <p className="text-2xl font-bold">{stats.followUpsPending}</p>
+                      <p className="text-sm text-muted-foreground">Entries This Month</p>
+                      <p className="text-2xl font-bold">{stats.entriesThisMonth}</p>
                     </div>
                     <Clock className="h-8 w-8 text-yellow-500" />
                   </div>
@@ -468,20 +701,36 @@ export default function CustomerDailyOccurrenceBook() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">This Week</p>
-                      <p className="text-2xl font-bold">{stats.entriesThisWeek}</p>
+                      <p className="text-sm text-muted-foreground">Active Stores</p>
+                      <p className="text-2xl font-bold">{Object.keys(stats.byStore ?? {}).length}</p>
                     </div>
-                    <Calendar className="h-8 w-8 text-green-500" />
+                    <MapPin className="h-8 w-8 text-sky-500" />
                   </div>
                 </CardContent>
               </Card>
             </div>
           )}
 
+          {stats && Object.keys(stats.byCode ?? {}).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Incident Codes</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {Object.entries(stats.byCode).map(([code, count]) => (
+                  <div key={code} className="rounded-lg border p-3">
+                    <p className="text-sm text-muted-foreground">{getCodeMeta(code)}</p>
+                    <p className="text-lg font-semibold">{code} · {count}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Search and Filters */}
           <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-col md:flex-row gap-4">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex flex-col gap-3 sm:gap-4">
                 <div className="flex-1">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -489,62 +738,66 @@ export default function CustomerDailyOccurrenceBook() {
                       placeholder="Search occurrences..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 w-full"
                     />
                   </div>
                 </div>
                 
-                <div className="flex gap-2">
-                  <Select 
-                    value={filters.occurrenceType?.join(',') || 'all'} 
-                    onValueChange={(value) => setFilters({...filters, occurrenceType: value === 'all' ? undefined : [value as OccurrenceType]})}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                  <Input
+                    placeholder="Store number"
+                    value={filters.storeNumber ?? ''}
+                    onChange={(event) => setFilters({ ...filters, storeNumber: event.target.value || undefined })}
+                  />
+                  <Input
+                    placeholder="Store name"
+                    value={filters.storeName ?? ''}
+                    onChange={(event) => setFilters({ ...filters, storeName: event.target.value || undefined })}
+                  />
+                  <Input
+                    placeholder="Officer name"
+                    value={filters.officerName ?? ''}
+                    onChange={(event) => setFilters({ ...filters, officerName: event.target.value || undefined })}
+                  />
+                  <Select
+                    value={filters.code?.[0] ?? 'all'}
+                    onValueChange={(value) =>
+                      setFilters({ ...filters, code: value === 'all' ? undefined : [value as DailyOccurrenceCode] })
+                    }
                   >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Type" />
+                    <SelectTrigger className="w-full capitalize">
+                      <SelectValue placeholder="Code" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      {OCCURRENCE_TYPES.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
+                      <SelectItem value="all">All codes</SelectItem>
+                      {DOB_CODES.map((code) => (
+                        <SelectItem key={code.value} value={code.value}>
+                          {code.value} — {code.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  
-                  <Select 
-                    value={filters.severity?.join(',') || 'all'} 
-                    onValueChange={(value) => setFilters({...filters, severity: value === 'all' ? undefined : [value as OccurrenceSeverity]})}
-                  >
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue placeholder="Severity" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Severity</SelectItem>
-                      {SEVERITY_LEVELS.map((severity) => (
-                        <SelectItem key={severity.value} value={severity.value}>
-                          {severity.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  
-                  <Select 
-                    value={filters.status?.join(',') || 'all'} 
-                    onValueChange={(value) => setFilters({...filters, status: value === 'all' ? undefined : [value as OccurrenceStatus]})}
-                  >
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      {STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status.value} value={status.value}>
-                          {status.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="date-from" className="text-xs uppercase tracking-wide text-muted-foreground">Date from</Label>
+                    <Input
+                      id="date-from"
+                      type="date"
+                      value={filters.dateFrom ?? ''}
+                      onChange={(event) => setFilters({ ...filters, dateFrom: event.target.value || undefined })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="date-to" className="text-xs uppercase tracking-wide text-muted-foreground">Date to</Label>
+                    <Input
+                      id="date-to"
+                      type="date"
+                      value={filters.dateTo ?? ''}
+                      onChange={(event) => setFilters({ ...filters, dateTo: event.target.value || undefined })}
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -565,78 +818,140 @@ export default function CustomerDailyOccurrenceBook() {
                   <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-2">No Occurrences Found</h3>
                   <p className="text-muted-foreground">
-                    {searchTerm || Object.keys(filters).length > 0 
+                    {searchTerm || hasActiveFilters 
                       ? 'Try adjusting your search criteria or filters.'
                       : 'No occurrences have been recorded for this site yet.'
                     }
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date & Time</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Severity</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Reported By</TableHead>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {occurrences.map((occurrence) => (
-                        <TableRow key={occurrence.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                              <div>
-                                <div className="font-medium">
-                                  {new Date(occurrence.date).toLocaleDateString()}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {occurrence.time}
+                <>
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date & Time</TableHead>
+                          <TableHead>Store</TableHead>
+                          <TableHead>Officer</TableHead>
+                          <TableHead>Code</TableHead>
+                          <TableHead>Crime Report Sent to HO</TableHead>
+                          <TableHead>Details</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {occurrences.map((occurrence) => (
+                          <TableRow key={occurrence.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <div>
+                                  <div className="font-medium">
+                                    {new Date(occurrence.date).toLocaleDateString()}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {occurrence.time}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {OCCURRENCE_TYPES.find(t => t.value === occurrence.occurrenceType)?.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate">
-                            {occurrence.title}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getSeverityColor(occurrence.severity)}>
-                              {SEVERITY_LEVELS.find(s => s.value === occurrence.severity)?.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(occurrence.status)}>
-                              {STATUS_OPTIONS.find(s => s.value === occurrence.status)?.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                              <div>
-                                <div className="font-medium">{occurrence.reportedBy.name}</div>
-                                <div className="text-sm text-muted-foreground">{occurrence.reportedBy.role}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-medium truncate">{occurrence.storeName ?? '—'}</span>
+                                <span className="text-xs text-muted-foreground">#{occurrence.storeNumber ?? 'N/A'}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">{occurrence.officerName}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm font-semibold">
+                                {occurrence.code} — {getCodeMeta(occurrence.code)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {occurrence.crimeReportCompletedDate ? (
+                                <div className="text-sm">
+                                  <div>{new Date(occurrence.crimeReportCompletedDate).toLocaleDateString()}</div>
+                                  <div className="text-muted-foreground">{occurrence.crimeReportCompletedTime}</div>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">Pending</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="max-w-[220px]">
+                              <p className="text-sm text-muted-foreground line-clamp-2">{occurrence.details}</p>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedOccurrence(occurrence)
+                                    setViewDialogOpen(true)
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedOccurrence(occurrence)
+                                    setFormData({
+                                      id: occurrence.id,
+                                      customerId: occurrence.customerId,
+                                      siteId: occurrence.siteId,
+                                      storeName: occurrence.storeName ?? '',
+                                      storeNumber: occurrence.storeNumber ?? '',
+                                      date: occurrence.date,
+                                      time: occurrence.time,
+                                      officerName: occurrence.officerName,
+                                      code: occurrence.code,
+                                      crimeReportCompletedDate: occurrence.crimeReportCompletedDate,
+                                      crimeReportCompletedTime: occurrence.crimeReportCompletedTime,
+                                      details: occurrence.details,
+                                      signature: occurrence.signature
+                                    })
+                                    setEditDialogOpen(true)
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(occurrence)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-3">
+                    {occurrences.map((occurrence) => (
+                      <Card key={occurrence.id} className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-base truncate">{occurrence.storeName ?? 'Unnamed store'}</h3>
+                              <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                                <Calendar className="h-4 w-4" />
+                                <span>{new Date(occurrence.date).toLocaleDateString()} {occurrence.time}</span>
                               </div>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              <span className="truncate max-w-[120px]">{occurrence.location}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 flex-shrink-0">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -653,8 +968,19 @@ export default function CustomerDailyOccurrenceBook() {
                                 onClick={() => {
                                   setSelectedOccurrence(occurrence)
                                   setFormData({
-                                    ...occurrence,
-                                    witnessNames: occurrence.witnessNames || []
+                                    id: occurrence.id,
+                                    customerId: occurrence.customerId,
+                                    siteId: occurrence.siteId,
+                                    storeName: occurrence.storeName ?? '',
+                                    storeNumber: occurrence.storeNumber ?? '',
+                                    date: occurrence.date,
+                                    time: occurrence.time,
+                                    officerName: occurrence.officerName,
+                                    code: occurrence.code,
+                                    crimeReportCompletedDate: occurrence.crimeReportCompletedDate,
+                                    crimeReportCompletedTime: occurrence.crimeReportCompletedTime,
+                                    details: occurrence.details,
+                                    signature: occurrence.signature
                                   })
                                   setEditDialogOpen(true)
                                 }}
@@ -669,21 +995,36 @@ export default function CustomerDailyOccurrenceBook() {
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1 text-sm">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <User className="h-4 w-4" />
+                              <span>{occurrence.officerName}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <MapPin className="h-4 w-4" />
+                              <span>Store #{occurrence.storeNumber ?? 'N/A'}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <span className="font-semibold">{occurrence.code}</span>
+                              <span>{getCodeMeta(occurrence.code)}</span>
+                            </div>
+                            <p className="text-muted-foreground">{occurrence.details}</p>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
         </>
-      )}
 
       {/* Create Occurrence Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
           <DialogHeader>
             <DialogTitle>Add New Occurrence</DialogTitle>
             <DialogDescription>
@@ -692,145 +1033,16 @@ export default function CustomerDailyOccurrenceBook() {
           </DialogHeader>
           
           <div className="grid gap-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="date">Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({...formData, date: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="time">Time</Label>
-                <Input
-                  id="time"
-                  type="time"
-                  value={formData.time}
-                  onChange={(e) => setFormData({...formData, time: e.target.value})}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="occurrenceType">Type</Label>
-                <Select value={formData.occurrenceType} onValueChange={(value) => setFormData({...formData, occurrenceType: value as OccurrenceType})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {OCCURRENCE_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="severity">Severity</Label>
-                <Select value={formData.severity} onValueChange={(value) => setFormData({...formData, severity: value as OccurrenceSeverity})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SEVERITY_LEVELS.map((severity) => (
-                      <SelectItem key={severity.value} value={severity.value}>
-                        {severity.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div>
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={formData.title || ''}
-                onChange={(e) => setFormData({...formData, title: e.target.value})}
-                placeholder="Brief title for the occurrence"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                value={formData.location || ''}
-                onChange={(e) => setFormData({...formData, location: e.target.value})}
-                placeholder="Specific location within the site"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description || ''}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                placeholder="Detailed description of the occurrence"
-                rows={4}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="actionTaken">Action Taken</Label>
-              <Textarea
-                id="actionTaken"
-                value={formData.actionTaken || ''}
-                onChange={(e) => setFormData({...formData, actionTaken: e.target.value})}
-                placeholder="What action was taken at the time"
-                rows={3}
-              />
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="followUpRequired"
-                checked={formData.followUpRequired}
-                onCheckedChange={(checked) => setFormData({...formData, followUpRequired: checked})}
-              />
-              <Label htmlFor="followUpRequired">Follow-up Required</Label>
-            </div>
-            
-            {formData.followUpRequired && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="followUpDate">Follow-up Date</Label>
-                  <Input
-                    id="followUpDate"
-                    type="date"
-                    value={formData.followUpDate || ''}
-                    onChange={(e) => setFormData({...formData, followUpDate: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="followUpNotes">Follow-up Notes</Label>
-                  <Textarea
-                    id="followUpNotes"
-                    value={formData.followUpNotes || ''}
-                    onChange={(e) => setFormData({...formData, followUpNotes: e.target.value})}
-                    placeholder="Notes for follow-up"
-                  />
-                </div>
-              </div>
-            )}
-            
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="managerNotified"
-                checked={formData.managerNotified}
-                onCheckedChange={(checked) => setFormData({...formData, managerNotified: checked})}
-              />
-              <Label htmlFor="managerNotified">Manager Notified</Label>
-            </div>
-            
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+            {renderOccurrenceForm('create')}
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCreateDialogOpen(false)
+                  setFormData(getDefaultFormState())
+                }}
+              >
                 Cancel
               </Button>
               <Button onClick={() => handleSubmit(false)}>
@@ -848,7 +1060,7 @@ export default function CustomerDailyOccurrenceBook() {
           setSelectedOccurrence(null)
         }
       }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
           <DialogHeader>
             <DialogTitle>Edit Occurrence</DialogTitle>
             <DialogDescription>
@@ -857,149 +1069,21 @@ export default function CustomerDailyOccurrenceBook() {
           </DialogHeader>
           
           <div className="grid gap-4">
-            {/* Same form fields as create dialog */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-date">Date</Label>
-                <Input
-                  id="edit-date"
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({...formData, date: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-time">Time</Label>
-                <Input
-                  id="edit-time"
-                  type="time"
-                  value={formData.time}
-                  onChange={(e) => setFormData({...formData, time: e.target.value})}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-occurrenceType">Type</Label>
-                <Select value={formData.occurrenceType} onValueChange={(value) => setFormData({...formData, occurrenceType: value as OccurrenceType})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {OCCURRENCE_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="edit-severity">Severity</Label>
-                <Select value={formData.severity} onValueChange={(value) => setFormData({...formData, severity: value as OccurrenceSeverity})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SEVERITY_LEVELS.map((severity) => (
-                      <SelectItem key={severity.value} value={severity.value}>
-                        {severity.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div>
-              <Label htmlFor="edit-title">Title</Label>
-              <Input
-                id="edit-title"
-                value={formData.title || ''}
-                onChange={(e) => setFormData({...formData, title: e.target.value})}
-                placeholder="Brief title for the occurrence"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="edit-location">Location</Label>
-              <Input
-                id="edit-location"
-                value={formData.location || ''}
-                onChange={(e) => setFormData({...formData, location: e.target.value})}
-                placeholder="Specific location within the site"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={formData.description || ''}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                placeholder="Detailed description of the occurrence"
-                rows={4}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="edit-actionTaken">Action Taken</Label>
-              <Textarea
-                id="edit-actionTaken"
-                value={formData.actionTaken || ''}
-                onChange={(e) => setFormData({...formData, actionTaken: e.target.value})}
-                placeholder="What action was taken at the time"
-                rows={3}
-              />
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="edit-followUpRequired"
-                checked={formData.followUpRequired}
-                onCheckedChange={(checked) => setFormData({...formData, followUpRequired: checked})}
-              />
-              <Label htmlFor="edit-followUpRequired">Follow-up Required</Label>
-            </div>
-            
-            {formData.followUpRequired && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-followUpDate">Follow-up Date</Label>
-                  <Input
-                    id="edit-followUpDate"
-                    type="date"
-                    value={formData.followUpDate || ''}
-                    onChange={(e) => setFormData({...formData, followUpDate: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-followUpNotes">Follow-up Notes</Label>
-                  <Textarea
-                    id="edit-followUpNotes"
-                    value={formData.followUpNotes || ''}
-                    onChange={(e) => setFormData({...formData, followUpNotes: e.target.value})}
-                    placeholder="Notes for follow-up"
-                  />
-                </div>
-              </div>
-            )}
-            
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="edit-managerNotified"
-                checked={formData.managerNotified}
-                onCheckedChange={(checked) => setFormData({...formData, managerNotified: checked})}
-              />
-              <Label htmlFor="edit-managerNotified">Manager Notified</Label>
-            </div>
-            
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+            {renderOccurrenceForm('edit')}
+
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditDialogOpen(false)
+                  setSelectedOccurrence(null)
+                  setFormData(getDefaultFormState())
+                }}
+                className="w-full sm:w-auto"
+              >
                 Cancel
               </Button>
-              <Button onClick={() => handleSubmit(true)}>
+              <Button onClick={() => handleSubmit(true)} className="w-full sm:w-auto">
                 Update Occurrence
               </Button>
             </div>
@@ -1009,7 +1093,7 @@ export default function CustomerDailyOccurrenceBook() {
 
       {/* View Occurrence Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
           <DialogHeader>
             <DialogTitle>Occurrence Details</DialogTitle>
             <DialogDescription>
@@ -1019,7 +1103,7 @@ export default function CustomerDailyOccurrenceBook() {
           
           {selectedOccurrence && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm text-muted-foreground">Date</Label>
                   <p className="font-medium">{new Date(selectedOccurrence.date).toLocaleDateString()}</p>
@@ -1029,79 +1113,66 @@ export default function CustomerDailyOccurrenceBook() {
                   <p className="font-medium">{selectedOccurrence.time}</p>
                 </div>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm text-muted-foreground">Type</Label>
+                  <Label className="text-sm text-muted-foreground">Store</Label>
+                  <p className="font-medium">{selectedOccurrence.storeName ?? '—'}</p>
+                  <p className="text-sm text-muted-foreground">#{selectedOccurrence.storeNumber ?? 'N/A'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-muted-foreground">Officer Name</Label>
+                  <p className="font-medium">{selectedOccurrence.officerName}</p>
+                </div>
+                <div>
+                  <Label className="text-sm text-muted-foreground">Code</Label>
                   <p className="font-medium">
-                    {OCCURRENCE_TYPES.find(t => t.value === selectedOccurrence.occurrenceType)?.label}
+                    {selectedOccurrence.code} — {getCodeMeta(selectedOccurrence.code)}
                   </p>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm text-muted-foreground">Severity</Label>
-                  <Badge className={getSeverityColor(selectedOccurrence.severity)}>
-                    {SEVERITY_LEVELS.find(s => s.value === selectedOccurrence.severity)?.label}
-                  </Badge>
+                  <Label className="text-sm text-muted-foreground">Crime Report Sent to HO</Label>
+                  {selectedOccurrence.crimeReportCompletedDate ? (
+                    <p className="font-medium">
+                      {new Date(selectedOccurrence.crimeReportCompletedDate).toLocaleDateString()}{' '}
+                      {selectedOccurrence.crimeReportCompletedTime}
+                    </p>
+                  ) : (
+                    <p className="font-medium">Pending</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-sm text-muted-foreground">Signature</Label>
+                  <p className="font-medium">{selectedOccurrence.signature}</p>
                 </div>
               </div>
-              
+
               <div>
-                <Label className="text-sm text-muted-foreground">Title</Label>
-                <p className="font-medium">{selectedOccurrence.title}</p>
+                <Label className="text-sm text-muted-foreground">Details</Label>
+                <p className="mt-1 whitespace-pre-line">{selectedOccurrence.details}</p>
               </div>
-              
+
               <div>
-                <Label className="text-sm text-muted-foreground">Location</Label>
-                <p className="font-medium">{selectedOccurrence.location}</p>
+                <Label className="text-sm text-muted-foreground">Reported By</Label>
+                <p className="font-medium">{selectedOccurrence.reportedBy.name}</p>
+                <p className="text-sm text-muted-foreground">{selectedOccurrence.reportedBy.role}</p>
               </div>
-              
-              <div>
-                <Label className="text-sm text-muted-foreground">Description</Label>
-                <p className="mt-1">{selectedOccurrence.description}</p>
-              </div>
-              
-              {selectedOccurrence.actionTaken && (
-                <div>
-                  <Label className="text-sm text-muted-foreground">Action Taken</Label>
-                  <p className="mt-1">{selectedOccurrence.actionTaken}</p>
-                </div>
-              )}
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm text-muted-foreground">Reported By</Label>
-                  <p className="font-medium">{selectedOccurrence.reportedBy.name}</p>
-                  <p className="text-sm text-muted-foreground">{selectedOccurrence.reportedBy.role}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-muted-foreground">Status</Label>
-                  <Badge className={getStatusColor(selectedOccurrence.status)}>
-                    {STATUS_OPTIONS.find(s => s.value === selectedOccurrence.status)?.label}
-                  </Badge>
-                </div>
-              </div>
-              
-              {selectedOccurrence.followUpRequired && (
-                <div>
-                  <Label className="text-sm text-muted-foreground">Follow-up Information</Label>
-                  <div className="mt-1 space-y-2">
-                    {selectedOccurrence.followUpDate && (
-                      <p><span className="font-medium">Date:</span> {new Date(selectedOccurrence.followUpDate).toLocaleDateString()}</p>
-                    )}
-                    {selectedOccurrence.followUpNotes && (
-                      <p><span className="font-medium">Notes:</span> {selectedOccurrence.followUpNotes}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-              
+
               <div className="pt-4 border-t">
-                <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-muted-foreground">
                   <div>
                     <p><span className="font-medium">Created:</span> {new Date(selectedOccurrence.createdAt).toLocaleString()}</p>
                   </div>
                   <div>
-                    <p><span className="font-medium">Updated:</span> {new Date(selectedOccurrence.updatedAt).toLocaleString()}</p>
+                    <p><span className="font-medium">Updated:</span> {selectedOccurrence.updatedAt
+                      ? new Date(selectedOccurrence.updatedAt).toLocaleString()
+                      : 'Not updated'}</p>
                   </div>
                 </div>
               </div>

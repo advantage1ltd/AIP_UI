@@ -1,4 +1,5 @@
 import { http, HttpResponse, delay } from 'msw'
+import { BASE_API_URL } from '@/config/api'
 import { allMockVisits } from '@/pages/operations/SiteVisitPage'
 import type { SiteVisit, SiteVisitsResponse } from '@/types/siteVisit'
 
@@ -59,7 +60,7 @@ const filterVisits = (visits: InternalSiteVisit[], searchParams: URLSearchParams
 
 export const siteVisitHandlers = [
   // GET /api/site-visits - Get paginated site visits
-  http.get('/api/site-visits', async ({ request }) => {
+  http.get(`${BASE_API_URL}/site-visits`, async ({ request }) => {
     console.log('📥 MSW: GET /api/site-visits called');
     await delay(500); // Simulate network delay
     

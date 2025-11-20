@@ -8,6 +8,11 @@ import type {
   DailyActivityUpdateRequest
 } from '@/types/dailyActivity';
 
+// Type for backend DTO response (single report)
+interface DailyActivityReportDto {
+  data: DailyActivityReport;
+}
+
 const BASE_URL = '/daily-activity-reports';
 
 // Helper to get headers with customer ID
@@ -24,47 +29,84 @@ export const dailyActivityService = {
     pageSize: number = 10,
     filters?: DailyActivityFilters
   ): Promise<DailyActivityResponse> {
-    const params = {
+    const params: Record<string, string> = {
       page: page.toString(),
-      pageSize: pageSize.toString(),
-      ...(filters?.search && { search: filters.search }),
-      ...(filters?.customerId && { customerId: filters.customerId }),
-      ...(filters?.siteId && { siteId: filters.siteId }),
-      ...(filters?.reportDate && { reportDate: filters.reportDate }),
-      ...(filters?.officerName && { officerName: filters.officerName }),
-      ...(filters?.dateRange?.from && { from: filters.dateRange.from.toISOString() }),
-      ...(filters?.dateRange?.to && { to: filters.dateRange.to.toISOString() })
+      pageSize: pageSize.toString()
     };
 
+    if (filters?.search) {
+      params.search = filters.search;
+    }
+    if (filters?.customerId) {
+      params.customerId = filters.customerId;
+    }
+    if (filters?.siteId) {
+      params.siteId = filters.siteId;
+    }
+    if (filters?.reportDate) {
+      params.reportDate = filters.reportDate;
+    }
+    if (filters?.officerName) {
+      params.officerName = filters.officerName;
+    }
+    if (filters?.dateRange?.from) {
+      params.from = filters.dateRange.from.toISOString();
+    }
+    if (filters?.dateRange?.to) {
+      params.to = filters.dateRange.to.toISOString();
+    }
+
     const searchParams = new URLSearchParams(params);
-    const response = await api.get(`${BASE_URL}?${searchParams.toString()}`, {
+    // Backend returns { data: DailyActivityReportDto[], pagination: PaginationInfoDto }
+    // where PaginationInfoDto has { currentPage, totalPages, pageSize, totalCount, hasPrevious, hasNext }
+    const backendResponse = await api.get<{
+      data: DailyActivityReport[];
+      pagination: {
+        currentPage: number;
+        totalPages: number;
+        pageSize: number;
+        totalCount: number;
+        hasPrevious: boolean;
+        hasNext: boolean;
+      };
+    }>(`${BASE_URL}?${searchParams.toString()}`, {
       headers: getHeaders()
     });
-    return response.data;
+    
+    // Map backend response to frontend format
+    return {
+      data: backendResponse.data.data,
+      pagination: {
+        currentPage: backendResponse.data.pagination.currentPage,
+        pageSize: backendResponse.data.pagination.pageSize,
+        total: backendResponse.data.pagination.totalCount
+      }
+    };
   },
 
   // Get a single report by ID
   async getReport(id: string): Promise<DailyActivityReport> {
-    const response = await api.get(`${BASE_URL}/${id}`, {
+    const response = await api.get<DailyActivityReportDto>(`${BASE_URL}/${id}`, {
       headers: getHeaders()
     });
-    return response.data;
+    // Backend returns DailyActivityReportDto with data property
+    return response.data.data;
   },
 
   // Create a new report
   async createReport(data: DailyActivityRequest): Promise<DailyActivityReport> {
-    const response = await api.post(BASE_URL, data, {
+    const response = await api.post<DailyActivityReportDto>(BASE_URL, data, {
       headers: getHeaders()
     });
-    return response.data;
+    return response.data.data;
   },
 
   // Update an existing report
   async updateReport(id: string, data: DailyActivityUpdateRequest): Promise<DailyActivityReport> {
-    const response = await api.put(`${BASE_URL}/${id}`, data, {
+    const response = await api.put<DailyActivityReportDto>(`${BASE_URL}/${id}`, data, {
       headers: getHeaders()
     });
-    return response.data;
+    return response.data.data;
   },
 
   // Delete a report

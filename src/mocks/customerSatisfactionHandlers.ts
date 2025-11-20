@@ -1,8 +1,6 @@
 import { http, HttpResponse, delay } from 'msw';
+import { BASE_API_URL } from '@/config/api';
 import type { CustomerSurvey, CustomerSurveyRequest, CustomerSurveyResponse, CustomerSurveyUpdateRequest } from '@/types/customerSatisfaction';
-
-// Base API URL
-const BASE_API_URL = '/api';
 
 // Helper function to get customer ID from request headers
 const getCustomerId = (request: Request): number | null => {

@@ -3,20 +3,29 @@ import { useNavigate } from "react-router-dom"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CUSTOMER_PAGES } from "@/config/customerPages"
 import type { Customer } from "@/types/customer"
 import useAuth from "@/hooks/useAuth"
 import { RefreshCw } from "lucide-react"
 import { customerOperations } from "@/mocks/customerStore"
+import { customerPageAccessCache } from "@/services/customerPageAccessCache"
+import type { CustomerPageAccessPage } from "@/api/customerPageAccess"
 
 export default function CustomerReporting() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [selectedCustomer, setSelectedCustomer] = useState<string>("")
-  const [availablePages, setAvailablePages] = useState<string[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [pageState, setPageState] = useState<{
+    isLoading: boolean
+    error: string | null
+    pages: CustomerPageAccessPage[]
+  }>({
+    isLoading: false,
+    error: null,
+    pages: []
+  })
 
   // Refresh data when needed
   const refreshData = () => setRefreshTrigger(prev => prev + 1)
@@ -70,44 +79,63 @@ export default function CustomerReporting() {
   }, [refreshData])
 
   useEffect(() => {
+    let isActive = true
+
     if (!selectedCustomer) {
-      setAvailablePages([])
+      setPageState({
+        isLoading: false,
+        error: null,
+        pages: []
+      })
       return
     }
 
-    const customer = customers.find(c => c.id.toString() === selectedCustomer)
-    if (customer) {
-      // Get enabled pages from pageAssignments if available, fallback to viewConfig
-      if (customer.pageAssignments) {
-        const enabledPages = Object.entries(customer.pageAssignments)
-          .filter(([_, assignment]) => (assignment as any).enabled)
-          .map(([pageId]) => pageId)
-        setAvailablePages(enabledPages)
-        console.log('🔍 [CustomerReporting] Available pages from pageAssignments:', {
-          customerId: customer.id,
-          customerName: customer.companyName,
-          enabledPages
+    const loadCustomerPages = async () => {
+      try {
+        setPageState(prev => ({ ...prev, isLoading: true, error: null, pages: [] }))
+        const customerId = Number(selectedCustomer)
+        if (Number.isNaN(customerId)) {
+          throw new Error('Invalid customer selection')
+        }
+
+        const access = await customerPageAccessCache.get(customerId)
+        const assignedPages = access.availablePages
+          .filter(page => access.assignedPageIds.includes(page.pageId))
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+        if (!isActive) return
+
+        setPageState({
+          isLoading: false,
+          error: null,
+          pages: assignedPages
         })
-      } else if (customer.viewConfig?.enabledPages) {
-        setAvailablePages(customer.viewConfig.enabledPages)
-        console.log('🔍 [CustomerReporting] Available pages from viewConfig:', {
-          customerId: customer.id,
-          customerName: customer.companyName,
-          enabledPages: customer.viewConfig.enabledPages
+
+        console.log('🔍 [CustomerReporting] Loaded assigned pages for customer:', {
+          customerId,
+          assignedCount: assignedPages.length
         })
-      } else {
-        setAvailablePages([])
-        console.log('🔍 [CustomerReporting] No page assignments found for customer:', {
-          customerId: customer.id,
-          customerName: customer.companyName
+      } catch (error) {
+        if (!isActive) return
+        const message = error instanceof Error ? error.message : 'Failed to load customer pages'
+        console.error('❌ [CustomerReporting] Error loading pages:', error)
+        setPageState({
+          isLoading: false,
+          error: message,
+          pages: []
         })
       }
     }
-  }, [selectedCustomer, customers])
 
-  const handlePageSelect = (pageId: string) => {
-    const page = CUSTOMER_PAGES[pageId]
-    if (page) {
+    loadCustomerPages()
+
+    return () => {
+      isActive = false
+    }
+  }, [selectedCustomer])
+
+  const handlePageSelect = (page: CustomerPageAccessPage) => {
+    if (page?.path) {
       navigate(page.path)
     }
   }
@@ -174,30 +202,37 @@ export default function CustomerReporting() {
 
       {selectedCustomer && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {availablePages.map(pageId => {
-            const page = CUSTOMER_PAGES[pageId]
-            if (!page) return null
+          {pageState.isLoading && (
+            <div className="col-span-full flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+            </div>
+          )}
 
-            return (
-              <Card
-                key={pageId}
-                className="p-4 cursor-pointer hover:bg-accent transition-colors"
-                onClick={() => handlePageSelect(pageId)}
-              >
-                <h3 className="font-semibold mb-2">{page.title}</h3>
-                <p className="text-sm text-muted-foreground">{page.description}</p>
-                {page.readOnly && (
-                  <span className="inline-block mt-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                    Read Only
-                  </span>
-                )}
-              </Card>
-            )
-          })}
+          {!pageState.isLoading && pageState.error && (
+            <div className="col-span-full text-center text-destructive text-sm">
+              {pageState.error}
+            </div>
+          )}
+
+          {!pageState.isLoading && !pageState.error && pageState.pages.map(page => (
+            <Card
+              key={page.pageId}
+              className="p-4 cursor-pointer hover:bg-accent transition-colors"
+              onClick={() => handlePageSelect(page)}
+            >
+              <h3 className="font-semibold mb-2">{page.title}</h3>
+              <p className="text-sm text-muted-foreground">{page.description}</p>
+              {page.category && (
+                <span className="inline-block mt-2 text-xs bg-muted px-2 py-1 rounded">
+                  {page.category}
+                </span>
+              )}
+            </Card>
+          ))}
         </div>
       )}
 
-      {selectedCustomer && availablePages.length === 0 && (
+      {selectedCustomer && !pageState.isLoading && !pageState.error && pageState.pages.length === 0 && (
         <div className="text-center py-8">
           <p className="text-muted-foreground">
             No pages have been configured for this customer.

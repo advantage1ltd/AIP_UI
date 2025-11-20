@@ -42,12 +42,6 @@ export const OperationsSection = () => {
         </Link>
       </SidebarMenuButton>
       <SidebarMenuButton asChild>
-        <Link to="/operations/patrol-log">
-          <Clipboard className="w-4 h-4" />
-          <span>Patrol Log</span>
-        </Link>
-      </SidebarMenuButton>
-      <SidebarMenuButton asChild>
         <Link to="/operations/safe-duress-words">
           <FileText className="w-4 h-4" />
           <span>Safe and Duress Words</span>

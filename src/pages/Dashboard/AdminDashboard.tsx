@@ -492,8 +492,20 @@ const TestComponents = () => {
 
 const AdminDashboard = () => {
   const location = useLocation();
-  const { currentRole, isTestMode, testRole } = usePageAccess();
+  const { currentRole, isTestMode, testRole, isLoading } = usePageAccess();
   const effectiveRole = isTestMode && testRole ? testRole : currentRole;
+
+  // Show loading state while page access data is being loaded
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="space-y-4 text-center">
+          <div className="text-lg font-medium">Loading Dashboard...</div>
+          <div className="text-sm text-gray-500">Please wait</div>
+        </div>
+      </div>
+    );
+  }
 
   // Show appropriate dashboard based on role
   if (effectiveRole === 'AdvantageOneOfficer' || effectiveRole === 'AdvantageOneHOOfficer') {

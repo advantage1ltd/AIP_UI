@@ -5,9 +5,9 @@ import './index.css'
 import { Provider } from 'react-redux'
 import { store } from './store/store'
 
-async function startApp() {
-  // Backend is ready - MSW disabled in favor of real API calls
-  console.log('🚀 Starting application with real backend API...')
+  if (import.meta.env.DEV) {
+  console.log('🚀 Starting application with real backend API (MSW disabled)...')
+  }
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
@@ -16,6 +16,3 @@ async function startApp() {
       </Provider>
     </React.StrictMode>
   )
-}
-
-startApp()

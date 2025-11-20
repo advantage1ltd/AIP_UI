@@ -395,12 +395,6 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           roles: ['administrator', 'advantage-ho'],
         },
         {
-          title: "Patrol Log",
-          href: "/operations/patrol-log",
-          icon: <ClipboardCheck className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer'],
-        },
-        {
           title: "Safe/Duress Words",
           href: "/operations/safe-duress-words",
           icon: <Key className="h-4 w-4" />,

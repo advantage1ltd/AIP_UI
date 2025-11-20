@@ -27,7 +27,6 @@ interface SitesTableProps {
 
 export function SitesTable({ customerId, onEdit, onDataChange, updateTrigger }: SitesTableProps) {
   const [sites, setSites] = useState<Site[]>([])
-  const [isFetchingSites, setIsFetchingSites] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -38,9 +37,10 @@ export function SitesTable({ customerId, onEdit, onDataChange, updateTrigger }: 
 
   // Fetch sites from service
   const fetchSites = async () => {
-    if (!customerId || isFetchingSites) return
-    
-    setIsFetchingSites(true)
+    if (!customerId) {
+      setSites([])
+      return
+    }
     try {
       console.log('🔧 [SitesTable] Fetching sites for customer:', customerId)
       const result = await siteService.getSitesByCustomer(customerId)
@@ -55,7 +55,7 @@ export function SitesTable({ customerId, onEdit, onDataChange, updateTrigger }: 
       console.log('🔧 [SitesTable] Error fetching sites:', error)
       setSites([])
     } finally {
-      setIsFetchingSites(false)
+      // noop
     }
   }
 
@@ -171,9 +171,7 @@ export function SitesTable({ customerId, onEdit, onDataChange, updateTrigger }: 
         </div>
       </div>
 
-      {isFetchingSites ? (
-        <div className="text-center py-8 text-gray-500">Loading sites...</div>
-      ) : safeSites.length === 0 ? (
+      {safeSites.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           No sites found for this customer. Click "Add Site" to create one.
         </div>

@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import { BASE_API_URL } from '@/config/api';
 import { CodeWord, WordHistory, UpdateCodeWordRequest } from '@/types/safeDuressWords';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -68,7 +69,7 @@ const filterHistory = (
 // MSW Handlers
 export const safeDuressWordsHandlers = [
   // Get current words
-  http.get('/api/safe-duress-words/current', async () => {
+  http.get(`${BASE_API_URL}/safe-duress-words/current`, async () => {
     await delay();
     console.log('📡 [MSW] GET /api/safe-duress-words/current');
     
@@ -79,7 +80,7 @@ export const safeDuressWordsHandlers = [
   }),
 
   // Get word history with pagination and filters
-  http.get('/api/safe-duress-words/history', async ({ request }) => {
+  http.get(`${BASE_API_URL}/safe-duress-words/history`, async ({ request }) => {
     await delay();
     console.log('📡 [MSW] GET /api/safe-duress-words/history');
 
@@ -109,7 +110,7 @@ export const safeDuressWordsHandlers = [
   }),
 
   // Get single history entry
-  http.get('/api/safe-duress-words/history/:id', async ({ params }) => {
+  http.get(`${BASE_API_URL}/safe-duress-words/history/:id`, async ({ params }) => {
     await delay();
     const { id } = params;
     console.log(`📡 [MSW] GET /api/safe-duress-words/history/${id}`);
@@ -133,7 +134,7 @@ export const safeDuressWordsHandlers = [
   }),
 
   // Update code word
-  http.put('/api/safe-duress-words', async ({ request }) => {
+  http.put(`${BASE_API_URL}/safe-duress-words`, async ({ request }) => {
     await delay();
     console.log('📡 [MSW] PUT /api/safe-duress-words');
 

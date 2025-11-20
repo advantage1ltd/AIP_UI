@@ -1,72 +1,28 @@
-import { Link, useNavigate, useLocation } from "react-router-dom"
-import {
-  Settings as SettingsIcon,
-  LayoutGrid,
-  Calendar,
-  Users,
-  Radio,
-  User,
-  FileText,
-  Building,
-  ShieldCheck,
-  Key,
-  Briefcase,
-  GraduationCap,
-  CalendarRange,
-  Shirt,
-  BookOpen,
-  UserCog,
-  Boxes,
-  ScrollText,
-  UserCheck,
-  CircleDollarSign,
-  MessageSquare,
-  Footprints,
-  BadgeCheck,
-  FileQuestion,
-  FileWarning,
-  BarChart3,
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  Store,
-  Gauge,
-  Bell,
-  FileSearch,
-  ClipboardCheck,
-  UserPlus,
-  Building2,
-  Clock,
-  Award,
-  HardHat,
-  FileSpreadsheet,
-  FileText as FileTextIcon,
-  AlertTriangle,
-  Wallet,
-  HelpCircle,
-  Cog,
-  BarChart2,
-  CheckSquare,
-  LayoutDashboard,
-  Users as Users2,
-  DollarSign,
-  GitBranch,
-  Receipt,
-} from "lucide-react"
+import { useNavigate, useLocation } from 'react-router-dom'
+import { Settings as SettingsIcon, LayoutGrid } from 'lucide-react'
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion"
-import { Button } from "../ui/button"
-import { cn } from "@/lib/utils"
-import { usePageAccess } from "@/contexts/PageAccessContext"
+} from '@/components/ui/accordion'
+import { Button } from '../ui/button'
+import { cn } from '@/lib/utils'
+import { usePageAccess } from '@/contexts/PageAccessContext'
+import { useCustomerSelection } from '@/contexts/CustomerSelectionContext'
+import { CustomerSelector } from '@/components/customer/CustomerSelector'
+import {
+	SIDEBAR_SECTIONS,
+	SIDEBAR_TOP_LINKS,
+	type SidebarGuardContext,
+	type SidebarNavLink,
+	type SidebarSection,
+} from '@/config/navigation/sidebar'
 
 interface SidebarNavigationProps {
-  onNavigate?: () => void;
-  isMobileOpen?: boolean;
-  onMobileClose?: () => void;
+	onNavigate?: () => void
+	isMobileOpen?: boolean
+	onMobileClose?: () => void
 }
 
 interface NavItemProps {
@@ -75,43 +31,84 @@ interface NavItemProps {
   label: string
   onClick?: () => void
   className?: string
+	bypassAccessCheck?: boolean
 }
 
-const NavItem = ({ to, icon, label, onClick, className }: NavItemProps) => {
-  const { hasAccess } = usePageAccess();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const isActive = location.pathname === to;
+const NavItem = ({ to, icon, label, onClick, className, bypassAccessCheck }: NavItemProps) => {
+	const { hasAccess } = usePageAccess()
+	const { selectedCustomerId, isAdmin } = useCustomerSelection()
+	const navigate = useNavigate()
+	const location = useLocation()
+
+	// Normalize path - ensure it starts with / and doesn't have double slashes
+	const normalizePath = (path: string) => {
+		if (!path) return '/'
+		// Remove any leading/trailing whitespace
+		const trimmed = path.trim()
+		// Split by ? to handle query parameters
+		const [pathPart, queryPart] = trimmed.split('?')
+		// Replace multiple consecutive slashes with a single slash
+		// This preserves the path structure but removes double slashes
+		const normalized = pathPart.replace(/\/+/g, '/')
+		// Ensure it starts with exactly one / (not //)
+		const finalPath = normalized.startsWith('//') ? normalized.substring(1) : normalized
+		// Reattach query string if it exists
+		return queryPart ? `${finalPath}?${queryPart}` : finalPath
+	}
+
+	const normalizedTo = normalizePath(to)
+	const isCustomerPage = normalizedTo.startsWith('/customer/')
+	const finalTo = isCustomerPage && isAdmin && selectedCustomerId ? `${normalizedTo}?customerId=${selectedCustomerId}` : normalizedTo
+	const isActive = location.pathname === normalizedTo || (isCustomerPage && location.pathname === normalizedTo.split('?')[0])
   
-  if (!hasAccess(to)) return null;
+	if (!bypassAccessCheck && !hasAccess(normalizedTo)) {
+		return null
+	}
   
   const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    navigate(to);
-    onClick?.();
+		e.preventDefault()
+		e.stopPropagation()
+    
+    if (isCustomerPage && isAdmin && !selectedCustomerId) {
+			return
+    }
+    
+		// Ensure path is normalized before navigation
+		const normalizedFinalTo = normalizePath(finalTo)
+		navigate(normalizedFinalTo)
+		onClick?.()
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      navigate(to);
-      onClick?.();
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault()
+			e.stopPropagation()
+      
+      if (isCustomerPage && isAdmin && !selectedCustomerId) {
+				return
+      }
+      
+			// Ensure path is normalized before navigation
+			const normalizedFinalTo = normalizePath(finalTo)
+			navigate(normalizedFinalTo)
+			onClick?.()
     }
   }
 
   return (
     <a
-      href={to}
+      href="#"
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-        "hover:bg-accent hover:text-accent-foreground",
-        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        isActive && "bg-accent text-accent-foreground",
-        className
+				'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+				'hover:bg-accent hover:text-accent-foreground',
+				'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+				isActive && 'bg-accent text-accent-foreground',
+				className,
       )}
       onClick={handleClick}
       tabIndex={0}
       onKeyDown={handleKeyDown}
+      aria-label={`Navigate to ${label}`}
     >
       {icon}
       <span>{label}</span>
@@ -121,16 +118,57 @@ const NavItem = ({ to, icon, label, onClick, className }: NavItemProps) => {
 
 // Helper function to check if officer has customer reporting access
 const getOfficerCustomerReportingAccess = (): boolean => {
-  // Check localStorage for officer customer reporting setting
-  // This can be configured in the Settings page
-  const officerReportingEnabled = localStorage.getItem('officer_customer_reporting_enabled');
-  return officerReportingEnabled === 'true';
-};
+	const officerReportingEnabled = localStorage.getItem('officer_customer_reporting_enabled')
+	return officerReportingEnabled === 'true'
+}
+
+const canDisplayLink = (link: SidebarNavLink, context: SidebarGuardContext, availablePages: Array<{ path: string }>, currentRole?: string | null) => {
+	// If link has a custom guard, use it (this allows explicit access control)
+	if (link.guard) {
+		return link.guard(context)
+	}
+
+	// If bypassAccessCheck is set, always show (for special cases like officer customer reporting)
+	if (link.bypassAccessCheck) {
+		return true
+	}
+
+	// For administrators, ALWAYS show all items from config (config is source of truth)
+	// Check both context and direct role comparison for safety
+	if (context.isAdministrator || currentRole === 'Administrator') {
+		return true
+	}
+
+	// Normalize path for comparison (remove trailing slashes, handle case sensitivity)
+	const normalizePath = (path: string) => path.replace(/\/$/, '').toLowerCase()
+	const requestedPath = normalizePath(link.path)
+
+	// Check if page exists in database
+	const pageExistsInDb = availablePages.some(p => {
+		const dbPath = normalizePath(p.path)
+		return dbPath === requestedPath
+	})
+
+	// Config is the source of truth for navigation structure
+	// If page doesn't exist in DB, show it anyway (route protection will handle access)
+	if (!pageExistsInDb) {
+		return true
+	}
+
+	// If page exists in DB, respect DB access control for non-admin users
+	// This allows Settings page to control access for specific roles
+	const hasAccess = context.hasAccess(link.path)
+	
+	// If access check fails, hide the link (user doesn't have permission)
+	// This respects the Settings page configuration
+	return hasAccess
+}
 
 export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate, onMobileClose }) => {
-  const { hasAccess, currentRole, isLoading } = usePageAccess();
-  const navigate = useNavigate();
-  const location = useLocation();
+	const { hasAccess, currentRole, isLoading, availablePages } = usePageAccess()
+	const { selectedCustomerId, isAdmin } = useCustomerSelection()
+	const navigate = useNavigate()
+	const location = useLocation()
   
   if (isLoading) {
     return (
@@ -146,114 +184,77 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           </div>
         </div>
       </div>
-    );
+		)
   }
 
   if (!currentRole) {
     return (
       <div className="px-3 py-2">
-        <div className="text-sm text-gray-500 dark:text-gray-400">
-          Please log in to view navigation
+				<div className="text-sm text-gray-500 dark:text-gray-400">Please log in to view navigation</div>
         </div>
-      </div>
-    );
+		)
   }
   
-  const hasSectionAccess = (paths: string[]) => {
-    return paths.some(path => hasAccess(path));
-  };
-  
-  const adminPaths = [
-    '/administration/user-setup',
-    '/administration/employee-registration',
-    '/administration/customer-setup',
-    '/administration/stock-control',
-    '/customer/views-config'
-  ];
-  
-  const operationsPaths = [
-    '/operations/incident-report',
-    '/operations/mystery-shopper',
-    '/operations/site-visit',
-    '/operations/holiday-requests',
-    '/operations/bank-holiday',
-    '/operations/customer-satisfaction',
-    '/operations/patrol-log',
-    '/operations/safe-duress-words',
-    '/operations/officer-support',
-    '/operations/officer-expenses'
-  ];
-  
-  const employeePaths = [
-    '/employee/uniform-equipment',
-    '/employee/disciplinary',
-    '/employee/diary'
-  ];
-  
-  const managementPaths = [
-    '/management/manager-support',
-    '/management/incidents-report',
-    '/management/officer-performance'
-  ];
-  
-  const customerPaths = [
-    '/customer/daily-activity-report',
-    '/customer/incident-graph',
-    '/customer/incident-report',
-    '/customer/satisfaction-report',
-    '/customer/be-safe-be-secure',
-    '/customer/officer-support',
-    '/customer/views-config'
-  ];
-  
-  const compliancePaths = [
-    '/compliance/contract-renewal',
-    '/compliance/password-register',
-    '/compliance/asset-register'
-  ];
-  
-  const recruitmentPaths = [
-    '/recruitment/vetting',
-    '/recruitment/cbt',
-    '/recruitment/take-test'
-  ];
-  
-  const crmPaths = [
-    '/crm/dashboard',
-    '/crm/leads',
-    '/crm/contacts',
-    '/crm/deals',
-    '/crm/pipeline',
-    '/crm/tasks'
-  ];
-  
-  const isCustomerRole = currentRole === 'CustomerSiteManager' || currentRole === 'CustomerHOManager';
-  const isAdministrator = currentRole === 'Administrator';
-  const isOfficerRole = currentRole === 'AdvantageOneOfficer' || currentRole === 'AdvantageOneHOOfficer';
-  
-  const showAdminSection = !isCustomerRole && hasSectionAccess(adminPaths);
-  const showOperationsSection = hasSectionAccess(operationsPaths);
-  const showEmployeeSection = hasSectionAccess(employeePaths);
-  const showManagementSection = hasSectionAccess(managementPaths);
-  const showCustomerSection = hasSectionAccess(customerPaths);
-  const showComplianceSection = hasSectionAccess(compliancePaths);
-  const showRecruitmentSection = hasSectionAccess(recruitmentPaths);
-  const showCrmSection = hasSectionAccess(crmPaths);
+	const isCustomerRole = currentRole === 'CustomerSiteManager' || currentRole === 'CustomerHOManager'
+	const isAdministrator = currentRole === 'Administrator'
+	const isOfficerRole = currentRole === 'AdvantageOneOfficer' || currentRole === 'AdvantageOneHOOfficer'
+
+	const guardContext: SidebarGuardContext = {
+		hasAccess,
+		isCustomerRole,
+		isAdministrator,
+		isOfficerRole,
+		hasOfficerCustomerReportingAccess: getOfficerCustomerReportingAccess,
+	}
+
+	const pages = availablePages || []
+	const topLevelLinks = SIDEBAR_TOP_LINKS.filter((link) => canDisplayLink(link, guardContext, pages, currentRole))
+
+	const visibleSections = SIDEBAR_SECTIONS.reduce<SidebarSection[]>((acc, section) => {
+		const guardPassed = section.guard ? section.guard(guardContext) : true
+		if (!guardPassed) {
+			return acc
+		}
+
+		const links = section.links.filter((link) => canDisplayLink(link, guardContext, pages, currentRole))
+		if (links.length === 0) {
+			return acc
+		}
+
+		acc.push({ ...section, links })
+		return acc
+	}, [])
 
   const handleKeyDown = (to: string) => (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      navigate(to);
-      onNavigate?.();
-      onMobileClose?.();
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault()
+
+			const isCustomerPage = to.startsWith('/customer/')
+			const finalTo = isCustomerPage && isAdmin && selectedCustomerId ? `${to}?customerId=${selectedCustomerId}` : to
+
+      if (isCustomerPage && isAdmin && !selectedCustomerId) {
+				return
+      }
+      
+			navigate(finalTo)
+			onNavigate?.()
+			onMobileClose?.()
     }
-  };
+	}
 
   const handleNavigation = (to: string) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    navigate(to);
-    onNavigate?.();
-    onMobileClose?.();
+		e.preventDefault()
+
+		const isCustomerPage = to.startsWith('/customer/')
+		const finalTo = isCustomerPage && isAdmin && selectedCustomerId ? `${to}?customerId=${selectedCustomerId}` : to
+
+    if (isCustomerPage && isAdmin && !selectedCustomerId) {
+			return
+    }
+    
+		navigate(finalTo)
+		onNavigate?.()
+		onMobileClose?.()
   }
 
   return (
@@ -264,17 +265,17 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
             <Button
               asChild
               className={cn(
-                "w-[180px] bg-white hover:bg-white/90 text-black flex items-center justify-start gap-2 h-9 px-3 rounded-[20px]",
-                location.pathname === "/" && "bg-white/90"
+								'w-[180px] rounded-[20px] bg-white px-3 text-black hover:bg-white/90 flex h-9 items-center justify-start gap-2',
+								location.pathname === '/' && 'bg-white/90',
               )}
             >
               <a 
                 href="/" 
-                onClick={handleNavigation("/")} 
-                onKeyDown={handleKeyDown("/")}
+								onClick={handleNavigation('/')}
+								onKeyDown={handleKeyDown('/')}
                 className="flex items-center gap-2"
               >
-                <div className="bg-red-500/10 p-1.5 rounded-lg">
+								<div className="rounded-lg bg-red-500/10 p-1.5">
                   <LayoutGrid className="h-[18px] w-[18px] text-red-500" />
                 </div>
                 <span className="text-xs font-medium">Dashboard</span>
@@ -283,426 +284,60 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
           </div>
         )}
 
-        {/* Action Calendar as top-level navigation */}
-        {hasAccess('/action-calendar') && (
+				{topLevelLinks.map((link) => {
+					const Icon = link.icon
+					return (
           <NavItem
-            to="/action-calendar"
-            icon={<Calendar className="h-4 w-4" />}
-            label="Action Calendar"
+							key={link.path}
+							to={link.path}
+							icon={<Icon className="h-4 w-4" />}
+							label={link.label}
             onClick={onNavigate}
+							bypassAccessCheck={link.bypassAccessCheck}
           />
-        )}
-
-        {/* Customer Reporting as top-level navigation */}
-        {(hasAccess('/management/customer-reporting') || (isOfficerRole && getOfficerCustomerReportingAccess())) && (
-          <NavItem
-            to="/management/customer-reporting"
-            icon={<BarChart3 className="h-4 w-4" />}
-            label="Customer Reporting"
-            onClick={onNavigate}
-          />
-        )}
+					)
+				})}
 
         <Accordion type="multiple" className="space-y-2">
-          {showAdminSection && (
-            <AccordionItem value="admin">
+					{visibleSections.map((section) => {
+						const SectionIcon = section.icon
+						return (
+							<AccordionItem value={section.id} key={section.id}>
               <AccordionTrigger className="text-sm">
                 <div className="flex items-center gap-2">
-                  <UserCog className="h-4 w-4" />
-                  <span>Administration</span>
+										<SectionIcon className="h-4 w-4" />
+										<span>{section.label}</span>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-1 pt-1">
-                {hasAccess('/administration/user-setup') && (
-                  <NavItem
-                    to="/administration/user-setup"
-                    icon={<User className="h-4 w-4" />}
-                    label="User Setup"
-                    onClick={onNavigate}
-                  />
+									{section.showCustomerSelector && isAdmin && (
+                  <div className="px-3 pb-2">
+                    <CustomerSelector />
+                    {!selectedCustomerId && (
+												<p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
+                        Please select a customer to access customer pages
+                      </p>
+                    )}
+                  </div>
                 )}
-                {hasAccess('/administration/employee-registration') && (
+                
+									{section.links.map((link) => {
+										const Icon = link.icon
+										return (
                   <NavItem
-                    to="/administration/employee-registration"
-                    icon={<UserPlus className="h-4 w-4" />}
-                    label="Employee Registration"
+												key={link.path}
+												to={link.path}
+												icon={<Icon className="h-4 w-4" />}
+												label={link.label}
                     onClick={onNavigate}
+												bypassAccessCheck={link.bypassAccessCheck}
                   />
-                )}
-                {hasAccess('/administration/customer-setup') && (
-                  <NavItem
-                    to="/administration/customer-setup"
-                    icon={<Building className="h-4 w-4" />}
-                    label="Customer Setup"
-                    onClick={onNavigate}
-                  />
-                )}
-                {hasAccess('/administration/stock-control') && (
-                  <NavItem
-                    to="/administration/stock-control"
-                    icon={<Boxes className="h-4 w-4" />}
-                    label="Stock Control"
-                    onClick={onNavigate}
-                  />
-                )}
+										)
+									})}
               </AccordionContent>
             </AccordionItem>
-          )}
-
-          {showCrmSection && (
-            <AccordionItem value="crm">
-              <AccordionTrigger className="text-sm">
-                <div className="flex items-center gap-2">
-                  <Users2 className="h-4 w-4" />
-                  <span>CRM</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                  {hasAccess('/crm/dashboard') && (
-                    <NavItem
-                      to="/crm/dashboard"
-                      icon={<LayoutDashboard className="h-4 w-4" />}
-                      label="Dashboard"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/crm/leads') && (
-                    <NavItem
-                      to="/crm/leads"
-                      icon={<UserPlus className="h-4 w-4" />}
-                      label="Leads"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/crm/contacts') && (
-                    <NavItem
-                      to="/crm/contacts"
-                    icon={<Users2 className="h-4 w-4" />}
-                      label="Contacts"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/crm/deals') && (
-                    <NavItem
-                      to="/crm/deals"
-                      icon={<DollarSign className="h-4 w-4" />}
-                      label="Deals"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/crm/pipeline') && (
-                    <NavItem
-                      to="/crm/pipeline"
-                      icon={<GitBranch className="h-4 w-4" />}
-                      label="Pipeline"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/crm/tasks') && (
-                    <NavItem
-                      to="/crm/tasks"
-                      icon={<CheckSquare className="h-4 w-4" />}
-                      label="Tasks"
-                      onClick={onNavigate}
-                    />
-                  )}
-              </AccordionContent>
-            </AccordionItem>
-          )}
-
-          {showOperationsSection && (
-            <AccordionItem value="operations">
-              <AccordionTrigger className="text-sm">
-                <div className="flex items-center gap-2">
-                <Radio className="h-4 w-4" />
-                  <span>Operations</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                  {hasAccess('/operations/incident-report') && (
-                    <NavItem
-                      to="/operations/incident-report"
-                    icon={<AlertTriangle className="h-4 w-4" />}
-                      label="Incident Report"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/operations/mystery-shopper') && (
-                    <NavItem
-                      to="/operations/mystery-shopper"
-                      icon={<FileSearch className="h-4 w-4" />}
-                      label="Mystery Shopper"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/operations/site-visit') && (
-                    <NavItem
-                      to="/operations/site-visit"
-                      icon={<Building className="h-4 w-4" />}
-                      label="Site Visit"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/operations/holiday-requests') && (
-                    <NavItem
-                      to="/operations/holiday-requests"
-                      icon={<Calendar className="h-4 w-4" />}
-                      label="Holiday Requests"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/operations/bank-holiday') && (
-                    <NavItem
-                      to="/operations/bank-holiday"
-                      icon={<CalendarRange className="h-4 w-4" />}
-                      label="Bank Holiday"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/operations/customer-satisfaction') && (
-                    <NavItem
-                      to="/operations/customer-satisfaction"
-                      icon={<BadgeCheck className="h-4 w-4" />}
-                      label="Customer Satisfaction"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/operations/patrol-log') && (
-                    <NavItem
-                      to="/operations/patrol-log"
-                      icon={<ClipboardCheck className="h-4 w-4" />}
-                      label="Patrol Log"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/operations/safe-duress-words') && (
-                    <NavItem
-                      to="/operations/safe-duress-words"
-                      icon={<Key className="h-4 w-4" />}
-                      label="Safe/Duress Words"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/operations/officer-support') && (
-                    <NavItem
-                      to="/operations/officer-support"
-                      icon={<HelpCircle className="h-4 w-4" />}
-                      label="Officer Support"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/operations/officer-expenses') && (
-                    <NavItem
-                      to="/operations/officer-expenses"
-                      icon={<Wallet className="h-4 w-4" />}
-                      label="Officer Expenses"
-                      onClick={onNavigate}
-                    />
-                  )}
-              </AccordionContent>
-            </AccordionItem>
-          )}
-
-          {showEmployeeSection && (
-            <AccordionItem value="employee">
-              <AccordionTrigger className="text-sm">
-                <div className="flex items-center gap-2">
-                <Users2 className="h-4 w-4" />
-                  <span>Employee</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                  {hasAccess('/employee/uniform-equipment') && (
-                    <NavItem
-                      to="/employee/uniform-equipment"
-                      icon={<Shirt className="h-4 w-4" />}
-                      label="Uniform & Equipment"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/employee/disciplinary') && (
-                    <NavItem
-                      to="/employee/disciplinary"
-                      icon={<AlertTriangle className="h-4 w-4" />}
-                      label="Disciplinary"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/employee/diary') && (
-                    <NavItem
-                      to="/employee/diary"
-                      icon={<FileTextIcon className="h-4 w-4" />}
-                      label="Diary"
-                      onClick={onNavigate}
-                    />
-                  )}
-              </AccordionContent>
-            </AccordionItem>
-          )}
-
-          {showManagementSection && (
-            <AccordionItem value="management">
-              <AccordionTrigger className="text-sm">
-                <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                  <span>Management</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                  {hasAccess('/management/manager-support') && (
-                    <NavItem
-                      to="/management/manager-support"
-                    icon={<Building className="h-4 w-4" />}
-                      label="Manager Support"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/management/incidents-report') && (
-                    <NavItem
-                      to="/management/incidents-report"
-                      icon={<FileWarning className="h-4 w-4" />}
-                      label="Incidents Report"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/management/officer-performance') && (
-                    <NavItem
-                      to="/management/officer-performance"
-                      icon={<UserCheck className="h-4 w-4" />}
-                      label="Officer Performance"
-                      onClick={onNavigate}
-                    />
-                  )}
-              </AccordionContent>
-            </AccordionItem>
-          )}
-
-          {showComplianceSection && (
-            <AccordionItem value="compliance">
-              <AccordionTrigger className="text-sm">
-                <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" />
-                  <span>Compliance</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                  {hasAccess('/compliance/contract-renewal') && (
-                    <NavItem
-                      to="/compliance/contract-renewal"
-                      icon={<FileText className="h-4 w-4" />}
-                      label="Contract Renewal"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/compliance/password-register') && (
-                    <NavItem
-                      to="/compliance/password-register"
-                      icon={<Key className="h-4 w-4" />}
-                      label="Password Register"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/compliance/asset-register') && (
-                    <NavItem
-                      to="/compliance/asset-register"
-                      icon={<Boxes className="h-4 w-4" />}
-                      label="Asset Register"
-                      onClick={onNavigate}
-                    />
-                  )}
-              </AccordionContent>
-            </AccordionItem>
-          )}
-
-          {showRecruitmentSection && (
-            <AccordionItem value="recruitment">
-              <AccordionTrigger className="text-sm">
-                <div className="flex items-center gap-2">
-                <GraduationCap className="h-4 w-4" />
-                  <span>Recruitment</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                  {hasAccess('/recruitment/vetting') && (
-                    <NavItem
-                      to="/recruitment/vetting"
-                      icon={<FileTextIcon className="h-4 w-4" />}
-                      label="Vetting"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/recruitment/cbt') && (
-                    <NavItem
-                      to="/recruitment/cbt"
-                      icon={<BookOpen className="h-4 w-4" />}
-                      label="CBT"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/recruitment/take-test') && (
-                    <NavItem
-                      to="/recruitment/take-test"
-                      icon={<FileQuestion className="h-4 w-4" />}
-                      label="Take Test"
-                      onClick={onNavigate}
-                    />
-                  )}
-              </AccordionContent>
-            </AccordionItem>
-          )}
-
-          {showCustomerSection && (
-            <AccordionItem value="customer">
-              <AccordionTrigger className="text-sm">
-                <div className="flex items-center gap-2">
-                <Building className="h-4 w-4" />
-                  <span>Customer</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                  {hasAccess('/customer/daily-activity-report') && (
-                    <NavItem
-                      to="/customer/daily-activity-report"
-                      icon={<FileText className="h-4 w-4" />}
-                      label="Daily Activity Report"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/customer/incident-graph') && (
-                    <NavItem
-                      to="/customer/incident-graph"
-                      icon={<BarChart2 className="h-4 w-4" />}
-                      label="Incident Graph"
-                      onClick={onNavigate}
-                    />
-                  )}
-                  {hasAccess('/customer/incident-report') && (
-                    <NavItem
-                      to="/customer/incident-report"
-                      icon={<FileWarning className="h-4 w-4" />}
-                      label="Incident Report"
-                      onClick={onNavigate}
-                    />
-                  )}
-                {hasAccess('/customer/satisfaction-report') && (
-                    <NavItem
-                    to="/customer/satisfaction-report"
-                      icon={<FileText className="h-4 w-4" />}
-                      label="Satisfaction Reports"
-                      onClick={onNavigate}
-                    />
-                  )}
-                {hasAccess('/customer/be-safe-be-secure') && (
-                    <NavItem
-                    to="/customer/be-safe-be-secure"
-                      icon={<ShieldCheck className="h-4 w-4" />}
-                    label="Daily Activity Graphs"
-                      onClick={onNavigate}
-                    />
-                  )}
-              </AccordionContent>
-            </AccordionItem>
-          )}
+						)
+					})}
         </Accordion>
 
         {isAdministrator && hasAccess('/settings') && (
@@ -716,5 +351,5 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
         )}
       </div>
     </div>
-  );
-};
+	)
+}

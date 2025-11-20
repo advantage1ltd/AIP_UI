@@ -1,13 +1,11 @@
 import { http, HttpResponse, delay } from 'msw';
+import { BASE_API_URL } from '@/config/api';
 import type { 
   DailyActivityReport, 
   DailyActivityRequest, 
   DailyActivityResponse, 
   DailyActivityUpdateRequest 
 } from '@/types/dailyActivity';
-
-// Base API URL
-const BASE_API_URL = '/api';
 
 // Helper function to get customer ID from request headers
 const getCustomerId = (request: Request): number | null => {

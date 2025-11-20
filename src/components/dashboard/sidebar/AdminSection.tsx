@@ -4,6 +4,7 @@ import {
   Database,
   FileText,
   UserPlus,
+  Settings,
 } from "lucide-react"
 import {
   SidebarMenuButton,
@@ -28,6 +29,12 @@ export function AdminSection() {
         <Link to="/administration/customer-setup">
           <Database className="w-4 h-4" />
           <span>Customer Setup</span>
+        </Link>
+      </SidebarMenuButton>
+      <SidebarMenuButton asChild>
+        <Link to="/administration/customer-page-settings">
+          <Settings className="w-4 h-4" />
+          <span>Customer Page Settings</span>
         </Link>
       </SidebarMenuButton>
       <SidebarMenuButton asChild>

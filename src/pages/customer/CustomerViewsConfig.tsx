@@ -6,16 +6,14 @@ import { Lock } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { CustomerViewConfig } from "@/components/customer-setup/CustomerViewConfig"
 import { useToast } from "@/hooks/use-toast"
-import type { Customer, CustomerViewConfig as CustomerViewConfigType } from "@/types/customer"
+import type { Customer } from "@/types/customer"
 import { BASE_API_URL } from "@/config/api"
-import { CUSTOMER_PAGES } from "@/config/customerPages"
 
 export default function CustomerViewsConfig() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('')
-  const [isLoading, setIsLoading] = useState(false)
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true)
   
   const selectedCustomer = customers.find(c => c.id.toString() === selectedCustomerId)
@@ -52,77 +50,6 @@ export default function CustomerViewsConfig() {
 
     loadCustomers()
   }, [])
-
-  const handleSaveConfig = async (config: Partial<CustomerViewConfigType>) => {
-    if (!selectedCustomer) return
-
-    setIsLoading(true)
-    try {
-      // Convert enabled pages to page assignments format
-      const pageAssignments: Record<string, any> = {}
-      
-      // Set all pages to disabled first
-      Object.keys(CUSTOMER_PAGES).forEach(pageId => {
-        pageAssignments[pageId] = { enabled: false }
-      })
-      
-      // Then enable the selected pages
-      config.enabledPages?.forEach(pageId => {
-        pageAssignments[pageId] = { enabled: true }
-      })
-
-      const response = await fetch(`${BASE_API_URL}/customers/${selectedCustomer.id}/page-assignments`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-        body: JSON.stringify({ pageAssignments })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to save configuration')
-      }
-
-      const result = await response.json()
-      
-      if (result.success) {
-        // Update local customer data
-        const updatedCustomers = customers.map(customer => 
-          customer.id === selectedCustomer.id 
-            ? { ...customer, viewConfig: { ...customer.viewConfig, ...config } }
-            : customer
-        )
-        setCustomers(updatedCustomers)
-
-        toast({
-          title: "Configuration Saved",
-          description: `Page configuration has been successfully updated for ${selectedCustomer.companyName}.`,
-        })
-
-        // Dispatch custom event to notify other pages of the configuration update
-        window.dispatchEvent(new CustomEvent('customer-config-updated', {
-          detail: { customerId: selectedCustomer.id, customerName: selectedCustomer.companyName }
-        }))
-
-        console.log('✅ [CustomerViewsConfig] Configuration updated in db.json:', {
-          customerId: selectedCustomer.id,
-          enabledPages: config.enabledPages
-        })
-      } else {
-        throw new Error(result.message || 'Failed to save configuration')
-      }
-    } catch (error) {
-      console.error('Error saving configuration:', error)
-      toast({
-        title: "Save Failed",
-        description: error instanceof Error ? error.message : "Failed to save page configuration. Please try again.",
-        variant: "destructive"
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const isAdmin = user?.role === 'Administrator'
 
@@ -182,10 +109,9 @@ export default function CustomerViewsConfig() {
 
           {selectedCustomer && (
             <CustomerViewConfig
-              customerId={selectedCustomer.id}
+              customerId={Number(selectedCustomer.id)}
+              customerType={selectedCustomer.customerType}
               initialConfig={selectedCustomer.viewConfig}
-              onSave={handleSaveConfig}
-              isLoading={isLoading}
             />
           )}
         </CardContent>

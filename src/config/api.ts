@@ -1,7 +1,7 @@
 import axios from 'axios'
 
-// Base API URL that will be used across the application
-// Update this to point to your real backend when ready
+// Base API URL for the .NET backend
+// Configure via VITE_API_BASE_URL environment variable or defaults to http://localhost:5128/api
 export const BASE_API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5128/api'
 
 export const api = axios.create({

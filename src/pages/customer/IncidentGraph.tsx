@@ -16,7 +16,8 @@ import {
 	incidentGraphService, 
 	IncidentGraphData, 
 	IncidentTypeData,
-	IncidentGraphFilters 
+	IncidentGraphFilters,
+	RegionOption 
 } from '@/services/incidentGraphService'
 import { BASE_API_URL } from '@/config/api'
 
@@ -103,7 +104,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 	// State management
   const [startDate, setStartDate] = useState<Date>()
   const [endDate, setEndDate] = useState<Date>()
-  const [selectedRegion, setSelectedRegion] = useState('all')
+  const [selectedRegionId, setSelectedRegionId] = useState('all')
   const [graphType, setGraphType] = useState<GraphType>('value')
   const [officerType, setOfficerType] = useState('all')
   const [timeFilter, setTimeFilter] = useState('ytd')
@@ -111,7 +112,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 	// Data state
 	const [graphData, setGraphData] = useState<IncidentGraphData[]>([])
 	const [incidentTypeData, setIncidentTypeData] = useState<IncidentTypeData[]>([])
-	const [availableRegions, setAvailableRegions] = useState<string[]>([])
+	const [availableRegions, setAvailableRegions] = useState<RegionOption[]>([])
 	const [customerName, setCustomerName] = useState<string>('')
   const [totalSaved, setTotalSaved] = useState(0)
   const [filteredTotal, setFilteredTotal] = useState(0)
@@ -129,10 +130,17 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 		customerId: currentCustomerId,
 		startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
 		endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
-		region: selectedRegion,
+		regionId: selectedRegionId === 'all' ? undefined : selectedRegionId,
 		officerType: officerType,
 		graphType: graphType
-	}), [currentCustomerId, startDate, endDate, selectedRegion, officerType, graphType])
+	}), [currentCustomerId, startDate, endDate, selectedRegionId, officerType, graphType])
+
+	const selectedRegionLabel = useMemo(() => {
+		if (selectedRegionId === 'all') {
+			return 'All Regions'
+		}
+		return availableRegions.find(region => region.id === selectedRegionId)?.name ?? 'Selected Region'
+	}, [selectedRegionId, availableRegions])
 
 	// Fetch data from API
 	const fetchData = useCallback(async () => {
@@ -157,7 +165,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 						customerId: filters.customerId,
 						startDate: filters.startDate,
 						endDate: filters.endDate,
-						region: filters.region,
+						regionId: filters.regionId,
 						officerType: filters.officerType
 					})
 					: Promise.resolve(null)
@@ -179,6 +187,11 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 				}
 			} else {
 				console.error('🔍 [IncidentGraph] Graph response not successful:', graphResponse)
+				// Set error message for failed responses
+				if (!graphResponse.data?.incidents || graphResponse.data.incidents.length === 0) {
+					const errorMsg = 'Unable to load incident data. Please ensure the backend server is running on http://localhost:5128'
+					setError(errorMsg)
+				}
 			}
 
 			if (typesResponse?.success) {
@@ -189,9 +202,15 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 				setFilteredTotal(totalIncidents)
 			}
 
-		} catch (err) {
+		} catch (err: any) {
 			console.error('🔍 [IncidentGraph] Error fetching incident data:', err)
-			setError(err instanceof Error ? err.message : 'Failed to fetch incident data')
+			
+			// Provide user-friendly error message for network errors
+			if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
+				setError('Unable to connect to the backend API. Please ensure the backend server is running on http://localhost:5128')
+			} else {
+				setError(err instanceof Error ? err.message : 'Failed to fetch incident data')
+			}
 		} finally {
 			setLoading(false)
 		}
@@ -234,30 +253,6 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 		}
 	}, [currentCustomerId])
 
-	// Test MSW connectivity
-	const testMSW = useCallback(async () => {
-		if (!currentCustomerId) return
-		
-		try {
-			console.log('🔍 [IncidentGraph] Testing MSW connectivity...')
-			const response = await fetch(`${BASE_API_URL}/incidents/test`, {
-				headers: {
-					'Content-Type': 'application/json',
-					'X-Customer-Id': currentCustomerId.toString()
-				}
-			})
-			
-			if (response.ok) {
-				const result = await response.json()
-				console.log('🔍 [IncidentGraph] MSW Test Result:', result)
-			} else {
-				console.error('🔍 [IncidentGraph] MSW Test Failed:', response.status, response.statusText)
-			}
-		} catch (err) {
-			console.error('🔍 [IncidentGraph] MSW Test Error:', err)
-		}
-	}, [currentCustomerId])
-
 	// Initialize component
 	useEffect(() => {
 		// Set responsive storesPerPage based on screen size
@@ -279,16 +274,13 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 		const yearStart = startOfYear(now)
 		setStartDate(yearStart)
 		setEndDate(now)
-		
-		// Test MSW first, then fetch initial data
-		testMSW()
 		fetchRegions()
 		fetchCustomerName()
 		
 		return () => {
 			window.removeEventListener('resize', handleResize)
 		}
-	}, [fetchRegions, fetchCustomerName, testMSW])
+	}, [fetchRegions, fetchCustomerName])
 
 	// Fetch data when filters change
 	useEffect(() => {
@@ -311,9 +303,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 		result = graphData.map(item => ({
 			location: item.location || item.siteName || 'Unknown Location',
 			value: graphType === 'value' 
-				? (officerType === 'uniform' ? (item.uniformOfficer || 0) :
-				   officerType === 'detective' ? (item.storeDetective || 0) :
-				   (item.valueRecovered || item.totalValueRecovered || item.value || 0))
+				? (item.valueRecovered || item.totalValueRecovered || item.value || 0)
 				: (item.value || 0), // For value graph type, use value from API
 			quantity: item.quantity || item.quantityRecovered || 0 // For quantity graph type, use quantity from API
 		}))
@@ -385,16 +375,12 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 					? 'Current Week'
 					: 'Selected Period'
 
-		const regionText = selectedRegion === 'all'
-			? 'All Regions'
-			: `${selectedRegion.charAt(0).toUpperCase() + selectedRegion.slice(1)} Region`
-
 		if (graphType === 'type') {
-			return `Total Incidents by ${officerTypeText} (${regionText}) - ${periodText}`
+			return `Total Incidents by ${officerTypeText} (${selectedRegionLabel}) - ${periodText}`
 		} else if (graphType === 'quantity') {
-			return `Total Items Recovered by ${officerTypeText} (${regionText}) - ${periodText}`
+			return `Total Items Recovered by ${officerTypeText} (${selectedRegionLabel}) - ${periodText}`
 		}
-		return `Total Value Recovered by ${officerTypeText} (${regionText}) - ${periodText}`
+		return `Total Value Recovered by ${officerTypeText} (${selectedRegionLabel}) - ${periodText}`
 	}
 
 	const handlePreviousPage = () => {
@@ -408,7 +394,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 
 	const regionOptions = [
 		{ value: 'all', label: 'All Regions' },
-		...availableRegions.map(region => ({ value: region.toLowerCase(), label: region }))
+		...availableRegions.map(region => ({ value: region.id, label: region.name }))
 	]
 
 	const renderGraph = () => {
@@ -902,7 +888,10 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 								<div className="sm:col-span-1 lg:col-span-4 space-y-2 sm:space-y-3">
 									<div>
 										<Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Region</Label>
-										<Select value={selectedRegion} onValueChange={setSelectedRegion}>
+										<Select value={selectedRegionId} onValueChange={(value) => {
+											setSelectedRegionId(value)
+											setCurrentPage(1)
+										}}>
 											<SelectTrigger className="bg-slate-800 border-slate-700 text-slate-200 h-8 sm:h-10 text-xs sm:text-sm">
 												<SelectValue placeholder="Select region" />
 											</SelectTrigger>
@@ -982,7 +971,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 								</div>
 								<div className="sm:col-span-2 lg:col-span-3 space-y-2 sm:space-y-3">
 									<div>
-										<Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Officer Type</Label>
+										<Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Officer Role</Label>
 										<RadioGroup
 											value={officerType}
 											onValueChange={setOfficerType}
@@ -1033,12 +1022,15 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 					<CardHeader className="py-2 px-3 sm:px-4">
 						<CardTitle className="text-base sm:text-lg md:text-xl font-semibold text-slate-200">
 							{graphType === 'type' ? (
-								`${selectedRegion === 'all' ? 'All Regions' : `${selectedRegion.charAt(0).toUpperCase() + selectedRegion.slice(1)} Region`} - Incident Types Distribution`
+								`${selectedRegionLabel} - Incident Types Distribution`
 							) : (
-								`${selectedRegion === 'all' ? 'All Regions - ' : `${selectedRegion.charAt(0).toUpperCase() + selectedRegion.slice(1)} Region - `}
-								${officerType === 'all' ? 'Total Incidents by Location' :
-								 officerType === 'uniform' ? 'Uniform Officer Incidents' :
-								 'Store Detective Incidents'}`
+								`${selectedRegionLabel} - ${
+									officerType === 'all'
+										? 'Total Incidents by Location'
+										: officerType === 'uniform'
+											? 'Uniform Officer Incidents'
+											: 'Store Detective Incidents'
+								}`
 							)}
 						</CardTitle>
 						{startDate && endDate && (

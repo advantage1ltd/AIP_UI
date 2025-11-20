@@ -1,553 +1,373 @@
 import { http, HttpResponse } from 'msw'
-import { 
-  DailyOccurrenceEntry, 
-  OccurrenceType, 
-  OccurrenceSeverity, 
-  OccurrenceStatus,
-  CreateOccurrenceRequest,
-  UpdateOccurrenceRequest,
-  DailyOccurrenceBookResponse,
-  SingleOccurrenceResponse,
-  OccurrenceStatsResponse,
-  DailyOccurrenceBookStats
+import {
+	DailyOccurrenceEntry,
+	CreateOccurrenceRequest,
+	UpdateOccurrenceRequest,
+	DailyOccurrenceBookResponse,
+	SingleOccurrenceResponse,
+	OccurrenceStatsResponse,
+	DailyOccurrenceBookStats
 } from '@/types/dailyOccurrenceBook'
 
-// In-memory store for Daily Occurrence Book entries
-let occurrenceStore: DailyOccurrenceEntry[] = []
-
-// Initialize with some sample data
-const initializeSampleData = () => {
-  const now = new Date()
-  const today = now.toISOString().split('T')[0]
-  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-
-  const sampleOccurrences: DailyOccurrenceEntry[] = [
-    {
-      id: 'DOB-001',
-      customerId: 21,
-      siteId: '1',
-      siteName: 'Main Entrance',
-      date: today,
-      time: '09:30',
-      occurrenceType: 'security_incident',
-      severity: 'medium',
-      status: 'investigating',
-      title: 'Suspicious individual observed near entrance',
-      description: 'A person in dark clothing was observed loitering near the main entrance for approximately 15 minutes. When approached, they quickly left the area.',
-      location: 'Main Entrance Gate',
-      reportedBy: {
-        id: '2',
-        name: 'Oscar Officer',
-        role: 'Security Officer',
-        badgeNumber: 'ADV-001'
-      },
-      witnessNames: ['John Doe (Visitor)', 'Jane Smith (Reception)'],
-      actionTaken: 'Approached individual, they left immediately. Increased patrols in area.',
-      followUpRequired: true,
-      followUpBy: '2',
-      followUpDate: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      followUpNotes: 'Review CCTV footage and check for any similar incidents',
-      managerNotified: true,
-      managerNotifiedAt: new Date(now.getTime() - 30 * 60 * 1000).toISOString(),
-      createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(),
-      createdBy: '2',
-      updatedBy: '2'
-    },
-    {
-      id: 'DOB-002',
-      customerId: 21,
-      siteId: '1',
-      siteName: 'Main Entrance',
-      date: yesterday,
-      time: '14:15',
-      occurrenceType: 'maintenance_issue',
-      severity: 'low',
-      status: 'resolved',
-      title: 'Flickering light in parking area',
-      description: 'Light fixture in parking zone B was flickering intermittently.',
-      location: 'Parking Zone B',
-      reportedBy: {
-        id: '2',
-        name: 'Oscar Officer',
-        role: 'Security Officer',
-        badgeNumber: 'ADV-001'
-      },
-      actionTaken: 'Reported to maintenance team',
-      followUpRequired: false,
-      managerNotified: false,
-      createdAt: new Date(now.getTime() - 26 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(),
-      createdBy: '2',
-      updatedBy: '2'
-    },
-    {
-      id: 'DOB-003',
-      customerId: 21,
-      siteId: '2',
-      siteName: 'North Building',
-      date: lastWeek,
-      time: '22:00',
-      occurrenceType: 'emergency_test',
-      severity: 'low',
-      status: 'closed',
-      title: 'Monthly fire alarm test',
-      description: 'Conducted monthly fire alarm system test as per schedule.',
-      location: 'Entire Building',
-      reportedBy: {
-        id: '2',
-        name: 'Oscar Officer',
-        role: 'Security Officer',
-        badgeNumber: 'ADV-001'
-      },
-      actionTaken: 'All alarms functioning correctly. System reset after test.',
-      followUpRequired: false,
-      managerNotified: true,
-      managerNotifiedAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      createdAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      createdBy: '2',
-      updatedBy: '2'
-    },
-    {
-      id: 'DOB-004',
-      customerId: 21,
-      siteId: '1',
-      siteName: 'Main Entrance',
-      date: today,
-      time: '16:45',
-      occurrenceType: 'visitor_log',
-      severity: 'low',
-      status: 'open',
-      title: 'VIP visitor arrival',
-      description: 'CEO of partner company arrived for scheduled meeting.',
-      location: 'Reception Area',
-      reportedBy: {
-        id: '2',
-        name: 'Oscar Officer',
-        role: 'Security Officer',
-        badgeNumber: 'ADV-001'
-      },
-      actionTaken: 'Escorted to executive floor, visitor badge issued.',
-      followUpRequired: true,
-      followUpBy: '2',
-      followUpDate: today,
-      followUpNotes: 'Ensure visitor is escorted out at end of meeting',
-      managerNotified: false,
-      createdAt: new Date(now.getTime() - 30 * 60 * 1000).toISOString(),
-      updatedAt: new Date(now.getTime() - 30 * 60 * 1000).toISOString(),
-      createdBy: '2',
-      updatedBy: '2'
-    }
-  ]
-
-  occurrenceStore = sampleOccurrences
+const CODE_DESCRIPTIONS: Record<string, string> = {
+	A: 'Arrest',
+	B: 'Deter',
+	C: 'Theft',
+	D: 'Violent Behaviour',
+	E: 'Abusive Behaviour',
+	F: 'Ban from Store',
+	G: 'Criminal Damage',
+	H: 'Underage Purchase',
+	J: 'Credit Card Fraud',
+	K: 'Anti-Social Behaviour',
+	L: 'Suspicious Behaviour',
+	M: 'Other'
 }
 
-// Initialize sample data
-initializeSampleData()
+const resolveCodeDescription = (code: string) => CODE_DESCRIPTIONS[code] ?? 'Other'
 
-// Helper function to generate statistics
-const generateStats = (occurrences: DailyOccurrenceEntry[]): DailyOccurrenceBookStats => {
-  const now = new Date()
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-  const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-
-  const thisWeek = occurrences.filter(o => new Date(o.date) >= oneWeekAgo)
-  const thisMonth = occurrences.filter(o => new Date(o.date) >= oneMonthAgo)
-  const openOccurrences = occurrences.filter(o => o.status === 'open' || o.status === 'investigating')
-  const highSeverity = occurrences.filter(o => o.severity === 'high' || o.severity === 'critical')
-  const followUpsPending = occurrences.filter(o => o.followUpRequired && o.status !== 'closed')
-
-  // Count by type
-  const byType: Record<OccurrenceType, number> = {
-    general_observation: 0,
-    security_incident: 0,
-    safety_concern: 0,
-    visitor_log: 0,
-    maintenance_issue: 0,
-    equipment_fault: 0,
-    staff_arrival_departure: 0,
-    emergency_test: 0,
-    weather_condition: 0,
-    other: 0
-  }
-
-  // Count by severity
-  const bySeverity: Record<OccurrenceSeverity, number> = {
-    low: 0,
-    medium: 0,
-    high: 0,
-    critical: 0
-  }
-
-  // Count by status
-  const byStatus: Record<OccurrenceStatus, number> = {
-    open: 0,
-    investigating: 0,
-    resolved: 0,
-    closed: 0
-  }
-
-  occurrences.forEach(occurrence => {
-    byType[occurrence.occurrenceType]++
-    bySeverity[occurrence.severity]++
-    byStatus[occurrence.status]++
-  })
-
-  return {
-    totalEntries: occurrences.length,
-    entriesThisWeek: thisWeek.length,
-    entriesThisMonth: thisMonth.length,
-    openOccurrences: openOccurrences.length,
-    highSeverityOccurrences: highSeverity.length,
-    followUpsPending: followUpsPending.length,
-    byType,
-    bySeverity,
-    byStatus
-  }
+const now = new Date()
+const isoDate = (offsetDays = 0) => {
+	const date = new Date(now)
+	date.setDate(date.getDate() + offsetDays)
+	return date.toISOString().split('T')[0]
 }
 
-// Helper function to filter occurrences
+const isoDateTime = (offsetHours = 0) => {
+	const date = new Date(now)
+	date.setHours(date.getHours() + offsetHours)
+	return date.toISOString()
+}
+
+let occurrenceStore: DailyOccurrenceEntry[] = [
+	{
+		id: 'DOB-001',
+		customerId: 21,
+		siteId: '1',
+		siteName: 'Central Store',
+		storeName: 'Central Store',
+		storeNumber: 'CS-100',
+		dateCommenced: isoDate(-120),
+		date: isoDate(0),
+		time: '09:15',
+		officerName: 'Amelia Stone',
+		code: 'C',
+		codeDescription: resolveCodeDescription('C'),
+		crimeReportCompletedDate: isoDate(0),
+		crimeReportCompletedTime: '11:00',
+		details: 'Customer attempted to leave with concealed electronics. Items recovered and customer details shared with head office.',
+		signature: 'Amelia Stone',
+		reportedBy: {
+			id: '2',
+			name: 'Amelia Stone',
+			role: 'Security Officer'
+		},
+		createdAt: isoDateTime(-2),
+		updatedAt: isoDateTime(-1),
+		createdBy: '2',
+		updatedBy: '2'
+	},
+	{
+		id: 'DOB-002',
+		customerId: 21,
+		siteId: '1',
+		siteName: 'Central Store',
+		storeName: 'Central Store',
+		storeNumber: 'CS-100',
+		dateCommenced: isoDate(-120),
+		date: isoDate(-1),
+		time: '17:40',
+		officerName: 'Jordan Clark',
+		code: 'F',
+		codeDescription: resolveCodeDescription('F'),
+		details: 'Previously banned individual attempted entry. Person escorted off site and ban reiterated.',
+		signature: 'Jordan Clark',
+		reportedBy: {
+			id: '3',
+			name: 'Jordan Clark',
+			role: 'Security Supervisor'
+		},
+		createdAt: isoDateTime(-26),
+		updatedAt: isoDateTime(-25),
+		createdBy: '3',
+		updatedBy: '3'
+	}
+]
+
+const generateStats = (entries: DailyOccurrenceEntry[]): DailyOccurrenceBookStats => {
+	const current = new Date()
+	const weekAgo = new Date(current)
+	weekAgo.setDate(current.getDate() - 7)
+	const monthAgo = new Date(current)
+	monthAgo.setDate(current.getDate() - 30)
+
+	const byCode = entries.reduce<Record<string, number>>((acc, entry) => {
+		acc[entry.code] = (acc[entry.code] ?? 0) + 1
+		return acc
+	}, {})
+
+	const byStore = entries.reduce<Record<string, number>>((acc, entry) => {
+		const key = entry.storeNumber ?? 'unknown'
+		acc[key] = (acc[key] ?? 0) + 1
+		return acc
+	}, {})
+
+	return {
+		totalEntries: entries.length,
+		entriesThisWeek: entries.filter((entry) => new Date(entry.date) >= weekAgo).length,
+		entriesThisMonth: entries.filter((entry) => new Date(entry.date) >= monthAgo).length,
+		byCode,
+		byStore
+	}
+}
+
 const filterOccurrences = (
-  occurrences: DailyOccurrenceEntry[],
-  customerId: number,
-  siteId?: string,
-  filters: any = {}
-): DailyOccurrenceEntry[] => {
-  return occurrences.filter(occurrence => {
-    // Customer filter
-    if (occurrence.customerId !== customerId) return false
-
-    // Site filter
-    if (siteId && occurrence.siteId !== siteId) return false
-
-    // Date range filter
-    if (filters.dateFrom && occurrence.date < filters.dateFrom) return false
-    if (filters.dateTo && occurrence.date > filters.dateTo) return false
-
-    // Type filter
-    if (filters.occurrenceType) {
-      const types = filters.occurrenceType.split(',')
-      if (!types.includes(occurrence.occurrenceType)) return false
-    }
-
-    // Severity filter
-    if (filters.severity) {
-      const severities = filters.severity.split(',')
-      if (!severities.includes(occurrence.severity)) return false
-    }
-
-    // Status filter
-    if (filters.status) {
-      const statuses = filters.status.split(',')
-      if (!statuses.includes(occurrence.status)) return false
-    }
-
-    // Search filter
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase()
-      const searchableText = [
-        occurrence.title,
-        occurrence.description,
-        occurrence.location,
-        occurrence.reportedBy.name,
-        occurrence.actionTaken || ''
-      ].join(' ').toLowerCase()
-      
-      if (!searchableText.includes(searchTerm)) return false
-    }
-
-    return true
-  })
+	entries: DailyOccurrenceEntry[],
+	customerId: number,
+	siteId?: string,
+	filters: Record<string, string | null> = {}
+) => {
+	return entries.filter((entry) => {
+		if (entry.customerId !== customerId) return false
+		if (siteId && entry.siteId !== siteId) return false
+		if (filters.dateFrom && entry.date < filters.dateFrom) return false
+		if (filters.dateTo && entry.date > filters.dateTo) return false
+		if (filters.storeNumber && entry.storeNumber !== filters.storeNumber) return false
+		if (filters.storeName && !(entry.storeName ?? '').toLowerCase().includes(filters.storeName.toLowerCase())) return false
+		if (filters.officerName && !entry.officerName.toLowerCase().includes(filters.officerName.toLowerCase())) return false
+		if (filters.code) {
+			const codes = filters.code.split(',')
+			if (!codes.includes(entry.code)) return false
+		}
+		if (filters.search) {
+			const haystack = [
+				entry.details,
+				entry.officerName,
+				entry.storeName,
+				entry.storeNumber,
+				entry.codeDescription
+			]
+				.join(' ')
+				.toLowerCase()
+			if (!haystack.includes(filters.search.toLowerCase())) return false
+		}
+		return true
+	})
 }
 
-// Helper function to create error response
-const createErrorResponse = (status: number, message: string) => {
-  return HttpResponse.json(
-    { success: false, error: message, data: null },
-    { status }
-  )
-}
+const createErrorResponse = (status: number, message: string) =>
+	HttpResponse.json({ success: false, error: message, data: null }, { status })
 
-// Helper function to simulate delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-// Generate unique ID
-const generateId = () => {
-  const count = occurrenceStore.length + 1
-  return `DOB-${count.toString().padStart(3, '0')}`
-}
+const generateId = () => `DOB-${(occurrenceStore.length + 1).toString().padStart(3, '0')}`
 
 export const dailyOccurrenceBookHandlers = [
-  // GET /api/customers/:customerId/daily-occurrence-book - Get all occurrences for a customer
-  http.get('/api/customers/:customerId/daily-occurrence-book', async ({ request, params }) => {
-    try {
-      await delay(300)
-      
-      const customerId = parseInt(params.customerId as string)
-      if (isNaN(customerId)) {
-        return createErrorResponse(400, 'Invalid customer ID')
-      }
+	http.get('/api/customers/:customerId/daily-occurrence-book', async ({ request, params }) => {
+		await delay(200)
 
-      const url = new URL(request.url)
-      const siteId = url.searchParams.get('siteId')
-      const filters = {
-        dateFrom: url.searchParams.get('dateFrom'),
-        dateTo: url.searchParams.get('dateTo'),
-        occurrenceType: url.searchParams.get('occurrenceType'),
-        severity: url.searchParams.get('severity'),
-        status: url.searchParams.get('status'),
-        search: url.searchParams.get('search')
-      }
+		const customerId = parseInt(params.customerId as string)
+		if (isNaN(customerId)) {
+			return createErrorResponse(400, 'Invalid customer ID')
+		}
 
-      console.log('📖 [DOB] Fetching occurrences for customer:', customerId, { siteId, filters })
+		const url = new URL(request.url)
+		const siteId = url.searchParams.get('siteId') || undefined
+		const filters = {
+			dateFrom: url.searchParams.get('dateFrom'),
+			dateTo: url.searchParams.get('dateTo'),
+			storeNumber: url.searchParams.get('storeNumber'),
+			storeName: url.searchParams.get('storeName'),
+			officerName: url.searchParams.get('officerName'),
+			code: url.searchParams.get('code'),
+			search: url.searchParams.get('search')
+		}
 
-      const filteredOccurrences = filterOccurrences(occurrenceStore, customerId, siteId || undefined, filters)
-      const stats = generateStats(filteredOccurrences)
+		const filtered = filterOccurrences(occurrenceStore, customerId, siteId, filters)
+		filtered.sort((a, b) => {
+			const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime()
+			if (dateDiff !== 0) return dateDiff
+			return b.time.localeCompare(a.time)
+		})
 
-      // Sort by date and time (newest first)
-      filteredOccurrences.sort((a, b) => {
-        const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime()
-        if (dateCompare !== 0) return dateCompare
-        return b.time.localeCompare(a.time)
-      })
+		const response: DailyOccurrenceBookResponse = {
+			success: true,
+			data: filtered,
+			stats: generateStats(filtered),
+			message: `Found ${filtered.length} entries`
+		}
 
-      const response: DailyOccurrenceBookResponse = {
-        success: true,
-        data: filteredOccurrences,
-        stats,
-        message: `Found ${filteredOccurrences.length} occurrence(s)`
-      }
+		return HttpResponse.json(response)
+	}),
 
-      return HttpResponse.json(response)
-    } catch (error) {
-      console.error('❌ [DOB] Error fetching occurrences:', error)
-      return createErrorResponse(500, 'Failed to fetch occurrences')
-    }
-  }),
+	http.post('/api/customers/:customerId/daily-occurrence-book', async ({ request, params }) => {
+		await delay(200)
 
-  // POST /api/customers/:customerId/daily-occurrence-book - Create new occurrence
-  http.post('/api/customers/:customerId/daily-occurrence-book', async ({ request, params }) => {
-    try {
-      await delay(300)
-      
-      const customerId = parseInt(params.customerId as string)
-      if (isNaN(customerId)) {
-        return createErrorResponse(400, 'Invalid customer ID')
-      }
+		const customerId = parseInt(params.customerId as string)
+		if (isNaN(customerId)) {
+			return createErrorResponse(400, 'Invalid customer ID')
+		}
 
-      const requestData: CreateOccurrenceRequest = await request.json()
-      
-      // Validate required fields
-      if (!requestData.title || !requestData.description || !requestData.location) {
-        return createErrorResponse(400, 'Title, description, and location are required')
-      }
+		const requestData: CreateOccurrenceRequest = await request.json()
+		const requiredFields: (keyof CreateOccurrenceRequest)[] = [
+			'storeName',
+			'storeNumber',
+			'date',
+			'time',
+			'officerName',
+			'code',
+			'details',
+			'signature',
+			'siteId'
+		]
 
-      const now = new Date().toISOString()
-      const newOccurrence: DailyOccurrenceEntry = {
-        id: generateId(),
-        customerId,
-        siteId: requestData.siteId,
-        date: requestData.date,
-        time: requestData.time,
-        occurrenceType: requestData.occurrenceType,
-        severity: requestData.severity,
-        status: 'open',
-        title: requestData.title,
-        description: requestData.description,
-        location: requestData.location,
-        reportedBy: {
-          id: '2', // Current user ID (would come from auth in real app)
-          name: 'Oscar Officer',
-          role: 'Security Officer',
-          badgeNumber: 'ADV-001'
-        },
-        witnessNames: requestData.witnessNames,
-        actionTaken: requestData.actionTaken,
-        followUpRequired: requestData.followUpRequired,
-        followUpBy: requestData.followUpBy,
-        followUpDate: requestData.followUpDate,
-        followUpNotes: requestData.followUpNotes,
-        managerNotified: requestData.managerNotified,
-        managerNotifiedAt: requestData.managerNotified ? now : undefined,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: '2',
-        updatedBy: '2'
-      }
+		const missing = requiredFields.filter((field) => !requestData[field])
+		if (missing.length) {
+			return createErrorResponse(400, `Missing required fields: ${missing.join(', ')}`)
+		}
 
-      occurrenceStore.push(newOccurrence)
+		const timestamp = new Date().toISOString()
+		const newEntry: DailyOccurrenceEntry = {
+			id: generateId(),
+			customerId,
+			siteId: requestData.siteId,
+			siteName: requestData.storeName,
+			storeName: requestData.storeName,
+			storeNumber: requestData.storeNumber,
+			dateCommenced: requestData.dateCommenced,
+			date: requestData.date,
+			time: requestData.time,
+			officerName: requestData.officerName,
+			code: requestData.code,
+			codeDescription: resolveCodeDescription(requestData.code),
+			crimeReportCompletedDate: requestData.crimeReportCompletedDate,
+			crimeReportCompletedTime: requestData.crimeReportCompletedTime,
+			details: requestData.details,
+			signature: requestData.signature,
+			reportedBy: {
+				id: '2',
+				name: 'Training Officer',
+				role: 'Security Officer'
+			},
+			createdAt: timestamp,
+			updatedAt: timestamp,
+			createdBy: '2',
+			updatedBy: '2'
+		}
 
-      console.log('✅ [DOB] Created new occurrence:', newOccurrence.id)
+		occurrenceStore.unshift(newEntry)
 
-      const response: SingleOccurrenceResponse = {
-        success: true,
-        data: newOccurrence,
-        message: 'Occurrence created successfully'
-      }
+		const response: SingleOccurrenceResponse = {
+			success: true,
+			data: newEntry,
+			message: 'Occurrence created successfully'
+		}
 
-      return HttpResponse.json(response)
-    } catch (error) {
-      console.error('❌ [DOB] Error creating occurrence:', error)
-      return createErrorResponse(500, 'Failed to create occurrence')
-    }
-  }),
+		return HttpResponse.json(response)
+	}),
 
-  // GET /api/customers/:customerId/daily-occurrence-book/:occurrenceId - Get specific occurrence
-  http.get('/api/customers/:customerId/daily-occurrence-book/:occurrenceId', async ({ params }) => {
-    try {
-      await delay(300)
-      
-      const customerId = parseInt(params.customerId as string)
-      const occurrenceId = params.occurrenceId as string
+	http.get('/api/customers/:customerId/daily-occurrence-book/:occurrenceId', ({ params }) => {
+		const customerId = parseInt(params.customerId as string)
+		const occurrenceId = params.occurrenceId as string
 
-      if (isNaN(customerId)) {
-        return createErrorResponse(400, 'Invalid customer ID')
-      }
+		if (isNaN(customerId)) {
+			return createErrorResponse(400, 'Invalid customer ID')
+		}
 
-      const occurrence = occurrenceStore.find(
-        o => o.id === occurrenceId && o.customerId === customerId
-      )
+		const occurrence = occurrenceStore.find(
+			(entry) => entry.customerId === customerId && entry.id === occurrenceId
+		)
 
-      if (!occurrence) {
-        return createErrorResponse(404, 'Occurrence not found')
-      }
+		if (!occurrence) {
+			return createErrorResponse(404, 'Occurrence not found')
+		}
 
-      const response: SingleOccurrenceResponse = {
-        success: true,
-        data: occurrence,
-        message: 'Occurrence retrieved successfully'
-      }
+		const response: SingleOccurrenceResponse = {
+			success: true,
+			data: occurrence,
+			message: 'Occurrence retrieved successfully'
+		}
 
-      return HttpResponse.json(response)
-    } catch (error) {
-      console.error('❌ [DOB] Error fetching occurrence:', error)
-      return createErrorResponse(500, 'Failed to fetch occurrence')
-    }
-  }),
+		return HttpResponse.json(response)
+	}),
 
-  // PUT /api/customers/:customerId/daily-occurrence-book/:occurrenceId - Update occurrence
-  http.put('/api/customers/:customerId/daily-occurrence-book/:occurrenceId', async ({ request, params }) => {
-    try {
-      await delay(300)
-      
-      const customerId = parseInt(params.customerId as string)
-      const occurrenceId = params.occurrenceId as string
+	http.put('/api/customers/:customerId/daily-occurrence-book/:occurrenceId', async ({ request, params }) => {
+		await delay(200)
 
-      if (isNaN(customerId)) {
-        return createErrorResponse(400, 'Invalid customer ID')
-      }
+		const customerId = parseInt(params.customerId as string)
+		const occurrenceId = params.occurrenceId as string
 
-      const updateData: UpdateOccurrenceRequest = await request.json()
+		if (isNaN(customerId)) {
+			return createErrorResponse(400, 'Invalid customer ID')
+		}
 
-      const occurrenceIndex = occurrenceStore.findIndex(
-        o => o.id === occurrenceId && o.customerId === customerId
-      )
+		const updateData: UpdateOccurrenceRequest = await request.json()
 
-      if (occurrenceIndex === -1) {
-        return createErrorResponse(404, 'Occurrence not found')
-      }
+		const index = occurrenceStore.findIndex(
+			(entry) => entry.customerId === customerId && entry.id === occurrenceId
+		)
 
-      const existingOccurrence = occurrenceStore[occurrenceIndex]
-      const updatedOccurrence: DailyOccurrenceEntry = {
-        ...existingOccurrence,
-        ...updateData,
-        id: occurrenceId, // Ensure ID doesn't change
-        customerId, // Ensure customer ID doesn't change
-        updatedAt: new Date().toISOString(),
-        updatedBy: '2' // Current user ID
-      }
+		if (index === -1) {
+			return createErrorResponse(404, 'Occurrence not found')
+		}
 
-      // Handle manager notification
-      if (updateData.managerNotified && !existingOccurrence.managerNotified) {
-        updatedOccurrence.managerNotifiedAt = new Date().toISOString()
-      }
+		const existing = occurrenceStore[index]
+		const updated: DailyOccurrenceEntry = {
+			...existing,
+			...updateData,
+			codeDescription: updateData.code ? resolveCodeDescription(updateData.code) : existing.codeDescription,
+			updatedAt: new Date().toISOString(),
+			updatedBy: '2'
+		}
 
-      occurrenceStore[occurrenceIndex] = updatedOccurrence
+		occurrenceStore[index] = updated
 
-      console.log('✅ [DOB] Updated occurrence:', occurrenceId)
+		const response: SingleOccurrenceResponse = {
+			success: true,
+			data: updated,
+			message: 'Occurrence updated successfully'
+		}
 
-      const response: SingleOccurrenceResponse = {
-        success: true,
-        data: updatedOccurrence,
-        message: 'Occurrence updated successfully'
-      }
+		return HttpResponse.json(response)
+	}),
 
-      return HttpResponse.json(response)
-    } catch (error) {
-      console.error('❌ [DOB] Error updating occurrence:', error)
-      return createErrorResponse(500, 'Failed to update occurrence')
-    }
-  }),
+	http.delete('/api/customers/:customerId/daily-occurrence-book/:occurrenceId', ({ params }) => {
+		const customerId = parseInt(params.customerId as string)
+		const occurrenceId = params.occurrenceId as string
 
-  // DELETE /api/customers/:customerId/daily-occurrence-book/:occurrenceId - Delete occurrence
-  http.delete('/api/customers/:customerId/daily-occurrence-book/:occurrenceId', async ({ params }) => {
-    try {
-      await delay(300)
-      
-      const customerId = parseInt(params.customerId as string)
-      const occurrenceId = params.occurrenceId as string
+		if (isNaN(customerId)) {
+			return createErrorResponse(400, 'Invalid customer ID')
+		}
 
-      if (isNaN(customerId)) {
-        return createErrorResponse(400, 'Invalid customer ID')
-      }
+		const index = occurrenceStore.findIndex(
+			(entry) => entry.customerId === customerId && entry.id === occurrenceId
+		)
 
-      const occurrenceIndex = occurrenceStore.findIndex(
-        o => o.id === occurrenceId && o.customerId === customerId
-      )
+		if (index === -1) {
+			return createErrorResponse(404, 'Occurrence not found')
+		}
 
-      if (occurrenceIndex === -1) {
-        return createErrorResponse(404, 'Occurrence not found')
-      }
+		occurrenceStore.splice(index, 1)
 
-      const deletedOccurrence = occurrenceStore[occurrenceIndex]
-      occurrenceStore.splice(occurrenceIndex, 1)
+		return HttpResponse.json({ success: true, message: 'Occurrence deleted successfully' })
+	}),
 
-      console.log('🗑️ [DOB] Deleted occurrence:', occurrenceId)
+	http.get('/api/customers/:customerId/daily-occurrence-book/stats', ({ request, params }) => {
+		const customerId = parseInt(params.customerId as string)
+		if (isNaN(customerId)) {
+			return createErrorResponse(400, 'Invalid customer ID')
+		}
 
-      return HttpResponse.json({
-        success: true,
-        message: `Occurrence "${deletedOccurrence.title}" deleted successfully`
-      })
-    } catch (error) {
-      console.error('❌ [DOB] Error deleting occurrence:', error)
-      return createErrorResponse(500, 'Failed to delete occurrence')
-    }
-  }),
+		const url = new URL(request.url)
+		const siteId = url.searchParams.get('siteId') || undefined
 
-  // GET /api/customers/:customerId/daily-occurrence-book/stats - Get occurrence statistics
-  http.get('/api/customers/:customerId/daily-occurrence-book/stats', async ({ request, params }) => {
-    try {
-      await delay(300)
-      
-      const customerId = parseInt(params.customerId as string)
-      if (isNaN(customerId)) {
-        return createErrorResponse(400, 'Invalid customer ID')
-      }
+		const filtered = filterOccurrences(occurrenceStore, customerId, siteId, {})
+		const response: OccurrenceStatsResponse = {
+			success: true,
+			data: generateStats(filtered),
+			message: 'Statistics retrieved successfully'
+		}
 
-      const url = new URL(request.url)
-      const siteId = url.searchParams.get('siteId')
-
-      const filteredOccurrences = filterOccurrences(
-        occurrenceStore, 
-        customerId, 
-        siteId || undefined
-      )
-      
-      const stats = generateStats(filteredOccurrences)
-
-      const response: OccurrenceStatsResponse = {
-        success: true,
-        data: stats,
-        message: 'Statistics retrieved successfully'
-      }
-
-      return HttpResponse.json(response)
-    } catch (error) {
-      console.error('❌ [DOB] Error fetching stats:', error)
-      return createErrorResponse(500, 'Failed to fetch statistics')
-    }
-  })
+		return HttpResponse.json(response)
+	})
 ]

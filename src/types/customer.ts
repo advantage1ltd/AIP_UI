@@ -115,7 +115,6 @@ export type CustomerPageId =
   | 'incident-report'
   | 'customer-satisfaction'
   | 'be-safe-be-secure'
-  | 'patrol-log'
   | 'site-visit-reports'
   | 'keyholding-logs'
   | 'event-briefings'

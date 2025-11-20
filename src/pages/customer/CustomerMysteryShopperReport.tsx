@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import MysteryShopperPage from "@/pages/operations/MysteryShopperPage"
 import { useAuth } from "@/contexts/AuthContext"
+import { useCustomerSelection } from "@/contexts/CustomerSelectionContext"
 import { findCustomerById } from "@/hooks/useAvailableCustomers"
+import { siteService } from '@/services/siteService'
 
 export default function CustomerMysteryShopperReport() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user, isLoading: authLoading } = useAuth()
+  const { isAdmin } = useCustomerSelection()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [customer, setCustomer] = useState<{ id: number; name: string } | null>(null)
@@ -18,15 +21,9 @@ export default function CustomerMysteryShopperReport() {
 
   const fetchSiteName = async (customerId: number, siteId: string) => {
     try {
-      const response = await fetch('/api/dashboard/sites', {
-        headers: {
-          'X-Customer-Id': customerId.toString()
-        }
-      });
-      
-      if (response.ok) {
-        const sites = await response.json();
-        const site = sites.find((s: any) => s.id === siteId);
+      const response = await siteService.getSitesByCustomer(customerId);
+      if (response.success) {
+        const site = response.data.find((s) => String(s.siteID) === siteId);
         if (site) {
           setSelectedSiteName(site.locationName);
           console.log('CustomerMysteryShopperReport: Found site name:', site.locationName);
@@ -64,7 +61,11 @@ export default function CustomerMysteryShopperReport() {
         }
 
         if (!targetCustomerId) {
-          setError("No customer ID found")
+          if (isAdmin) {
+            setError("Please select a customer from the sidebar to view this page. Open the Customer section and select a customer from the dropdown.")
+          } else {
+            setError("No customer ID found")
+          }
           return
         }
 
@@ -108,8 +109,19 @@ export default function CustomerMysteryShopperReport() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-600">{error}</p>
+        <div className={`p-4 rounded-lg border ${
+          isAdmin 
+            ? 'bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800' 
+            : 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+        }`}>
+          <p className={isAdmin ? 'text-amber-800 dark:text-amber-200' : 'text-red-600 dark:text-red-400'}>
+            {error}
+          </p>
+          {isAdmin && (
+            <p className="text-sm text-amber-700 dark:text-amber-300 mt-2">
+              As an administrator, you need to select a customer first before accessing customer-specific pages.
+            </p>
+          )}
         </div>
       </div>
     )

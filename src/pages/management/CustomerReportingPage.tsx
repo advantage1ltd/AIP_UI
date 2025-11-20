@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { CustomerWithRelations, CustomerPage } from '@/types/customer';
@@ -37,6 +37,10 @@ import {
   MapPin
 } from 'lucide-react';
 import { customerOperations } from '@/mocks/customerStore';
+import { customerPageAccessCache } from '@/services/customerPageAccessCache';
+import { siteService } from '@/services/siteService';
+import type { Site } from '@/types/customer';
+import type { CustomerPageAccessPage } from '@/api/customerPageAccess';
 
 const iconMap = {
   Calendar,
@@ -61,6 +65,61 @@ interface Site {
 
 type ReportingStep = 'customer' | 'page' | 'site';
 
+const mapAccessPageToCustomerPage = (page: CustomerPageAccessPage): CustomerPage => {
+  const config = Object.values(CUSTOMER_PAGES).find(
+    cfg => cfg.id === page.pageId || cfg.path === page.path
+  );
+
+  return {
+    id: page.pageId,
+    title: page.title || config?.title || page.pageId,
+    description: page.description || config?.description || '',
+    enabled: true,
+    requiredForTypes: [],
+    path: page.path,
+    readOnly: config?.readOnly ?? false,
+    category: (config?.category || page.category || 'reports') as CustomerPage['category'],
+    icon: config?.icon || 'FileText'
+  };
+};
+
+const resolveNumericCustomerId = (customer: CustomerWithRelations): number | null => {
+  const candidates = [
+    (customer as any)?.id,
+    (customer as any)?.customerId,
+    (customer as any)?.CustomerId,
+    (customer as any)?.customerID
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate === null || candidate === undefined) continue;
+
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      return candidate;
+    }
+
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      const parsed = Number(candidate);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
+};
+
+const buildCustomerKey = (customer: CustomerWithRelations, index: number): string => {
+  const numericId = resolveNumericCustomerId(customer);
+  if (numericId !== null) {
+    return `customer-${numericId}`;
+  }
+  if (customer.id) {
+    return `customer-${customer.id}`;
+  }
+  return `customer-index-${index}`;
+};
+
 export default function CustomerReportingPage() {
   const [customers, setCustomers] = useState<CustomerWithRelations[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
@@ -74,6 +133,16 @@ export default function CustomerReportingPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithRelations | null>(null);
   const [selectedPage, setSelectedPage] = useState<CustomerPage | null>(null);
   const [selectedSite, setSelectedSite] = useState<Site | null>(null);
+  const [assignedPageCounts, setAssignedPageCounts] = useState<Record<string, number>>({});
+  const [pageAccessState, setPageAccessState] = useState<{
+    isLoading: boolean;
+    error: string | null;
+    pages: CustomerPage[];
+  }>({
+    isLoading: false,
+    error: null,
+    pages: []
+  });
   
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -100,17 +169,9 @@ export default function CustomerReportingPage() {
         });
       }
       
-      // Transform customer data to include available pages
-      const customersWithPages = customerData.map((customer: any) => {
-        const availablePages = getAvailablePages(customer);
-        return {
-          ...customer,
-          availablePages
-        };
-      });
-      
-      setCustomers(customersWithPages);
-      console.log('✅ [CustomerReportingPage] Loaded customers from store:', customersWithPages.length);
+      setCustomers(customerData);
+      console.log('✅ [CustomerReportingPage] Loaded customers from store:', customerData.length);
+      await preloadAssignedCounts(customerData);
       
     } catch (error) {
       console.error('❌ [CustomerReportingPage] Error fetching customer data:', error);
@@ -120,23 +181,53 @@ export default function CustomerReportingPage() {
     }
   };
 
+  const preloadAssignedCounts = async (customerList: CustomerWithRelations[]) => {
+    try {
+      const entries = await Promise.all(
+        customerList.map(async (customer) => {
+          const numericId = resolveNumericCustomerId(customer);
+          if (numericId === null) {
+            console.warn('⚠️ [CustomerReportingPage] Invalid customer ID, skipping assignment preload:', customer.id);
+            return null;
+          }
+
+          try {
+            const access = await customerPageAccessCache.get(numericId);
+            return [String(numericId), access.assignedPageIds.length] as const;
+          } catch (error) {
+            console.error('❌ [CustomerReportingPage] Failed to load assignment count for customer', customer.id, error);
+            return [String(numericId), 0] as const;
+          }
+        })
+      );
+
+      const validEntries = entries.filter((entry): entry is readonly [string, number] => Boolean(entry));
+      if (validEntries.length > 0) {
+        setAssignedPageCounts(prev => ({
+          ...prev,
+          ...Object.fromEntries(validEntries)
+        }));
+      }
+    } catch (error) {
+      console.error('❌ [CustomerReportingPage] Error preloading assignment counts:', error);
+    }
+  };
+
   const fetchSitesForCustomer = async (customerId: number) => {
     try {
       setIsLoadingSites(true);
       console.log('🏢 [CustomerReportingPage] Loading sites for customer:', customerId);
       
-      const response = await fetch('/api/dashboard/sites', {
-        headers: {
-          'X-Customer-Id': customerId.toString()
-        }
-      });
+      const response = await siteService.getSitesByCustomer(customerId);
       
-      if (response.ok) {
-        const sitesData = await response.json();
-        console.log('🏢 [CustomerReportingPage] Loaded sites:', sitesData.length, 'for customer', customerId);
-        setSites(sitesData);
+      if (response.success) {
+        const sortedSites = response.data.sort((a, b) =>
+          (a.locationName || '').localeCompare(b.locationName || '')
+        );
+        console.log('🏢 [CustomerReportingPage] Loaded sites:', sortedSites.length, 'for customer', customerId);
+        setSites(sortedSites);
       } else {
-        console.error('Failed to fetch sites');
+        console.error('Failed to fetch sites', response);
         setSites([]);
       }
     } catch (error) {
@@ -151,82 +242,91 @@ export default function CustomerReportingPage() {
     fetchCustomerReportingData();
   }, [user]);
 
-  const getAvailablePages = (customer: CustomerWithRelations): CustomerPage[] => {
-    try {
-      // Get enabled pages from customer's pageAssignments
-      if (customer.pageAssignments) {
-        const enabledPageIds = Object.entries(customer.pageAssignments)
-          .filter(([_, assignment]) => (assignment as any).enabled)
-          .map(([pageId]) => pageId);
-        
-        // Map page IDs to CustomerPage objects
-        const availablePages = enabledPageIds.map(pageId => {
-          const pageConfig = CUSTOMER_PAGES[pageId];
-          if (pageConfig) {
-            return {
-              ...pageConfig,
-              id: pageId
-            };
-          }
-          return null;
-        }).filter(Boolean) as CustomerPage[];
-        
-        console.log('🔍 [CustomerReportingPage] Available pages for customer:', {
-          customerId: customer.id,
-          customerName: customer.companyName,
-          enabledPageIds,
-          availablePagesCount: availablePages.length
-        });
-        
-        return availablePages;
-      }
-      
-      // Fallback to viewConfig if pageAssignments not available
-      if (customer.viewConfig?.enabledPages) {
-        const availablePages = customer.viewConfig.enabledPages.map(pageId => {
-          const pageConfig = CUSTOMER_PAGES[pageId];
-          if (pageConfig) {
-            return {
-              ...pageConfig,
-              id: pageId
-            };
-          }
-          return null;
-        }).filter(Boolean) as CustomerPage[];
-        
-        console.log('🔍 [CustomerReportingPage] Using viewConfig fallback for customer:', {
-          customerId: customer.id,
-          customerName: customer.companyName,
-          availablePagesCount: availablePages.length
-        });
-        
-        return availablePages;
-      }
-      
-      console.log('🔍 [CustomerReportingPage] No page assignments found for customer:', {
-        customerId: customer.id,
-        customerName: customer.companyName
-      });
-      
-      return [];
-    } catch (error) {
-      console.error('❌ [CustomerReportingPage] Error getting available pages:', error);
-      return [];
-    }
-  };
-
   const getIcon = (iconName: string | undefined) => {
     if (!iconName) return FileText;
     return iconMap[iconName as keyof typeof iconMap] || FileText;
   };
+
+  const loadPagesForCustomer = useCallback(async (customerId: number) => {
+    try {
+      setPageAccessState({ isLoading: true, error: null, pages: [] });
+      
+      // Force refresh to get latest assignments (cache is cleared when pages are assigned)
+      const access = await customerPageAccessCache.get(customerId, { force: false });
+      
+      console.log('🔍 [CustomerReportingPage] Page access data:', {
+        customerId,
+        totalAvailablePages: access.availablePages.length,
+        assignedPageIds: access.assignedPageIds,
+        assignedCount: access.assignedPageIds.length
+      });
+      
+      const assignedPages = access.availablePages
+        .filter(page => access.assignedPageIds.includes(page.pageId))
+        .map(mapAccessPageToCustomerPage);
+
+      setPageAccessState({
+        isLoading: false,
+        error: null,
+        pages: assignedPages
+      });
+
+      console.log('✅ [CustomerReportingPage] Loaded assigned pages:', {
+        customerId,
+        count: assignedPages.length,
+        pageIds: assignedPages.map(p => p.id)
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load customer pages';
+      console.error('❌ [CustomerReportingPage] Error loading customer pages:', error);
+      setPageAccessState({
+        isLoading: false,
+        error: message,
+        pages: []
+      });
+    }
+  }, []);
 
   const handleCustomerSelect = (customer: CustomerWithRelations) => {
     setSelectedCustomer(customer);
     setSelectedPage(null);
     setSelectedSite(null);
     setCurrentStep('page');
-    fetchSitesForCustomer(customer.id);
+
+    const numericId = resolveNumericCustomerId(customer);
+    if (numericId !== null) {
+      loadPagesForCustomer(numericId);
+      fetchSitesForCustomer(numericId);
+    } else {
+      setPageAccessState({
+        isLoading: false,
+        error: 'Invalid customer identifier',
+        pages: []
+      });
+    }
   };
+
+  // Listen for customer page access updates and refresh if the selected customer's pages were updated
+  useEffect(() => {
+    const handlePageAccessUpdate = (event: CustomEvent) => {
+      const { customerId } = event.detail;
+      const numericId = resolveNumericCustomerId(selectedCustomer);
+      
+      // If the updated customer matches the currently selected customer, refresh the pages
+      if (numericId !== null && numericId === customerId) {
+        console.log('🔄 [CustomerReportingPage] Page access updated for selected customer, refreshing...');
+        // Clear cache and force refresh
+        customerPageAccessCache.clear(customerId);
+        loadPagesForCustomer(numericId);
+      }
+    };
+
+    window.addEventListener('customer-page-access-updated', handlePageAccessUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('customer-page-access-updated', handlePageAccessUpdate as EventListener);
+    };
+  }, [selectedCustomer, loadPagesForCustomer]);
 
   const handlePageSelect = (page: CustomerPage) => {
     setSelectedPage(page);
@@ -241,8 +341,16 @@ export default function CustomerReportingPage() {
   const handleNavigateToReport = () => {
     if (!selectedCustomer || !selectedPage || !selectedSite) return;
     
+    const numericCustomerId = resolveNumericCustomerId(selectedCustomer);
+    const customerIdForUrl = numericCustomerId ?? selectedCustomer.id;
+    
+    if (!customerIdForUrl) {
+      console.error('❌ [CustomerReportingPage] Unable to resolve customer ID for navigation');
+      return;
+    }
+    
     // Navigate to the selected page with customer and site context
-    const url = `${selectedPage.path}?customerId=${selectedCustomer.id}&siteId=${selectedSite.id}`;
+    const url = `${selectedPage.path}?customerId=${customerIdForUrl}&siteId=${selectedSite.siteID}`;
     console.log('🚀 [CustomerReportingPage] Navigating to:', url);
     navigate(url);
   };
@@ -264,7 +372,7 @@ export default function CustomerReportingPage() {
     customer.companyName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const availablePages = selectedCustomer ? getAvailablePages(selectedCustomer) : [];
+  const availablePages = pageAccessState.pages;
 
   if (isLoading) {
     return (
@@ -346,9 +454,15 @@ export default function CustomerReportingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCustomers.map((customer) => (
+            {filteredCustomers.map((customer, index) => {
+              const numericId = resolveNumericCustomerId(customer);
+              const assignedCount = numericId !== null
+                ? (assignedPageCounts[String(numericId)] ?? 0)
+                : 0;
+
+              return (
               <Card 
-                key={customer.id} 
+                  key={buildCustomerKey(customer, index)} 
                 className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-blue-200"
                 onClick={() => handleCustomerSelect(customer)}
               >
@@ -371,14 +485,15 @@ export default function CustomerReportingPage() {
                     </div>
                     <div className="flex items-center justify-between mt-4">
                       <Badge variant="secondary">
-                        {getAvailablePages(customer).length} Reports Available
+                          {assignedCount} Reports Available
                       </Badge>
                       <ChevronRight className="w-4 h-4 text-gray-400" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
 
           {filteredCustomers.length === 0 && (
@@ -408,7 +523,20 @@ export default function CustomerReportingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {availablePages.map((page) => {
+            {pageAccessState.isLoading && (
+              <div className="col-span-full text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
+                <p className="text-gray-600">Loading available reports...</p>
+              </div>
+            )}
+
+            {!pageAccessState.isLoading && pageAccessState.error && (
+              <div className="col-span-full text-center py-12 text-red-600">
+                {pageAccessState.error}
+              </div>
+            )}
+
+            {!pageAccessState.isLoading && !pageAccessState.error && availablePages.map((page) => {
               const IconComponent = getIcon(page.icon);
               return (
                 <Card 
@@ -435,7 +563,7 @@ export default function CustomerReportingPage() {
             })}
           </div>
 
-          {availablePages.length === 0 && (
+          {!pageAccessState.isLoading && !pageAccessState.error && availablePages.length === 0 && (
             <div className="text-center py-12">
               <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No reports available</h3>
@@ -492,9 +620,9 @@ export default function CustomerReportingPage() {
                         </label>
                        <div className="max-w-md mx-auto">
                          <Select 
-                           value={selectedSite?.id || ''} 
+                           value={selectedSite ? String(selectedSite.siteID) : ''} 
                            onValueChange={(value) => {
-                             const site = sites.find(s => s.id === value);
+                             const site = sites.find(s => String(s.siteID) === value);
                              if (site) {
                                handleSiteSelect(site);
                              }
@@ -504,11 +632,14 @@ export default function CustomerReportingPage() {
                              <SelectValue placeholder="Select a site..." />
                            </SelectTrigger>
                            <SelectContent className="max-h-60">
-                             {sites.map((site) => (
-                               <SelectItem key={site.id} value={site.id}>
-                                 {site.locationName}
+                             {sites.map((site) => {
+                               const siteValue = String(site.siteID);
+                               return (
+                                 <SelectItem key={siteValue} value={siteValue}>
+                                   {site.locationName || `Site ${siteValue}`}
                                </SelectItem>
-                             ))}
+                               );
+                             })}
                            </SelectContent>
                          </Select>
                        </div>

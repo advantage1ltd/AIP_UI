@@ -141,11 +141,6 @@ export const MOCK_OFFICERS: Officer[] = [
 ]
 
 export const MOCK_OFFICER_ROLES: OfficerRole[] = [
-  { id: '1', name: 'Security Officer', level: 1 },
-  { id: '2', name: 'Senior Security Officer', level: 2 },
-  { id: '3', name: 'Store Detective', level: 2 },
-  { id: '4', name: 'Senior Store Detective', level: 3 },
-  { id: '5', name: 'Security Supervisor', level: 3 },
-  { id: '6', name: 'Site Manager', level: 4 },
-  { id: '7', name: 'Regional Manager', level: 5 },
+  { id: '1', name: 'Store Detective', level: 1 },
+  { id: '2', name: 'Uniform Officer', level: 1 },
 ]; 

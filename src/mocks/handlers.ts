@@ -8,9 +8,9 @@ import { bankHolidayHandlers } from './bankHolidayHandlers'
 // import { customerHandlers } from './customerHandlers' // Commented out - transitioning to real backend
 import { regionsHandlers } from './regionsHandlers'
 import { sitesHandlers } from './sitesHandlers'
-import { incidentHandlers } from './incidentHandlers'
+// import { incidentHandlers } from './incidentHandlers' // Removed - using real backend API
 import { userHandlers } from './userHandlers' // Commented out - transitioning to real backend
-import { settingsHandlers } from './settingsHandlers'
+// import { settingsHandlers } from './settingsHandlers' // Removed - using real backend API
 import { headerHandlers } from './headerHandlers'
 import { dashboardHandlers } from './dashboardHandlers'
 import { mysteryShopperHandlers } from './mysteryShopperHandlers'
@@ -22,27 +22,27 @@ import { dailyOccurrenceBookHandlers } from './dailyOccurrenceBookHandlers'
 // import { employeeHandlers } from './employeeHandlers' // Commented out - transitioning to real backend
 
 
+// MSW is disabled - all handlers commented out to use real .NET backend API
 export const handlers = [
-  // All handlers commented out - transitioning to real backend
-  // ...customerHandlers,
-  // ...userHandlers,
-  // ...headerHandlers,
-  // ...dashboardHandlers,
-  // ...siteVisitHandlers,
-  // ...safeDuressWordsHandlers,
-  // ...holidayRequestHandlers,
-  // ...customerSatisfactionHandlers,
-  // ...bankHolidayHandlers,
-  // ...regionsHandlers,
-  // ...sitesHandlers,
-  // ...incidentHandlers,
-  // ...mysteryShopperHandlers,
-  // ...dailyActivityHandlers,
-  // ...dailyActivityAnalyticsHandlers,
-  // ...settingsHandlers,
-  // ...employeeDiaryHandlers,
-  // ...dailyOccurrenceBookHandlers,
-  // ...employeeHandlers
+  // All handlers disabled - using real .NET backend API
+  // ...incidentHandlers, // Using real backend API
+  // ...dashboardHandlers, // Using real backend API
+  // ...siteVisitHandlers, // Using real backend API
+  // ...safeDuressWordsHandlers, // Using real backend API
+  // ...holidayRequestHandlers, // Using real backend API
+  // ...customerSatisfactionHandlers, // Using real backend API
+  // ...bankHolidayHandlers, // Using real backend API
+  // ...regionsHandlers, // Using real backend API
+  // ...sitesHandlers, // Using real backend API
+  // ...mysteryShopperHandlers, // Using real backend API
+  // ...dailyActivityHandlers, // Using real backend API
+  // ...dailyActivityAnalyticsHandlers, // Using real backend API
+  // ...dailyOccurrenceBookHandlers, // Using real backend API
+  // ...customerHandlers, // Using real backend API
+  // ...userHandlers, // Using real backend API
+  // ...headerHandlers, // Using real backend API
+  // ...employeeDiaryHandlers, // Using real backend API
+  // ...employeeHandlers // Using real backend API
 ]
 
 // MSW Data Store with Enhanced Synchronization

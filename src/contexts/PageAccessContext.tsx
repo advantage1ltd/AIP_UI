@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PageAccess, pageAccessApi } from '@/api/pageAccess';
 import { useAuth } from '@/hooks/useAuth';
+import { customerPageAccessCache } from '@/services/customerPageAccessCache';
+import { PAGE_DEFINITIONS } from '@/config/navigation/pageDefinitions';
 
 interface PageAccessContextType {
   hasAccess: (path: string) => boolean;
@@ -13,9 +15,41 @@ interface PageAccessContextType {
   isLoading: boolean;
   refreshSettings: () => Promise<void>;
   clearCacheAndReload: () => Promise<void>;
+  syncPages: () => Promise<void>;
+  isTestMode: boolean;
+  setIsTestMode: (isTestMode: boolean) => void;
+  testRole: string | null;
+  setTestRole: (role: string | null) => void;
 }
 
 const PageAccessContext = createContext<PageAccessContextType | undefined>(undefined);
+
+const parseNumericId = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const resolveCustomerContextId = (role: string | null, user: any): number | null => {
+  if (!role || !user) return null;
+  const isCustomerRole = role === 'CustomerSiteManager' || role === 'CustomerHOManager';
+
+  if (isCustomerRole) {
+    return (
+      parseNumericId(user?.customerId) ??
+      parseNumericId(user?.CustomerId) ??
+      parseNumericId(user?.companyId) ??
+      null
+    );
+  }
+
+  const assignedCustomerIds = user?.assignedCustomerIds;
+  if (Array.isArray(assignedCustomerIds) && assignedCustomerIds.length > 0) {
+    return parseNumericId(assignedCustomerIds[0]);
+  }
+
+  return null;
+};
 
 export const usePageAccess = () => {
   const context = useContext(PageAccessContext);
@@ -29,11 +63,15 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [currentRole, setCurrentRole] = useState<string | null>(null);
   const [pageAccessByRole, setPageAccessByRole] = useState<Record<string, string[]>>({});
   const [availablePages, setAvailablePages] = useState<PageAccess[]>([]);
+  const [customerAssignedPageIds, setCustomerAssignedPageIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [isTestMode, setIsTestMode] = useState(false);
+  const [testRole, setTestRole] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const lastCustomerContextId = useRef<number | null>(null);
 
   const hasAccess = (path: string): boolean => {
     try {
@@ -49,6 +87,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       // Get the allowed page IDs for the role
       const allowedPageIds = pageAccessByRole[currentRole];
       if (!allowedPageIds) {
+        console.warn('🔒 [PageAccess] No page IDs found for role:', currentRole);
         return false;
       }
       
@@ -62,6 +101,10 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const page = availablePages.find(p => p.path === requestedPath);
       
       if (!page) {
+        // Only log if this is not a common path that might not be in availablePages
+        if (!requestedPath.startsWith('/customer/') && requestedPath !== '/') {
+          console.warn('🔒 [PageAccess] Page not found in availablePages:', requestedPath);
+        }
         return false;
       }
       
@@ -70,68 +113,72 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return true;
       }
       
+      // For customer roles, check customer-specific page assignments
+      const isCustomerRole = currentRole === 'CustomerSiteManager' || currentRole === 'CustomerHOManager';
+      const isCustomerPage = page.path?.startsWith('/customer') || page.category === 'Customer';
+      
+      if (isCustomerRole && isCustomerPage) {
+        // Dashboard is always available
+        if (page.id === 'dashboard' || requestedPath === '/dashboard') {
+          return true;
+        }
+        // Check if this page is assigned to the customer
+        const hasCustomerAccess = customerAssignedPageIds.has(page.id);
+        if (!hasCustomerAccess) {
+          console.warn('🔒 [PageAccess] Customer page not assigned:', page.id, 'at path:', requestedPath);
+        }
+        return hasCustomerAccess;
+      }
+      
       // Check if the role has access to this page
-      return allowedPageIds.includes(page.id);
+      const hasAccess = allowedPageIds.includes(page.id);
+      if (!hasAccess) {
+        console.warn('🔒 [PageAccess] Access denied for', currentRole, 'to page:', page.id, 'at path:', requestedPath);
+      }
+      return hasAccess;
     } catch (error) {
-      console.error('Error checking access:', error);
+      console.error('🔒 [PageAccess] Error checking access:', error);
       return false;
     }
   };
 
   /**
-   * Refresh settings from localStorage or API
+   * Refresh settings from API
+   * Wrapped in useCallback to prevent unnecessary re-renders
    */
-  const refreshSettings = async (): Promise<void> => {
+  const refreshSettings = useCallback(async (): Promise<void> => {
     try {
       setIsLoading(true);
       
-      // Check if there are saved settings in localStorage first
-      const savedSettings = localStorage.getItem('db_pageAccess_settings');
-      let data;
-      
-      if (savedSettings) {
-        console.log('📖 [PageAccess] Refreshing with saved settings from localStorage');
-        const parsedSettings = JSON.parse(savedSettings);
-        
-        // Still need to get availablePages from the API
-        const apiData = await pageAccessApi.getSettings();
-        data = {
-          pageAccessByRole: parsedSettings.pageAccessByRole,
-          availablePages: apiData.availablePages
-        };
-      } else {
-        // Fetch page access data from API
-        data = await pageAccessApi.getSettings();
-      }
+      // Fetch page access data from API
+      const data = await pageAccessApi.getSettings();
       
       setPageAccessByRole(data.pageAccessByRole);
       setAvailablePages(data.availablePages);
       
       console.log('✅ [PageAccess] Settings refreshed successfully');
+      console.log('📋 [PageAccess] Page access by role:', Object.keys(data.pageAccessByRole));
+      console.log('📄 [PageAccess] Total available pages:', data.availablePages.length);
     } catch (error) {
       console.error('Error refreshing settings:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // No dependencies - this function doesn't depend on any state/props
 
   /**
-   * Clear cached settings and reload fresh from db.json
+   * Clear cached settings and reload fresh from API
    */
   const clearCacheAndReload = async (): Promise<void> => {
     try {
       setIsLoading(true);
       
-      // Clear any cached settings
-      localStorage.removeItem('db_pageAccess_settings');
-      console.log('🗑️ [PageAccess] Cleared cached settings');
-      
-      // Force reload fresh settings from db.json
+      // Force reload fresh settings from API
       const data = await pageAccessApi.getSettings();
       setPageAccessByRole(data.pageAccessByRole);
       setAvailablePages(data.availablePages);
       
-      console.log('🔄 [PageAccess] Reloaded fresh settings from db.json');
+      console.log('🔄 [PageAccess] Reloaded fresh settings from API');
     } catch (error) {
       console.error('Error clearing cache and reloading:', error);
     } finally {
@@ -139,10 +186,61 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  /**
+   * Sync pages from frontend definitions to backend
+   * Only available for administrators
+   */
+  const syncPages = async (): Promise<void> => {
+    try {
+      if (currentRole !== 'Administrator') {
+        console.warn('🔒 [PageAccess] Only administrators can sync pages');
+        return;
+      }
+
+      console.log('🔄 [PageAccess] Syncing pages from definitions...');
+      const result = await pageAccessApi.syncPages(PAGE_DEFINITIONS);
+      
+      console.log(`✅ [PageAccess] Pages synced: ${result.message}`);
+      
+      // Refresh settings after sync to get updated pages
+      await refreshSettings();
+    } catch (error) {
+      console.error('❌ [PageAccess] Error syncing pages:', error);
+      // Don't throw - allow app to continue even if sync fails
+    }
+  };
+
+  const loadCustomerPageAssignments = useCallback(async (customerId: number | null) => {
+    const normalizedCustomerId = parseNumericId(customerId);
+
+    if (!normalizedCustomerId) {
+      setCustomerAssignedPageIds(new Set());
+      lastCustomerContextId.current = null;
+      return;
+    }
+
+    try {
+      const response = await customerPageAccessCache.get(normalizedCustomerId);
+      setCustomerAssignedPageIds(new Set(response.assignedPageIds));
+      lastCustomerContextId.current = normalizedCustomerId;
+      console.log('✅ [PageAccess] Customer page assignments loaded:', response.assignedPageIds.length, 'pages');
+    } catch (error) {
+      console.error('Error loading customer page assignments:', error);
+      setCustomerAssignedPageIds(new Set());
+      lastCustomerContextId.current = null;
+    }
+  }, []);
+
+  const syncCustomerAssignmentsForRole = useCallback(async (role: string | null) => {
+    const customerContextId = resolveCustomerContextId(role, user);
+    await loadCustomerPageAssignments(customerContextId);
+  }, [user, loadCustomerPageAssignments]);
+
   // Enhanced setCurrentRole that ensures page access data is loaded
   const setCurrentRoleWithData = async (role: string | null) => {
     if (!role) {
       setCurrentRole(null);
+      setCustomerAssignedPageIds(new Set());
       return;
     }
 
@@ -163,12 +261,18 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setAvailablePages(data.availablePages);
         
         console.log('✅ Page access data loaded for role:', role);
+        if (data.pageAccessByRole[role]) {
+          console.log('📋 [PageAccess] Pages available for', role + ':', data.pageAccessByRole[role].length);
+          console.log('📄 [PageAccess] Page IDs:', data.pageAccessByRole[role]);
+        }
       } catch (error) {
         console.error('Error loading page access data for role:', error);
       } finally {
         setIsLoading(false);
       }
     }
+
+    await syncCustomerAssignmentsForRole(role);
   };
 
   // Initialize role and fetch page access
@@ -184,34 +288,13 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (storedRole) {
           console.log('🔄 [PageAccess] Initializing currentRole from localStorage:', storedRole);
           
-          // Check if there are saved settings in localStorage first
-          const savedSettings = localStorage.getItem('db_pageAccess_settings');
-          let data;
-          
-          if (savedSettings) {
-            console.log('📖 [PageAccess] Using saved settings from localStorage');
-            const parsedSettings = JSON.parse(savedSettings);
-            
-            // Still need to get availablePages from the API
-            console.log('🔍 [PageAccess] Fetching availablePages from API...');
-            const apiData = await pageAccessApi.getSettings();
-            data = {
-              pageAccessByRole: parsedSettings.pageAccessByRole,
-              availablePages: apiData.availablePages
-            };
-            console.log('✅ [PageAccess] Combined data loaded:', {
-              roles: Object.keys(data.pageAccessByRole),
-              pages: data.availablePages.length
-            });
-          } else {
-            // Fetch page access data from API
-            console.log('🔍 [PageAccess] No saved settings, fetching from API...');
-            data = await pageAccessApi.getSettings();
-            console.log('✅ [PageAccess] API data loaded:', {
-              roles: Object.keys(data.pageAccessByRole),
-              pages: data.availablePages.length
-            });
-          }
+          // Fetch page access data from API
+          console.log('🔍 [PageAccess] Fetching page access settings from API...');
+          const data = await pageAccessApi.getSettings();
+          console.log('✅ [PageAccess] API data loaded:', {
+            roles: Object.keys(data.pageAccessByRole),
+            pages: data.availablePages.length
+          });
           
           const validRoles = Object.keys(data.pageAccessByRole);
           
@@ -232,6 +315,14 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setPageAccessByRole(data.pageAccessByRole);
           setAvailablePages(data.availablePages);
           setCurrentRole(validatedRole);
+          
+          await syncCustomerAssignmentsForRole(validatedRole);
+          
+          // Debug log to show what was loaded
+          if (validatedRole && data.pageAccessByRole[validatedRole]) {
+            console.log('📋 [PageAccess] Initial load - Pages for', validatedRole + ':', data.pageAccessByRole[validatedRole].length);
+            console.log('📄 [PageAccess] Page IDs:', data.pageAccessByRole[validatedRole].slice(0, 10), '...');
+          }
         }
       } catch (error) {
         console.error('Error initializing access:', error);
@@ -268,7 +359,13 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setPageAccessByRole(data.pageAccessByRole);
         setAvailablePages(data.availablePages);
         
+        await syncCustomerAssignmentsForRole(currentRole);
+        
         console.log('✅ Page access data reloaded for new role:', currentRole);
+        if (currentRole && data.pageAccessByRole[currentRole]) {
+          console.log('📋 [PageAccess] Reload - Pages for', currentRole + ':', data.pageAccessByRole[currentRole].length);
+          console.log('📄 [PageAccess] Page IDs:', data.pageAccessByRole[currentRole].slice(0, 10), '...');
+        }
       } catch (error) {
         console.error('Error reloading page access for role change:', error);
       } finally {
@@ -277,7 +374,41 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
 
     reloadPageAccessForRole();
-  }, [currentRole, hasInitialized]);
+  }, [currentRole, hasInitialized, syncCustomerAssignmentsForRole]);
+
+  // Optional: Auto-sync pages on startup for administrators (runs once)
+  // This ensures pages from sidebar.ts are always in sync with the database
+  // Use a ref to track if we've already attempted sync to prevent multiple runs
+  const hasAttemptedSyncRef = useRef(false);
+  const syncInProgressRef = useRef(false);
+  const lastPageCountRef = useRef<number>(0);
+  
+  // DISABLED: Frontend-to-backend page syncing
+  // 
+  // Enterprise Architecture Decision: Database-First Approach
+  // Pages are now managed entirely in the database and initialized on backend startup.
+  // This ensures:
+  // 1. Database is the single source of truth
+  // 2. Pages are always available without relying on frontend sync
+  // 3. No risk of sync failures breaking functionality
+  // 4. Better for enterprise deployments and CI/CD pipelines
+  //
+  // Pages are initialized via:
+  // - Backend startup initialization (Program.cs)
+  // - Database seeding (DataSeedingService)
+  // - Manual initialization endpoint (if needed)
+  //
+  // To add new pages, update the InitializeDefaultPageAccessAsync method in PageAccessService.cs
+  // and deploy the backend. Pages will be automatically initialized on next startup.
+  
+  // useEffect(() => {
+  //   // Auto-sync disabled - pages are now managed in database
+  // }, []);
+
+  useEffect(() => {
+    if (!currentRole || !hasInitialized) return;
+    syncCustomerAssignmentsForRole(currentRole);
+  }, [currentRole, hasInitialized, syncCustomerAssignmentsForRole]);
 
   // Update localStorage when role changes
   useEffect(() => {
@@ -298,7 +429,8 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         '/login',
         '/dashboard',
         '/',
-        '/profile'
+        '/profile',
+        '/test/barcode'
       ];
       
       if (skipPaths.includes(currentPath)) {
@@ -315,7 +447,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch (error) {
       console.error('Error in redirect effect:', error);
     }
-  }, [currentRole, pageAccessByRole, isLoading, hasInitialized, availablePages]);
+  }, [currentRole, pageAccessByRole, isLoading, hasInitialized, availablePages, customerAssignedPageIds.size]);
 
   return (
     <PageAccessContext.Provider value={{
@@ -327,7 +459,12 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       availablePages,
       isLoading,
       refreshSettings,
-      clearCacheAndReload
+      clearCacheAndReload,
+      syncPages,
+      isTestMode,
+      setIsTestMode,
+      testRole,
+      setTestRole
     }}>
       {children}
     </PageAccessContext.Provider>

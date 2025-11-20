@@ -6,9 +6,16 @@ export interface CreateUserRequest {
   email: string
   password?: string
   role: string
+  firstName: string
+  lastName: string
+  pageAccessRole?: string
   employeeId?: number
   phoneNumber?: string
   userCompany?: string
+  jobTitle?: string
+  signature?: string
+  signatureCode?: string
+  recordIsDeleted?: boolean
   assignedCustomerIds?: number[]
 }
 

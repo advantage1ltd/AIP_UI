@@ -97,13 +97,43 @@ export const siteService = {
     try {
       console.log('🔄 [SiteService] Fetching sites for customer:', customerId)
       
-      const response = await api.get<ApiResponse<Site[]>>(SITE_ENDPOINTS.BY_CUSTOMER(customerId.toString()))
+      const response = await api.get<ApiResponse<any[]>>(SITE_ENDPOINTS.BY_CUSTOMER(customerId.toString()))
       
       if (response.data.success) {
-        console.log('✅ [SiteService] Successfully fetched sites for customer:', response.data.data.length)
+        // Map backend response to frontend Site type
+        // Backend returns SiteID and LocationName (PascalCase), frontend expects siteID and locationName (camelCase)
+        const mappedSites: Site[] = response.data.data.map((site: any) => ({
+          siteID: site.SiteID || site.siteID || site.SiteId || site.siteId,
+          fkCustomerID: site.fkCustomerID || site.fkCustomerId,
+          fkRegionID: site.fkRegionID || site.fkRegionId,
+          coreSiteYN: site.CoreSiteYN ?? site.coreSiteYN ?? false,
+          locationName: site.LocationName || site.locationName || '',
+          locationType: site.LocationType || site.locationType,
+          sinNumber: site.SINNumber || site.sinNumber || site.SinNumber,
+          buildingName: site.BuildingName || site.buildingName,
+          numberandStreet: site.NumberandStreet || site.numberandStreet,
+          villageOrSuburb: site.VillageOrSuburb || site.villageOrSuburb,
+          town: site.Town || site.town,
+          county: site.County || site.county,
+          postcode: site.Postcode || site.postcode,
+          telephoneNumber: site.TelephoneNumber || site.telephoneNumber,
+          contractStartDate: site.ContractStartDate || site.contractStartDate,
+          contractEndDate: site.ContractEndDate || site.contractEndDate,
+          details: site.Details || site.details,
+          siteSurveyComplete: site.SiteSurveyComplete || site.siteSurveyComplete,
+          assignmentInstructionsIssued: site.AssignmentInstructionsIssued || site.assignmentInstructionsIssued,
+          riskAssessmentIssued: site.RiskAssessmentIssued || site.riskAssessmentIssued,
+          recordIsDeletedYN: site.RecordIsDeletedYN ?? site.recordIsDeletedYN ?? false,
+          dateCreated: site.DateCreated || site.dateCreated || new Date().toISOString(),
+          createdBy: site.CreatedBy || site.createdBy || '',
+          dateModified: site.DateModified || site.dateModified,
+          modifiedBy: site.ModifiedBy || site.modifiedBy
+        }))
+        
+        console.log('✅ [SiteService] Successfully fetched sites for customer:', mappedSites.length)
         return {
           success: true,
-          data: response.data.data
+          data: mappedSites
         }
       } else {
         console.error('❌ [SiteService] Failed to fetch sites for customer:', response.data.message)

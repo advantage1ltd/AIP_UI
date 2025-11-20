@@ -1,10 +1,11 @@
 import { http, HttpResponse, delay } from 'msw'
+import { BASE_API_URL } from '@/config/api'
 import { mockOfficers, mockCustomers, mockLocations, evaluationCriteria } from '@/components/mystery-shopper/mockData'
 import { v4 as uuidv4 } from 'uuid'
 import type { MysteryShopperEvaluation } from '@/types/mysteryShopper'
 
-// Base API URL
-const API_URL = '/api'
+// Base API URL (Keep the variable name for backwards compatibility)
+const API_URL = BASE_API_URL
 
 // Helper function to get customer ID from request headers
 const getCustomerId = (request: Request): number | null => {

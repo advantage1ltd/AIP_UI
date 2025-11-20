@@ -8,6 +8,7 @@ import { Toaster } from './components/ui/toaster';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { AuthProvider } from './contexts/AuthContext';
+import { CustomerSelectionProvider } from './contexts/CustomerSelectionContext';
 import { RouterProvider } from 'react-router-dom';
 import router from './routes';
 
@@ -74,7 +75,9 @@ const App = () => {
         <QueryClientProvider client={queryClient}>
           <ThemeProvider defaultTheme="system" storageKey="aip-theme">
             <AuthProvider>
-              <RouterProvider router={router} />
+              <CustomerSelectionProvider>
+                <RouterProvider router={router} />
+              </CustomerSelectionProvider>
             </AuthProvider>
             <Toaster />
             <ToastContainer />

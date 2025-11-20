@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { UserCog, Search, Check, X, Save, AlertCircle, Eye } from 'lucide-react'
@@ -93,16 +93,8 @@ const Settings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize admin access with all pages
-  useEffect(() => {
-    if (availablePages.length > 0 && (!pageAccessByRole.Administrator || pageAccessByRole.Administrator.length === 0)) {
-      const allPageIds = availablePages.map(page => page.id);
-      setPageAccessByRole({
-        ...pageAccessByRole,
-        Administrator: allPageIds
-      });
-    }
-  }, [availablePages, pageAccessByRole]);
+  // Ref to track the last synced settings to prevent infinite loops
+  const lastSyncedSettingsRef = useRef<string>('');
 
   // Query for fetching settings
   const { data: settings, isLoading: queryLoading, error: queryError } = useQuery({
@@ -110,46 +102,44 @@ const Settings = () => {
     queryFn: settingsService.getPageAccessSettings,
   });
 
-  // Effect to handle settings data and ensure admin access
+  // Effect to sync settings data to local state (only when settings change from API)
   useEffect(() => {
-    if (settings && availablePages.length > 0) {
-      const allPageIds = availablePages.map(page => page.id);
-      const adminPages = settings.pageAccessByRole.Administrator || [];
-      
-      // If admin doesn't have all pages, update their access
-      if (!allPageIds.every(id => adminPages.includes(id))) {
-        const updatedSettings = {
-          ...settings,
-          pageAccessByRole: {
-            ...settings.pageAccessByRole,
-            Administrator: allPageIds
-          }
-        };
-        setPageAccessByRole(updatedSettings.pageAccessByRole);
-        // Save the updated settings
-        saveSettings(updatedSettings);
-      } else {
-        setPageAccessByRole(settings.pageAccessByRole);
-      }
+    if (!settings) return;
+    
+    // Create a stable key from the settings to track if we've already synced this version
+    const settingsKey = JSON.stringify(settings.pageAccessByRole);
+    
+    // Only sync if this is a new settings object (different from last synced)
+    if (settingsKey !== lastSyncedSettingsRef.current) {
+      lastSyncedSettingsRef.current = settingsKey;
+      setPageAccessByRole(settings.pageAccessByRole);
     }
-  }, [settings, availablePages]);
+  }, [settings]); // Only depend on settings to prevent infinite loop
 
   // Effect to check if admin access has been modified
   useEffect(() => {
-    if (availablePages.length > 0 && pageAccessByRole.Administrator) {
-      const allPageIds = availablePages.map(page => page.id);
+    const pagesToUse = settings?.availablePages && settings.availablePages.length > 0 
+      ? settings.availablePages 
+      : availablePages;
+    
+    if (pagesToUse.length > 0 && pageAccessByRole.Administrator) {
+      const allPageIds = pagesToUse.map(page => page.id);
       setAdminAccessModified(
         !allPageIds.every(id => pageAccessByRole.Administrator.includes(id))
       );
     }
-  }, [pageAccessByRole, availablePages]);
+  }, [pageAccessByRole, settings, availablePages]);
 
   // Mutation for saving settings
   const { mutate: saveSettings, isPending: isSaving } = useMutation({
     mutationFn: settingsService.savePageAccessSettings,
-    onSuccess: async () => {
-      // Refresh the page access context to use the new saved settings
-      await refreshSettings();
+    onSuccess: async (data) => {
+      // Update the ref FIRST to mark this as synced to prevent infinite loop
+      const newSettingsKey = JSON.stringify(data.pageAccessByRole);
+      lastSyncedSettingsRef.current = newSettingsKey;
+      
+      // Update context state with the saved data (this updates the context immediately)
+      setPageAccessByRole(data.pageAccessByRole);
       
       toast({
         title: adminAccessModified ? "Warning: Admin Access Modified" : "Settings Saved",
@@ -158,6 +148,9 @@ const Settings = () => {
           : "Page access settings have been saved successfully.",
         variant: adminAccessModified ? "destructive" : "default",
       });
+      
+      // Invalidate and refetch the query - the ref prevents the useEffect from re-syncing
+      // since we've already marked this version as synced
       queryClient.invalidateQueries({ queryKey: ['pageAccess'] });
     },
     onError: () => {
@@ -171,7 +164,12 @@ const Settings = () => {
 
   // Mutation for resetting admin access
   const { mutate: resetAdmin, isPending: isResetting } = useMutation({
-    mutationFn: () => settingsService.resetAdminAccess(availablePages),
+    mutationFn: () => {
+      const pagesToUse = settings?.availablePages && settings.availablePages.length > 0 
+        ? settings.availablePages 
+        : availablePages;
+      return settingsService.resetAdminAccess(pagesToUse);
+    },
     onSuccess: async (data) => {
       setPageAccessByRole(data.pageAccessByRole);
       
@@ -213,8 +211,13 @@ const Settings = () => {
     );
   }
 
+  // Use pages from query result if available, otherwise fall back to context
+  const pagesToUse = settings?.availablePages && settings.availablePages.length > 0 
+    ? settings.availablePages 
+    : availablePages;
+
   // Filter pages based on search query
-  const filteredPages = availablePages?.filter(page => {
+  const filteredPages = pagesToUse?.filter(page => {
     const searchLower = searchQuery?.toLowerCase() || '';
     return (
       page?.title?.toLowerCase().includes(searchLower) ||
@@ -242,57 +245,35 @@ const Settings = () => {
     'recruitment': 'Recruitment'
   };
 
-  // Define subcategory display names
-  const subcategoryMap: Record<string, string> = {
-    'action-calendar': 'Action Calendar',
-    'user-setup': 'Administration',
-    'employee-registration': 'Administration',
-    'customer-setup': 'Administration',
-    'stock-control': 'Administration',
-    'uniform-equipment': 'Employee',
-    'disciplinary': 'Employee',
-    'diary': 'Employee',
-    'customer-reporting': 'Reports',
-    'manager-support': 'Management',
-    'incidents-report': 'Management',
-    'officer-performance': 'Management',
-    'incident-report': 'Operations',
-    'mystery-shopper': 'Operations',
-    'site-visit': 'Operations',
-    'holiday-requests': 'Operations',
-    'bank-holiday': 'Operations',
-    'customer-satisfaction': 'Operations',
-    'patrol-log': 'Operations',
-    'safe-duress-words': 'Operations',
-    'officer-support': 'Operations',
-    'officer-expenses': 'Operations',
-    'daily-activity-report': 'Customer',
-    'incident-graph': 'Customer',
-    'customer-incident-report': 'Customer',
-    'satisfaction-reports': 'Customer',
-    'be-safe-be-secure-graph': 'Customer',
-    'customer-officer-support': 'Customer',
-    'customer-reports': 'Reports',
-    'dashboard': 'Dashboard',
-    'settings': 'Settings',
-    'take-test': 'Recruitment',
-    'crm-dashboard': 'CRM',
-    'crm-deals': 'CRM',
-    'crm-leads': 'CRM',
-    'crm-pipeline': 'CRM',
-    'crm-tasks': 'CRM',
-    'recruitment-cbt': 'Recruitment',
-    'recruitment-vetting': 'Recruitment',
-    'compliance-asset-register': 'Compliance',
-    'compliance-contract-renewal': 'Compliance',
-    'compliance-password-register': 'Compliance'
+  // Dynamic categorization function - uses database category, falls back to path-based
+  const getPageSubcategory = (page: Page): string => {
+    // First, try to use the category from the database
+    if (page.category) {
+      return page.category;
+    }
+    
+    // Fallback: Extract category from path (e.g., /administration/user-setup -> Administration)
+    const pathParts = page.path.split('/').filter(Boolean);
+    if (pathParts.length > 0) {
+      const firstPart = pathParts[0];
+      // Capitalize first letter
+      return firstPart.charAt(0).toUpperCase() + firstPart.slice(1);
+    }
+    
+    // Final fallback: Use page ID to infer category
+    if (page.id.includes('crm-')) return 'CRM';
+    if (page.id.includes('customer-')) return 'Customer';
+    if (page.id.includes('recruitment-') || page.id === 'cbt' || page.id === 'vetting') return 'Recruitment';
+    if (page.id.includes('compliance-')) return 'Compliance';
+    
+    return 'Other';
   };
 
   const categoryOrder = ['dashboard', 'management', 'reports', 'customer', 'settings', 'recruitment'];
 
-  // Group pages by subcategory for better organization
+  // Group pages by subcategory for better organization (dynamic categorization)
   const pagesBySubcategory = filteredPages.reduce((acc, page) => {
-    const subcategory = subcategoryMap[page.id] || categoryDisplayNames[page.path.split('/')[1] || 'dashboard'];
+    const subcategory = getPageSubcategory(page);
     if (!acc[subcategory]) {
       acc[subcategory] = [];
     }
@@ -365,7 +346,11 @@ const Settings = () => {
 
   // Handle reset admin access
   const handleResetAdminAccess = () => {
-    const allPageIds = availablePages.map(page => page.id);
+    const pagesToUse = settings?.availablePages && settings.availablePages.length > 0 
+      ? settings.availablePages 
+      : availablePages;
+    
+    const allPageIds = pagesToUse.map(page => page.id);
     const updatedSettings = {
       ...pageAccessByRole,
       Administrator: allPageIds

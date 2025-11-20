@@ -1,5 +1,5 @@
-import React, { lazy } from 'react';
-import { createBrowserRouter, Outlet } from 'react-router-dom';
+import React, { lazy, useEffect } from 'react';
+import { createBrowserRouter, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Layout } from '@/components/layout/Layout';
 import LoginPage from '@/pages/LoginPage';
@@ -9,11 +9,38 @@ import CustomerDetailPage from '@/pages/customer/CustomerDetailPage';
 import ActionCalendar from '@/pages/ActionCalendar';
 import { UserRole } from '@/types/user';
 import { PageAccessProvider } from '@/contexts/PageAccessContext';
+import { CustomerSelectionUrlSync } from '@/components/customer/CustomerSelectionUrlSync';
+
+// Component to normalize paths and fix double slashes
+const PathNormalizer = () => {
+	const location = useLocation();
+	const navigate = useNavigate();
+
+	useEffect(() => {
+		const pathname = location.pathname;
+		// Check if pathname has double or more slashes anywhere
+		if (pathname.includes('//')) {
+			// Replace multiple consecutive slashes with a single slash
+			// This ensures we always have exactly one / at the start
+			const normalized = pathname.replace(/\/+/g, '/');
+			if (normalized !== pathname) {
+				console.warn('🔧 [PathNormalizer] Fixing double slash in path:', pathname, '->', normalized);
+				// Use replace: true to avoid adding to history and prevent navigation loops
+				const newPath = normalized + (location.search || '') + (location.hash || '');
+				navigate(newPath, { replace: true });
+				return; // Exit early to prevent further processing
+			}
+		}
+	}, [location.pathname, location.search, location.hash, navigate]);
+
+	return null;
+};
 
 // Import all the necessary pages
 import UserSetup from '@/pages/administration/UserSetup';
 import EmployeeRegistration from '@/pages/administration/EmployeeRegistration';
 import CustomerSetup from '@/pages/administration/CustomerSetup';
+import CustomerPageSettings from '@/pages/administration/CustomerPageSettings';
 import StockControl from '@/pages/administration/StockControl';
 import IncidentReportPage from '@/pages/operations/IncidentReportPage';
 import MysteryShopperPage from '@/pages/operations/MysteryShopperPage';
@@ -21,7 +48,6 @@ import SiteVisitPage from '@/pages/operations/SiteVisitPage';
 import HolidayRequestPage from '@/pages/operations/HolidayRequestPage';
 import BankHolidayPage from '@/pages/operations/BankHolidayPage';
 import CustomerSatisfactionPage from '@/pages/operations/CustomerSatisfactionPage';
-import PatrolLogPage from '@/pages/operations/PatrolLogPage';
 import SafeDuressWordsPage from '@/pages/operations/SafeDuressWordsPage';
 import OfficerSupportPage from '@/pages/operations/OfficerSupportPage';
 import OfficerExpensesPage from '@/pages/operations/OfficerExpensesPage';
@@ -62,14 +88,18 @@ const CustomerMysteryShopperReport = lazy(() => import('./pages/customer/Custome
 const CustomerSiteVisitReport = lazy(() => import('./pages/customer/CustomerSiteVisitReport'));
 const CustomerDailyOccurrenceBook = lazy(() => import('./pages/customer/CustomerDailyOccurrenceBook'));
 const CustomerOfficerSupportPage = lazy(() => import('./pages/customer/CustomerOfficerSupportPage'));
+const CustomerCrimeIntelligencePage = lazy(() => import('./pages/customer/CustomerCrimeIntelligence'));
 
 const CustomerViewsConfig = lazy(() => import('./pages/customer/CustomerViewsConfig'));
+import BarcodeTestPage from './pages/test/BarcodeTestPage';
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: (
       <PageAccessProvider>
+        <PathNormalizer />
+        <CustomerSelectionUrlSync />
         <Outlet />
       </PageAccessProvider>
     ),
@@ -77,6 +107,10 @@ const router = createBrowserRouter([
       {
         path: 'login',
         element: <LoginPage />,
+      },
+      {
+        path: 'test/barcode',
+        element: <BarcodeTestPage />,
       },
       {
         path: '/',
@@ -148,6 +182,14 @@ const router = createBrowserRouter([
             ),
           },
           {
+            path: 'administration/customer-page-settings',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator'] as UserRole[]}>
+                <CustomerPageSettings />
+              </ProtectedRoute>
+            ),
+          },
+          {
             path: 'administration/stock-control',
             element: (
               <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
@@ -201,14 +243,6 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneHOOfficer'] as UserRole[]}>
                 <CustomerSatisfactionPage />
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: 'operations/patrol-log',
-            element: (
-              <ProtectedRoute>
-                <PatrolLogPage />
               </ProtectedRoute>
             ),
           },
@@ -332,6 +366,14 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
                 <CustomerIncidentReportPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customer/crime-intelligence',
+            element: (
+              <ProtectedRoute allowedRoles={['Administrator', 'AdvantageOneOfficer', 'CustomerHOManager', 'CustomerSiteManager'] as UserRole[]}>
+                <CustomerCrimeIntelligencePage />
               </ProtectedRoute>
             ),
           },

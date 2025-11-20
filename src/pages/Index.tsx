@@ -490,11 +490,35 @@ const TestComponents = () => {
 
 const Index = () => {
   const location = useLocation();
-  const { currentRole, isTestMode, testRole } = usePageAccess();
+  const { currentRole, isTestMode, testRole, isLoading } = usePageAccess();
   const effectiveRole = isTestMode && testRole ? testRole : currentRole;
+
+  // Debug log to help troubleshoot
+  React.useEffect(() => {
+    console.log('🏠 [Index] Component state:', {
+      currentRole,
+      isTestMode,
+      testRole,
+      effectiveRole,
+      isLoading
+    });
+  }, [currentRole, isTestMode, testRole, effectiveRole, isLoading]);
+
+  // Show loading state while page access data is being loaded
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="space-y-4 text-center">
+          <div className="text-lg font-medium">Loading Dashboard...</div>
+          <div className="text-sm text-gray-500">Please wait</div>
+        </div>
+      </div>
+    );
+  }
 
   // Show appropriate dashboard based on role
   if (effectiveRole === 'Administrator' || effectiveRole === 'AdvantageOneHOOfficer') {
+    console.log('🏠 [Index] Rendering AdminDashboard for role:', effectiveRole);
     return (
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-screen">
@@ -508,6 +532,7 @@ const Index = () => {
       </Suspense>
     )
   } else if (effectiveRole === 'AdvantageOneOfficer') {
+    console.log('🏠 [Index] Rendering OfficerDashboard for role:', effectiveRole);
     return (
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-screen">
@@ -521,6 +546,7 @@ const Index = () => {
       </Suspense>
     )
   } else if (effectiveRole === 'CustomerSiteManager' || effectiveRole === 'CustomerHOManager') {
+    console.log('🏠 [Index] Rendering CustomerDashboard for role:', effectiveRole);
     return (
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-screen">
@@ -536,11 +562,13 @@ const Index = () => {
   }
 
   // Fallback to loading state if no role matched
+  console.warn('🏠 [Index] No matching role found, showing fallback. Role:', effectiveRole);
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="space-y-4 text-center">
         <div className="text-lg font-medium">Loading...</div>
-        <div className="text-sm text-gray-500">Please wait</div>
+        <div className="text-sm text-gray-500">Please wait while we set up your dashboard</div>
+        <div className="text-xs text-gray-400 mt-2">Current role: {effectiveRole || 'Not set'}</div>
       </div>
     </div>
   );
