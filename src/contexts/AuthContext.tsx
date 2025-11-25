@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AuthResponse } from '@/types/user';
 import { BASE_API_URL } from '@/config/api';
 import { authService } from '@/services/authService';
+import { extractCustomerId } from '@/utils/customerId';
 
 interface AuthContextType {
   user: User | null;
@@ -18,29 +19,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Listen for user assignment updates
+  useEffect(() => {
+    const handleUserAssignmentsUpdate = (event: CustomEvent) => {
+      const updatedUser = event.detail;
+      if (updatedUser && updatedUser.id === user?.id) {
+        console.log('🔄 [AuthContext] Updating user assignments from event');
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        authService.setCurrentUser(updatedUser);
+      }
+    };
+
+    window.addEventListener('user-assignments-updated', handleUserAssignmentsUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('user-assignments-updated', handleUserAssignmentsUpdate as EventListener);
+    };
+  }, [user]);
+
   useEffect(() => {
     // Check for existing session
     const token = localStorage.getItem('authToken');
     const storedUser = localStorage.getItem('user');
     
-    if (token && storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        
-        // NEW: Update unified auth service with existing session
-        authService.setCurrentUser(userData);
-        
-        setUser(userData);
-        // Ensure role is set in localStorage
-        if (userData.role) {
-          localStorage.setItem('userRole', userData.role);
+    const restoreSession = async () => {
+      if (token && storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          
+          // Ensure customerId is set for customer roles (backward compatibility)
+          const userRoleRaw = userData.role || userData.Role;
+          const userRole = (userRoleRaw?.toLowerCase() || '') as UserRole;
+          const isAdvantageOneRole = ['advantageoneofficer', 'advantageonehoofficer', 'administrator'].includes(userRole);
+          
+          if (!isAdvantageOneRole) {
+            // Normalize CustomerId from API response (PascalCase) to customerId (camelCase)
+            // The data in localStorage came from the API, so trust it
+            const apiCustomerId = (userData as any).CustomerId ?? userData.customerId;
+            if (apiCustomerId !== null && apiCustomerId !== undefined && apiCustomerId !== 0) {
+              (userData as any).customerId = apiCustomerId;
+              // Preserve both formats for compatibility
+              (userData as any).CustomerId = apiCustomerId;
+              console.log('🔧 [AuthContext] Normalized CustomerId from API during session restore:', apiCustomerId);
+              // Update localStorage with normalized data
+              localStorage.setItem('user', JSON.stringify(userData));
+            } else {
+              console.warn('⚠️ [AuthContext] No CustomerId found in stored user data. User may need to log in again.', {
+                role: userRole,
+                userId: userData.id || userData.Id,
+                userDataKeys: Object.keys(userData)
+              });
+            }
+          }
+          
+          // NEW: Update unified auth service with existing session
+          authService.setCurrentUser(userData);
+          
+          setUser(userData);
+          // Ensure role is set in localStorage
+          if (userData.role) {
+            localStorage.setItem('userRole', userData.role);
+          }
+        } catch (err) {
+          console.error('Failed to parse stored user:', err);
         }
-      } catch (err) {
-        console.error('Failed to parse stored user:', err);
       }
-    }
-    
-    setIsLoading(false);
+      
+      setIsLoading(false);
+    };
+
+    restoreSession();
   }, []);
 
   const login = async (username: string, password: string) => {
@@ -76,44 +125,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.success && data.data) {
         // The backend returns a nested structure where data.data contains the actual response
         const loginData = data.data;
-        const accessToken = loginData.accessToken;
+        // Support both 'accessToken' and 'token' for backward compatibility
+        const accessToken = loginData.accessToken || loginData.token;
         const userData = loginData.user;
         
+        console.log('🔍 [AuthContext] Full loginData structure:', loginData);
         console.log('🔍 [AuthContext] User data:', userData);
+        console.log('🔍 [AuthContext] User data customerId (direct):', (userData as any)?.customerId);
+        console.log('🔍 [AuthContext] User data CustomerId (PascalCase):', (userData as any)?.CustomerId);
         
         if (!userData) {
           throw new Error('User data is missing from response');
         }
         
-        // Type-safe user assignment based on role
-        const userRole = userData.Role || userData.role || userData.Roles?.[0] || 'CustomerSiteManager';
-        const isAdvantageOneRole = ['AdvantageOneOfficer', 'AdvantageOneHOOfficer', 'Administrator'].includes(userRole);
+        if (!accessToken) {
+          throw new Error('Access token is missing from response');
+        }
         
-        console.log('🔍 [AuthContext] Extracted role:', userRole);
+        // Type-safe user assignment based on role
+        const userRoleRaw = userData.Role || userData.role || userData.Roles?.[0] || 'customersitemanager';
+        const userRole = (userRoleRaw?.toLowerCase() || 'customersitemanager') as UserRole;
+        const isAdvantageOneRole = ['advantageoneofficer', 'advantageonehoofficer', 'administrator'].includes(userRole);
+        
+        console.log('🔍 [AuthContext] Extracted role (raw):', userRoleRaw);
+        console.log('🔍 [AuthContext] Extracted role (normalized):', userRole);
         console.log('🔍 [AuthContext] Is AdvantageOne role:', isAdvantageOneRole);
         
         localStorage.setItem('authToken', accessToken);
-        localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('userRole', userRole);
         
-        // Update unified auth service
-        authService.setCurrentUser(userData);
+        // Build the complete user object with all necessary fields BEFORE storing in localStorage
+        let completeUserData: User;
         
         if (isAdvantageOneRole) {
-          setUser({
+          completeUserData = {
             ...userData,
-            role: userRole as 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator',
+            role: userRole as 'advantageoneofficer' | 'advantageonehoofficer' | 'administrator',
             assignedCustomerIds: (userData as any).AssignedCustomerIds || (userData as any).assignedCustomerIds || []
-          });
+          };
         } else {
-          // For customer users, use customerId only
-          const customerId = (userData as any).CustomerId || (userData as any).customerId;
-          setUser({
+          // For customer users: API returns CustomerId (PascalCase) - normalize to customerId (camelCase)
+          // Trust the API response directly - it comes from the database
+          const apiCustomerId = (userData as any).CustomerId ?? (userData as any).customerId;
+          
+          if (!apiCustomerId || apiCustomerId === 0) {
+            console.error('❌ [AuthContext] API did not return CustomerId for customer user:', {
+              role: userRole,
+              userId: userData.id || userData.Id,
+              userDataKeys: Object.keys(userData),
+              rawUserData: userData
+            });
+            throw new Error('Customer ID is required for customer users but was not provided by the API');
+          }
+          
+          // Normalize: store as both customerId (camelCase) and CustomerId (PascalCase) for compatibility
+          completeUserData = {
             ...userData,
-            role: userRole as 'CustomerSiteManager' | 'CustomerHOManager',
-            customerId: customerId
-          });
+            role: userRole as 'customersitemanager' | 'customerhomanager',
+            customerId: apiCustomerId
+          };
+          (completeUserData as any).CustomerId = apiCustomerId;
+          
+          console.log('✅ [AuthContext] Customer user logged in with CustomerId from API:', apiCustomerId);
         }
+        
+        // Store the complete user object (with customerId and CustomerId) in localStorage
+        localStorage.setItem('user', JSON.stringify(completeUserData));
+        
+        // Update unified auth service with complete user data
+        authService.setCurrentUser(completeUserData);
+        
+        // Set user state
+        setUser(completeUserData);
       } else {
         throw new Error(data.message || 'Invalid response from server');
       }

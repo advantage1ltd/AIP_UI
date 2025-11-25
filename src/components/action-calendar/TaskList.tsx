@@ -1,35 +1,71 @@
-import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Task } from "@/pages/ActionCalendar"
-import { cn } from "@/lib/utils"
-import { Label } from "@/components/ui/label"
-import { Clock, AlertCircle, CheckCircle2, PauseCircle, User, Calendar, ArrowUpCircle, MinusCircle, ArrowDownCircle, Pencil, Trash2 } from "lucide-react"
-import { format, isToday } from "date-fns"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar as CalendarPicker } from "@/components/ui/calendar"
-import { useToast } from "@/hooks/use-toast"
+import { useEffect, useMemo, useState } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import { Task } from '@/pages/ActionCalendar'
+import { cn } from '@/lib/utils'
+import { Label } from '@/components/ui/label'
+import { Clock, AlertCircle, CheckCircle2, PauseCircle, User, Calendar, ArrowUpCircle, MinusCircle, ArrowDownCircle, Pencil, Trash2, Activity, Loader2 } from 'lucide-react'
+import { format, isToday } from 'date-fns'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar as CalendarPicker } from '@/components/ui/calendar'
+import { useToast } from '@/hooks/use-toast'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { employeeService } from '@/services/employeeService'
+import { Employee } from '@/types/employee'
 
 interface TaskListProps {
   tasks: Task[]
-  onUpdateStatus: (taskId: string, status: Task['status'], notes?: string) => void
+  onOpenProgress: (task: Task) => void
   onUpdateTask?: (taskId: string, updatedTask: Partial<Task>) => void
   onDeleteTask?: (taskId: string) => void
+  canManageTasks: boolean
+  canUpdateStatus: (task: Task) => boolean
 }
 
-export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: TaskListProps) {
+export function TaskList({ tasks, onOpenProgress, onUpdateTask, onDeleteTask, canManageTasks, canUpdateStatus }: TaskListProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [newStatus, setNewStatus] = useState<Task['status']>('pending')
-  const [statusNotes, setStatusNotes] = useState("")
-  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editedTask, setEditedTask] = useState<Partial<Task>>({})
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [loadingEmployees, setLoadingEmployees] = useState(false)
   const { toast } = useToast()
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        setLoadingEmployees(true)
+        const activeEmployees = await employeeService.getActiveEmployees()
+        setEmployees(activeEmployees)
+      } catch (error) {
+        console.error('Failed to load employees for action calendar editing:', error)
+        toast({
+          title: 'Unable to load employees',
+          description: 'We could not fetch employee assignments. Please retry or contact support.',
+          variant: 'destructive'
+        })
+      } finally {
+        setLoadingEmployees(false)
+      }
+    }
+
+    fetchEmployees()
+  }, [toast])
+
+  const assignableEmployees = useMemo(
+    () => employees.filter(employee => employee.userId),
+    [employees]
+  )
+  const hasAssignableEmployees = assignableEmployees.length > 0
+  const currentAssigneeMissing = Boolean(
+    editedTask.assignee && !employees.some(employee => employee.userId === editedTask.assignee)
+  )
+
+  const getEmployeeDisplayName = (employee: Employee) =>
+    `${employee.firstName} ${employee.surname}${employee.employeeNumber ? ` (${employee.employeeNumber})` : ''}`
 
   const getPriorityIcon = (priority: Task['priority']) => {
     switch (priority) {
@@ -83,15 +119,6 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
     }
   }
 
-  const handleStatusUpdate = () => {
-    if (selectedTask) {
-      onUpdateStatus(selectedTask.id, newStatus, statusNotes)
-      setIsUpdateDialogOpen(false)
-      setStatusNotes("")
-      setSelectedTask(null)
-    }
-  }
-
   const handleEditTask = (task: Task) => {
     setSelectedTask(task)
     setEditedTask({
@@ -127,13 +154,6 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
     }
   }
 
-  const openUpdateDialog = (task: Task) => {
-    setSelectedTask(task)
-    setNewStatus(task.status)
-    setStatusNotes(task.statusNotes || "")
-    setIsUpdateDialogOpen(true)
-  }
-
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-4 sm:p-8 text-center">
@@ -164,7 +184,7 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <User className="h-3 w-3 sm:h-4 sm:w-4" />
-                    {task.assignee}
+                    {task.assigneeName || task.assignee}
                   </div>
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -182,26 +202,28 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
                 )}
               </div>
               <div className="flex sm:flex-col gap-2 sm:gap-3 items-start sm:items-end mt-2 sm:mt-0">
-                <div className="flex gap-1 sm:gap-2 order-last sm:order-first">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleEditTask(task)}
-                    className="h-10 w-10 sm:h-12 sm:w-12 bg-blue-50 border-blue-200 hover:bg-blue-100 hover:text-blue-700"
-                  >
-                    <Pencil className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600" />
-                    <span className="sr-only">Edit task</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleDeleteTask(task.id)}
-                    className="h-10 w-10 sm:h-12 sm:w-12 bg-red-50 border-red-200 hover:bg-red-100 hover:text-red-700"
-                  >
-                    <Trash2 className="h-6 w-6 sm:h-7 sm:w-7 text-red-600" />
-                    <span className="sr-only">Delete task</span>
-                  </Button>
-                </div>
+                {canManageTasks && (
+                  <div className="flex gap-1 sm:gap-2 order-last sm:order-first">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleEditTask(task)}
+                      className="h-10 w-10 sm:h-12 sm:w-12 bg-blue-50 border-blue-200 hover:bg-blue-100 hover:text-blue-700"
+                    >
+                      <Pencil className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600" />
+                      <span className="sr-only">Edit task</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="h-10 w-10 sm:h-12 sm:w-12 bg-red-50 border-red-200 hover:bg-red-100 hover:text-red-700"
+                    >
+                      <Trash2 className="h-6 w-6 sm:h-7 sm:w-7 text-red-600" />
+                      <span className="sr-only">Delete task</span>
+                    </Button>
+                  </div>
+                )}
                 <div className="flex sm:flex-col gap-2 items-center sm:items-end">
                   <Badge className={cn(
                     "transition-colors flex items-center gap-1 text-xs sm:text-sm px-2 py-1",
@@ -214,12 +236,19 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
                     variant="outline"
                     className={cn(
                       "h-9 sm:h-10 px-3 sm:px-4 min-w-[100px] sm:min-w-[120px] text-xs sm:text-sm gap-1 sm:gap-2 transition-colors font-medium border",
-                      getStatusColor(task.status)
+                      getStatusColor(task.status),
+                      "capitalize"
                     )}
-                    onClick={() => openUpdateDialog(task)}
+                    onClick={() => onOpenProgress(task)}
+                    disabled={!canUpdateStatus(task)}
+                    aria-disabled={!canUpdateStatus(task)}
+                    aria-label={canUpdateStatus(task) ? "Report progress" : "You do not have permission to update this task"}
                   >
                     {getStatusIcon(task.status)}
-                    {task.status}
+                    <span className="flex items-center gap-1">
+                      {task.status}
+                      <Activity className="h-3 w-3 text-muted-foreground" />
+                    </span>
                   </Button>
                 </div>
               </div>
@@ -227,47 +256,6 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
           </CardContent>
         </Card>
       ))}
-
-      <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-[425px] p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle>Update Task Status</DialogTitle>
-            <DialogDescription>
-              Change the task status and add any relevant notes about the update.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2 sm:py-4">
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={newStatus} onValueChange={(value: Task['status']) => setNewStatus(value)}>
-                <SelectTrigger id="status" className="w-full">
-                  <SelectValue placeholder="Select Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="blocked">Blocked</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Status Notes</Label>
-              <Textarea
-                id="notes"
-                placeholder="Add notes about the status change"
-                value={statusNotes}
-                onChange={(e) => setStatusNotes(e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleStatusUpdate}>Update Status</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="w-[95vw] max-w-[500px] p-4 sm:p-6">
@@ -315,12 +303,66 @@ export function TaskList({ tasks, onUpdateStatus, onUpdateTask, onDeleteTask }: 
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-assignee">Assignee</Label>
-                <Input
-                  id="edit-assignee"
-                  value={editedTask.assignee || ""}
-                  onChange={(e) => setEditedTask({ ...editedTask, assignee: e.target.value })}
-                  className="w-full"
-                />
+                {!loadingEmployees && employees.length > 0 && !hasAssignableEmployees && (
+                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded p-2">
+                    Employees without user accounts cannot be assigned tasks. Create accounts under Administration → Users.
+                  </p>
+                )}
+                <Select
+                  value={editedTask.assignee || undefined}
+                  onValueChange={(value) => {
+                    if (value.startsWith('no-user-')) return
+                    setEditedTask({ ...editedTask, assignee: value })
+                  }}
+                  disabled={loadingEmployees || employees.length === 0}
+                >
+                  <SelectTrigger id="edit-assignee">
+                    {loadingEmployees ? (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading employees...
+                      </div>
+                    ) : (
+                      <SelectValue placeholder="Select assignee" />
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingEmployees ? (
+                      <SelectItem value="loading" disabled>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading employees...
+                        </div>
+                      </SelectItem>
+                    ) : employees.length === 0 ? (
+                      <SelectItem value="no-employees" disabled>
+                        No employees available
+                      </SelectItem>
+                    ) : (
+                      <>
+                        {employees.map((employee) => (
+                          <SelectItem
+                            key={employee.id}
+                            value={employee.userId ?? `no-user-${employee.id}`}
+                            disabled={!employee.userId}
+                            className={cn(
+                              'text-sm',
+                              !employee.userId && 'text-muted-foreground'
+                            )}
+                          >
+                            {getEmployeeDisplayName(employee)}
+                            {!employee.userId && ' — no user account'}
+                          </SelectItem>
+                        ))}
+                        {currentAssigneeMissing && editedTask.assignee && (
+                          <SelectItem value={editedTask.assignee} disabled className="text-xs italic text-muted-foreground">
+                            Current assignee (no longer active)
+                          </SelectItem>
+                        )}
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">

@@ -89,7 +89,11 @@ export default function LoginPage() {
       const roleToSet = user.role
       console.log('🔑 Setting role for page access:', roleToSet)
       console.log('🔍 Full user object from login:', user)
-      await setCurrentRole(roleToSet)
+      
+      // Set role (don't await - let it load in background)
+      setCurrentRole(roleToSet).catch(err => {
+        console.warn('⚠️ [LoginPage] Error setting role:', err);
+      })
 
       // All users now go to /dashboard
       const redirectPath = '/dashboard'
@@ -196,7 +200,7 @@ export default function LoginPage() {
                 <div>• Email: manager@customer.com</div>
                 <div>• Password: Test123!@#</div>
                 <div className="mt-2 text-xs text-orange-600">
-                  <strong>Note:</strong> These are the new backend credentials. The old MSW credentials are no longer valid.
+                  <strong>Note:</strong> These are the backend API credentials.
                 </div>
               </div>
             </div>

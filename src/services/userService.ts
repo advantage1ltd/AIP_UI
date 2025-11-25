@@ -11,7 +11,7 @@ export interface CreateUserRequest {
   pageAccessRole?: string
   employeeId?: number
   phoneNumber?: string
-  userCompany?: string
+  customerId?: number // For Customer users - direct foreign key to Customer table
   jobTitle?: string
   signature?: string
   signatureCode?: string
@@ -31,7 +31,8 @@ export interface BackendUserResponse {
   signature?: string
   signatureCode?: string
   jobTitle?: string
-  userCompany?: string
+  customerId?: number
+  customerName?: string // Company name for customer users
   recordIsDeleted: boolean
   isActive: boolean
   createdAt: string
@@ -79,6 +80,7 @@ class UserService {
   async createUser(userData: CreateUserRequest): Promise<User> {
     try {
       console.log('🔄 [UserService] Creating user:', userData)
+      console.log('🔄 [UserService] CustomerId in request:', userData.customerId)
       const response = await api.post(`${this.baseUrl}/create`, userData)
       console.log('✅ [UserService] User created successfully:', response.data)
       
@@ -95,7 +97,8 @@ class UserService {
         signature: backendUser.signature,
         signatureCode: backendUser.signatureCode,
         jobTitle: backendUser.jobTitle,
-        userCompany: backendUser.userCompany as any,
+        customerId: backendUser.customerId,
+        customerName: backendUser.customerName,
         recordIsDeleted: backendUser.recordIsDeleted,
         createdAt: backendUser.createdAt,
         updatedAt: backendUser.updatedAt || backendUser.createdAt,
@@ -132,18 +135,32 @@ class UserService {
       console.log('✅ [UserService] Backend response users:', backendResponse.users)
       
       const transformedUsers = backendResponse.users.map(user => {
+        // Backend returns roles in lowercase, use directly
+        const normalizedRole = (user.role?.toLowerCase() || '') as UserRole;
+        const isCustomerRole = normalizedRole === 'customersitemanager' || normalizedRole === 'customerhomanager';
+        const normalizedPageAccessRole = (user.pageAccessRole?.toLowerCase() || normalizedRole) as UserRole;
+        
+        console.log('🔄 [UserService] getUsers - Transforming user:', {
+          username: user.username,
+          backendRole: user.role,
+          normalizedRole,
+          isCustomerRole,
+          customerId: user.customerId,
+          customerName: user.customerName
+        });
+        
         const baseUser = {
           id: user.id,
           username: user.username,
           firstName: user.firstName,
           lastName: user.lastName,
           email: user.email,
-          role: user.role as UserRole,
-          pageAccessRole: user.pageAccessRole as UserRole,
+          role: normalizedRole,
+          pageAccessRole: normalizedPageAccessRole,
           signature: user.signature,
           signatureCode: user.signatureCode,
           jobTitle: user.jobTitle,
-          userCompany: user.userCompany as any,
+          customerId: user.customerId,
           recordIsDeleted: user.recordIsDeleted,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt || user.createdAt,
@@ -155,16 +172,23 @@ class UserService {
         };
 
         // Handle union type based on role
-        if (user.role === 'CustomerSiteManager' || user.role === 'CustomerHOManager') {
-          return {
+        if (isCustomerRole) {
+          const customerUser = {
             ...baseUser,
-            role: user.role as 'CustomerSiteManager' | 'CustomerHOManager',
-            customerId: 0 // Default value, should be set properly
+            role: normalizedRole as 'customersitemanager' | 'customerhomanager',
+            customerId: user.customerId ?? undefined, // Use actual customerId from backend
+            customerName: user.customerName
           } as CustomerUser;
+          console.log('✅ [UserService] Created CustomerUser:', {
+            id: customerUser.id,
+            customerId: customerUser.customerId,
+            customerName: customerUser.customerName
+          });
+          return customerUser;
         } else {
           return {
             ...baseUser,
-            role: user.role as 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator',
+            role: normalizedRole as 'advantageoneofficer' | 'advantageonehoofficer' | 'administrator',
             assignedCustomerIds: this.parseAssignedCustomerIds(user.assignedCustomerIds),
             assignedCustomerNames: user.assignedCustomerNames || []
           } as AdvantageOneUser;
@@ -199,24 +223,37 @@ class UserService {
       
       // Transform backend response to frontend format
       const backendUser = response.data as BackendUserResponse
+      
+      // Backend returns roles in lowercase, use directly
+      const normalizedRole = (backendUser.role?.toLowerCase() || '') as UserRole;
+      const normalizedPageAccessRole = (backendUser.pageAccessRole?.toLowerCase() || normalizedRole) as UserRole;
+      
+      console.log('🔄 [UserService] getUserById - Role normalization:', {
+        backendRole: backendUser.role,
+        normalizedRole,
+        customerId: backendUser.customerId,
+        customerName: backendUser.customerName
+      });
+      
       return {
         id: backendUser.id,
         username: backendUser.username,
         firstName: backendUser.firstName,
         lastName: backendUser.lastName,
         email: backendUser.email,
-        role: backendUser.role as UserRole,
-        pageAccessRole: backendUser.pageAccessRole as UserRole,
+        role: normalizedRole,
+        pageAccessRole: normalizedPageAccessRole,
         signature: backendUser.signature,
         signatureCode: backendUser.signatureCode,
         jobTitle: backendUser.jobTitle,
-        userCompany: backendUser.userCompany as any,
+        customerId: backendUser.customerId,
+        customerName: backendUser.customerName,
         recordIsDeleted: backendUser.recordIsDeleted,
         createdAt: backendUser.createdAt,
         updatedAt: backendUser.updatedAt || backendUser.createdAt,
         employeeId: backendUser.employeeId,
         employeeName: backendUser.employeeName,
-        assignedCustomerIds: backendUser.assignedCustomerIds || [],
+        assignedCustomerIds: this.parseAssignedCustomerIds(backendUser.assignedCustomerIds),
         assignedCustomerNames: backendUser.assignedCustomerNames || [],
         phoneNumber: backendUser.phoneNumber,
         emailConfirmed: backendUser.emailConfirmed,
@@ -233,31 +270,80 @@ class UserService {
    */
   async updateUser(userData: { id: string } & Partial<CreateUserRequest>): Promise<User> {
     try {
+      console.log('🔄 [UserService] updateUser called with:', {
+        id: userData.id,
+        hasCustomerId: 'customerId' in userData,
+        customerId: userData.customerId,
+        customerIdType: typeof userData.customerId,
+        role: userData.role,
+        hasAssignedCustomerIds: 'assignedCustomerIds' in userData
+      })
+      
       const { id, ...updateData } = userData
       
       // Ensure assignedCustomerIds is included in the update data
       if ('assignedCustomerIds' in userData) {
         (updateData as any).assignedCustomerIds = userData.assignedCustomerIds
+        console.log('🔄 [UserService] Added assignedCustomerIds:', (updateData as any).assignedCustomerIds)
       }
       
-      console.log('🔄 [UserService] Updating user:', { id, updateData })
+      // Always include customerId in update data (even if null/undefined)
+      // This ensures the backend can properly handle customerId updates
+      if ('customerId' in userData) {
+        // Send null explicitly if customerId is undefined, to allow backend to process it
+        (updateData as any).customerId = userData.customerId ?? null
+        console.log('🔄 [UserService] Processed customerId:', {
+          original: userData.customerId,
+          processed: (updateData as any).customerId,
+          type: typeof (updateData as any).customerId,
+          isNull: (updateData as any).customerId === null,
+          isUndefined: (updateData as any).customerId === undefined
+        })
+      } else {
+        console.log('⚠️ [UserService] customerId not in userData, not including in update')
+      }
+      
+      console.log('🔄 [UserService] Final updateData being sent:', JSON.stringify(updateData, null, 2))
+      console.log('🔄 [UserService] Making PUT request to:', `${this.baseUrl}/${id}`)
+      
       const response = await api.put(`${this.baseUrl}/${id}`, updateData)
-      console.log('✅ [UserService] User updated successfully:', response.data)
+      
+      console.log('✅ [UserService] API response received:', {
+        status: response.status,
+        hasData: !!response.data,
+        customerId: response.data?.customerId,
+        customerName: response.data?.customerName,
+        role: response.data?.role,
+        fullResponse: response.data
+      })
       
       // Transform backend response to frontend format
       const backendUser = response.data as BackendUserResponse
+      
+      // Backend returns roles in lowercase, use directly
+      const normalizedRole = (backendUser.role?.toLowerCase() || '') as UserRole;
+      const normalizedPageAccessRole = (backendUser.pageAccessRole?.toLowerCase() || normalizedRole) as UserRole;
+      
+      console.log('🔄 [UserService] updateUser - Role normalization:', {
+        backendRole: backendUser.role,
+        normalizedRole,
+        customerId: backendUser.customerId,
+        customerName: backendUser.customerName
+      });
+      
       return {
         id: backendUser.id,
         username: backendUser.username,
         firstName: backendUser.firstName,
         lastName: backendUser.lastName,
         email: backendUser.email,
-        role: backendUser.role as UserRole,
-        pageAccessRole: backendUser.pageAccessRole as UserRole,
+        role: normalizedRole,
+        pageAccessRole: normalizedPageAccessRole,
         signature: backendUser.signature,
         signatureCode: backendUser.signatureCode,
         jobTitle: backendUser.jobTitle,
-        userCompany: backendUser.userCompany as any,
+        customerId: backendUser.customerId,
+        customerName: backendUser.customerName,
         recordIsDeleted: backendUser.recordIsDeleted,
         createdAt: backendUser.createdAt,
         updatedAt: backendUser.updatedAt || backendUser.createdAt,

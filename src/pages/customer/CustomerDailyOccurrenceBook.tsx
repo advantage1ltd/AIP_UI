@@ -199,7 +199,7 @@ export default function CustomerDailyOccurrenceBook() {
         console.log('CustomerDailyOccurrenceBook: Found customer:', customerData)
 
         // Verify access
-        if (user && user.role === 'AdvantageOneOfficer' && 'assignedCustomerIds' in user && (user as any).assignedCustomerIds && !(user as any).assignedCustomerIds.includes(targetCustomerId)) {
+        if (user && user.role === 'advantageoneofficer' && 'assignedCustomerIds' in user && (user as any).assignedCustomerIds && !(user as any).assignedCustomerIds.includes(targetCustomerId)) {
           setError('Access denied: You are not assigned to this customer')
           setLoading(false)
           return

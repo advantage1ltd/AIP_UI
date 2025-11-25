@@ -2,9 +2,8 @@ const express = require('express');
 const router = express.Router();
 
 // NOTE: This file is not currently used in the application.
-// The application uses MSW (Mock Service Worker) for API mocking.
-// See src/mocks/userHandlers.ts for the actual authentication logic.
-// This file is kept for potential future backend integration.
+// The application uses the real .NET backend API for authentication.
+// This file is kept for reference only.
 
 // This is a temporary solution. In production, you should:
 // 1. Use a real database (or load from db.json dynamically)
@@ -13,7 +12,7 @@ const router = express.Router();
 // 4. Implement rate limiting
 const users = [
   // This hardcoded array should be replaced with dynamic database loading
-  // when this API is actually used. Currently MSW handles all authentication.
+  // when this API is actually used.
   {
     id: '1',
     username: 'admin',

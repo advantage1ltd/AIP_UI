@@ -39,7 +39,6 @@ export interface SidebarGuardContext {
 	isCustomerRole: boolean
 	isAdministrator: boolean
 	isOfficerRole: boolean
-	hasOfficerCustomerReportingAccess?: () => boolean
 }
 
 type GuardFn = (context: SidebarGuardContext) => boolean
@@ -71,10 +70,7 @@ export const SIDEBAR_TOP_LINKS: SidebarNavLink[] = [
 		path: '/management/customer-reporting',
 		label: 'Customer Reporting',
 		icon: BarChart3,
-		guard: (context) =>
-			context.hasAccess('/management/customer-reporting') ||
-			(context.isOfficerRole && context.hasOfficerCustomerReportingAccess?.() === true),
-		bypassAccessCheck: true,
+		guard: (context) => context.hasAccess('/management/customer-reporting'),
 	},
 ]
 
@@ -83,7 +79,9 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 		id: 'administration',
 		label: 'Administration',
 		icon: UserCog,
-		guard: ({ isCustomerRole }) => !isCustomerRole,
+		// Remove section-level guard - let individual links be controlled by page access settings
+		// This allows CustomerHOManager to see User Setup if granted in settings
+		guard: undefined,
 		links: [
 			{
 				path: '/administration/user-setup',
@@ -234,11 +232,6 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 				icon: Building,
 			},
 			{
-				path: '/management/incidents-report',
-				label: 'Incidents Report',
-				icon: FileWarning,
-			},
-			{
 				path: '/management/officer-performance',
 				label: 'Officer Performance',
 				icon: UserCheck,
@@ -294,6 +287,19 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 		label: 'Customer',
 		icon: Building,
 		showCustomerSelector: true,
+		// Hide customer section from officers in sidebar (but they can still access pages via direct navigation)
+		guard: (context) => {
+			// Administrators and customer roles can see it
+			if (context.isAdministrator || context.isCustomerRole) {
+				return true;
+			}
+			// Hide from officers in sidebar (access is still granted via PageAccessContext fallback)
+			if (context.isOfficerRole) {
+				return false;
+			}
+			// For other roles, check access normally
+			return true;
+		},
 		links: [
 			{
 				path: '/customer/daily-activity-report',
@@ -301,14 +307,14 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 				icon: FileText,
 			},
 			{
-				path: '/customer/incident-graph',
-				label: 'Incident Graph',
+				path: '/customer/be-safe-be-secure',
+				label: 'Daily Activity Report Graph',
 				icon: BarChart2,
 			},
 			{
-				path: '/customer/crime-intelligence',
-				label: 'Crime Intelligence',
-				icon: TrendingUp,
+				path: '/customer/incident-graph',
+				label: 'Incident Graph',
+				icon: BarChart2,
 			},
 			{
 				path: '/customer/incident-report',
@@ -316,24 +322,19 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 				icon: FileWarning,
 			},
 			{
+				path: '/customer/crime-intelligence',
+				label: 'Crime Intelligence',
+				icon: TrendingUp,
+			},
+			{
 				path: '/customer/satisfaction-report',
 				label: 'Satisfaction Reports',
 				icon: FileText,
 			},
 			{
-				path: '/customer/be-safe-be-secure',
-				label: 'Daily Activity Graphs',
-				icon: ShieldCheck,
-			},
-			{
 				path: '/customer/officer-support',
 				label: 'Officer Support',
 				icon: HelpCircle,
-			},
-			{
-				path: '/customer/daily-occurrence-book',
-				label: 'Daily Occurrence Book',
-				icon: FileText,
 			},
 		],
 	},

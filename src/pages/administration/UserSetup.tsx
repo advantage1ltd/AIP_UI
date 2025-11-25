@@ -70,18 +70,29 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination'
 import { userService } from '@/services/userService'
+import { useAvailableCustomers, findCustomerById } from '@/hooks/useAvailableCustomers'
 
 const UserSetup = () => {
   const dispatch = useAppDispatch()
   const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState<'all' | 'name' | 'email' | 'company'>('all')
+  const [filterType, setFilterType] = useState<'all' | 'name' | 'email' | 'customer'>('all')
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | undefined>()
   const [showUserDialog, setShowUserDialog] = useState(false)
   const [viewUser, setViewUser] = useState<User | undefined>()
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize] = useState(10)
+  const { availableCustomers } = useAvailableCustomers()
+  
+  // Create a mapping of customerId to customer name for quick lookup
+  const customerNameMap = useMemo(() => {
+    const map = new Map<number, string>()
+    availableCustomers.forEach(customer => {
+      map.set(customer.id, customer.name)
+    })
+    return map
+  }, [availableCustomers])
 
   // Check authentication on component mount
   useEffect(() => {
@@ -152,11 +163,36 @@ const UserSetup = () => {
   }
 
   const handleUpdateUser = async (data: UpdateUserInput) => {
-    console.log('🔄 [UserSetup] Updating user started', { data })
+    console.log('🔄 [UserSetup] handleUpdateUser called with:', {
+      id: data.id,
+      customerId: (data as any).customerId,
+      customerIdType: typeof (data as any).customerId,
+      role: (data as any).role,
+      fullData: data
+    })
     
     try {
+      console.log('🔄 [UserSetup] Dispatching updateUserAsync...')
       const result = await dispatch(updateUserAsync(data)).unwrap()
-      console.log('✅ [UserSetup] User updated successfully', { result })
+      console.log('✅ [UserSetup] updateUserAsync completed:', {
+        id: result.id,
+        customerId: result.customerId,
+        customerName: (result as any).customerName,
+        role: result.role,
+        fullResult: result
+      })
+      
+      // Refetch users to ensure we have the latest data including customerName
+      console.log('🔄 [UserSetup] Refetching users list...')
+      const refetchResult = await dispatch(fetchUsers({
+        page: currentPage,
+        pageSize,
+        searchTerm: searchQuery || undefined
+      })).unwrap()
+      console.log('✅ [UserSetup] Users list refetched:', {
+        count: refetchResult.length,
+        updatedUser: refetchResult.find((u: any) => u.id === data.id)
+      })
       
       setShowUserDialog(false)
       setSelectedUser(undefined)
@@ -165,7 +201,12 @@ const UserSetup = () => {
         description: 'User has been updated successfully.',
       })
     } catch (error) {
-      console.error('❌ [UserSetup] User update failed:', error)
+      console.error('❌ [UserSetup] User update failed:', {
+        error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        dataThatFailed: data
+      })
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to update user',
@@ -222,7 +263,7 @@ const UserSetup = () => {
         signature: (detail as any).signature ?? (detail as any).Signature,
         signatureCode: (detail as any).signatureCode ?? (detail as any).SignatureCode,
         jobTitle: (detail as any).jobTitle ?? (detail as any).JobTitle,
-        userCompany: (detail as any).userCompany ?? (detail as any).UserCompany,
+        customerId: (detail as any).customerId ?? (detail as any).CustomerId,
         recordIsDeleted: (detail as any).recordIsDeleted ?? (detail as any).RecordIsDeleted ?? false,
         createdAt: (detail as any).createdAt ?? (detail as any).CreatedAt ?? new Date().toISOString(),
         updatedAt: (detail as any).updatedAt ?? (detail as any).UpdatedAt ?? new Date().toISOString(),
@@ -231,12 +272,22 @@ const UserSetup = () => {
       }
 
       let normalized: User
-      if (role === 'CustomerSiteManager' || role === 'CustomerHOManager') {
-        const customerId = Number((detail as any).customerId ?? (detail as any).CustomerId)
-        normalized = { ...(base as any), role, customerId } as User
+      const normalizedRole = role?.toLowerCase() as UserRole
+      if (normalizedRole === 'customersitemanager' || normalizedRole === 'customerhomanager') {
+        // Properly handle customerId - preserve the value from backend
+        const rawCustomerId = (detail as any).customerId ?? (detail as any).CustomerId ?? base.customerId
+        const customerId = rawCustomerId != null && rawCustomerId !== undefined && rawCustomerId !== '' 
+          ? Number(rawCustomerId) 
+          : undefined
+        // Only set customerId if it's a valid positive number
+        normalized = { 
+          ...(base as any), 
+          role: normalizedRole, 
+          customerId: customerId != null && !isNaN(customerId) && customerId > 0 ? customerId : undefined
+        } as User
       } else {
         const assignedCustomerIds = ((detail as any).assignedCustomerIds ?? (detail as any).AssignedCustomerIds ?? []).map((id: any) => Number(id))
-        normalized = { ...(base as any), role, assignedCustomerIds } as User
+        normalized = { ...(base as any), role: normalizedRole, assignedCustomerIds } as User
       }
 
       setSelectedUser(normalized)
@@ -263,17 +314,29 @@ const UserSetup = () => {
 
   const handleCloseView = () => setViewUser(undefined)
 
+  // Helper to format role for display (PascalCase)
+  const formatRoleForDisplay = (role: UserRole): string => {
+    const roleMap: Record<UserRole, string> = {
+      'administrator': 'Administrator',
+      'advantageoneofficer': 'AdvantageOneOfficer',
+      'advantageonehoofficer': 'AdvantageOneHOOfficer',
+      'customersitemanager': 'CustomerSiteManager',
+      'customerhomanager': 'CustomerHOManager'
+    };
+    return roleMap[role] || role;
+  };
+
   const getStatusColor = (role: UserRole) => {
     switch (role) {
-      case 'Administrator':
+      case 'administrator':
         return 'bg-red-100 text-red-800'
-      case 'AdvantageOneHOOfficer':
+      case 'advantageonehoofficer':
         return 'bg-purple-100 text-purple-800'
-      case 'AdvantageOneOfficer':
+      case 'advantageoneofficer':
         return 'bg-green-100 text-green-800'
-      case 'CustomerSiteManager':
+      case 'customersitemanager':
         return 'bg-orange-100 text-orange-800'
-      case 'CustomerHOManager':
+      case 'customerhomanager':
         return 'bg-yellow-100 text-yellow-800'
       default:
         return 'bg-gray-100 text-gray-800'
@@ -282,14 +345,14 @@ const UserSetup = () => {
 
   const getStatusIcon = (role: UserRole) => {
     switch (role) {
-      case 'Administrator':
+      case 'administrator':
         return <Shield className="h-4 w-4 text-red-600" />
-      case 'AdvantageOneHOOfficer':
+      case 'advantageonehoofficer':
         return <UserCheck className="h-4 w-4 text-purple-600" />
-      case 'AdvantageOneOfficer':
+      case 'advantageoneofficer':
         return <Users className="h-4 w-4 text-green-600" />
-      case 'CustomerSiteManager':
-      case 'CustomerHOManager':
+      case 'customersitemanager':
+      case 'customerhomanager':
         return <Building2 className="h-4 w-4 text-orange-600" />
       default:
         return <UserX className="h-4 w-4 text-gray-600" />
@@ -298,17 +361,17 @@ const UserSetup = () => {
 
   // Stats (using all filtered users, not paginated)
   const totalFilteredUsers = displayUsers.length
-  const activeStatusList = [
-    'AdvantageOneOfficer',
-    'AdvantageOneHOOfficer',
-    'Administrator',
-    'CustomerSiteManager',
-    'CustomerHOManager'
+  const activeStatusList: UserRole[] = [
+    'advantageoneofficer',
+    'advantageonehoofficer',
+    'administrator',
+    'customersitemanager',
+    'customerhomanager'
   ]
   const activeUsers = displayUsers.filter(u => activeStatusList.includes(u.role)).length
-  const adminUsers = displayUsers.filter(u => u.role === 'Administrator').length
+  const adminUsers = displayUsers.filter(u => u.role === 'administrator').length
   const adminPercent = totalFilteredUsers > 0 ? ((adminUsers / totalFilteredUsers) * 100).toFixed(1) : '0.0'
-  const officerUsers = displayUsers.filter(u => u.role === 'AdvantageOneOfficer').length
+  const officerUsers = displayUsers.filter(u => u.role === 'advantageoneofficer').length
 
   return (
     <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-indigo-100/80 via-purple-50/80 to-pink-100/80">
@@ -343,7 +406,7 @@ const UserSetup = () => {
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="name">Name</SelectItem>
                   <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="company">Company</SelectItem>
+                  <SelectItem value="customer">Customer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -409,7 +472,7 @@ const UserSetup = () => {
                   <TableHead className="text-xs sm:text-sm">Name</TableHead>
                   <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Email</TableHead>
                   <TableHead className="text-xs sm:text-sm hidden md:table-cell">Job Title</TableHead>
-                  <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Company</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Customer</TableHead>
                   <TableHead className="text-xs sm:text-sm">Status</TableHead>
                   <TableHead className="text-xs sm:text-sm hidden md:table-cell">Officer Type</TableHead>
                   <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Assigned Customers</TableHead>
@@ -438,16 +501,18 @@ const UserSetup = () => {
                   </TableCell>
                     <TableCell className="text-xs sm:text-sm hidden lg:table-cell">
                       <div className="text-xs sm:text-sm text-gray-600">
-                      {user.userCompany || 'N/A'}
+                      {user.customerId 
+                        ? ((user as any).customerName || customerNameMap.get(user.customerId) || `Customer ID: ${user.customerId}`)
+                        : 'N/A'}
                     </div>
                   </TableCell>
                     <TableCell className="py-2 sm:py-3">
                       <Badge className={`${getStatusColor(user.role)} flex items-center gap-1 sm:gap-1.5 text-xs`}>
                         <span className="hidden sm:inline">{getStatusIcon(user.role)}</span>
-                        <span className="truncate">{user.role}</span>
+                        <span className="truncate">{formatRoleForDisplay(user.role)}</span>
                     </Badge>
                   </TableCell>
-                    <TableCell className="text-xs sm:text-sm hidden md:table-cell">{user.role}</TableCell>
+                    <TableCell className="text-xs sm:text-sm hidden md:table-cell">{formatRoleForDisplay(user.role)}</TableCell>
                     <TableCell className="hidden lg:table-cell">
                     <div className="flex items-center gap-1">
                         <Users className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
@@ -651,13 +716,17 @@ const UserSetup = () => {
                       <div className="font-medium text-base">{viewUser.jobTitle || 'N/A'}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">User Company</div>
-                      <div className="font-medium text-base">{viewUser.userCompany || 'N/A'}</div>
+                      <div className="text-xs text-gray-500 mb-1">Customer</div>
+                      <div className="font-medium text-base">
+                        {viewUser.customerId 
+                          ? ((viewUser as any).customerName || customerNameMap.get(viewUser.customerId) || `Customer ID: ${viewUser.customerId}`)
+                          : 'N/A'}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Role and Company Information */}
+                {/* Role and Customer Information */}
                 <Card>
                   <CardHeader className="pb-4">
                     <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -668,11 +737,11 @@ const UserSetup = () => {
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Role</div>
-                      <div className="font-medium text-base">{viewUser.role}</div>
+                      <div className="font-medium text-base">{formatRoleForDisplay(viewUser.role)}</div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Page Access Role</div>
-                      <div className="font-medium text-base">{viewUser.pageAccessRole}</div>
+                      <div className="font-medium text-base">{formatRoleForDisplay(viewUser.pageAccessRole)}</div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Created At</div>

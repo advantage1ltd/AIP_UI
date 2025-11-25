@@ -10,6 +10,7 @@ export interface HolidayRequest {
   dateAuthorised: Date | null;
   status: 'pending' | 'approved' | 'denied';
   comment: string;
+  reason?: string;
   totalDays: number;
   archived: boolean;
 }
@@ -19,13 +20,14 @@ export interface CreateHolidayRequestDTO {
   startDate: Date;
   endDate: Date;
   returnToWorkDate: Date;
-  authorisedBy: string;
+  authorisedBy?: string;
   comment?: string;
 }
 
 export interface UpdateHolidayRequestDTO extends Partial<CreateHolidayRequestDTO> {
   status?: 'pending' | 'approved' | 'denied';
   dateAuthorised?: Date | null;
+  reason?: string;
 }
 
 export interface HolidayRequestsResponse {

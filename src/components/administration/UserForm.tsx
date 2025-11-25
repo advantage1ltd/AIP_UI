@@ -17,7 +17,6 @@ import {
   UserRole,
   CustomerUser,
   AdvantageOneUser,
-  USER_COMPANIES,
 } from '@/types/user';
 import { useAvailableCustomers } from '@/hooks/useAvailableCustomers';
 import { Users, Eye, EyeOff, Building2, Lock, FileText, Shield, Briefcase, ChevronRight, ChevronLeft, AlertTriangle, Loader2 } from 'lucide-react';
@@ -35,12 +34,24 @@ interface UserFormProps {
 }
 
 const USER_ROLES: UserRole[] = [
-  'AdvantageOneOfficer',
-  'AdvantageOneHOOfficer',
-  'Administrator',
-  'CustomerSiteManager',
-  'CustomerHOManager',
+  'advantageoneofficer',
+  'advantageonehoofficer',
+  'administrator',
+  'customersitemanager',
+  'customerhomanager',
 ];
+
+// Helper to format role for display (PascalCase)
+const formatRoleForDisplay = (role: UserRole): string => {
+  const roleMap: Record<UserRole, string> = {
+    'administrator': 'Administrator',
+    'advantageoneofficer': 'AdvantageOneOfficer',
+    'advantageonehoofficer': 'AdvantageOneHOOfficer',
+    'customersitemanager': 'CustomerSiteManager',
+    'customerhomanager': 'CustomerHOManager'
+  };
+  return roleMap[role] || role;
+};
 
 type FormState = {
   firstName: string;
@@ -53,12 +64,12 @@ type FormState = {
   signature?: string;
   signatureCode?: string;
   jobTitle?: string;
-  userCompany?: string;
+  customerId?: number;
   recordIsDeleted?: boolean;
   employeeId?: number;
 } & (
-  | { role: 'CustomerSiteManager' | 'CustomerHOManager' }
-  | { role: 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator'; assignedCustomerIds: number[] }
+  | { role: 'customersitemanager' | 'customerhomanager' }
+  | { role: 'advantageoneofficer' | 'advantageonehoofficer' | 'administrator'; assignedCustomerIds: number[] }
 );
 
 export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => {
@@ -83,6 +94,11 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
         console.log('🔍 [UserForm] AssignedCustomerIds:', initialData.assignedCustomerIds);
         console.log('🔍 [UserForm] AssignedCustomerIds type:', typeof initialData.assignedCustomerIds);
         console.log('🔍 [UserForm] AssignedCustomerIds length:', Array.isArray(initialData.assignedCustomerIds) ? initialData.assignedCustomerIds.length : 'Not an array');
+      }
+      
+      // Debug customerId for customer users
+      if (initialData.role === 'customersitemanager' || initialData.role === 'customerhomanager') {
+        console.log('🔍 [UserForm] CustomerId from initialData:', (initialData as CustomerUser)?.customerId);
       }
     }
   }, [initialData]);
@@ -115,7 +131,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
       signature: initialData?.signature || '',
       signatureCode: initialData?.signatureCode || '',
       jobTitle: initialData?.jobTitle || '',
-      userCompany: initialData?.userCompany || '',
+      customerId: (initialData as CustomerUser)?.customerId ?? undefined,
       recordIsDeleted: initialData?.recordIsDeleted || false,
       employeeId: (initialData as any)?.employeeId ?? undefined,
     };
@@ -126,10 +142,11 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
       fullBaseData: baseData
     });
 
-    if (initialData?.role === 'CustomerSiteManager' || initialData?.role === 'CustomerHOManager') {
+    if (initialData?.role === 'customersitemanager' || initialData?.role === 'customerhomanager') {
       return {
         ...baseData,
         role: initialData.role,
+        customerId: (initialData as CustomerUser)?.customerId ?? undefined,
       } as FormState;
     } else {
       const assignedCustomerIds = initialData && 'assignedCustomerIds' in initialData 
@@ -140,7 +157,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
       
       return {
         ...baseData,
-        role: (initialData?.role as 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator') || 'AdvantageOneOfficer',
+        role: (initialData?.role as 'advantageoneofficer' | 'advantageonehoofficer' | 'administrator') || 'advantageoneofficer',
         assignedCustomerIds,
       } as FormState;
     }
@@ -151,7 +168,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
   const [loadingEmployees, setLoadingEmployees] = useState(false);
 
   useEffect(() => {
-    const shouldLoad = formData.role !== 'CustomerSiteManager' && formData.role !== 'CustomerHOManager';
+    const shouldLoad = formData.role !== 'customersitemanager' && formData.role !== 'customerhomanager';
     if (!shouldLoad) {
       setEmployees([]);
       return;
@@ -311,7 +328,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
   const handleSelectChange = (name: string, value: string) => {
     if (name === 'role') {
       const role = value as UserRole;
-      const isCustomerRole = role === 'CustomerSiteManager' || role === 'CustomerHOManager';
+      const isCustomerRole = role === 'customersitemanager' || role === 'customerhomanager';
       
       if (isCustomerRole) {
         setFormData({
@@ -319,6 +336,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
           role,
           pageAccessRole: role,
           employeeId: undefined,
+          customerId: undefined,
         } as FormState);
       } else {
         setFormData({
@@ -329,12 +347,24 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
           employeeId: undefined,
         } as FormState);
       }
-    } else if (name === 'userCompany') {
-      setFormData(prev => ({ ...prev, userCompany: value }));
+    } else if (name === 'customerId') {
+      setFormData(prev => ({ ...prev, customerId: value ? parseInt(value) : undefined }));
     }
   };
 
-  const isCustomerRole = formData.role === 'CustomerSiteManager' || formData.role === 'CustomerHOManager';
+  const isCustomerRole = formData.role === 'customersitemanager' || formData.role === 'customerhomanager';
+
+  // Debug logging for customerId changes
+  useEffect(() => {
+    if (isCustomerRole) {
+      console.log('🔍 [UserForm] CustomerId in formData:', formData.customerId);
+      console.log('🔍 [UserForm] Available customers count:', availableCustomers.length);
+      if (formData.customerId) {
+        const selectedCustomer = availableCustomers.find(c => c.id === formData.customerId);
+        console.log('🔍 [UserForm] Selected customer:', selectedCustomer?.name || 'Not found');
+      }
+    }
+  }, [formData.customerId, isCustomerRole, availableCustomers]);
 
   // Debug logging for employee dropdown
   useEffect(() => {
@@ -358,6 +388,12 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
       return;
     }
     
+    // Validate customerId requirement for customer users
+    if (isCustomerRole && !formData.customerId) {
+      toast.error('Customer selection is required for customer users');
+      return;
+    }
+    
     console.log('🔄 [UserForm] Form submission started', {
       isEdit: !!initialData,
       userId: initialData?.id,
@@ -366,6 +402,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
         email: formData.email,
         role: formData.role,
         employeeId: formData.employeeId,
+        customerId: formData.customerId,
         assignedCustomerIds: 'assignedCustomerIds' in formData ? formData.assignedCustomerIds : 'N/A'
       }
     });
@@ -378,15 +415,26 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
           id: initialData.id,
           ...(password ? { password } : {}),
           ...restData,
-        } as UpdateUserInput & { employeeId?: number };
+        } as UpdateUserInput & { employeeId?: number; customerId?: number };
+        
+        // Explicitly ensure customerId is included for customer users
+        // Always send customerId for customer roles, even if it's undefined (to allow clearing)
+        if (isCustomerRole) {
+          (updateData as any).customerId = formData.customerId ?? null;
+        } else {
+          // For non-customer roles, explicitly set to null to clear any existing customerId
+          (updateData as any).customerId = null;
+        }
         
         console.log('🔄 [UserForm] Submitting update data', updateData);
+        console.log('🔄 [UserForm] CustomerId in update data:', (updateData as any).customerId);
+        console.log('🔄 [UserForm] Is customer role:', isCustomerRole);
         onSubmit(updateData);
       } else {
         const createData = {
           ...formData,
           confirmPassword: formData.password || '',
-        } as CreateUserInput & { employeeId?: number };
+        } as CreateUserInput & { employeeId?: number; customerId?: number };
         
         console.log('🔄 [UserForm] Submitting create data', createData);
         onSubmit(createData);
@@ -488,7 +536,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
               <SelectContent>
                 {USER_ROLES.map((role) => (
                   <SelectItem key={role} value={role}>
-                    {role}
+                    {formatRoleForDisplay(role)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -590,22 +638,44 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
           </div>
           {isCustomerRole && (
             <div>
-              <Label htmlFor="userCompany">User Company</Label>
+              <Label htmlFor="customerId" className={!formData.customerId ? 'text-red-600' : ''}>
+                Customer *
+              </Label>
               <Select
-                value={formData.userCompany || ''}
-                onValueChange={(value) => handleSelectChange('userCompany', value)}
+                value={formData.customerId ? String(formData.customerId) : ''}
+                onValueChange={(value) => handleSelectChange('customerId', value)}
+                required
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select company" />
+                <SelectTrigger className={!formData.customerId ? 'border-red-500' : ''}>
+                  <SelectValue placeholder={isLoading ? 'Loading customers...' : 'Select customer'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {USER_COMPANIES.map((company) => (
-                    <SelectItem key={company} value={company}>
-                      {company}
+                  {isLoading ? (
+                    <SelectItem value="loading" disabled>
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading customers...
+                      </div>
                     </SelectItem>
-                  ))}
+                  ) : availableCustomers.length === 0 ? (
+                    <SelectItem value="no-customers" disabled>
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        No customers available
+                      </div>
+                    </SelectItem>
+                  ) : (
+                    availableCustomers.map((customer) => (
+                      <SelectItem key={customer.id} value={String(customer.id)}>
+                        {customer.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
+              {!formData.customerId && (
+                <p className="text-xs text-red-600 mt-1">Customer selection is required for customer users</p>
+              )}
             </div>
           )}
           <div className={isCustomerRole ? "" : "md:col-start-1"}>

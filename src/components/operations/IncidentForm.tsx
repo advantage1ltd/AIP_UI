@@ -165,7 +165,7 @@ export interface IncidentFormProps {
 
 const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit, onCancel, onScanBarcode, isLoading = false, customerId: propCustomerId, siteId: propSiteId }) => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'Administrator';
+  const isAdmin = user?.role === 'administrator';
   
   // Debug logging (remove in production)
   if (initialData) {
@@ -462,10 +462,10 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
           // Map user roles to officer roles
           const roleMapping: Record<string, string> = {
             'Security Officer': 'Security Officer',
-            'AdvantageOneOfficer': 'Security Officer',
-            'CustomerSiteManager': 'Site Manager',
-            'CustomerHOManager': 'Head of Security',
-            'Administrator': 'Security Officer'
+            'advantageoneofficer': 'Security Officer',
+            'customersitemanager': 'Site Manager',
+            'customerhomanager': 'Head of Security',
+            'administrator': 'Security Officer'
           };
           
           const officerRole = roleMapping[user.role] || 'Security Officer';

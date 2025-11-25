@@ -4,8 +4,6 @@ import { cn } from '@/lib/utils';
 import { PageHeaderProps } from '@/types/header';
 import { headerService } from '@/services/headerService';
 import { LoadingSpinner } from '@/components/ui/loading-state';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
 
 export const PageHeader: React.FC<PageHeaderProps> = ({
   pageId,
@@ -64,15 +62,15 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     );
   }
 
-  // Error state
-  if (error) {
-    return (
-      <Alert variant="destructive" className="mb-6">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>Failed to load header data</AlertDescription>
-      </Alert>
-    );
-  }
+  // Error state - fail silently, just use fallback values
+  // if (error) {
+  //   return (
+  //     <Alert variant="destructive" className="mb-6">
+  //       <AlertCircle className="h-4 w-4" />
+  //       <AlertDescription>Failed to load header data</AlertDescription>
+  //     </Alert>
+  //   );
+  // }
 
   // Generate title based on form state
   const getTitle = () => {

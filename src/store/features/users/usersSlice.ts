@@ -27,6 +27,13 @@ const mapUserDetailToUser = (detail: any): User => {
 
   const assignedCustomerIds = detail.assignedCustomerIds ?? detail.AssignedCustomerIds
   const customerId = detail.customerId ?? detail.CustomerId
+  const customerName = detail.customerName ?? detail.CustomerName
+  const employeeId = detail.employeeId ?? detail.EmployeeId
+  const employeeName = detail.employeeName ?? detail.EmployeeName
+  const assignedCustomerNames = detail.assignedCustomerNames ?? detail.AssignedCustomerNames
+  const phoneNumber = detail.phoneNumber ?? detail.PhoneNumber
+  const emailConfirmed = detail.emailConfirmed ?? detail.EmailConfirmed ?? false
+  const lastLoginAt = detail.lastLoginAt ?? detail.LastLoginAt
 
   const mappedUser = {
     id: detail.id ?? detail.Id,
@@ -39,12 +46,18 @@ const mapUserDetailToUser = (detail: any): User => {
     signature: detail.signature ?? detail.Signature,
     signatureCode: detail.signatureCode ?? detail.SignatureCode,
     jobTitle: detail.jobTitle ?? detail.JobTitle,
-    userCompany: detail.userCompany ?? detail.UserCompany,
+    customerId: customerId != null ? customerId : undefined,
+    customerName: customerName,
     recordIsDeleted: detail.recordIsDeleted ?? detail.RecordIsDeleted ?? false,
     createdAt: detail.createdAt ?? detail.CreatedAt ?? new Date().toISOString(),
     updatedAt: detail.updatedAt ?? detail.UpdatedAt ?? new Date().toISOString(),
+    employeeId: employeeId != null ? employeeId : undefined,
+    employeeName: employeeName,
+    phoneNumber: phoneNumber,
+    emailConfirmed: emailConfirmed,
+    lastLoginAt: lastLoginAt,
     ...(assignedCustomerIds ? { assignedCustomerIds } : {}),
-    ...(customerId ? { customerId } : {}),
+    ...(assignedCustomerNames ? { assignedCustomerNames } : {}),
   }
   
   return mappedUser as User
@@ -164,11 +177,39 @@ const usersSlice = createSlice({
       })
       .addCase(updateUserAsync.fulfilled, (state, action) => {
         state.loading = false
+        console.log('🔄 [usersSlice] updateUserAsync.fulfilled:', {
+          userId: action.payload.id,
+          customerId: action.payload.customerId,
+          customerName: (action.payload as any).customerName,
+          role: action.payload.role,
+          fullPayload: action.payload
+        })
+        
         const index = state.users.findIndex(user => user.id === action.payload.id)
+        console.log('🔄 [usersSlice] User index in store:', index)
+        
         if (index !== -1) {
           // Convert UserDetailResponse to User format
           const user: User = mapUserDetailToUser(action.payload as any)
+          console.log('🔄 [usersSlice] Mapped user:', {
+            id: user.id,
+            customerId: user.customerId,
+            customerName: (user as any).customerName,
+            role: user.role
+          })
+          const oldUser = state.users[index]
           state.users[index] = user
+          console.log('✅ [usersSlice] User updated in store:', {
+            oldCustomerId: oldUser.customerId,
+            newCustomerId: user.customerId,
+            oldCustomerName: (oldUser as any).customerName,
+            newCustomerName: (user as any).customerName
+          })
+        } else {
+          // If user not found in list, add it (shouldn't happen but handle gracefully)
+          console.log('⚠️ [usersSlice] User not found in store, adding new user')
+          const user: User = mapUserDetailToUser(action.payload as any)
+          state.users.push(user)
         }
       })
       .addCase(updateUserAsync.rejected, (state, action) => {

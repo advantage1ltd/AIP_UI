@@ -1,9 +1,10 @@
+// Roles are stored in lowercase to match backend
 export type UserRole = 
-  | 'AdvantageOneOfficer'
-  | 'AdvantageOneHOOfficer'
-  | 'Administrator'
-  | 'CustomerSiteManager'
-  | 'CustomerHOManager';
+  | 'advantageoneofficer'
+  | 'advantageonehoofficer'
+  | 'administrator'
+  | 'customersitemanager'
+  | 'customerhomanager';
 
 export interface Customer {
   id: string;
@@ -69,7 +70,6 @@ export interface BaseUser {
   signature?: string;
   signatureCode?: string;
   jobTitle?: string;
-  userCompany?: 'Central England COOP' | 'Midcounties COOP' | 'Eastbrook Worcester' | 'Eastbrook Tewksbury' | 'Heart of England';
   recordIsDeleted?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -78,12 +78,13 @@ export interface BaseUser {
 }
 
 export interface CustomerUser extends BaseUser {
-  role: Extract<UserRole, 'CustomerSiteManager' | 'CustomerHOManager'>;
+  role: Extract<UserRole, 'customersitemanager' | 'customerhomanager'>;
   customerId: number;
+  customerName?: string; // Company name for customer users
 }
 
 export interface AdvantageOneUser extends BaseUser {
-  role: Extract<UserRole, 'AdvantageOneOfficer' | 'AdvantageOneHOOfficer' | 'Administrator'>;
+  role: Extract<UserRole, 'advantageoneofficer' | 'advantageonehoofficer' | 'administrator'>;
   assignedCustomerIds?: number[];
   assignedCustomerNames?: string[];
 }
@@ -129,13 +130,18 @@ export interface UsersResponse {
   message?: string;
 }
 
+/**
+ * @deprecated Use customerService.getAllCustomers() or customerMappingService.getCustomerMappings() instead
+ * This static array is kept for backward compatibility only.
+ * Customer IDs should be fetched dynamically from the API to ensure they match the database.
+ */
 export const AVAILABLE_CUSTOMERS = [
-  { id: 21, name: "Central England COOP" },
+  { id: 1, name: "Central England COOP" },
   { id: 22, name: "Heart of England" },
   { id: 23, name: "Midcounties COOP" },
   { id: 24, name: "Eastbrook Worcester" },
   { id: 25, name: "Eastbrook Tewksbury" }
-];
+] as const;
 
 export const USER_COMPANIES = [
   'Central England COOP',

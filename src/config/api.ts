@@ -9,23 +9,22 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
-  }
+  },
+  timeout: 10000 // 10 second timeout to prevent hanging requests
 })
 
 // Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken')
-    console.log('🔄 [API Interceptor] Making request', { 
-      url: config.url, 
-      method: config.method,
-      hasToken: !!token,
-      tokenLength: token ? token.length : 0,
-      tokenStart: token ? token.substring(0, 20) + '...' : 'none',
-      data: config.data,
-      baseURL: config.baseURL,
-      fullURL: `${config.baseURL}${config.url}`
-    })
+    if (import.meta.env.DEV) {
+      console.log('🔄 [API Interceptor] Making request', { 
+        url: config.url, 
+        method: config.method,
+        hasToken: !!token,
+        baseURL: config.baseURL
+      })
+    }
     
     // Skip authentication for test endpoints
     if (config.url?.includes('/test')) {
@@ -36,8 +35,8 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
       console.log('🔑 [API Interceptor] Added Authorization header:', `Bearer ${token.substring(0, 20)}...`)
-    } else {
-      console.warn('⚠️ [API Interceptor] No auth token found for request:', config.url)
+    } else if (import.meta.env.DEV) {
+      console.info('ℹ️ [API Interceptor] Skipping Authorization header; no auth token for request:', config.url)
     }
     return config
   },
@@ -50,34 +49,67 @@ api.interceptors.request.use(
 // Add response interceptor for error handling
 api.interceptors.response.use(
   (response) => {
-    console.log('✅ [API Interceptor] Response received', { 
-      url: response.config.url, 
-      status: response.status,
-      data: response.data
-    })
+    if (import.meta.env.DEV) {
+      console.log('✅ [API Interceptor] Response received', { 
+        url: response.config.url, 
+        status: response.status
+      })
+    }
     return response
   },
   (error) => {
-    console.error('❌ [API Interceptor] Response error:', { 
-      url: error.config?.url, 
-      status: error.response?.status,
-      message: error.message,
-      responseData: error.response?.data,
-      requestData: error.config?.data,
-      headers: error.config?.headers,
-      authHeader: error.config?.headers?.Authorization ? 'Present' : 'Missing',
-      error: error
-    })
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+    
+    // For expected errors (404, etc.), log less verbosely
+    const isExpectedError = status === 404 || status === 403;
+    
+    const shouldLogVerbose = import.meta.env.DEV;
+    const shouldLogWarningOnly = !shouldLogVerbose && isExpectedError;
+
+    if (shouldLogWarningOnly) {
+      console.warn(`⚠️ [API Interceptor] ${status} ${error.config?.method?.toUpperCase()} ${url}`);
+    } else if (shouldLogVerbose) {
+      const errorDetails = {
+        url, 
+        method: error.config?.method,
+        status,
+        statusText: error.response?.statusText,
+        message: error.message,
+        responseData: error.response?.data,
+        requestData: error.config?.data,
+        headers: error.config?.headers,
+        authHeader: error.config?.headers?.Authorization ? 'Present' : 'Missing',
+      }
+      console.error('❌ [API Interceptor] Response error:', errorDetails)
+      if (error.response?.data) {
+        console.error('❌ [API Interceptor] Error response data:', JSON.stringify(error.response.data, null, 2))
+      }
+    }
     
     if (error.response?.status === 401) {
-      console.warn('⚠️ [API Interceptor] Unauthorized access detected')
-      console.log('🔍 [API Interceptor] Current auth token:', localStorage.getItem('authToken'))
-      console.log('🔍 [API Interceptor] Request headers:', error.config?.headers)
+      // Don't redirect for settings endpoint - it's allowed to be anonymous
+      // Don't redirect if already on login page
+      const isSettingsEndpoint = url.includes('/PageAccess/settings') || url.includes('/pageaccess/settings')
+      const isLoginPage = window.location.pathname.includes('/login')
       
-      // Only redirect to login if we're not already on the login page
-      if (!window.location.pathname.includes('/login')) {
-        console.warn('⚠️ [API Interceptor] Redirecting to login')
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ [API Interceptor] Unauthorized access detected', {
+          url,
+          isSettingsEndpoint,
+          isLoginPage
+        })
+      }
+      
+      // Only redirect to login if:
+      // 1. Not the settings endpoint (which allows anonymous access)
+      // 2. Not already on the login page
+      // 3. Has an auth token (meaning user was authenticated but token expired)
+      const hasToken = localStorage.getItem('authToken')
+      if (!isSettingsEndpoint && !isLoginPage && hasToken) {
+        console.warn('⚠️ [API Interceptor] Redirecting to login due to expired/invalid token')
         localStorage.removeItem('authToken')
+        localStorage.removeItem('user')
         window.location.href = '/login'
       }
     }

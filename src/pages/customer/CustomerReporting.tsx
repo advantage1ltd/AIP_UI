@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Customer } from "@/types/customer"
 import useAuth from "@/hooks/useAuth"
 import { RefreshCw } from "lucide-react"
-import { customerOperations } from "@/mocks/customerStore"
+import { customerService } from "@/services/customerService"
 import { customerPageAccessCache } from "@/services/customerPageAccessCache"
 import type { CustomerPageAccessPage } from "@/api/customerPageAccess"
 
@@ -36,17 +36,25 @@ export default function CustomerReporting() {
         setLoading(true)
         
         // Load customer data from customer store (which uses cached data)
-        let customerData = await customerOperations.getAll()
+        let customerData = await customerService.getAllCustomers()
         
         // For officers, filter to only assigned customers
-        if (user?.role === 'AdvantageOneOfficer') {
+        if (user?.role === 'advantageoneofficer') {
           const assignedCustomerIds = user.assignedCustomerIds || []
-          customerData = customerData.filter((customer: any) => 
-            assignedCustomerIds.includes(customer.id)
-          )
+          // Normalize IDs to numbers for comparison (customer.id might be string or number)
+          const assignedIdsAsNumbers = assignedCustomerIds.map(id => Number(id)).filter(id => !isNaN(id))
+          
+          customerData = customerData.filter((customer: any) => {
+            const customerId = Number(customer.id)
+            const isAssigned = !isNaN(customerId) && assignedIdsAsNumbers.includes(customerId)
+            return isAssigned
+          })
+          
           console.log('🔄 [CustomerReporting] Filtered customers for officer:', {
-            assignedCustomerIds,
-            filteredCount: customerData.length
+            assignedCustomerIds: assignedCustomerIds,
+            assignedIdsAsNumbers: assignedIdsAsNumbers,
+            filteredCount: customerData.length,
+            filteredCustomerIds: customerData.map((c: any) => c.id)
           })
         }
         

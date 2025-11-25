@@ -360,14 +360,6 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
 		sortOrder: 41,
 	},
 	{
-		pageId: 'incidents-report',
-		title: 'Incidents Report',
-		path: '/management/incidents-report',
-		category: 'Management',
-		description: 'Incidents reporting',
-		sortOrder: 42,
-	},
-	{
 		pageId: 'officer-performance',
 		title: 'Officer Performance',
 		path: '/management/officer-performance',
@@ -492,6 +484,32 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
 		category: 'Customer',
 		description: 'Daily occurrence book (DOB)',
 		sortOrder: 77,
+	},
+	// Legacy/alias page definitions that the backend expects (these are duplicates/aliases)
+	// These are kept to satisfy backend validation checks
+	{
+		pageId: 'incident-graph',
+		title: 'Incident Graph',
+		path: '/customer/incident-graph',
+		category: 'Customer',
+		description: 'Incident graphs (legacy alias for customer-incident-graph)',
+		sortOrder: 81,
+	},
+	{
+		pageId: 'satisfaction-reports',
+		title: 'Satisfaction Reports',
+		path: '/customer/satisfaction-report',
+		category: 'Customer',
+		description: 'Customer satisfaction reports (legacy alias for customer-satisfaction-report)',
+		sortOrder: 82,
+	},
+	{
+		pageId: 'be-safe-be-secure-graph',
+		title: 'Daily Activity Graphs',
+		path: '/customer/be-safe-be-secure',
+		category: 'Customer',
+		description: 'Daily activity graphs (legacy alias for customer-be-safe-be-secure)',
+		sortOrder: 83,
 	},
 ]
 

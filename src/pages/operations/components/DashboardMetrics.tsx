@@ -26,7 +26,7 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ surveys }) =
   }, [surveys]);
 
   const uniqueLocations = useMemo(() => {
-    return new Set(surveys.map(s => s.location)).size;
+    return new Set(surveys.map(s => s.siteName)).size;
   }, [surveys]);
 
   const metrics = [

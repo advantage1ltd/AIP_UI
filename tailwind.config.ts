@@ -32,6 +32,14 @@ export default {
 		},
 		extend: {
 			colors: {
+				'header-bg': '#F3F4F6',
+				'header-text': '#1F2937',
+				'header-border': '#CBD5F5',
+				'sidebar-bg': '#242932',
+				'sidebar-text': '#D9D9D9',
+				'sidebar-border': '#2F3542',
+				'accent-teal': '#00A8A8',
+				'accent-teal-hover': '#00C2C2',
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',

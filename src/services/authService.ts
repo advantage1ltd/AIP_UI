@@ -123,8 +123,8 @@ export class AuthService {
    * Get user access level based on role
    */
   private getUserAccessLevel(role: string): 'global' | 'customer' | 'site' {
-    const globalRoles = ['Administrator', 'AdvantageOneHOOfficer']
-    const customerRoles = ['CustomerHOManager', 'AdvantageOneOfficer']
+    const globalRoles = ['administrator', 'advantageonehoofficer']
+    const customerRoles = ['customerhomanager', 'advantageoneofficer']
     
     if (globalRoles.includes(role)) return 'global'
     if (customerRoles.includes(role)) return 'customer'
@@ -136,13 +136,13 @@ export class AuthService {
    */
   private calculateAccessibleCustomerIds(user: any): number[] {
     // For customer users, return their customer ID
-    if (['CustomerSiteManager', 'CustomerHOManager'].includes(user.role)) {
+    if (['customersitemanager', 'customerhomanager'].includes(user.role)) {
       const customerId = user.customerId
       return customerId ? [customerId] : []
     }
     
     // For AdvantageOne officers with assigned customers
-    if (user.role === 'AdvantageOneOfficer' && user.assignedCustomerIds) {
+    if (user.role === 'advantageoneofficer' && user.assignedCustomerIds) {
       // Convert string array to number array if needed
       const ids = Array.isArray(user.assignedCustomerIds) 
         ? user.assignedCustomerIds.map((id: any) => typeof id === 'string' ? parseInt(id) : id)
@@ -181,18 +181,18 @@ export class AuthService {
    */
   private getDefaultRolePermissions(): Record<string, string[]> {
     return {
-      'Administrator': ['*'], // Global access to everything
-      'AdvantageOneHOOfficer': ['*'], // Global access to everything
-      'AdvantageOneOfficer': [
+      'administrator': ['*'], // Global access to everything
+      'advantageonehoofficer': ['*'], // Global access to everything
+      'advantageoneofficer': [
         'incidents:read', 'incidents:create', 'incidents:update',
         'customers:read', 'sites:read', 'regions:read'
       ],
-      'CustomerHOManager': [
+      'customerhomanager': [
         'incidents:read', 'incidents:create', 'incidents:update',
         'customers:read', 'sites:read', 'regions:read',
         'reports:read'
       ],
-      'CustomerSiteManager': [
+      'customersitemanager': [
         'incidents:read', 'incidents:create',
         'customers:read', 'sites:read'
       ]

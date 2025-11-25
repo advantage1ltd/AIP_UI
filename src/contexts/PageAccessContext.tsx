@@ -1,472 +1,821 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { PageAccess, pageAccessApi } from '@/api/pageAccess';
-import { useAuth } from '@/hooks/useAuth';
+import { PageAccess, PageAccessSettings, pageAccessApi } from '@/api/pageAccess';
+import { useAuth } from '@/contexts/AuthContext';
 import { customerPageAccessCache } from '@/services/customerPageAccessCache';
 import { PAGE_DEFINITIONS } from '@/config/navigation/pageDefinitions';
 
 interface PageAccessContextType {
-  hasAccess: (path: string) => boolean;
-  currentRole: string | null;
-  setCurrentRole: (role: string | null) => Promise<void>;
-  pageAccessByRole: Record<string, string[]>;
-  setPageAccessByRole: (access: Record<string, string[]>) => void;
-  availablePages: PageAccess[];
-  isLoading: boolean;
-  refreshSettings: () => Promise<void>;
-  clearCacheAndReload: () => Promise<void>;
-  syncPages: () => Promise<void>;
-  isTestMode: boolean;
-  setIsTestMode: (isTestMode: boolean) => void;
-  testRole: string | null;
-  setTestRole: (role: string | null) => void;
+	hasAccess: (path: string) => boolean;
+	currentRole: string | null;
+	setCurrentRole: (role: string | null) => Promise<void>;
+	pageAccessByRole: Record<string, string[]>;
+	setPageAccessByRole: React.Dispatch<React.SetStateAction<Record<string, string[]>>>;
+	availablePages: PageAccess[];
+	isLoading: boolean;
+	status: 'idle' | 'loading' | 'ready' | 'offline';
+	error: string | null;
+	refreshSettings: () => Promise<void>;
+	clearCacheAndReload: () => Promise<void>;
+	syncPages: () => Promise<void>;
+	isTestMode: boolean;
+	setIsTestMode: (isTestMode: boolean) => void;
+	testRole: string | null;
+	setTestRole: (role: string | null) => void;
 }
 
-const PageAccessContext = createContext<PageAccessContextType | undefined>(undefined);
+export const PageAccessContext = createContext<PageAccessContextType | undefined>(undefined);
 
-const parseNumericId = (value: unknown): number | null => {
-  if (value === null || value === undefined) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const resolveCustomerContextId = (role: string | null, user: any): number | null => {
-  if (!role || !user) return null;
-  const isCustomerRole = role === 'CustomerSiteManager' || role === 'CustomerHOManager';
-
-  if (isCustomerRole) {
-    return (
-      parseNumericId(user?.customerId) ??
-      parseNumericId(user?.CustomerId) ??
-      parseNumericId(user?.companyId) ??
-      null
-    );
-  }
-
-  const assignedCustomerIds = user?.assignedCustomerIds;
-  if (Array.isArray(assignedCustomerIds) && assignedCustomerIds.length > 0) {
-    return parseNumericId(assignedCustomerIds[0]);
-  }
-
-  return null;
+const EMPTY_PAGE_ACCESS_SETTINGS: PageAccessSettings = {
+	pageAccessByRole: {},
+	availablePages: []
 };
 
 export const usePageAccess = () => {
-  const context = useContext(PageAccessContext);
-  if (context === undefined) {
-    throw new Error('usePageAccess must be used within a PageAccessProvider');
-  }
-  return context;
+	const context = useContext(PageAccessContext);
+	if (context === undefined) {
+		throw new Error('usePageAccess must be used within a PageAccessProvider');
+	}
+	return context;
 };
 
 export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRole, setCurrentRole] = useState<string | null>(null);
-  const [pageAccessByRole, setPageAccessByRole] = useState<Record<string, string[]>>({});
-  const [availablePages, setAvailablePages] = useState<PageAccess[]>([]);
-  const [customerAssignedPageIds, setCustomerAssignedPageIds] = useState<Set<string>>(new Set());
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasInitialized, setHasInitialized] = useState(false);
-  const [isTestMode, setIsTestMode] = useState(false);
-  const [testRole, setTestRole] = useState<string | null>(null);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user } = useAuth();
-  const lastCustomerContextId = useRef<number | null>(null);
+	const { user } = useAuth();
+	
+	const [currentRole, setCurrentRoleState] = useState<string | null>(() => {
+		// Try to get role from localStorage user data on initial mount
+		try {
+			const storedUser = localStorage.getItem('user');
+			if (storedUser) {
+				const userData = JSON.parse(storedUser);
+				const userRole = userData.pageAccessRole || userData.role || userData.Role || null;
+				if (userRole) {
+					// Backend returns roles in lowercase, just ensure it's lowercase
+					return userRole.trim().toLowerCase();
+				}
+			}
+		} catch {
+			// Ignore errors parsing localStorage
+		}
+		return null;
+	});
+	const [pageAccessByRole, setPageAccessByRole] = useState<Record<string, string[]>>({});
+	const [availablePages, setAvailablePages] = useState<PageAccess[]>([]);
+	const [customerAssignedPageIds, setCustomerAssignedPageIds] = useState<Set<string>>(new Set());
+	const [isLoading, setIsLoading] = useState(false);
+	const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'offline'>('idle');
+	const [error, setError] = useState<string | null>(null);
+	const [isTestMode, setIsTestMode] = useState(false);
+	const [testRole, setTestRole] = useState<string | null>(null);
+	
+	const initializationRef = useRef(false);
+	const lastCustomerContextId = useRef<number | null>(null);
+	const settingsLoadAttempted = useRef(false);
 
-  const hasAccess = (path: string): boolean => {
-    try {
-      if (!currentRole) {
-        return false;
-      }
-      
-      // If page access data is not loaded yet, allow access to prevent redirect loops
-      if (Object.keys(pageAccessByRole).length === 0) {
-        return true;
-      }
-      
-      // Get the allowed page IDs for the role
-      const allowedPageIds = pageAccessByRole[currentRole];
-      if (!allowedPageIds) {
-        console.warn('🔒 [PageAccess] No page IDs found for role:', currentRole);
-        return false;
-      }
-      
-      // If availablePages is not loaded yet, allow access to prevent redirect loops
-      if (availablePages.length === 0) {
-        return true;
-      }
-      
-      // Look for matching page
-      const requestedPath = path.endsWith('/') ? path.slice(0, -1) : path;
-      const page = availablePages.find(p => p.path === requestedPath);
-      
-      if (!page) {
-        // Only log if this is not a common path that might not be in availablePages
-        if (!requestedPath.startsWith('/customer/') && requestedPath !== '/') {
-          console.warn('🔒 [PageAccess] Page not found in availablePages:', requestedPath);
-        }
-        return false;
-      }
-      
-      // Administrator should have access to ALL pages
-      if (currentRole === 'Administrator') {
-        return true;
-      }
-      
-      // For customer roles, check customer-specific page assignments
-      const isCustomerRole = currentRole === 'CustomerSiteManager' || currentRole === 'CustomerHOManager';
-      const isCustomerPage = page.path?.startsWith('/customer') || page.category === 'Customer';
-      
-      if (isCustomerRole && isCustomerPage) {
-        // Dashboard is always available
-        if (page.id === 'dashboard' || requestedPath === '/dashboard') {
-          return true;
-        }
-        // Check if this page is assigned to the customer
-        const hasCustomerAccess = customerAssignedPageIds.has(page.id);
-        if (!hasCustomerAccess) {
-          console.warn('🔒 [PageAccess] Customer page not assigned:', page.id, 'at path:', requestedPath);
-        }
-        return hasCustomerAccess;
-      }
-      
-      // Check if the role has access to this page
-      const hasAccess = allowedPageIds.includes(page.id);
-      if (!hasAccess) {
-        console.warn('🔒 [PageAccess] Access denied for', currentRole, 'to page:', page.id, 'at path:', requestedPath);
-      }
-      return hasAccess;
-    } catch (error) {
-      console.error('🔒 [PageAccess] Error checking access:', error);
-      return false;
-    }
-  };
+	// Stable check for auth token
+	const hasAuthToken = useCallback((): boolean => {
+		try {
+			return Boolean(localStorage.getItem('authToken'));
+		} catch {
+			return false;
+		}
+	}, []);
 
-  /**
-   * Refresh settings from API
-   * Wrapped in useCallback to prevent unnecessary re-renders
-   */
-  const refreshSettings = useCallback(async (): Promise<void> => {
-    try {
-      setIsLoading(true);
-      
-      // Fetch page access data from API
-      const data = await pageAccessApi.getSettings();
-      
-      setPageAccessByRole(data.pageAccessByRole);
-      setAvailablePages(data.availablePages);
-      
-      console.log('✅ [PageAccess] Settings refreshed successfully');
-      console.log('📋 [PageAccess] Page access by role:', Object.keys(data.pageAccessByRole));
-      console.log('📄 [PageAccess] Total available pages:', data.availablePages.length);
-    } catch (error) {
-      console.error('Error refreshing settings:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []); // No dependencies - this function doesn't depend on any state/props
+	// Normalize role name to lowercase (backend stores roles in lowercase)
+	const normalizeRoleName = useCallback((role: string | null): string | null => {
+		if (!role) return null;
+		// Backend returns roles in lowercase, just ensure it's lowercase
+		return role.trim().toLowerCase();
+	}, []);
 
-  /**
-   * Clear cached settings and reload fresh from API
-   */
-  const clearCacheAndReload = async (): Promise<void> => {
-    try {
-      setIsLoading(true);
-      
-      // Force reload fresh settings from API
-      const data = await pageAccessApi.getSettings();
-      setPageAccessByRole(data.pageAccessByRole);
-      setAvailablePages(data.availablePages);
-      
-      console.log('🔄 [PageAccess] Reloaded fresh settings from API');
-    } catch (error) {
-      console.error('Error clearing cache and reloading:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+	// Resolve role key from available roles (case-insensitive)
+	const resolveRoleKey = useCallback((roleName: string | null): string | null => {
+		if (!roleName) return null;
+		
+		const normalized = normalizeRoleName(roleName);
+		if (!normalized) return null;
 
-  /**
-   * Sync pages from frontend definitions to backend
-   * Only available for administrators
-   */
-  const syncPages = async (): Promise<void> => {
-    try {
-      if (currentRole !== 'Administrator') {
-        console.warn('🔒 [PageAccess] Only administrators can sync pages');
-        return;
-      }
+		// Check exact match first
+		if (pageAccessByRole[normalized]) {
+			return normalized;
+		}
 
-      console.log('🔄 [PageAccess] Syncing pages from definitions...');
-      const result = await pageAccessApi.syncPages(PAGE_DEFINITIONS);
-      
-      console.log(`✅ [PageAccess] Pages synced: ${result.message}`);
-      
-      // Refresh settings after sync to get updated pages
-      await refreshSettings();
-    } catch (error) {
-      console.error('❌ [PageAccess] Error syncing pages:', error);
-      // Don't throw - allow app to continue even if sync fails
-    }
-  };
+		// Check case-insensitive match
+		const match = Object.keys(pageAccessByRole).find(key => 
+			key.toLowerCase() === normalized.toLowerCase()
+		);
 
-  const loadCustomerPageAssignments = useCallback(async (customerId: number | null) => {
-    const normalizedCustomerId = parseNumericId(customerId);
+		return match || normalized;
+	}, [pageAccessByRole, normalizeRoleName]);
 
-    if (!normalizedCustomerId) {
-      setCustomerAssignedPageIds(new Set());
-      lastCustomerContextId.current = null;
-      return;
-    }
+	// Load page access settings from API
+	const loadPageAccessSettings = useCallback(async (): Promise<PageAccessSettings> => {
+		if (!hasAuthToken()) {
+			return EMPTY_PAGE_ACCESS_SETTINGS;
+		}
 
-    try {
-      const response = await customerPageAccessCache.get(normalizedCustomerId);
-      setCustomerAssignedPageIds(new Set(response.assignedPageIds));
-      lastCustomerContextId.current = normalizedCustomerId;
-      console.log('✅ [PageAccess] Customer page assignments loaded:', response.assignedPageIds.length, 'pages');
-    } catch (error) {
-      console.error('Error loading customer page assignments:', error);
-      setCustomerAssignedPageIds(new Set());
-      lastCustomerContextId.current = null;
-    }
-  }, []);
+		try {
+			const data = await pageAccessApi.getSettings();
+			
+			// Log loaded settings for debugging
+			if (import.meta.env.DEV) {
+				console.group('📥 [PageAccess] Settings Loaded from API');
+				console.log('📊 Settings Summary:', {
+					availablePagesCount: data.availablePages.length,
+					rolesCount: Object.keys(data.pageAccessByRole).length,
+					roleKeys: Object.keys(data.pageAccessByRole)
+				});
+				
+				// Log AdvantageOneOfficer specifically
+				const officerPages = data.pageAccessByRole['advantageoneofficer'] || [];
+				const customerPagesInList = officerPages.filter(p => String(p).toLowerCase().includes('customer')).map(p => String(p));
+				
+				// Check if this looks like default settings (has all default customer pages)
+				const defaultCustomerPages = [
+					'customer-daily-activity-report',
+					'customer-incident-graph',
+					'customer-incident-report',
+					'customer-satisfaction-report',
+					'customer-be-safe-be-secure',
+					'daily-occurrence-book',
+					'customer-officer-support',
+					'customer-views-config',
+					'customer-crime-intelligence',
+					'customer-site-visit-reports',
+					'customer-mystery-shopper-report'
+				];
+				const hasAllDefaultCustomerPages = defaultCustomerPages.every(pageId => 
+					officerPages.some(p => String(p).toLowerCase().trim() === pageId.toLowerCase().trim())
+				);
+				
+				if (hasAllDefaultCustomerPages && customerPagesInList.length > 0) {
+					console.warn('⚠️ [PageAccess] WARNING: Settings appear to be DEFAULTS, not from database!');
+					console.warn('⚠️ [PageAccess] Officer has all default customer pages. This suggests defaults are being used instead of database settings.');
+					console.warn('⚠️ [PageAccess] If you disabled customer pages in settings, they should NOT appear here.');
+				}
+				
+				console.log('👤 AdvantageOneOfficer Pages:', {
+					count: officerPages.length,
+					hasCustomerIncidentReport: officerPages.includes('customer-incident-report'),
+					customerPagesCount: customerPagesInList.length,
+					hasAllDefaultCustomerPages,
+					allPages: officerPages,
+					pageTypes: officerPages.map(p => typeof p)
+				});
+				console.log('👤 AdvantageOneOfficer Pages (as strings):', officerPages.map(p => String(p)).join(', '));
+				console.log('👤 Has customer-incident-report?', officerPages.map(p => String(p).toLowerCase().trim()).includes('customer-incident-report'));
+				console.log('👤 Customer pages in list:', customerPagesInList);
+				
+				// Check available pages for customer-incident-report
+				const incidentReportPage = data.availablePages.find(p => 
+					p.path === '/customer/incident-report' || p.id === 'customer-incident-report'
+				);
+				console.log('📄 customer-incident-report Page in Available Pages:', {
+					found: !!incidentReportPage,
+					page: incidentReportPage ? {
+						id: incidentReportPage.id,
+						dbId: incidentReportPage.dbId,
+						path: incidentReportPage.path
+					} : null
+				});
+				
+				console.groupEnd();
+			}
+			
+			setPageAccessByRole(data.pageAccessByRole);
+			setAvailablePages(data.availablePages);
+			setStatus('ready');
+			setError(null);
+			return data;
+		} catch (error) {
+			console.error('❌ [PageAccess] Error loading settings:', error);
+			setError(error instanceof Error ? error.message : 'Failed to load page access settings');
+			setStatus('offline');
+			// Return defaults on error
+			return EMPTY_PAGE_ACCESS_SETTINGS;
+		}
+	}, [hasAuthToken]);
 
-  const syncCustomerAssignmentsForRole = useCallback(async (role: string | null) => {
-    const customerContextId = resolveCustomerContextId(role, user);
-    await loadCustomerPageAssignments(customerContextId);
-  }, [user, loadCustomerPageAssignments]);
+	// Load customer page assignments
+	const loadCustomerPageAssignments = useCallback(async (customerId: number | null) => {
+		if (!hasAuthToken() || !customerId) {
+			setCustomerAssignedPageIds(new Set());
+			lastCustomerContextId.current = null;
+			return;
+		}
 
-  // Enhanced setCurrentRole that ensures page access data is loaded
-  const setCurrentRoleWithData = async (role: string | null) => {
-    if (!role) {
-      setCurrentRole(null);
-      setCustomerAssignedPageIds(new Set());
-      return;
-    }
+		// Skip if already loaded for this customer
+		if (lastCustomerContextId.current === customerId) {
+			return;
+		}
 
-    console.log('🔑 Setting current role with data loading:', role);
-    
-    // Set the role immediately for UI responsiveness
-    setCurrentRole(role);
-    
-    // If we don't have page access data for this role, load it
-    const hasRoleData = pageAccessByRole[role] && availablePages.length > 0;
-    if (!hasRoleData) {
-      try {
-        console.log('🔄 Loading page access data for role:', role);
-        setIsLoading(true);
-        
-        const data = await pageAccessApi.getSettings();
-        setPageAccessByRole(data.pageAccessByRole);
-        setAvailablePages(data.availablePages);
-        
-        console.log('✅ Page access data loaded for role:', role);
-        if (data.pageAccessByRole[role]) {
-          console.log('📋 [PageAccess] Pages available for', role + ':', data.pageAccessByRole[role].length);
-          console.log('📄 [PageAccess] Page IDs:', data.pageAccessByRole[role]);
-        }
-      } catch (error) {
-        console.error('Error loading page access data for role:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
+		try {
+			const response = await customerPageAccessCache.get(customerId);
+			setCustomerAssignedPageIds(new Set(response.assignedPageIds));
+			lastCustomerContextId.current = customerId;
+		} catch (error: any) {
+			const status = error?.response?.status || error?.status;
+			const isExpectedError = status === 403 || status === 404;
+			
+			if (!isExpectedError && import.meta.env.DEV) {
+				console.warn('⚠️ [PageAccess] Error loading customer page assignments:', error);
+			}
+			
+			setCustomerAssignedPageIds(new Set());
+			lastCustomerContextId.current = null;
+		}
+	}, [hasAuthToken]);
 
-    await syncCustomerAssignmentsForRole(role);
-  };
+	// Check if user has access to a path
+	const hasAccess = useCallback((path: string): boolean => {
+		const startTime = performance.now();
+		try {
+			// Allow access during loading or if no data loaded yet (prevents redirect loops)
+			// This check must come before the currentRole check to prevent redirect loops
+			if (status === 'loading' || Object.keys(pageAccessByRole).length === 0 || availablePages.length === 0) {
+				if (import.meta.env.DEV && path !== '/dashboard' && path !== '/') {
+					console.log('✅ [PageAccess] Allowing access during initialization:', {
+						path,
+						status,
+						pageAccessByRoleCount: Object.keys(pageAccessByRole).length,
+						availablePagesCount: availablePages.length,
+						reason: 'System still loading'
+					});
+				}
+				return true;
+			}
 
-  // Initialize role and fetch page access
-  useEffect(() => {
-    const initializeAccess = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Get stored role
-        const storedRole = localStorage.getItem('userRole');
-        let validatedRole: string | null = null;
-        
-        if (storedRole) {
-          console.log('🔄 [PageAccess] Initializing currentRole from localStorage:', storedRole);
-          
-          // Fetch page access data from API
-          console.log('🔍 [PageAccess] Fetching page access settings from API...');
-          const data = await pageAccessApi.getSettings();
-          console.log('✅ [PageAccess] API data loaded:', {
-            roles: Object.keys(data.pageAccessByRole),
-            pages: data.availablePages.length
-          });
-          
-          const validRoles = Object.keys(data.pageAccessByRole);
-          
-          const matchingRole = validRoles.find(
-            role => role.toLowerCase() === storedRole.toLowerCase()
-          );
-          
-          if (matchingRole) {
-            validatedRole = matchingRole;
-            if (matchingRole !== storedRole) {
-              localStorage.setItem('userRole', matchingRole);
-            }
-          } else {
-            console.warn(`Invalid role found in localStorage: ${storedRole}`);
-            localStorage.removeItem('userRole');
-          }
-          
-          setPageAccessByRole(data.pageAccessByRole);
-          setAvailablePages(data.availablePages);
-          setCurrentRole(validatedRole);
-          
-          await syncCustomerAssignmentsForRole(validatedRole);
-          
-          // Debug log to show what was loaded
-          if (validatedRole && data.pageAccessByRole[validatedRole]) {
-            console.log('📋 [PageAccess] Initial load - Pages for', validatedRole + ':', data.pageAccessByRole[validatedRole].length);
-            console.log('📄 [PageAccess] Page IDs:', data.pageAccessByRole[validatedRole].slice(0, 10), '...');
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing access:', error);
-        // Even if there's an error, we should still set the role and mark as initialized
-        // to prevent the app from getting stuck
-        if (storedRole) {
-          setCurrentRole(storedRole);
-        }
-      } finally {
-        setIsLoading(false);
-        setHasInitialized(true);
-      }
-    };
+			// No role = no access (except during initialization which is handled above)
+			if (!currentRole) {
+				if (import.meta.env.DEV && path !== '/dashboard' && path !== '/') {
+					console.log('❌ [PageAccess] Access denied: No currentRole', {
+						path,
+						status,
+						reason: 'No role assigned'
+					});
+				}
+				return false;
+			}
 
-    initializeAccess();
-  }, []);
+			// Normalize path - strip query parameters and hash
+			let normalizedPath = path.split('?')[0].split('#')[0];
+			normalizedPath = normalizedPath.endsWith('/') && normalizedPath !== '/' ? normalizedPath.slice(0, -1) : normalizedPath;
 
-  // Re-initialize page access data when currentRole changes during session (e.g., after login)
-  useEffect(() => {
-    const reloadPageAccessForRole = async () => {
-      // Skip if not initialized yet, no role, or if we already have data for this role
-      if (!hasInitialized || !currentRole) return;
-      
-      // Check if we already have page access data for this role
-      const hasRoleData = pageAccessByRole[currentRole] && availablePages.length > 0;
-      if (hasRoleData) return;
-      
-      try {
-        console.log('🔄 Role changed during session, reloading page access for:', currentRole);
-        setIsLoading(true);
-        
-        // Fetch fresh page access data
-        const data = await pageAccessApi.getSettings();
-        setPageAccessByRole(data.pageAccessByRole);
-        setAvailablePages(data.availablePages);
-        
-        await syncCustomerAssignmentsForRole(currentRole);
-        
-        console.log('✅ Page access data reloaded for new role:', currentRole);
-        if (currentRole && data.pageAccessByRole[currentRole]) {
-          console.log('📋 [PageAccess] Reload - Pages for', currentRole + ':', data.pageAccessByRole[currentRole].length);
-          console.log('📄 [PageAccess] Page IDs:', data.pageAccessByRole[currentRole].slice(0, 10), '...');
-        }
-      } catch (error) {
-        console.error('Error reloading page access for role change:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+			// Dashboard and root are always accessible
+			if (normalizedPath === '/dashboard' || normalizedPath === '/') {
+				return true;
+			}
 
-    reloadPageAccessForRole();
-  }, [currentRole, hasInitialized, syncCustomerAssignmentsForRole]);
+			// Find page by path (exact match first, then try without leading slash)
+			let page = availablePages.find(p => p.path === normalizedPath);
+			if (!page) {
+				// Try without leading slash
+				const pathWithoutSlash = normalizedPath.startsWith('/') ? normalizedPath.slice(1) : normalizedPath;
+				page = availablePages.find(p => p.path === `/${pathWithoutSlash}` || p.path === pathWithoutSlash);
+			}
+			
+			if (!page) {
+				// Page not in available pages - deny access
+				if (import.meta.env.DEV) {
+					console.warn('🔒 [PageAccess] Page not found in availablePages:', {
+						originalPath: path,
+						normalizedPath,
+						availablePaths: availablePages.slice(0, 20).map(p => ({ path: p.path, id: p.id })),
+						totalPages: availablePages.length,
+						searchingFor: normalizedPath
+					});
+				}
+				return false;
+			}
+			
+			if (import.meta.env.DEV) {
+				console.log('🔍 [PageAccess] Found page:', {
+					path: normalizedPath,
+					pageId: page.id,
+					pageIdType: typeof page.id,
+					pageDbId: page.dbId,
+					pageDbIdType: typeof page.dbId,
+					pagePath: page.path,
+					pageCategory: page.category,
+					pageTitle: page.title
+				});
+				
+				// Check if there are other pages with similar paths or IDs
+				const similarPages = availablePages.filter(ap => 
+					ap.path === page.path || 
+					ap.id === page.id ||
+					(ap.dbId && page.dbId && ap.dbId === page.dbId)
+				);
+				if (similarPages.length > 1) {
+					console.log('⚠️ [PageAccess] Found multiple pages with same path/ID:', similarPages.map(p => ({
+						id: p.id,
+						dbId: p.dbId,
+						path: p.path
+					})));
+				}
+			}
 
-  // Optional: Auto-sync pages on startup for administrators (runs once)
-  // This ensures pages from sidebar.ts are always in sync with the database
-  // Use a ref to track if we've already attempted sync to prevent multiple runs
-  const hasAttemptedSyncRef = useRef(false);
-  const syncInProgressRef = useRef(false);
-  const lastPageCountRef = useRef<number>(0);
-  
-  // DISABLED: Frontend-to-backend page syncing
-  // 
-  // Enterprise Architecture Decision: Database-First Approach
-  // Pages are now managed entirely in the database and initialized on backend startup.
-  // This ensures:
-  // 1. Database is the single source of truth
-  // 2. Pages are always available without relying on frontend sync
-  // 3. No risk of sync failures breaking functionality
-  // 4. Better for enterprise deployments and CI/CD pipelines
-  //
-  // Pages are initialized via:
-  // - Backend startup initialization (Program.cs)
-  // - Database seeding (DataSeedingService)
-  // - Manual initialization endpoint (if needed)
-  //
-  // To add new pages, update the InitializeDefaultPageAccessAsync method in PageAccessService.cs
-  // and deploy the backend. Pages will be automatically initialized on next startup.
-  
-  // useEffect(() => {
-  //   // Auto-sync disabled - pages are now managed in database
-  // }, []);
+			// Administrators have full access
+			if (currentRole.toLowerCase() === 'administrator') {
+				return true;
+			}
 
-  useEffect(() => {
-    if (!currentRole || !hasInitialized) return;
-    syncCustomerAssignmentsForRole(currentRole);
-  }, [currentRole, hasInitialized, syncCustomerAssignmentsForRole]);
+			// Get role permissions
+			const roleKey = resolveRoleKey(currentRole);
+			if (!roleKey) {
+				if (import.meta.env.DEV) {
+					console.warn('🔒 [PageAccess] No role key resolved for role:', currentRole, 'Available keys:', Object.keys(pageAccessByRole));
+				}
+				return false;
+			}
 
-  // Update localStorage when role changes
-  useEffect(() => {
-    if (currentRole) {
-      localStorage.setItem('userRole', currentRole);
-    }
-  }, [currentRole]);
+			const allowedPageIds = pageAccessByRole[roleKey];
+			if (!allowedPageIds || allowedPageIds.length === 0) {
+				if (import.meta.env.DEV) {
+					console.warn('🔒 [PageAccess] No page IDs found for role:', roleKey, 'Resolved from:', currentRole);
+				}
+				return false;
+			}
 
-  // Effect to redirect if user doesn't have access to current page
-  useEffect(() => {
-    try {
-      if (!currentRole || isLoading || !hasInitialized) return;
+			// Check if role has access to this page
+			// Access logic (prioritized):
+			// 1. Administrators: Full access (bypassed above)
+			// 2. Path-based matching: Check if ANY page with same path is in allowedPageIds (MOST RELIABLE)
+			// 3. Page ID matching: Direct ID match (case-insensitive)
+			// 4. Officers + Customer pages: Allow if page exists (customer assignment checked at API level)
+			// 5. Customer roles + Customer pages: Check customer page assignments
+			// 
+			// Note: Officers can access customer pages even if not in allowedPageIds because:
+			// - Customer assignment is verified at the API/data level when accessing customer data
+			// - Route-level access should allow officers to reach customer pages
+			// - The actual customer assignment check happens in the backend API
+			// 
+			// Path-based matching is more reliable because:
+			// - Paths are what we're actually checking (the URL)
+			// - Paths are stable and predictable
+			// - Less prone to ID format mismatches
+			
+			const pagePathLower = page.path?.toLowerCase().trim();
+			const pageIdLower = page.id?.toLowerCase().trim();
+			let hasRoleAccess = false;
+			
+			// PRIMARY: Path-based matching (most reliable)
+			// Check if any page with the same path has an ID in the allowed list
+			if (pagePathLower) {
+				// Find all pages with the same path
+				const pagesWithSamePath = availablePages.filter(ap => {
+					const apPath = ap.path?.toLowerCase().trim();
+					return apPath === pagePathLower;
+				});
+				
+				// Check if any of these pages have an ID in the allowed list
+				hasRoleAccess = pagesWithSamePath.some(pageWithPath => {
+					const pageId = pageWithPath.id?.toLowerCase().trim();
+					const pageDbId = pageWithPath.dbId ? String(pageWithPath.dbId).toLowerCase().trim() : null;
+					
+					return allowedPageIds.some(allowedId => {
+						const allowedIdStr = String(allowedId).toLowerCase().trim();
+						// Match by page ID
+						if (pageId && allowedIdStr === pageId) {
+							return true;
+						}
+						// Match by dbId
+						if (pageDbId && allowedIdStr === pageDbId) {
+							return true;
+						}
+						return false;
+					});
+				});
+				
+				if (import.meta.env.DEV && hasRoleAccess) {
+					console.log('✅ [PageAccess] Access granted via PATH-based matching:', {
+						path: pagePathLower,
+						matchingPages: pagesWithSamePath.map(p => ({ id: p.id, dbId: p.dbId }))
+					});
+				}
+			}
+			
+			// SECONDARY: Direct page ID matching (if path-based didn't work)
+			if (!hasRoleAccess && pageIdLower) {
+				// Try exact match first (fastest)
+				if (allowedPageIds.includes(page.id)) {
+					hasRoleAccess = true;
+				} else {
+					// Try case-insensitive match
+					hasRoleAccess = allowedPageIds.some(allowedId => {
+						const allowedIdStr = String(allowedId).toLowerCase().trim();
+						return allowedIdStr === pageIdLower;
+					});
+				}
+				
+				// Also try dbId match
+				if (!hasRoleAccess && page.dbId !== undefined) {
+					const dbIdStr = String(page.dbId).toLowerCase().trim();
+					hasRoleAccess = allowedPageIds.some(allowedId => {
+						const allowedIdStr = String(allowedId).toLowerCase().trim();
+						return allowedIdStr === dbIdStr;
+					});
+				}
+				
+				if (import.meta.env.DEV && hasRoleAccess) {
+					console.log('✅ [PageAccess] Access granted via ID-based matching:', {
+						pageId: page.id,
+						pageDbId: page.dbId
+					});
+				}
+			}
+			
+			// TERTIARY: For officers, allow access to specific pages they should always have
+			// (This happens BEFORE the debug logging so we can see if it worked)
+			const isOfficer = currentRole === 'advantageoneofficer' || currentRole === 'advantageonehoofficer';
+			const isCustomerPage = page.path?.startsWith('/customer') || page.category === 'Customer';
+			const isManagementCustomerReporting = page.path === '/management/customer-reporting' || page.id === 'management-customer-reporting';
+			
+			if (!hasRoleAccess && isOfficer) {
+				// Officers can access customer pages (customer assignment checked at API level)
+				if (isCustomerPage) {
+					if (import.meta.env.DEV) {
+						console.log('✅ [PageAccess] Allowing customer page access for officer (customer assignment checked at API level):', {
+							path,
+							pageId: page.id,
+							pagePath: page.path,
+							reason: 'Officers can access customer pages - customer assignment verified at data access level'
+						});
+					}
+					hasRoleAccess = true;
+				}
+				// Officers should always have access to management customer reporting
+				else if (isManagementCustomerReporting) {
+					if (import.meta.env.DEV) {
+						console.log('✅ [PageAccess] Allowing management customer reporting for officer:', {
+							path,
+							pageId: page.id,
+							reason: 'Officers should always have access to customer reporting management page'
+						});
+					}
+					hasRoleAccess = true;
+				}
+			}
+			
+			if (import.meta.env.DEV && !hasRoleAccess) {
+				const debugInfo = {
+					originalPath: path,
+					normalizedPath,
+					pageId: page.id,
+					pageDbId: page.dbId,
+					currentRole,
+					roleKey,
+					allowedPageIdsCount: allowedPageIds.length,
+					allowedPageIds: allowedPageIds.slice(0, 30), // Show first 30
+					pageIdInAllowed: allowedPageIds.includes(page.id),
+					pageDbIdInAllowed: page.dbId ? allowedPageIds.includes(page.dbId.toString()) : false,
+					hasAccess: false,
+					pagePath: page.path,
+					pageCategory: page.category
+				};
+				
+				// Log as separate lines for better readability
+				console.group('🔒 [PageAccess] Access denied for:', normalizedPath);
+				
+				// Explicit string logging for debugging
+				console.log('🔍 ACTUAL VALUES:');
+				console.log('  Page ID:', page.id, '(type:', typeof page.id + ')');
+				console.log('  Page DB ID:', page.dbId, '(type:', typeof page.dbId + ')');
+				console.log('  Page Path:', page.path);
+				console.log('  Page ID (normalized):', page.id?.toLowerCase().trim());
+				console.log('  Allowed IDs count:', allowedPageIds.length);
+				console.log('  Allowed IDs (as strings):', allowedPageIds.map(id => String(id)).join(', '));
+				console.log('  Looking for "customer-incident-report":', allowedPageIds.map(id => String(id).toLowerCase().trim()).includes('customer-incident-report'));
+				
+				// Check path-based matching
+				const pagesWithSamePath = availablePages.filter(ap => {
+					const apPath = ap.path?.toLowerCase().trim();
+					return apPath === pagePathLower;
+				});
+				const pathBasedMatch = pagesWithSamePath.some(pageWithPath => {
+					const pageId = pageWithPath.id?.toLowerCase().trim();
+					const pageDbId = pageWithPath.dbId ? String(pageWithPath.dbId).toLowerCase().trim() : null;
+					return allowedPageIds.some(allowedId => {
+						const allowedIdStr = String(allowedId).toLowerCase().trim();
+						return (pageId && allowedIdStr === pageId) || (pageDbId && allowedIdStr === pageDbId);
+					});
+				});
+				
+				console.log('📄 Page Info:', {
+					id: page.id,
+					dbId: page.dbId,
+					path: page.path,
+					category: page.category,
+					pagesWithSamePath: pagesWithSamePath.length,
+					pathBasedMatchAvailable: pathBasedMatch
+				});
+				console.log('👤 User Role:', {
+					currentRole,
+					roleKey,
+					resolved: roleKey ? '✅' : '❌'
+				});
+				console.log('📋 Allowed Page IDs (Full List):', allowedPageIds);
+				console.log('📋 Allowed Page IDs (Full List - Strings):', allowedPageIds.map(id => String(id)));
+				console.log('📋 Allowed Page IDs (First 30):', allowedPageIds.slice(0, 30));
+				console.log('📋 Allowed Page IDs (Types):', allowedPageIds.map(id => ({ id, type: typeof id, stringValue: String(id) })));
+				// Enhanced search with case-insensitive comparison
+				const exactMatch = allowedPageIds.find(id => String(id).toLowerCase().trim() === pageIdLower);
+				const dbIdMatch = page.dbId ? allowedPageIds.find(id => String(id).toLowerCase().trim() === String(page.dbId).toLowerCase().trim()) : null;
+				
+				console.log('🔍 Search Results:', {
+					'path-based match': pathBasedMatch,
+					'page.id in allowed? (exact)': allowedPageIds.includes(page.id),
+					'page.id in allowed? (case-insensitive)': !!exactMatch,
+					'page.dbId in allowed?': page.dbId ? allowedPageIds.includes(page.dbId.toString()) : 'N/A',
+					'page.dbId match (case-insensitive)': !!dbIdMatch,
+					'page.id type': typeof page.id,
+					'page.dbId type': typeof page.dbId,
+					'exact match found': exactMatch || null,
+					'dbId match found': dbIdMatch || null,
+					'pageId normalized': pageIdLower,
+					'allowedIds sample (normalized)': allowedPageIds.slice(0, 5).map(id => String(id).toLowerCase().trim())
+				});
+				console.log('🔎 Looking for:', {
+					pageId: page.id,
+					pageIdNormalized: pageIdLower,
+					pageDbId: page.dbId?.toString(),
+					pageIdType: typeof page.id,
+					pageDbIdType: typeof page.dbId,
+					pagePath: page.path
+				});
+				// Check all customer pages to see which ones are in the allowed list
+				const customerPageIds = ['customer-incident-report', 'customer-incident-graph', 'customer-satisfaction-report', 'customer-daily-activity-report'];
+				const customerPageMatches = customerPageIds.map(customerPageId => {
+					const exactMatch = allowedPageIds.includes(customerPageId);
+					const caseInsensitiveMatch = allowedPageIds.some(id => String(id).toLowerCase().trim() === customerPageId.toLowerCase().trim());
+					const foundId = allowedPageIds.find(id => String(id).toLowerCase().trim() === customerPageId.toLowerCase().trim());
+					return {
+						pageId: customerPageId,
+						exactMatch,
+						caseInsensitiveMatch,
+						foundId: foundId || null,
+						foundIdType: foundId ? typeof foundId : null
+					};
+				});
+				
+				const allowedPagesWithSamePath = pagesWithSamePath.filter(ap => {
+					const apIdLower = ap.id?.toLowerCase().trim();
+					const apDbIdStr = ap.dbId ? String(ap.dbId).toLowerCase().trim() : null;
+					return allowedPageIds.some(allowedId => {
+						const allowedIdStr = String(allowedId).toLowerCase().trim();
+						return allowedIdStr === apIdLower || allowedIdStr === apDbIdStr;
+					});
+				});
+				
+				console.log('🔍 Direct Comparison:', {
+					'customer-incident-report in array (exact)': allowedPageIds.includes('customer-incident-report'),
+					'customer-incident-report in array (case-insensitive)': allowedPageIds.some(id => String(id).toLowerCase().trim() === 'customer-incident-report'),
+					'dbId in array': page.dbId ? allowedPageIds.includes(String(page.dbId)) : false,
+					'dbId in array (case-insensitive)': page.dbId ? allowedPageIds.some(id => String(id).toLowerCase().trim() === String(page.dbId).toLowerCase().trim()) : false,
+					'customer pages matches': customerPageMatches,
+					'pages with same path': pagesWithSamePath.map(p => ({ id: p.id, dbId: p.dbId, path: p.path })),
+					'allowed pages with same path': allowedPagesWithSamePath.map(p => ({ id: p.id, dbId: p.dbId, path: p.path })),
+					'path-based match would work': pathBasedMatch
+				});
+				
+				// Show all allowed IDs that contain "incident" or "customer"
+				const relevantIds = allowedPageIds.filter(id => {
+					const idStr = String(id).toLowerCase();
+					return idStr.includes('incident') || idStr.includes('customer');
+				});
+				console.log('🔍 Relevant Allowed IDs (containing "incident" or "customer"):', relevantIds);
+				console.log('🔍 All Allowed IDs:', allowedPageIds.map(id => String(id)).join(', '));
+				console.groupEnd();
+			}
 
-      const currentPath = window.location.pathname;
-      
-      // Skip redirect for these paths
-      const skipPaths = [
-        '/login',
-        '/dashboard',
-        '/',
-        '/profile',
-        '/test/barcode'
-      ];
-      
-      if (skipPaths.includes(currentPath)) {
-        return;
-      }
-      
-      // Only redirect if we have page access data loaded
-      if (Object.keys(pageAccessByRole).length > 0 && availablePages.length > 0) {
-        if (!hasAccess(currentPath)) {
-          console.warn(`User with role ${currentRole} does not have access to ${currentPath}, redirecting to dashboard`);
-          navigate('/dashboard');
-        }
-      }
-    } catch (error) {
-      console.error('Error in redirect effect:', error);
-    }
-  }, [currentRole, pageAccessByRole, isLoading, hasInitialized, availablePages, customerAssignedPageIds.size]);
 
-  return (
-    <PageAccessContext.Provider value={{
-      hasAccess,
-      currentRole,
-      setCurrentRole: setCurrentRoleWithData,
-      pageAccessByRole,
-      setPageAccessByRole,
-      availablePages,
-      isLoading,
-      refreshSettings,
-      clearCacheAndReload,
-      syncPages,
-      isTestMode,
-      setIsTestMode,
-      testRole,
-      setTestRole
-    }}>
-      {children}
-    </PageAccessContext.Provider>
-  );
-}; 
+			if (!hasRoleAccess) {
+				return false;
+			}
+
+			// For customer roles accessing customer pages, check customer assignments
+			const isCustomerRole = currentRole === 'customersitemanager' || currentRole === 'customerhomanager';
+
+			if (isCustomerRole && isCustomerPage && customerAssignedPageIds.size > 0) {
+				const hasCustomerAssignment = customerAssignedPageIds.has(page.id);
+				if (import.meta.env.DEV) {
+					console.log('🔍 [PageAccess] Customer assignment check:', {
+						path,
+						pageId: page.id,
+						isCustomerRole,
+						isCustomerPage,
+						customerAssignedPageIdsCount: customerAssignedPageIds.size,
+						hasCustomerAssignment,
+						decision: hasCustomerAssignment ? '✅ ALLOWED' : '❌ DENIED'
+					});
+				}
+				return hasCustomerAssignment;
+			}
+
+			// Success - access granted
+			if (import.meta.env.DEV) {
+				const endTime = performance.now();
+				const duration = endTime - startTime;
+				console.log('✅ [PageAccess] Access GRANTED:', {
+					path,
+					pageId: page.id,
+					pagePath: page.path,
+					currentRole,
+					roleKey,
+					duration: `${duration.toFixed(2)}ms`,
+					reason: isCustomerRole && isCustomerPage 
+						? 'Customer role with customer page (no assignment check needed)' 
+						: 'Role has access to page'
+				});
+			}
+			return true;
+		} catch (error) {
+			console.error('🔒 [PageAccess] Error checking access:', error);
+			console.error('📋 Error Context:', {
+				path,
+				currentRole,
+				errorMessage: error instanceof Error ? error.message : String(error),
+				stack: error instanceof Error ? error.stack : undefined
+			});
+			return false;
+		}
+	}, [currentRole, pageAccessByRole, availablePages, customerAssignedPageIds, status, resolveRoleKey]);
+
+	// Refresh settings
+	const refreshSettings = useCallback(async (): Promise<void> => {
+		if (!hasAuthToken()) {
+			setStatus('idle');
+			setError(null);
+			setIsLoading(false);
+			return;
+		}
+
+		try {
+			setIsLoading(true);
+			await loadPageAccessSettings();
+		} catch (error) {
+			console.error('❌ [PageAccess] Error refreshing settings:', error);
+		} finally {
+			setIsLoading(false);
+		}
+	}, [hasAuthToken, loadPageAccessSettings]);
+
+	// Clear cache and reload
+	const clearCacheAndReload = useCallback(async (): Promise<void> => {
+		settingsLoadAttempted.current = false;
+		await refreshSettings();
+	}, [refreshSettings]);
+
+	// Sync pages (admin only)
+	const syncPages = useCallback(async (): Promise<void> => {
+		if (!hasAuthToken() || currentRole !== 'administrator') {
+			return;
+		}
+
+		try {
+			await pageAccessApi.syncPages(PAGE_DEFINITIONS);
+			await refreshSettings();
+		} catch (error) {
+			console.error('❌ [PageAccess] Error syncing pages:', error);
+		}
+	}, [hasAuthToken, currentRole, refreshSettings]);
+
+	// Set current role with data loading
+	const setCurrentRole = useCallback(async (role: string | null) => {
+		const normalizedRole = normalizeRoleName(role);
+		setCurrentRoleState(normalizedRole);
+
+		if (!normalizedRole || !hasAuthToken()) {
+			setCustomerAssignedPageIds(new Set());
+			lastCustomerContextId.current = null;
+			return;
+		}
+
+		// Load customer assignments if needed
+		const isCustomerRole = normalizedRole === 'customersitemanager' || normalizedRole === 'customerhomanager';
+		if (isCustomerRole && user) {
+			const customerId = 'customerId' in user ? user.customerId : null;
+			await loadCustomerPageAssignments(customerId);
+		} else {
+			setCustomerAssignedPageIds(new Set());
+			lastCustomerContextId.current = null;
+		}
+	}, [normalizeRoleName, hasAuthToken, user, loadCustomerPageAssignments]);
+
+	// Set role immediately when user exists (before loading settings)
+	// This runs synchronously on mount and whenever user changes
+	useEffect(() => {
+		if (user) {
+			const userRole = (user as any).pageAccessRole || user.role || null;
+			const normalizedRole = normalizeRoleName(userRole);
+			if (normalizedRole && normalizedRole !== currentRole) {
+				setCurrentRoleState(normalizedRole);
+			}
+		} else if (!user && currentRole) {
+			// Clear role when user logs out
+			setCurrentRoleState(null);
+		}
+	}, [user?.id, user?.role, normalizeRoleName]); // Only depend on user.id and user.role, not currentRole
+
+	// Initialize on mount and when user/auth token changes
+	useEffect(() => {
+		// Prevent multiple initializations
+		if (initializationRef.current) {
+			return;
+		}
+
+		const initialize = async () => {
+			// Skip if no auth token
+			if (!hasAuthToken()) {
+				setStatus('idle');
+				setIsLoading(false);
+				return;
+			}
+
+			// Skip if already attempted
+			if (settingsLoadAttempted.current) {
+				return;
+			}
+
+			settingsLoadAttempted.current = true;
+			initializationRef.current = true;
+
+			try {
+				setIsLoading(true);
+				setStatus('loading');
+
+				// Load settings
+				await loadPageAccessSettings();
+
+				// Set role from user (in case it wasn't set yet)
+				if (user) {
+					const userRole = (user as any).pageAccessRole || user.role || null;
+					const normalizedRole = normalizeRoleName(userRole);
+					
+					if (normalizedRole) {
+						setCurrentRoleState(normalizedRole);
+						
+						// Load customer assignments if needed
+						const isCustomerRole = normalizedRole === 'customersitemanager' || normalizedRole === 'customerhomanager';
+						if (isCustomerRole && 'customerId' in user) {
+							await loadCustomerPageAssignments(user.customerId);
+						}
+					}
+				}
+			} catch (error) {
+				console.error('❌ [PageAccess] Initialization error:', error);
+				setStatus('offline');
+				
+				// Set role from user even on error
+				if (user) {
+					const userRole = (user as any).pageAccessRole || user.role || null;
+					const normalizedRole = normalizeRoleName(userRole);
+					if (normalizedRole) {
+						setCurrentRoleState(normalizedRole);
+					}
+				}
+			} finally {
+				setIsLoading(false);
+			}
+		};
+
+		initialize();
+	}, [hasAuthToken, user?.id, loadPageAccessSettings, normalizeRoleName, loadCustomerPageAssignments]);
+
+	// Reset when user logs out
+	useEffect(() => {
+		if (!hasAuthToken()) {
+			setCurrentRoleState(null);
+			setPageAccessByRole({});
+			setAvailablePages([]);
+			setCustomerAssignedPageIds(new Set());
+			setStatus('idle');
+			setError(null);
+			initializationRef.current = false;
+			settingsLoadAttempted.current = false;
+			lastCustomerContextId.current = null;
+		}
+	}, [hasAuthToken]);
+
+	return (
+		<PageAccessContext.Provider value={{
+			hasAccess,
+			currentRole,
+			setCurrentRole,
+			pageAccessByRole,
+			setPageAccessByRole,
+			availablePages,
+			isLoading,
+			status,
+			error,
+			refreshSettings,
+			clearCacheAndReload,
+			syncPages,
+			isTestMode,
+			setIsTestMode,
+			testRole,
+			setTestRole
+		}}>
+			{children}
+		</PageAccessContext.Provider>
+	);
+};

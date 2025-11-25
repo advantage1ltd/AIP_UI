@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -20,7 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CUSTOMERS, REGIONS, SITES, RATING_SCALE, CustomerSurvey } from './types';
+import { RATING_SCALE, CustomerSurvey } from './types';
 import { Minus, Plus, Map, Building, User, Award, Star, Smile, UserCheck, Shield, Users, Clock, Zap, ClipboardList } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Label } from "@/components/ui/label";
@@ -67,6 +67,9 @@ interface SurveyFormProps {
   initialData?: CustomerSurvey | null;
   customerId?: string;
   siteId?: string;
+  customers?: Array<{ id: string; name: string }>;
+  regions?: Array<{ id: string; name: string; customerId: string }>;
+  sites?: Array<{ id: string; name: string; customerId: string; regionId: string }>;
 }
 
 // Form section wrapper for consistent styling
@@ -143,16 +146,20 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
   onCancel,
   initialData,
   customerId,
-  siteId
+  siteId,
+  customers: propCustomers = [],
+  regions: propRegions = [],
+  sites: propSites = []
 }) => {
   const { user } = useAuth();
-  const form = useForm();
-  const [formData, setFormData] = useState<Omit<CustomerSurvey, 'id'>>({
+  
+  // Initialize default form values
+  const defaultValues = {
     officerName: initialData?.officerName || '',
     date: initialData?.date || format(new Date(), 'yyyy-MM-dd'),
     customer: initialData?.customer || '',
     region: initialData?.region || '',
-    location: initialData?.location || '',
+    location: initialData?.siteName || initialData?.location || '',
     ratings: initialData?.ratings || {
       uniformAndAppearance: 5,
       professionalism: 5,
@@ -166,48 +173,129 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
     areaManagerName: initialData?.areaManagerName || '',
     followUpActions: initialData?.followUpActions || [''],
     datesToBeCompleted: initialData?.datesToBeCompleted || ['']
+  };
+  
+  const form = useForm({
+    defaultValues
   });
+  
+  const [formData, setFormData] = useState<Omit<CustomerSurvey, 'id'>>(defaultValues);
 
-  // Get filtered regions based on selected customer
-  const getFilteredRegions = () => {
-    const selectedCustomer = CUSTOMERS.find(c => c.name === formData.customer);
-    if (!selectedCustomer) return [];
-    return REGIONS.filter(r => r.customerId === selectedCustomer.id);
-  };
+  // Use prop data or fallback to empty arrays
+  const customers = propCustomers.length > 0 ? propCustomers : [];
+  const regions = propRegions.length > 0 ? propRegions : [];
+  const sites = propSites.length > 0 ? propSites : [];
 
-  // Get filtered sites based on selected customer and region
-  const getFilteredSites = () => {
-    const selectedCustomer = CUSTOMERS.find(c => c.name === formData.customer);
+  // Get filtered regions based on selected customer (memoized)
+  const filteredRegions = useMemo(() => {
+    const selectedCustomer = customers.find(c => c.name === formData.customer);
     if (!selectedCustomer) return [];
-    const customerSites = SITES.filter(s => s.customerId === selectedCustomer.id);
+    return regions.filter(r => r.customerId === selectedCustomer.id);
+  }, [customers, regions, formData.customer]);
+
+  // Get filtered sites based on selected customer and region (memoized)
+  const filteredSites = useMemo(() => {
+    const selectedCustomer = customers.find(c => c.name === formData.customer);
+    if (!selectedCustomer) {
+      console.log('🔍 [getFilteredSites] No customer selected');
+      return [];
+    }
     
-    const selectedRegion = getFilteredRegions().find(r => r.name === formData.region);
-    if (!selectedRegion) return customerSites;
+    const customerSites = sites.filter(s => s.customerId === selectedCustomer.id);
     
-    return customerSites.filter(s => s.regionId === selectedRegion.id);
-  };
+    console.log('🔍 [getFilteredSites] Customer sites:', {
+      selectedCustomer: selectedCustomer.name,
+      selectedCustomerId: selectedCustomer.id,
+      customerSitesCount: customerSites.length,
+      allSitesCount: sites.length,
+      formDataRegion: formData.region,
+      customerSites: customerSites.map(s => ({ name: s.name, regionId: s.regionId, customerId: s.customerId }))
+    });
+    
+    // If no region is selected, return all customer sites
+    if (!formData.region) {
+      console.log('🔍 [getFilteredSites] No region selected, returning all customer sites');
+      return customerSites;
+    }
+    
+    const selectedRegion = filteredRegions.find(r => r.name === formData.region);
+    if (!selectedRegion) {
+      console.log('🔍 [getFilteredSites] Region not found:', {
+        searchedRegion: formData.region,
+        availableRegions: filteredRegions.map(r => ({ id: r.id, name: r.name, customerId: r.customerId })),
+        allRegions: regions.map(r => ({ id: r.id, name: r.name, customerId: r.customerId }))
+      });
+      return customerSites;
+    }
+    
+    console.log('🔍 [getFilteredSites] Selected region:', {
+      regionName: selectedRegion.name,
+      regionId: selectedRegion.id,
+      regionCustomerId: selectedRegion.customerId
+    });
+    
+    // Debug: Show all site regionIds before filtering
+    console.log('🔍 [getFilteredSites] All customer sites with regionIds:', 
+      customerSites.map(s => ({
+        siteName: s.name,
+        siteRegionId: s.regionId,
+        siteRegionIdType: typeof s.regionId,
+        selectedRegionId: selectedRegion.id,
+        selectedRegionIdType: typeof selectedRegion.id,
+        willMatch: String(s.regionId || '') === String(selectedRegion.id || '')
+      }))
+    );
+    
+    const filtered = customerSites.filter(s => {
+      // Compare both as strings to ensure type matching
+      const siteRegionId = String(s.regionId || '').trim();
+      const selectedRegionId = String(selectedRegion.id || '').trim();
+      const matches = siteRegionId === selectedRegionId;
+      
+      if (!matches && s.regionId) {
+        console.log('❌ [getFilteredSites] Site does NOT match:', {
+          siteName: s.name,
+          siteRegionId,
+          selectedRegionId,
+          siteRegionIdRaw: s.regionId,
+          selectedRegionIdRaw: selectedRegion.id
+        });
+      }
+      
+      return matches;
+    });
+    
+    console.log('🔍 [getFilteredSites] Final filtered sites:', {
+      selectedRegion: selectedRegion.name,
+      selectedRegionId: selectedRegion.id,
+      filteredSitesCount: filtered.length,
+      filteredSites: filtered.map(s => ({ name: s.name, regionId: s.regionId }))
+    });
+    
+    return filtered;
+  }, [customers, sites, filteredRegions, formData.customer, formData.region]);
 
   // Helper functions to get names from IDs for auto-fill
   const getCustomerNameFromId = (customerId: string): string => {
-    const customer = CUSTOMERS.find(c => c.id === customerId);
-    console.log('🔍 Customer lookup:', { customerId, found: customer, allCustomers: CUSTOMERS });
+    const customer = customers.find(c => c.id === customerId);
+    console.log('🔍 Customer lookup:', { customerId, found: customer, allCustomers: customers });
     return customer?.name || '';
   };
 
   const getSiteNameFromId = (siteId: string): string => {
-    const site = SITES.find(s => s.id === siteId);
-    console.log('🔍 Site lookup:', { siteId, found: site, allSites: SITES });
+    const site = sites.find(s => s.id === siteId);
+    console.log('🔍 Site lookup:', { siteId, found: site, allSites: sites });
     return site?.name || '';
   };
 
   const getRegionNameFromSiteId = (siteId: string): string => {
-    const site = SITES.find(s => s.id === siteId);
+    const site = sites.find(s => s.id === siteId);
     if (!site) {
       console.log('❌ Region lookup: Site not found for', siteId);
       return '';
     }
-    const region = REGIONS.find(r => r.id === site.regionId);
-    console.log('🔍 Region lookup:', { siteId, site, regionId: site.regionId, found: region, allRegions: REGIONS });
+    const region = regions.find(r => r.id === site.regionId);
+    console.log('🔍 Region lookup:', { siteId, site, regionId: site.regionId, found: region, allRegions: regions });
     return region?.name || '';
   };
 
@@ -231,9 +319,9 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
         customerName, 
         siteName, 
         regionName,
-        allCustomers: CUSTOMERS,
-        allSites: SITES,
-        allRegions: REGIONS
+        allCustomers: customers,
+        allSites: sites,
+        allRegions: regions
       });
       
       if (customerName && siteName) {
@@ -241,7 +329,7 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
           ...prev,
           customer: customerName,
           region: regionName,
-          location: siteName
+          location: siteName // Will be mapped to siteName in service
         }));
       }
     }
@@ -350,8 +438,11 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
                 {...field}
                 placeholder="Enter follow-up action"
                 className="h-8 md:h-9 text-xs md:text-sm"
-                value={formData.followUpActions[index] || ''}
-                onChange={(e) => handleFollowUpActionChange(index, e.target.value)}
+                value={formData.followUpActions[index] ?? ''}
+                onChange={(e) => {
+                  field.onChange(e);
+                  handleFollowUpActionChange(index, e.target.value);
+                }}
               />
             </FormControl>
             <FormMessage className="text-[10px]" />
@@ -371,8 +462,11 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
                 {...field}
                 type="date"
                 className="h-8 md:h-9 text-xs md:text-sm"
-                value={formData.datesToBeCompleted[index] || ''}
-                onChange={(e) => handleDateToCompleteChange(index, e.target.value)}
+                value={formData.datesToBeCompleted[index] ?? ''}
+                onChange={(e) => {
+                  field.onChange(e);
+                  handleDateToCompleteChange(index, e.target.value);
+                }}
               />
             </FormControl>
             <FormMessage className="text-[10px]" />
@@ -480,7 +574,7 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
                         region: '', // Reset region when customer changes
                         location: '' // Reset location when customer changes
                       }))}
-                      disabled={!!(customerId && siteId && user?.role !== 'Administrator')}
+                      disabled={!!(customerId && siteId && user?.role !== 'administrator')}
                     >
                       <FormControl>
                         <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm">
@@ -488,7 +582,7 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {CUSTOMERS.map((customer) => (
+                        {customers.map((customer) => (
                           <SelectItem key={customer.id} value={customer.name} className="text-xs md:text-sm">
                             {customer.name}
                           </SelectItem>
@@ -513,11 +607,14 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
                     </FormLabel>
                     <Select 
                       value={formData.region} 
-                      onValueChange={(value) => setFormData(prev => ({ 
-                        ...prev, 
-                        region: value,
-                        location: '' // Reset location when region changes
-                      }))}
+                      onValueChange={(value) => {
+                        console.log('🔍 [Region Change]', { value, formData });
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          region: value,
+                          location: '' // Reset location when region changes
+                        }));
+                      }}
                       disabled={!formData.customer || !!(customerId && siteId && user?.role !== 'Administrator')}
                     >
                       <FormControl>
@@ -526,7 +623,7 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {getFilteredRegions().map((region) => (
+                        {filteredRegions.map((region) => (
                           <SelectItem key={region.id} value={region.name} className="text-xs md:text-sm">
                             {region.name}
                           </SelectItem>
@@ -550,21 +647,26 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
                       </div>
                     </FormLabel>
                     <Select 
+                      key={`site-select-${formData.region}-${filteredSites.length}`}
                       value={formData.location} 
                       onValueChange={(value) => setFormData(prev => ({ ...prev, location: value }))}
                       disabled={!formData.customer || !!(customerId && siteId && user?.role !== 'Administrator')}
                     >
                       <FormControl>
                         <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm">
-                          <SelectValue placeholder={!formData.customer ? "Select customer first" : "Select site"} />
+                          <SelectValue placeholder={!formData.customer ? "Select customer first" : !formData.region ? "Select region first" : filteredSites.length === 0 ? "No sites available" : "Select site"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {getFilteredSites().map((site) => (
-                          <SelectItem key={site.id} value={site.name} className="text-xs md:text-sm">
-                            {site.name}
-                          </SelectItem>
-                        ))}
+                        {filteredSites.length > 0 ? (
+                          filteredSites.map((site) => (
+                            <SelectItem key={site.id} value={site.name} className="text-xs md:text-sm">
+                              {site.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="px-2 py-1.5 text-xs text-gray-500">No sites available for selected region</div>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage className="text-[10px]" />
@@ -631,6 +733,11 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
                         {...field} 
                         placeholder="Enter area manager name"
                         className="h-8 md:h-9 text-xs md:text-sm"
+                        value={formData.areaManagerName || ''}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          setFormData(prev => ({ ...prev, areaManagerName: e.target.value }));
+                        }}
                       />
                     </FormControl>
                     <FormMessage className="text-[10px]" />

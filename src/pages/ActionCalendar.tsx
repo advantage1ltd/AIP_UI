@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Calendar } from "@/components/ui/calendar"
 import { AddTaskForm } from "@/components/action-calendar/AddTaskForm"
 import { TaskList } from "@/components/action-calendar/TaskList"
+import { TaskProgressSheet } from "@/components/action-calendar/TaskProgressSheet"
 import { usePageAccess } from "@/contexts/PageAccessContext"
 import { 
   Plus, 
@@ -29,7 +30,8 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
-import { actionCalendarService, ActionCalendarTask } from "@/services/actionCalendarService"
+import { actionCalendarService, ActionCalendarTask, ActionCalendarStatusUpdate } from "@/services/actionCalendarService"
+import useAuth from "@/hooks/useAuth"
 
 export type Task = {
   id: string
@@ -38,8 +40,26 @@ export type Task = {
   date: Date
   priority: 'low' | 'medium' | 'high'
   assignee: string
+  assigneeName?: string
   status: 'pending' | 'in-progress' | 'completed' | 'blocked'
   statusNotes?: string
+  email?: string
+  createdById?: string
+  createdByName?: string
+  modifiedById?: string
+  modifiedByName?: string
+  dateCreated?: Date
+  dateModified?: Date
+}
+
+export type TaskStatusUpdate = {
+  id: string
+  taskId: string
+  status: Task['status']
+  comment?: string
+  updateDate: Date
+  updatedBy?: string
+  updatedByName: string
 }
 
 const ActionCalendar = () => {
@@ -59,7 +79,32 @@ const ActionCalendar = () => {
   const [activeTab, setActiveTab] = useState<string>("day")
   const { toast } = useToast()
   const { currentRole } = usePageAccess()
-  const isAdmin = currentRole === 'Administrator'
+  const { user } = useAuth()
+  const isAdmin = currentRole === 'administrator'
+  const currentUserId = user?.id
+  const [statusUpdates, setStatusUpdates] = useState<Record<string, TaskStatusUpdate[]>>({})
+  const [statusUpdatesLoading, setStatusUpdatesLoading] = useState<Record<string, boolean>>({})
+  const [statusUpdatesError, setStatusUpdatesError] = useState<Record<string, string | null>>({})
+  const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [isProgressSheetOpen, setIsProgressSheetOpen] = useState(false)
+
+  const canManageTasks = isAdmin
+  const canUpdateTaskStatus = (task: Task) => {
+    if (isAdmin) return true
+    if (task.assignee && currentUserId && task.assignee === currentUserId) return true
+    if (task.createdById && currentUserId && task.createdById === currentUserId) return true
+    return false
+  }
+
+  const mapStatusUpdate = (update: ActionCalendarStatusUpdate): TaskStatusUpdate => ({
+    id: update.actionCalendarStatusUpdateId.toString(),
+    taskId: update.actionCalendarId.toString(),
+    status: update.status,
+    comment: update.comment,
+    updateDate: new Date(update.updateDate),
+    updatedBy: update.updatedBy,
+    updatedByName: update.updatedByUserName
+  })
 
   // Load tasks from backend
   const loadTasks = async () => {
@@ -95,6 +140,83 @@ const ActionCalendar = () => {
       setStatistics(stats)
     } catch (error) {
       console.error('Error loading statistics:', error)
+    }
+  }
+
+  const loadTaskStatusUpdates = async (taskId: string, force = false) => {
+    if (!force && statusUpdates[taskId]) {
+      return
+    }
+
+    setStatusUpdatesLoading(prev => ({ ...prev, [taskId]: true }))
+    setStatusUpdatesError(prev => ({ ...prev, [taskId]: null }))
+
+    try {
+      const response = await actionCalendarService.getStatusUpdates(parseInt(taskId))
+      if (response.success) {
+        setStatusUpdates(prev => ({ ...prev, [taskId]: response.data.map(mapStatusUpdate) }))
+      } else {
+        throw new Error(response.message || 'Failed to load status updates')
+      }
+    } catch (error) {
+      console.error('Error loading status updates:', error)
+      setStatusUpdatesError(prev => ({ ...prev, [taskId]: 'Unable to load progress updates. Please try again.' }))
+      toast({
+        title: "Error",
+        description: "Failed to load task progress history.",
+        variant: "destructive"
+      })
+    } finally {
+      setStatusUpdatesLoading(prev => ({ ...prev, [taskId]: false }))
+    }
+  }
+
+  const handleOpenProgress = async (task: Task) => {
+    setActiveTask(task)
+    setIsProgressSheetOpen(true)
+    await loadTaskStatusUpdates(task.id)
+  }
+
+  const handleSubmitProgressUpdate = async (taskId: string, payload: { status: Task['status']; comment?: string }) => {
+    try {
+      setStatusUpdatesError(prev => ({ ...prev, [taskId]: null }))
+      const response = await actionCalendarService.createStatusUpdate(parseInt(taskId), payload)
+      if (response.success) {
+        const mappedUpdate = mapStatusUpdate(response.data)
+        setStatusUpdates(prev => ({
+          ...prev,
+          [taskId]: [mappedUpdate, ...(prev[taskId] || [])]
+        }))
+        await loadTasks()
+        await loadStatistics()
+        toast({
+          title: "Progress Updated",
+          description: "Task progress has been shared with the task creator and assignee."
+        })
+      } else {
+        throw new Error(response.message || 'Failed to submit status update')
+      }
+    } catch (error) {
+      console.error('Error updating task progress:', error)
+      setStatusUpdatesError(prev => ({ ...prev, [taskId]: 'Unable to submit update. Please try again.' }))
+      toast({
+        title: "Error",
+        description: "Failed to submit task progress.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleCloseProgressSheet = (open: boolean) => {
+    setIsProgressSheetOpen(open)
+    if (!open) {
+      setActiveTask(null)
+    }
+  }
+
+  const handleRefreshActiveTaskUpdates = () => {
+    if (activeTask) {
+      loadTaskStatusUpdates(activeTask.id, true)
     }
   }
 
@@ -141,53 +263,6 @@ const ActionCalendar = () => {
       toast({
         title: "Error",
         description: "Failed to create task",
-        variant: "destructive"
-      })
-    }
-  }
-
-  const handleUpdateTaskStatus = async (taskId: string, newStatus: Task['status'], notes?: string) => {
-    if (!isAdmin) {
-      toast({
-        title: "Access Denied",
-        description: "Only administrators can update task status.",
-        variant: "destructive"
-      })
-      return
-    }
-
-    try {
-      const task = tasks.find(t => t.id === taskId)
-      if (!task) return
-
-      const backendTask = actionCalendarService.convertToBackendFormat({
-        ...task,
-        status: newStatus,
-        description: notes || task.description
-      })
-
-      const response = await actionCalendarService.updateTask(parseInt(taskId), backendTask)
-      
-      if (response.success) {
-        const updatedTask = actionCalendarService.convertToFrontendFormat(response.data)
-        setTasks(tasks.map(t => t.id === taskId ? updatedTask : t))
-        await loadStatistics() // Refresh statistics
-        toast({
-          title: "Task Updated",
-          description: "Task status has been successfully updated.",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || "Failed to update task",
-          variant: "destructive"
-        })
-      }
-    } catch (error) {
-      console.error('Error updating task:', error)
-      toast({
-        title: "Error",
-        description: "Failed to update task",
         variant: "destructive"
       })
     }
@@ -566,9 +641,11 @@ const ActionCalendar = () => {
                             tasks={tasks.filter(task => 
                               isSameDay(new Date(task.date), date)
                             )}
-                            onUpdateStatus={handleUpdateTaskStatus}
+                            onOpenProgress={handleOpenProgress}
                             onUpdateTask={handleUpdateTask}
                             onDeleteTask={handleDeleteTask}
+                            canManageTasks={canManageTasks}
+                            canUpdateStatus={canUpdateTaskStatus}
                           />
                         ) : (
                           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -620,9 +697,11 @@ const ActionCalendar = () => {
                             tasks={tasks.filter(task => 
                               isSameWeek(new Date(task.date), date)
                             )}
-                            onUpdateStatus={handleUpdateTaskStatus}
+                            onOpenProgress={handleOpenProgress}
                             onUpdateTask={handleUpdateTask}
                             onDeleteTask={handleDeleteTask}
+                            canManageTasks={canManageTasks}
+                            canUpdateStatus={canUpdateTaskStatus}
                           />
                         ) : (
                           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -674,9 +753,11 @@ const ActionCalendar = () => {
                             tasks={tasks.filter(task => 
                               isSameMonth(new Date(task.date), date)
                             )}
-                            onUpdateStatus={handleUpdateTaskStatus}
+                            onOpenProgress={handleOpenProgress}
                             onUpdateTask={handleUpdateTask}
                             onDeleteTask={handleDeleteTask}
+                            canManageTasks={canManageTasks}
+                            canUpdateStatus={canUpdateTaskStatus}
                           />
                         ) : (
                           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -720,6 +801,18 @@ const ActionCalendar = () => {
           </div>
         </div>
       </div>
+      <TaskProgressSheet
+        open={isProgressSheetOpen}
+        onOpenChange={handleCloseProgressSheet}
+        task={activeTask}
+        statusUpdates={activeTask ? statusUpdates[activeTask.id] ?? [] : []}
+        isLoading={activeTask ? statusUpdatesLoading[activeTask.id] ?? false : false}
+        error={activeTask ? statusUpdatesError[activeTask.id] : undefined}
+        onRefresh={handleRefreshActiveTaskUpdates}
+        onSubmitProgress={handleSubmitProgressUpdate}
+        canUpdate={activeTask ? canUpdateTaskStatus(activeTask) : false}
+        isAdmin={isAdmin}
+      />
     </div>
   )
 }

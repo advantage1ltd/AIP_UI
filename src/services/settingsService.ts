@@ -5,8 +5,9 @@ export const settingsService = {
 		return pageAccessApi.getSettings();
 	},
 
-	savePageAccessSettings: async (settings: { pageAccessByRole: Record<string, string[]> }): Promise<PageAccessSettings> => {
-		return pageAccessApi.saveSettings(settings.pageAccessByRole);
+	savePageAccessSettings: async (settings: { pageAccessByRole: Record<string, string[]> }, availablePages: PageAccess[] = []): Promise<PageAccessSettings> => {
+		// Send PageIds directly (backend handles both PageIds and Titles)
+		return pageAccessApi.saveSettings(settings.pageAccessByRole, availablePages);
 	},
 
 	resetAdminAccess: async (availablePages: PageAccess[]): Promise<PageAccessSettings> => {
@@ -15,9 +16,9 @@ export const settingsService = {
 		const updatedSettings = {
 			pageAccessByRole: {
 				...currentSettings.pageAccessByRole,
-				Administrator: allPageIds
+				administrator: allPageIds
 			}
 		};
-		return settingsService.savePageAccessSettings(updatedSettings);
+		return settingsService.savePageAccessSettings(updatedSettings, availablePages);
 	}
 };

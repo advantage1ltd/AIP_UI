@@ -15,7 +15,8 @@ export const safeDuressWordsService = {
   // Get current code words
   getCurrentWords: async (): Promise<ApiResponse<{ safe: CodeWord; duress: CodeWord }>> => {
     const response = await api.get(`${BASE_URL}/current`);
-    return response.data;
+    // Backend returns { data: { safe: ..., duress: ... } }
+    return { data: response.data.data };
   },
 
   // Get word change history with pagination and filters
@@ -34,18 +35,24 @@ export const safeDuressWordsService = {
     });
 
     const response = await api.get(`${BASE_URL}/history?${queryParams}`);
-    return response.data;
+    // Backend returns { data: [...], pagination: {...} }
+    return {
+      data: response.data.data,
+      pagination: response.data.pagination
+    };
   },
 
   // Update a code word
   updateCodeWord: async (data: UpdateCodeWordRequest): Promise<ApiResponse<CodeWord>> => {
     const response = await api.put(`${BASE_URL}`, data);
-    return response.data;
+    // Backend returns { data: CodeWord }
+    return { data: response.data.data };
   },
 
   // Get single history entry
   getHistoryEntry: async (id: string): Promise<ApiResponse<WordHistory>> => {
     const response = await api.get(`${BASE_URL}/history/${id}`);
-    return response.data;
+    // Backend returns { data: WordHistory }
+    return { data: response.data.data };
   }
 }; 

@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useCustomerSelection } from "@/contexts/CustomerSelectionContext"
 import { findCustomerById } from "@/hooks/useAvailableCustomers"
 import { siteService } from '@/services/siteService'
+import { extractCustomerId } from '@/utils/customerId'
 
 export default function CustomerDailyActivityReport() {
   const navigate = useNavigate()
@@ -53,8 +54,8 @@ export default function CustomerDailyActivityReport() {
         // Get customer ID from URL parameter or user's customerId (for customer users)
         const urlCustomerId = searchParams.get('customerId')
         const urlSiteId = searchParams.get('siteId')
-        const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined
-        const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : userCustomerId
+        const userCustomerId = extractCustomerId(user)
+        const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : (userCustomerId || undefined)
 
         console.log('CustomerDailyActivityReport: URL customerId:', urlCustomerId)
         console.log('CustomerDailyActivityReport: URL siteId:', urlSiteId)

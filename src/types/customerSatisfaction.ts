@@ -15,7 +15,7 @@ export interface CustomerSurvey {
   date: string;
   customer: string;
   region: string;
-  location: string;
+  siteName: string;
   ratings: CustomerSurveyRatings;
   storeManagerName: string;
   areaManagerName: string;

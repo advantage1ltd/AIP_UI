@@ -87,7 +87,7 @@ export const SurveyDetails: React.FC<SurveyDetailsProps> = ({
                   <span className="text-[10px] sm:text-xs font-medium text-gray-500">Location</span>
                   <div className="flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-gray-400" />
-                    <span className="truncate text-gray-900">{survey.location}, {survey.region}</span>
+                    <span className="truncate text-gray-900">{survey.siteName}, {survey.region}</span>
                   </div>
                 </div>
               </div>

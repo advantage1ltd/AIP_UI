@@ -17,7 +17,7 @@ import { RegionDialog } from "./RegionDialog"
 import { SiteDialog } from "./SiteDialog"
 import { RegionsTable } from "./RegionsTable"
 import { SitesTable } from "./SitesTable"
-import { customerOperations } from "@/mocks/customerStore"
+import { customerService } from "@/services/customerService"
 import { DUMMY_REGIONS } from "@/data/mockRegions"
 import { DUMMY_SITES } from "@/data/mockSites"
 

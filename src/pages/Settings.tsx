@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { UserCog, Search, Check, X, Save, AlertCircle, Eye } from 'lucide-react'
@@ -34,35 +34,30 @@ interface UserRole {
 const Settings = () => {
   const queryClient = useQueryClient();
   
-  // State for officer customer reporting setting
-  const [officerCustomerReportingEnabled, setOfficerCustomerReportingEnabled] = useState(() => {
-    return localStorage.getItem('officer_customer_reporting_enabled') === 'true';
-  });
-
-  // Define user roles
+  // Define user roles (stored in lowercase to match backend)
   const userRoles: UserRole[] = [
     { 
-      id: 'AdvantageOneOfficer', 
+      id: 'advantageoneofficer', 
       name: 'Advantage One Officer', 
       description: 'Security officers working on site' 
     },
     { 
-      id: 'AdvantageOneHOOfficer', 
+      id: 'advantageonehoofficer', 
       name: 'Advantage One HO Officer', 
       description: 'Head office staff managing operations' 
     },
     { 
-      id: 'Administrator', 
+      id: 'administrator', 
       name: 'Administrator', 
       description: 'System administrators with full access' 
     },
     { 
-      id: 'CustomerSiteManager', 
+      id: 'customersitemanager', 
       name: 'Customer Site Manager', 
       description: 'Client managers at specific locations' 
     },
     { 
-      id: 'CustomerHOManager', 
+      id: 'customerhomanager', 
       name: 'Customer Head Office Manager', 
       description: 'Client executives overseeing all sites' 
     }
@@ -111,6 +106,13 @@ const Settings = () => {
     
     // Only sync if this is a new settings object (different from last synced)
     if (settingsKey !== lastSyncedSettingsRef.current) {
+      // Log what we're syncing (for debugging)
+      if (import.meta.env.DEV) {
+        const officerPages = settings.pageAccessByRole['advantageoneofficer'] || [];
+        const crmPages = officerPages.filter(id => id.startsWith('crm-'));
+        console.log(`🔄 [Settings] Syncing from API - Officer has ${crmPages.length} CRM pages:`, crmPages);
+      }
+      
       lastSyncedSettingsRef.current = settingsKey;
       setPageAccessByRole(settings.pageAccessByRole);
     }
@@ -122,18 +124,38 @@ const Settings = () => {
       ? settings.availablePages 
       : availablePages;
     
-    if (pagesToUse.length > 0 && pageAccessByRole.Administrator) {
+    if (pagesToUse.length > 0 && pageAccessByRole.administrator) {
       const allPageIds = pagesToUse.map(page => page.id);
       setAdminAccessModified(
-        !allPageIds.every(id => pageAccessByRole.Administrator.includes(id))
+        !allPageIds.every(id => pageAccessByRole.administrator.includes(id))
       );
     }
   }, [pageAccessByRole, settings, availablePages]);
 
   // Mutation for saving settings
   const { mutate: saveSettings, isPending: isSaving } = useMutation({
-    mutationFn: settingsService.savePageAccessSettings,
+    mutationFn: async (settingsToSave: { pageAccessByRole: Record<string, string[]> }) => {
+      // Get available pages to convert PageIds to Titles before saving
+      // Use settings from query result if available, otherwise use availablePages from context
+      const pagesToUse = settings?.availablePages && settings.availablePages.length > 0 
+        ? settings.availablePages 
+        : availablePages;
+      return settingsService.savePageAccessSettings(settingsToSave, pagesToUse);
+    },
     onSuccess: async (data) => {
+      // Log what was saved
+      if (import.meta.env.DEV) {
+        const officerPages = data.pageAccessByRole['advantageoneofficer'] || [];
+        const customerReportingPages = officerPages.filter(id => 
+          id === 'management-customer-reporting' || id === 'customer-reporting' || id.includes('customer-reporting')
+        );
+        console.log(`💾 [Settings] Save successful - Officer pages:`, {
+          total: officerPages.length,
+          customerReporting: customerReportingPages,
+          allPages: officerPages
+        });
+      }
+      
       // Update the ref FIRST to mark this as synced to prevent infinite loop
       const newSettingsKey = JSON.stringify(data.pageAccessByRole);
       lastSyncedSettingsRef.current = newSettingsKey;
@@ -141,22 +163,50 @@ const Settings = () => {
       // Update context state with the saved data (this updates the context immediately)
       setPageAccessByRole(data.pageAccessByRole);
       
+      // CRITICAL: Force refresh the context to ensure all components get updated data
+      // This ensures sidebar, navigation, and access checks all use the latest settings
+      await refreshSettings();
+      
       toast({
         title: adminAccessModified ? "Warning: Admin Access Modified" : "Settings Saved",
         description: adminAccessModified 
           ? "You have modified administrator access. This may affect system functionality."
-          : "Page access settings have been saved successfully.",
+          : "Page access settings have been saved successfully. Changes are now active.",
         variant: adminAccessModified ? "destructive" : "default",
       });
       
-      // Invalidate and refetch the query - the ref prevents the useEffect from re-syncing
-      // since we've already marked this version as synced
+      // Update the query cache directly with the saved data instead of refetching
+      // This prevents race conditions where refetch might get stale data
+      queryClient.setQueryData(['pageAccess'], data);
+      
+      // Also invalidate to ensure fresh data on next load, but don't refetch immediately
       queryClient.invalidateQueries({ queryKey: ['pageAccess'] });
     },
-    onError: () => {
+    onError: (error: any) => {
+      // Log detailed error information
+      console.error('❌ [Settings] Failed to save settings:', error);
+      console.error('❌ [Settings] Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        url: error?.config?.url,
+        requestData: error?.config?.data
+      });
+      
+      // Extract error message from response
+      let errorMessage = "There was a problem saving your changes. Please try again.";
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        errorMessage = error.response.data.errors.join(', ');
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error Saving Settings",
-        description: "There was a problem saving your changes. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -190,6 +240,11 @@ const Settings = () => {
       });
     }
   });
+
+  const officerCustomerReportingEnabled = useMemo(() => {
+    const officerPages = pageAccessByRole['advantageoneofficer'] || [];
+    return officerPages.includes('management-customer-reporting');
+  }, [pageAccessByRole]);
 
   if (queryLoading) {
     return (
@@ -302,10 +357,20 @@ const Settings = () => {
   const mobileRoleGroup1 = userRoles.slice(0, rolesPerRowMobile);
   const mobileRoleGroup2 = userRoles.slice(rolesPerRowMobile);
 
+  const updateRoleAccess = (roleId: string, updater: (pages: Set<string>) => void) => {
+    setPageAccessByRole(prev => {
+      const next = { ...prev };
+      const currentPages = new Set(next[roleId] || []);
+      updater(currentPages);
+      next[roleId] = Array.from(currentPages);
+      return next;
+    });
+  };
+
   // Handle toggle change
   const handleToggle = (pageId: string, roleId: string) => {
     // Prevent toggling Administrator access unless explicitly modifying
-    if (roleId === 'Administrator' && !adminAccessModified) {
+    if (roleId === 'administrator' && !adminAccessModified) {
       toast({
         title: "Administrator Access Protected",
         description: "Administrator must have access to all pages by default. Use 'Reset Admin Access' to restore full access.",
@@ -314,26 +379,25 @@ const Settings = () => {
       return;
     }
 
-    const newAccess = { ...pageAccessByRole };
-    const roleAccess = [...(newAccess[roleId] || [])];
-    
-    if (roleAccess.includes(pageId)) {
-      // Remove access
-      newAccess[roleId] = roleAccess.filter(id => id !== pageId);
-    } else {
-      // Add access
-      newAccess[roleId] = [...roleAccess, pageId];
-    }
-    
-    setPageAccessByRole(newAccess);
-    localStorage.setItem('pageAccessSettings', JSON.stringify(newAccess));
+    updateRoleAccess(roleId, (pages) => {
+      if (pages.has(pageId)) {
+        pages.delete(pageId);
+      } else {
+        pages.add(pageId);
+      }
+    });
   };
 
   // Handle save changes
   // Handler for officer customer reporting toggle
   const handleOfficerReportingToggle = (enabled: boolean) => {
-    setOfficerCustomerReportingEnabled(enabled);
-    localStorage.setItem('officer_customer_reporting_enabled', enabled.toString());
+    updateRoleAccess('advantageoneofficer', (pages) => {
+      if (enabled) {
+        pages.add('management-customer-reporting');
+      } else {
+        pages.delete('management-customer-reporting');
+      }
+    });
     toast({
       title: "Setting Updated",
       description: `Officer Customer Reporting access has been ${enabled ? 'enabled' : 'disabled'}.`,
@@ -341,6 +405,21 @@ const Settings = () => {
   };
 
   const handleSave = () => {
+    console.log('💾 [Settings] Save button clicked');
+    console.log('💾 [Settings] Current pageAccessByRole:', pageAccessByRole);
+    
+    // Verify we have pages to save
+    const totalPages = Object.values(pageAccessByRole).reduce((sum, pages) => sum + pages.length, 0);
+    if (totalPages === 0) {
+      toast({
+        title: "Warning",
+        description: "No page access settings to save. Please configure at least one role.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log('💾 [Settings] Calling saveSettings mutation...');
     saveSettings({ pageAccessByRole });
   };
 
@@ -353,7 +432,7 @@ const Settings = () => {
     const allPageIds = pagesToUse.map(page => page.id);
     const updatedSettings = {
       ...pageAccessByRole,
-      Administrator: allPageIds
+      administrator: allPageIds
     };
     setPageAccessByRole(updatedSettings);
     saveSettings({ pageAccessByRole: updatedSettings });

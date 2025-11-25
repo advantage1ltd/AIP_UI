@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { format, subDays, addDays } from "date-fns";
+import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { v4 as uuidv4 } from 'uuid';
 import { Pencil, Trash2, Eye, ChevronLeft, ChevronRight, Search, Plus, Calendar, Filter, Archive, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -51,132 +50,111 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 import { bankHolidayService } from "@/services/bankHolidayService";
-import type { BankHoliday } from "@/types/bankHoliday";
-import { mockOfficers } from "@/data/mockOfficers";
-import { mockManagers } from "@/data/mockManagers";
+import type { BankHoliday, BankHolidayStatus } from "@/types/bankHoliday";
+import { employeeService } from '@/services/employeeService'
+import { useAuth } from '@/contexts/AuthContext'
+import type { Employee } from '@/types/employee'
+
+interface EmployeeOption {
+	id: number;
+	fullName: string;
+	position?: string;
+}
 
 const formSchema = z.object({
-  officerId: z.string().min(1, "Officer is required"),
-  holidayDate: z.date({
-    required_error: "Bank holiday date is required",
-  })
-});
+	officerId: z.number({
+		required_error: 'Officer is required'
+	}).int().positive(),
+	holidayDate: z.date({
+		required_error: 'Bank holiday date is required'
+	})
+})
 
-// Generate mock holiday data
-const generateMockHolidays = (): BankHoliday[] => {
-  const holidays: BankHoliday[] = [];
-  const today = new Date();
+const toEmployeeOption = (employee: Employee): EmployeeOption => ({
+	id: employee.id,
+	fullName: employee.fullName ?? `${employee.firstName} ${employee.surname}`,
+	position: employee.position
+})
 
-  // Create 30 random holidays for the demo
-  for (let i = 0; i < 30; i++) {
-    const officerId = mockOfficers[Math.floor(Math.random() * mockOfficers.length)].id;
-    const managerId = mockManagers[Math.floor(Math.random() * mockManagers.length)].id;
-    const holidayDate = addDays(today, Math.floor(Math.random() * 90) - 45);
-    const requestDate = subDays(holidayDate, Math.floor(Math.random() * 30) + 1);
-    
-    // 70% of holidays are authorized, 10% declined, 20% pending
-    const random = Math.random();
-    let authDate = null;
-    let status = "pending";
-    
-    if (random > 0.3) {
-      // Authorized
-      authDate = addDays(requestDate, Math.floor(Math.random() * 5) + 1);
-      status = "authorized";
-    } else if (random > 0.2) {
-      // Declined - still has an auth date but marked as declined
-      authDate = addDays(requestDate, Math.floor(Math.random() * 5) + 1);
-      status = "declined";
-    }
-    
-    holidays.push({
-      id: uuidv4(),
-      officerId,
-      holidayDate,
-      dateOfRequest: requestDate,
-      authorisedBy: managerId,
-      dateAuthorised: authDate,
-      status: status as "authorized" | "declined" | "pending",
-      archived: false
-    });
-  }
+const isManagerOption = (employee: EmployeeOption): boolean =>
+	employee.position?.toLowerCase().includes('manager') ?? false
 
-  return holidays;
-};
+const toDate = (value: string): Date => new Date(value)
 
 // Reusable DateField component
 const DateField = ({ 
-  field, 
-  label, 
-  disabled = false 
+	field, 
+	label, 
+	disabled = false 
 }: { 
-  field: any; 
-  label: string; 
-  disabled?: boolean; 
+	field: any; 
+	label: string; 
+	disabled?: boolean; 
 }) => (
-  <FormItem className="flex flex-col">
-    <FormLabel className="text-sm">{label}</FormLabel>
-    <div className="relative">
-      <Input
-        type="date"
-        {...field}
-        value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
-        onChange={e => {
-          const date = new Date(e.target.value);
-          field.onChange(date);
-        }}
-        disabled={disabled}
-        className="pl-8 text-sm h-9"
-      />
-      <Calendar className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
-    </div>
-    <FormMessage className="text-xs" />
-  </FormItem>
+	<FormItem className="flex flex-col">
+		<FormLabel className="text-sm">{label}</FormLabel>
+		<div className="relative">
+			<Input
+				type="date"
+				{...field}
+				value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+				onChange={e => {
+					const date = new Date(e.target.value);
+					field.onChange(date);
+				}}
+				disabled={disabled}
+				className="pl-8 text-sm h-9"
+			/>
+			<Calendar className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+		</div>
+		<FormMessage className="text-xs" />
+	</FormItem>
 );
 
 // Reusable SelectField component
 const SelectField = ({ 
-  field, 
-  label, 
-  placeholder, 
-  options,
-  valueKey = "id",
-  labelKey = "name",
-  additionalInfo,
+	field, 
+	label, 
+	placeholder, 
+	options,
+	getValue,
+	getLabel,
+	disabled = false
 }: { 
-  field: any; 
-  label: string; 
-  placeholder: string; 
-  options: any[];
-  valueKey?: string;
-  labelKey?: string;
-  additionalInfo?: string;
+	field: any; 
+	label: string; 
+	placeholder: string; 
+	options: EmployeeOption[];
+	getValue: (employee: EmployeeOption) => string;
+	getLabel: (employee: EmployeeOption) => string;
+	disabled?: boolean;
 }) => (
-  <FormItem>
-    <FormLabel className="text-sm">{label}</FormLabel>
-    <Select
-      onValueChange={field.onChange}
-      defaultValue={field.value}
-    >
-      <FormControl>
-        <SelectTrigger className="w-full h-9 text-sm">
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-      </FormControl>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem 
-            key={option[valueKey]} 
-            value={option[valueKey]} 
-            className="text-sm"
-          >
-            {option[labelKey]}{additionalInfo ? ` - ${option[additionalInfo]}` : ''}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-    <FormMessage className="text-xs" />
-  </FormItem>
+	<FormItem>
+		<FormLabel className="text-sm">{label}</FormLabel>
+		<Select
+			onValueChange={(value) => field.onChange(Number(value))}
+			value={field.value ? String(field.value) : undefined}
+			disabled={disabled}
+		>
+			<FormControl>
+				<SelectTrigger className="w-full h-9 text-sm" disabled={disabled}>
+					<SelectValue placeholder={placeholder} />
+				</SelectTrigger>
+			</FormControl>
+			<SelectContent>
+				{options.map((option) => (
+					<SelectItem 
+						key={getValue(option)} 
+						value={getValue(option)} 
+						className="text-sm"
+					>
+						{getLabel(option)}
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+		<FormMessage className="text-xs" />
+	</FormItem>
 );
 
 // Reusable action buttons component
@@ -281,7 +259,7 @@ const Pagination = ({
 );
 
 // Status badge component
-const StatusBadge = ({ status }: { status: "authorized" | "declined" | "pending" }) => {
+const StatusBadge = ({ status }: { status: BankHolidayStatus }) => {
   if (status === "authorized") {
     return (
       <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 whitespace-nowrap text-xs py-0.5">
@@ -305,15 +283,11 @@ const StatusBadge = ({ status }: { status: "authorized" | "declined" | "pending"
 // Reusable mobile card view for holidays
 const HolidayMobileCard = ({
   holiday,
-  getOfficerName,
-  getManagerName,
   onEdit,
   onView,
   onDelete
 }: {
   holiday: BankHoliday;
-  getOfficerName: (id: string) => string;
-  getManagerName: (id: string) => string;
   onEdit: (holiday: BankHoliday) => void;
   onView: (holiday: BankHoliday) => void;
   onDelete: (id: string) => void;
@@ -322,14 +296,14 @@ const HolidayMobileCard = ({
     <CardContent className="p-3">
       <div className="flex justify-between items-start mb-2">
         <div>
-          <h3 className="font-medium text-sm">{getOfficerName(holiday.officerId)}</h3>
-          <p className="text-xs text-muted-foreground">{format(holiday.holidayDate, 'dd MMM yyyy')}</p>
+          <h3 className="font-medium text-sm">{holiday.officerName}</h3>
+          <p className="text-xs text-muted-foreground">{format(toDate(holiday.holidayDate), 'dd MMM yyyy')}</p>
         </div>
         <MemoizedStatusBadge status={holiday.status} />
       </div>
       <div className="flex items-center justify-between text-xs pt-2 border-t border-muted">
         <span className="text-muted-foreground">
-          Manager: {getManagerName(holiday.authorisedBy)}
+          Manager: {holiday.authorisedByName ?? 'Pending assignment'}
         </span>
         <div className="flex gap-1">
           <Button
@@ -398,8 +372,11 @@ const LoadingCard = () => (
 );
 
 export default function BankHolidayPage() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [holidays, setHolidays] = useState<BankHoliday[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEmployeeLoading, setIsEmployeeLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [editingHoliday, setEditingHoliday] = useState<BankHoliday | null>(null);
@@ -408,16 +385,41 @@ export default function BankHolidayPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showArchived, setShowArchived] = useState(false);
+  const [officerOptions, setOfficerOptions] = useState<EmployeeOption[]>([]);
+  const [managerOptions, setManagerOptions] = useState<EmployeeOption[]>([]);
   const itemsPerPage = 10;
-  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      officerId: "",
+      officerId: user?.employeeId ?? undefined,
       holidayDate: undefined,
-    },
+    } as Partial<z.infer<typeof formSchema>>,
   });
+
+  useEffect(() => {
+    const loadEmployees = async () => {
+      try {
+        setIsEmployeeLoading(true);
+        const employees = await employeeService.getActiveEmployees();
+        const normalized = employees.map(toEmployeeOption);
+        setOfficerOptions(normalized);
+        const managerCandidates = normalized.filter(isManagerOption);
+        setManagerOptions(managerCandidates.length ? managerCandidates : normalized);
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+        toast({
+          title: 'Error',
+          description: 'Unable to load officers. Please try again.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsEmployeeLoading(false);
+      }
+    };
+
+    loadEmployees();
+  }, [toast]);
 
   // Fetch holidays
   const fetchHolidays = useCallback(async () => {
@@ -431,7 +433,7 @@ export default function BankHolidayPage() {
       });
       
       setHolidays(response.data);
-      setTotalPages(response.totalPages);
+      setTotalPages(response.totalPages || 1);
     } catch (error) {
       console.error('Error fetching bank holidays:', error);
       toast({
@@ -458,35 +460,41 @@ export default function BankHolidayPage() {
     if (editingHoliday) {
       form.reset({
         officerId: editingHoliday.officerId,
-        holidayDate: editingHoliday.holidayDate,
+        holidayDate: toDate(editingHoliday.holidayDate),
       });
     }
   }, [editingHoliday, form]);
 
+  useEffect(() => {
+    if (!editingHoliday && user?.employeeId) {
+      form.setValue('officerId', user.employeeId);
+    }
+  }, [editingHoliday, user?.employeeId, form]);
+
   const onSubmit = useCallback(async (values: z.infer<typeof formSchema>) => {
     try {
+      const payloadDate = values.holidayDate.toISOString();
+
       if (editingHoliday) {
-        const updatedHoliday = await bankHolidayService.updateBankHoliday(editingHoliday.id, {
+        await bankHolidayService.updateBankHoliday(editingHoliday.id, {
           officerId: values.officerId,
-          holidayDate: values.holidayDate
+          holidayDate: payloadDate
         });
         
-        setHolidays(prev => prev.map(holiday => 
-          holiday.id === editingHoliday.id ? updatedHoliday : holiday
-        ));
+        await fetchHolidays();
         
         toast({
           title: "Success",
           description: "Bank holiday updated successfully",
         });
       } else {
-        const newHoliday = await bankHolidayService.createBankHoliday({
+        await bankHolidayService.createBankHoliday({
           officerId: values.officerId,
-          holidayDate: values.holidayDate
+          holidayDate: payloadDate
         });
         
-        setHolidays(prev => [newHoliday, ...prev]);
         setCurrentPage(1);
+        await fetchHolidays();
         
         toast({
           title: "Success",
@@ -495,7 +503,10 @@ export default function BankHolidayPage() {
       }
 
       setIsDialogOpen(false);
-      form.reset();
+      form.reset({
+        officerId: user?.employeeId ?? undefined,
+        holidayDate: undefined,
+      });
       setEditingHoliday(null);
     } catch (error) {
       console.error('Error submitting bank holiday:', error);
@@ -505,12 +516,12 @@ export default function BankHolidayPage() {
         variant: "destructive"
       });
     }
-  }, [editingHoliday, form, toast]);
+  }, [editingHoliday, fetchHolidays, form, toast, user?.employeeId]);
 
   const handleDelete = useCallback(async (id: string) => {
     try {
       await bankHolidayService.deleteBankHoliday(id);
-      setHolidays(prev => prev.filter(h => h.id !== id));
+      await fetchHolidays();
       toast({
         title: "Success",
         description: "Bank holiday deleted successfully",
@@ -523,7 +534,7 @@ export default function BankHolidayPage() {
         variant: "destructive"
       });
     }
-  }, [toast]);
+  }, [fetchHolidays, toast]);
 
   const handleViewHoliday = useCallback((holiday: BankHoliday) => {
     setViewingHoliday(holiday);
@@ -583,16 +594,6 @@ export default function BankHolidayPage() {
   // Update the filtered holidays logic
   const paginatedHolidays = useMemo(() => holidays, [holidays]);
 
-  const getOfficerName = useCallback((officerId: string) => 
-    mockOfficers.find(o => o.id === officerId)?.name || 'Unknown',
-    []
-  );
-
-  const getManagerName = useCallback((managerId: string) => 
-    mockManagers.find(m => m.id === managerId)?.name || 'Unknown',
-    []
-  );
-
   // Stats counts
   const pendingCount = useMemo(() => 
     holidays.filter(h => h.status === "pending").length, 
@@ -629,6 +630,7 @@ export default function BankHolidayPage() {
                 }}
                 className="w-full sm:w-auto px-2 sm:px-3 md:px-4 py-1.5 flex items-center justify-center gap-1 text-sm"
                 size="sm"
+                disabled={isEmployeeLoading || officerOptions.length === 0}
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add Bank Holiday
@@ -655,12 +657,20 @@ export default function BankHolidayPage() {
                       control={form.control}
                       name="officerId"
                       render={({ field }) => (
-                        <SelectField 
-                          field={field}
-                          label="Officer Name"
-                          placeholder="Select an officer"
-                          options={mockOfficers}
-                        />
+                        <div className="space-y-1">
+                          <SelectField 
+                            field={field}
+                            label="Officer Name"
+                            placeholder={isEmployeeLoading ? "Loading officers..." : "Select an officer"}
+                            options={officerOptions}
+                            getValue={(option) => option.id.toString()}
+                            getLabel={(option) => option.fullName}
+                            disabled={isEmployeeLoading || officerOptions.length === 0}
+                          />
+                          {!isEmployeeLoading && officerOptions.length === 0 && (
+                            <p className="text-[11px] text-muted-foreground">No active officers available.</p>
+                          )}
+                        </div>
                       )}
                     />
 
@@ -791,8 +801,6 @@ export default function BankHolidayPage() {
                       <MemoizedHolidayMobileCard
                         key={holiday.id}
                         holiday={holiday}
-                        getOfficerName={getOfficerName}
-                        getManagerName={getManagerName}
                         onEdit={handleEditHoliday}
                         onView={handleViewHoliday}
                         onDelete={handleDelete}
@@ -847,13 +855,13 @@ export default function BankHolidayPage() {
                         {paginatedHolidays.map((holiday) => (
                           <TableRow key={holiday.id} className="hover:bg-muted/10">
                             <TableCell className="font-medium text-xs sm:text-sm p-2 sm:p-3 truncate max-w-[80px] sm:max-w-[120px]">
-                              {getOfficerName(holiday.officerId)}
+                              {holiday.officerName}
                             </TableCell>
                             <TableCell className="text-xs sm:text-sm p-2 sm:p-3 whitespace-nowrap">
-                              {format(holiday.holidayDate, 'dd/MM/yy')}
+                              {format(toDate(holiday.holidayDate), 'dd/MM/yy')}
                             </TableCell>
                             <TableCell className="text-xs sm:text-sm p-2 sm:p-3 hidden sm:table-cell truncate max-w-[120px]">
-                              {getManagerName(holiday.authorisedBy)}
+                              {holiday.authorisedByName ?? '—'}
                             </TableCell>
                             <TableCell className="p-2 sm:p-3">
                               <MemoizedStatusBadge status={holiday.status} />
@@ -911,26 +919,26 @@ export default function BankHolidayPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <div className="text-xs sm:text-sm font-medium text-muted-foreground">Officer</div>
-                      <div className="text-sm sm:text-base font-semibold">{getOfficerName(viewingHoliday.officerId)}</div>
+                      <div className="text-sm sm:text-base font-semibold">{viewingHoliday.officerName}</div>
                     </div>
                     <div>
                       <div className="text-xs sm:text-sm font-medium text-muted-foreground">Bank Holiday Date</div>
-                      <div className="text-sm sm:text-base font-semibold">{format(viewingHoliday.holidayDate, 'dd MMM yyyy')}</div>
+                      <div className="text-sm sm:text-base font-semibold">{format(toDate(viewingHoliday.holidayDate), 'dd MMM yyyy')}</div>
                     </div>
                     <div>
                       <div className="text-xs sm:text-sm font-medium text-muted-foreground">Date of Request</div>
-                      <div className="text-sm sm:text-base font-semibold">{format(viewingHoliday.dateOfRequest, 'dd MMM yyyy')}</div>
+                      <div className="text-sm sm:text-base font-semibold">{format(toDate(viewingHoliday.dateOfRequest), 'dd MMM yyyy')}</div>
                     </div>
                     <div>
                       <div className="text-xs sm:text-sm font-medium text-muted-foreground">Authorised By</div>
-                      <div className="text-sm sm:text-base font-semibold">{getManagerName(viewingHoliday.authorisedBy)}</div>
+                      <div className="text-sm sm:text-base font-semibold">{viewingHoliday.authorisedByName ?? 'Pending assignment'}</div>
                     </div>
                     <div className="sm:col-span-2">
                       <div className="text-xs sm:text-sm font-medium text-muted-foreground">Authorization Status</div>
                       <div className="flex items-center gap-2">
                         <MemoizedStatusBadge status={viewingHoliday.status} />
                         {viewingHoliday.dateAuthorised && (
-                          <span className="text-xs sm:text-sm">{format(viewingHoliday.dateAuthorised, 'dd MMM yyyy')}</span>
+                          <span className="text-xs sm:text-sm">{format(toDate(viewingHoliday.dateAuthorised), 'dd MMM yyyy')}</span>
                         )}
                       </div>
                     </div>
@@ -949,24 +957,20 @@ export default function BankHolidayPage() {
                     const formData = new FormData(form);
                     const decision = formData.get('decision') as 'authorized' | 'declined';
                     const reason = formData.get('reason') as string;
-                    const authorisedBy = formData.get('authorisedBy') as string;
+                    const authorisedByEmployeeIdValue = formData.get('authorisedByEmployeeId') as string;
+                    const authorisedByEmployeeId = authorisedByEmployeeIdValue ? Number(authorisedByEmployeeIdValue) : undefined;
                     const dateAuthorised = formData.get('dateAuthorised') as string;
                     
-                    if (decision && reason && authorisedBy && dateAuthorised && viewingHoliday) {
+                    if (decision && reason && authorisedByEmployeeId && dateAuthorised && viewingHoliday) {
                       try {
-                        const updatedHoliday = await bankHolidayService.updateBankHoliday(
-                          viewingHoliday.id,
-                          {
-                            status: decision,
-                            authorisedBy,
-                            dateAuthorised: new Date(dateAuthorised),
-                            reason
-                          }
-                        );
+                        await bankHolidayService.updateBankHoliday(viewingHoliday.id, {
+                          status: decision,
+                          authorisedByEmployeeId,
+                          dateAuthorised: new Date(dateAuthorised).toISOString(),
+                          reason
+                        });
                         
-                        setHolidays(prev => prev.map(h => 
-                          h.id === viewingHoliday.id ? updatedHoliday : h
-                        ));
+                        await fetchHolidays();
                         
                         toast({
                           title: "Success",
@@ -986,7 +990,7 @@ export default function BankHolidayPage() {
                     } else {
                       toast({
                         title: "Error",
-                        description: "Please fill in all required fields.",
+                        description: "Please fill in all required fields, including the authorising manager.",
                         variant: "destructive"
                       });
                     }
@@ -1022,25 +1026,27 @@ export default function BankHolidayPage() {
 
                     <div className="space-y-3 p-2 sm:p-3 border rounded-lg bg-muted/20">
                       <div>
-                        <label htmlFor="authorisedBy" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="authorisedByEmployeeId" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                           Authorised By
                         </label>
-                        <Select name="authorisedBy" required>
-                          <SelectTrigger className="w-full h-9 text-sm">
-                            <SelectValue placeholder="Select authorising manager" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {mockManagers.map((manager) => (
-                              <SelectItem 
-                                key={manager.id} 
-                                value={manager.id}
-                                className="text-sm"
-                              >
-                                {manager.name} - {manager.role}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <select
+                          id="authorisedByEmployeeId"
+                          name="authorisedByEmployeeId"
+                          className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          required
+                          defaultValue=""
+                          disabled={isEmployeeLoading || managerOptions.length === 0}
+                        >
+                          <option value="" disabled>Select authorising manager</option>
+                          {managerOptions.map((manager) => (
+                            <option key={manager.id} value={manager.id}>
+                              {manager.fullName}{manager.position ? ` - ${manager.position}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {managerOptions.length === 0 && !isEmployeeLoading && (
+                          <p className="text-[11px] text-muted-foreground mt-1">No managers available. Please add a manager first.</p>
+                        )}
                       </div>
 
                       <div>

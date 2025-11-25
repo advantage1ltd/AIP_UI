@@ -21,6 +21,16 @@ export interface ActionCalendarTask {
   modifiedByUserName?: string;
 }
 
+export interface ActionCalendarStatusUpdate {
+  actionCalendarStatusUpdateId: number;
+  actionCalendarId: number;
+  status: 'pending' | 'in-progress' | 'completed' | 'blocked';
+  comment?: string;
+  updateDate: string;
+  updatedBy?: string;
+  updatedByUserName: string;
+}
+
 export interface CreateActionCalendarTask {
   taskTitle: string;
   taskDescription?: string;
@@ -66,6 +76,25 @@ export interface ActionCalendarsResponse {
   };
 }
 
+export interface ActionCalendarStatusUpdatesResponse {
+  success: boolean;
+  message: string;
+  data: ActionCalendarStatusUpdate[];
+  errors?: string[];
+}
+
+export interface ActionCalendarStatusUpdateResponse {
+  success: boolean;
+  message: string;
+  data: ActionCalendarStatusUpdate;
+  errors?: string[];
+}
+
+export interface CreateActionCalendarStatusUpdateRequest {
+  status: 'pending' | 'in-progress' | 'completed' | 'blocked';
+  comment?: string;
+}
+
 export interface ActionCalendarStatistics {
   total: number;
   completed: number;
@@ -98,6 +127,13 @@ class ActionCalendarService {
     const response = await fetch(`${this.baseUrl}${endpoint}`, config);
 
     if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        window.location.replace('/login');
+        throw new Error('Unauthorized');
+      }
+
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
@@ -158,6 +194,17 @@ class ActionCalendarService {
     return this.request<ActionCalendarStatistics>('/statistics');
   }
 
+  async getStatusUpdates(taskId: number): Promise<ActionCalendarStatusUpdatesResponse> {
+    return this.request<ActionCalendarStatusUpdatesResponse>(`/${taskId}/status-updates`);
+  }
+
+  async createStatusUpdate(taskId: number, payload: CreateActionCalendarStatusUpdateRequest): Promise<ActionCalendarStatusUpdateResponse> {
+    return this.request<ActionCalendarStatusUpdateResponse>(`/${taskId}/status-updates`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
   // Helper method to convert frontend Task type to backend format
   convertToBackendFormat(task: any): CreateActionCalendarTask {
     return {
@@ -182,14 +229,17 @@ class ActionCalendarService {
       date: new Date(task.dueDate),
       priority: task.priorityLevel,
       assignee: task.assignTo,
+      assigneeName: task.assignedUserName || task.assignTo,
       status: task.taskStatus,
       statusNotes: task.taskDescription,
       email: task.email,
       isRecurring: task.isRecurring,
       reminderDate: task.reminderDate ? new Date(task.reminderDate) : undefined,
       completedDate: task.completedDate ? new Date(task.completedDate) : undefined,
-      createdBy: task.createdByUserName,
-      modifiedBy: task.modifiedByUserName,
+      createdById: task.createdBy,
+      createdByName: task.createdByUserName,
+      modifiedById: task.modifiedBy,
+      modifiedByName: task.modifiedByUserName,
       dateCreated: new Date(task.dateCreated),
       dateModified: task.dateModified ? new Date(task.dateModified) : undefined,
     };

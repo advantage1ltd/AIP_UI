@@ -517,7 +517,7 @@ const Index = () => {
   }
 
   // Show appropriate dashboard based on role
-  if (effectiveRole === 'Administrator' || effectiveRole === 'AdvantageOneHOOfficer') {
+  if (effectiveRole === 'administrator' || effectiveRole === 'advantageonehoofficer') {
     console.log('🏠 [Index] Rendering AdminDashboard for role:', effectiveRole);
     return (
       <Suspense fallback={
@@ -531,7 +531,7 @@ const Index = () => {
         <AdminDashboard />
       </Suspense>
     )
-  } else if (effectiveRole === 'AdvantageOneOfficer') {
+  } else if (effectiveRole === 'advantageoneofficer') {
     console.log('🏠 [Index] Rendering OfficerDashboard for role:', effectiveRole);
     return (
       <Suspense fallback={
@@ -545,7 +545,7 @@ const Index = () => {
         <OfficerDashboard />
       </Suspense>
     )
-  } else if (effectiveRole === 'CustomerSiteManager' || effectiveRole === 'CustomerHOManager') {
+  } else if (effectiveRole === 'customersitemanager' || effectiveRole === 'customerhomanager') {
     console.log('🏠 [Index] Rendering CustomerDashboard for role:', effectiveRole);
     return (
       <Suspense fallback={
@@ -556,7 +556,7 @@ const Index = () => {
           </div>
         </div>
       }>
-        <CustomerDashboard userRole={effectiveRole as 'CustomerSiteManager' | 'CustomerHOManager'} />
+        <CustomerDashboard userRole={effectiveRole as 'customersitemanager' | 'customerhomanager'} />
       </Suspense>
     )
   }

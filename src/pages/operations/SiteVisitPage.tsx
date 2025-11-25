@@ -8,6 +8,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { SiteVisit } from "@/types/siteVisit";
 import { toast } from 'react-toastify';
 import { siteVisitService } from '@/services/siteVisitService'
+import { useCustomerSelection } from "@/contexts/CustomerSelectionContext";
+import { customerService } from '@/services/customerService';
+import { regionService } from '@/services/regionService';
+import { siteService } from '@/services/siteService';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -54,12 +58,31 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Separator } from "@/components/ui/separator";
 import {
   FileText,
   CheckCircle,
   AlertTriangle,
   Users,
+  Building2,
+  MapPin,
+  Calendar,
+  User,
+  CreditCard,
+  FileCheck,
+  Shirt,
+  ClipboardCheck,
+  MessageSquare,
+  UserCircle,
+  Award,
 } from "lucide-react";
 import {
   Pagination,
@@ -70,31 +93,13 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
-// Mock data
-const mockCustomers = [
-  { id: "HOE", name: "Heart of England" },
-  { id: "MCS", name: "Midcounties COOP" },
-];
-
-const mockRegions = [
-  { id: "SD", name: "Store Detective" },
-  { id: "LP", name: "Loss Prevention" },
-];
-
-const mockLocations = [
-  { id: "SAR", name: "SD Alfia Road" },
-  { id: "SHR", name: "SD High Road" },
-];
-
-const mockOfficers = [
-  { id: "GSG", name: "Gurjit Singh Gutha" },
-  { id: "JSM", name: "John Smith" },
-];
-
-const mockManagers = [
-  { id: "GB2", name: "GB2" },
-  { id: "GB3", name: "GB3" },
-];
+// Types for dropdown options
+interface DropdownOption {
+  id: string;
+  name: string;
+  customerId?: string | number;
+  regionId?: string | number;
+}
 
 const ratingOptions = [
   { value: "Good", label: "Good" },
@@ -108,237 +113,7 @@ const documentationOptions = [
   { value: "Training/Improvement Required", label: "Training/Improvement Required" },
 ];
 
-const mockData = {
-  actionId: "00000000",
-  siteVisitId: "00002009"
-};
-
-// Add initial mockVisits data after mockData
-const mockVisits = [
-  {
-    id: "sv001",
-    actionId: "ACT12345",
-    siteVisitId: "SV78901",
-    customer: "HOE",
-    customerName: "Heart of England",
-    region: "SD",
-    regionName: "Store Detective",
-    location: "SAR",
-    locationName: "SD Alfia Road", 
-    visitType: "retail" as const,
-    officerName: "Gurjit Singh Gutha",
-    idBadgeExpiry: "2024-12-15",
-    siaLicenceNumber: "1234567890123456",
-    siaLicenceExpiry: "2025-06-30",
-    recordOfIncidentsCompletion: "Good",
-    dailyOccurrenceBookCompletion: "Good",
-    pocketBookCompletion: "Good",
-    ecrCompletion: "Good",
-    top20Lines: "Good",
-    assignmentInstructions: "Good",
-    assignmentInstructionsUnderstood: "Yes" as const,
-    healthAndSafetyUnderstood: "Yes" as const,
-    healthAndSafetyInPlace: "Yes" as const,
-    dateHSRiskAssessment: "2023-11-20",
-    trainingInstructionsGivenDate: "2023-11-15",
-    jumper: "Good",
-    shirt: "Good",
-    tie: "Good",
-    hiVisJacket: "Good",
-    jacket: "Good",
-    trousers: "Good",
-    epaulettes: "Good",
-    shoes: "Good",
-    trainingInstructions: "Regular site patrols completed",
-    securityOfficerSign: "G. Singh",
-    managerName: "GB2",
-    followUpAction: "",
-    followUpActionDate: "",
-    date: "2023-12-10",
-    assignmentInstructionsInPlace: "Yes" as const,
-    assignmentInstructionsDate: "2023-05-15",
-    createdAt: "2023-12-10T12:30:00.000Z",
-    status: "Completed" as const,
-    recommendations: "",
-    updatedAt: "2023-12-10T12:30:00.000Z"
-  },
-  {
-    id: "sv002",
-    actionId: "ACT67890",
-    siteVisitId: "SV12345",
-    customer: "MCS",
-    customerName: "Midcounties COOP",
-    region: "LP",
-    regionName: "Loss Prevention",
-    location: "SHR",
-    locationName: "SD High Road",
-    visitType: "warehouse",
-    officerName: "John Smith",
-    idBadgeExpiry: "2024-08-20",
-    siaLicenceNumber: "9876543210987654",
-    siaLicenceExpiry: "2025-02-15",
-    recordOfIncidentsCompletion: "Good",
-    dailyOccurrenceBookCompletion: "Acceptable",
-    pocketBookCompletion: "Acceptable",
-    ecrCompletion: "Good",
-    top20Lines: "Fair",
-    assignmentInstructions: "Good",
-    assignmentInstructionsUnderstood: "Yes",
-    healthAndSafetyUnderstood: "Yes",
-    healthAndSafetyInPlace: "Yes",
-    dateHSRiskAssessment: "2023-10-05",
-    trainingInstructionsGivenDate: "2023-10-05",
-    jumper: "Good",
-    shirt: "Fair",
-    tie: "Good",
-    hiVisJacket: "Good",
-    jacket: "Fair",
-    trousers: "Good",
-    epaulettes: "Good",
-    shoes: "Fair",
-    trainingInstructions: "Additional training on incident reporting",
-    securityOfficerSign: "J. Smith",
-    managerName: "GB3",
-    followUpAction: "Follow-up training scheduled",
-    followUpActionDate: "2024-02-15",
-    date: "2024-01-22",
-    assignmentInstructionsInPlace: "Yes",
-    assignmentInstructionsDate: "2023-06-10",
-    createdAt: "2024-01-22T09:15:00.000Z",
-    status: "Follow-up Required",
-    recommendations: "Additional training needed",
-    updatedAt: "2024-01-22T09:15:00.000Z"
-  },
-  {
-    id: "sv003",
-    actionId: "ACT24680",
-    siteVisitId: "SV97531",
-    customer: "HOE",
-    customerName: "Heart of England",
-    region: "SD",
-    regionName: "Store Detective",
-    location: "SAR",
-    locationName: "SD Alfia Road",
-    visitType: "retail",
-    officerName: "John Smith",
-    idBadgeExpiry: "2024-10-01",
-    siaLicenceNumber: "5678901234567890",
-    siaLicenceExpiry: "2025-04-20",
-    recordOfIncidentsCompletion: "Acceptable",
-    dailyOccurrenceBookCompletion: "Good",
-    pocketBookCompletion: "Good",
-    ecrCompletion: "Good",
-    top20Lines: "Good",
-    assignmentInstructions: "Good",
-    assignmentInstructionsUnderstood: "Yes",
-    healthAndSafetyUnderstood: "Yes",
-    healthAndSafetyInPlace: "Yes",
-    dateHSRiskAssessment: "2023-09-15",
-    trainingInstructionsGivenDate: "2023-09-15",
-    jumper: "Good",
-    shirt: "Good",
-    tie: "Good",
-    hiVisJacket: "Good",
-    jacket: "Good",
-    trousers: "Good",
-    epaulettes: "Good",
-    shoes: "Good",
-    trainingInstructions: "Standard training completed",
-    securityOfficerSign: "J. Smith",
-    managerName: "GB2",
-    followUpAction: "",
-    followUpActionDate: "",
-    date: "2024-02-08",
-    assignmentInstructionsInPlace: "Yes",
-    assignmentInstructionsDate: "2023-07-05",
-    createdAt: "2024-02-08T14:45:00.000Z",
-    status: "Completed",
-    recommendations: "",
-    updatedAt: "2024-02-08T14:45:00.000Z"
-  }
-];
-
-// After the mockVisits array, add more mock data to demonstrate pagination
-// Add more mockVisits items to demonstrate pagination (add after existing mockVisits)
-const additionalMockVisits = Array.from({ length: 15 }, (_, i) => ({
-  id: `sv${(i + 4).toString().padStart(3, '0')}`,
-  actionId: `ACT${Math.floor(10000 + Math.random() * 90000)}`,
-  siteVisitId: `SV${Math.floor(10000 + Math.random() * 90000)}`,
-  customer: i % 2 === 0 ? "HOE" : "MCS",
-  customerName: i % 2 === 0 ? "Heart of England" : "Midcounties COOP",
-  region: i % 3 === 0 ? "SD" : "LP",
-  regionName: i % 3 === 0 ? "Store Detective" : "Loss Prevention",
-  location: i % 2 === 0 ? "SAR" : "SHR",
-  locationName: i % 2 === 0 ? "SD Alfia Road" : "SD High Road",
-  visitType: (i % 2 === 0 ? "retail" : "warehouse") as 'retail' | 'warehouse' | 'office',
-  officerName: i % 2 === 0 ? "Gurjit Singh Gutha" : "John Smith",
-  idBadgeExpiry: `2024-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
-  siaLicenceNumber: `${Math.floor(1000000000000000 + Math.random() * 9000000000000000)}`,
-  siaLicenceExpiry: `2025-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
-  recordOfIncidentsCompletion: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Acceptable" : "Training/Improvement Required",
-  dailyOccurrenceBookCompletion: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Acceptable" : "Training/Improvement Required",
-  pocketBookCompletion: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Acceptable" : "Training/Improvement Required",
-  ecrCompletion: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Acceptable" : "Training/Improvement Required",
-  top20Lines: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
-  assignmentInstructions: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
-  assignmentInstructionsUnderstood: i % 5 === 0 ? "No" : "Yes" as 'Yes' | 'No',
-  healthAndSafetyUnderstood: i % 5 === 0 ? "No" : "Yes" as 'Yes' | 'No',
-  healthAndSafetyInPlace: i % 5 === 0 ? "No" : "Yes" as 'Yes' | 'No',
-  dateHSRiskAssessment: `2023-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
-  trainingInstructionsGivenDate: `2023-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
-  jumper: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
-  shirt: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
-  tie: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
-  hiVisJacket: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
-  jacket: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
-  trousers: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
-  epaulettes: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
-  shoes: i % 3 === 0 ? "Good" : i % 3 === 1 ? "Fair" : "Poor",
-  trainingInstructions: i % 2 === 0 ? "Regular site patrols completed" : "Additional training on incident reporting",
-  securityOfficerSign: i % 2 === 0 ? "G. Singh" : "J. Smith",
-  managerName: i % 2 === 0 ? "GB2" : "GB3",
-  followUpAction: i % 3 === 0 ? "" : i % 3 === 1 ? "Follow-up training scheduled" : "Escalated to senior management",
-  followUpActionDate: i % 3 === 0 ? "" : `2024-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
-  date: `${2023 + Math.floor(i / 8)}-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
-  assignmentInstructionsInPlace: i % 5 === 0 ? "No" : "Yes" as 'Yes' | 'No',
-  assignmentInstructionsDate: `2023-${Math.floor(1 + Math.random() * 12).toString().padStart(2, '0')}-${Math.floor(1 + Math.random() * 28).toString().padStart(2, '0')}`,
-  createdAt: new Date(2023, Math.floor(i / 4), 15 + i).toISOString(),
-  status: i % 4 === 0 ? "Follow-up Required" : "Completed" as 'Completed' | 'Follow-up Required',
-  recommendations: i % 3 === 0 ? "" : "Additional training recommended",
-  updatedAt: new Date(2023, Math.floor(i / 4), 15 + i).toISOString()
-}));
-
-// Update the mock data constant
-export const allMockVisits: SiteVisit[] = [...mockVisits, ...additionalMockVisits].map(visit => ({
-  ...visit,
-  visitType: visit.visitType as 'retail' | 'warehouse' | 'office',
-  healthAndSafetyInPlace: (visit.healthAndSafetyInPlace || 'Yes') as 'Yes' | 'No',
-  healthAndSafetyUnderstood: (visit.healthAndSafetyUnderstood || 'Yes') as 'Yes' | 'No',
-  assignmentInstructionsUnderstood: (visit.assignmentInstructionsUnderstood || 'Yes') as 'Yes' | 'No',
-  assignmentInstructionsInPlace: (visit.assignmentInstructionsInPlace || 'Yes') as 'Yes' | 'No',
-  status: (visit.status || 'Completed') as 'Completed' | 'Follow-up Required',
-  trainingInstructionsGivenDate: visit.trainingInstructionsGivenDate || visit.date || visit.createdAt.split('T')[0],
-  dateHSRiskAssessment: visit.dateHSRiskAssessment || visit.date || visit.createdAt.split('T')[0],
-  assignmentInstructionsDate: visit.assignmentInstructionsDate || visit.date || visit.createdAt.split('T')[0],
-  date: visit.date || visit.createdAt.split('T')[0],
-  jumper: visit.jumper || 'Good',
-  shirt: visit.shirt || 'Good',
-  tie: visit.tie || 'Good',
-  hiVisJacket: visit.hiVisJacket || 'Good',
-  jacket: visit.jacket || 'Good',
-  trousers: visit.trousers || 'Good',
-  epaulettes: visit.epaulettes || 'Good',
-  shoes: visit.shoes || 'Good',
-  trainingInstructions: visit.trainingInstructions || '',
-  securityOfficerSign: visit.securityOfficerSign || '',
-  managerName: visit.managerName || '',
-  followUpAction: visit.followUpAction || '',
-  followUpActionDate: visit.followUpActionDate || '',
-  recommendations: visit.recommendations || '',
-  updatedAt: visit.updatedAt || visit.createdAt
-}));
-
-// Add formatDate helper at the top of the file after imports
+// Add formatDate helper
 const formatDate = (date: Date) => {
   return date.toISOString().split('T')[0];
 };
@@ -349,27 +124,19 @@ const formSchema = z.object({
   siteVisitId: z.string().optional(),
   customer: z.string({
     required_error: "Please select a customer",
-  }).refine((value) => mockCustomers.some(c => c.id === value), {
-    message: "Please select a valid customer"
-  }),
+  }).min(1, "Please select a customer"),
   region: z.string({
     required_error: "Please select a region",
-  }).refine((value) => mockRegions.some(r => r.id === value), {
-    message: "Please select a valid region"
-  }),
+  }).min(1, "Please select a region"),
   location: z.string({
     required_error: "Please select a location",
-  }).refine((value) => mockLocations.some(l => l.id === value), {
-    message: "Please select a valid location"
-  }),
+  }).min(1, "Please select a location"),
   visitType: z.string({
     required_error: "Please select visit type",
   }),
   officerName: z.string({
-    required_error: "Please select an officer",
-  }).refine((value) => mockOfficers.some(o => o.id === value), {
-    message: "Please select a valid officer"
-  }),
+    required_error: "Please enter officer name",
+  }).min(1, "Officer name is required"),
   idBadgeExpiry: z.string({
     required_error: "Please enter ID badge expiry",
   }),
@@ -397,10 +164,8 @@ const formSchema = z.object({
   trainingInstructions: z.string().optional(),
   securityOfficerSign: z.string().optional(),
   managerName: z.string({
-    required_error: "Please select a manager",
-  }).refine((value) => mockManagers.some(m => m.id === value), {
-    message: "Please select a valid manager"
-  }),
+    required_error: "Please enter manager name",
+  }).min(1, "Manager name is required"),
   followUpAction: z.string().optional(),
   date: z.string({
     required_error: "Please select a date",
@@ -421,6 +186,7 @@ interface SiteVisitPageProps {
 }
 
 export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps) {
+  const { selectedCustomerId } = useCustomerSelection();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [visits, setVisits] = useState<SiteVisit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -433,65 +199,23 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Load initial data
-  useEffect(() => {
-    const loadVisits = async () => {
-      try {
-        setIsLoading(true);
-        console.log('🔍 [SiteVisitPage] Loading visits with filters:', { customerId, siteId, currentPage, searchQuery });
-        
-        const params: any = {
-          page: currentPage,
-          pageSize: itemsPerPage,
-          search: searchQuery
-        };
-        
-        // Add customer and site filters if provided
-        if (customerId) params.customerId = customerId;
-        if (siteId) params.siteId = siteId;
-        
-        const response = await siteVisitService.getSiteVisits(params);
-        console.log('📤 [SiteVisitPage] Site visits response:', response);
-        setVisits(response.data);
-        setTotalPages(response.totalPages);
-        setTotalCount(response.total);
-      } catch (error) {
-        console.error('❌ [SiteVisitPage] Failed to load visits:', error);
-        toast.error('Failed to load site visits', {
-          position: "top-right",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Resolve customer ID from prop or context
+  const resolvedCustomerId = customerId ? parseInt(customerId, 10) : selectedCustomerId;
 
-    loadVisits();
-  }, [currentPage, itemsPerPage, searchQuery, customerId, siteId]);
+  // State for dropdown options
+  const [customers, setCustomers] = useState<DropdownOption[]>([]);
+  const [regions, setRegions] = useState<DropdownOption[]>([]);
+  const [locations, setLocations] = useState<DropdownOption[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [isLoadingRegions, setIsLoadingRegions] = useState(false);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
 
-  // Server-side pagination is used. "visits" already contains only current page items.
-
-  // Add search handler
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    setCurrentPage(1); // Reset to first page when searching
-  };
-
-  // Handle page change
-  const handlePageChange = (page: number) => {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
-  };
-
+  // Initialize form before useEffect hooks that use it
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      actionId: mockData.actionId || `ACT-${Date.now()}`,
-      siteVisitId: mockData.siteVisitId || `SV-${Date.now()}`,
+      actionId: `ACT-${Date.now()}`,
+      siteVisitId: `SV-${Date.now()}`,
       customer: "",
       region: "",
       location: "",
@@ -530,6 +254,189 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
       recommendations: "",
     },
   });
+
+  // Fetch customers on mount
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      setIsLoadingCustomers(true);
+      try {
+        const customersData = await customerService.getAllCustomers();
+        const mappedCustomers = customersData.map(c => ({
+          id: c.id.toString(),
+          name: c.companyName,
+          customerId: c.id
+        }));
+        setCustomers(mappedCustomers);
+        
+        // Pre-populate customer if resolvedCustomerId is available
+        if (resolvedCustomerId) {
+          const matchingCustomer = mappedCustomers.find(c => 
+            c.customerId === resolvedCustomerId
+          );
+          if (matchingCustomer && !form.getValues().customer) {
+            form.setValue('customer', matchingCustomer.id);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch customers:', error);
+        toast.error('Failed to load customers');
+      } finally {
+        setIsLoadingCustomers(false);
+      }
+    };
+    fetchCustomers();
+  }, [resolvedCustomerId, form]);
+
+  // Fetch regions when customer changes in form
+  useEffect(() => {
+    const selectedCustomerCode = form.watch('customer');
+    const selectedCustomer = customers.find(c => c.id === selectedCustomerCode);
+    
+    if (!selectedCustomer || !selectedCustomer.customerId) {
+      setRegions([]);
+      setLocations([]);
+      form.setValue('region', '');
+      form.setValue('location', '');
+      return;
+    }
+
+    const fetchRegions = async () => {
+      setIsLoadingRegions(true);
+      try {
+        const customerIdNum = typeof selectedCustomer.customerId === 'string' 
+          ? parseInt(selectedCustomer.customerId, 10) 
+          : selectedCustomer.customerId;
+        
+        const response = await regionService.getRegionsByCustomer(customerIdNum);
+        if (response.success) {
+          const mappedRegions = response.data.map((r: any) => ({
+            id: (r.regionID ?? r.regionId ?? r.id)?.toString() || '',
+            name: (r.regionName ?? r.name) || '',
+            customerId: customerIdNum
+          })).filter((r: DropdownOption) => r.id && r.name);
+          setRegions(mappedRegions);
+        }
+      } catch (error) {
+        console.error('Failed to fetch regions:', error);
+        toast.error('Failed to load regions');
+        setRegions([]);
+      } finally {
+        setIsLoadingRegions(false);
+      }
+    };
+
+    fetchRegions();
+  }, [form.watch('customer'), customers]);
+
+  // Fetch locations (sites) when customer changes in form
+  useEffect(() => {
+    const selectedCustomerCode = form.watch('customer');
+    const selectedCustomer = customers.find(c => c.id === selectedCustomerCode);
+    
+    if (!selectedCustomer || !selectedCustomer.customerId) {
+      setLocations([]);
+      form.setValue('location', '');
+      return;
+    }
+
+    const fetchLocations = async () => {
+      setIsLoadingLocations(true);
+      try {
+        const customerIdNum = typeof selectedCustomer.customerId === 'string' 
+          ? parseInt(selectedCustomer.customerId, 10) 
+          : selectedCustomer.customerId;
+        
+        const response = await siteService.getSitesByCustomer(customerIdNum);
+        if (response.success) {
+          const mappedLocations = response.data.map((s: any) => ({
+            id: (s.siteID ?? s.siteId ?? s.id)?.toString() || '',
+            name: (s.locationName ?? s.name) || '',
+            customerId: customerIdNum,
+            regionId: (s.fkRegionID ?? s.fkRegionId ?? s.regionId)?.toString()
+          })).filter((s: DropdownOption) => s.id && s.name);
+          
+          // Filter by region if selected
+          const selectedRegionCode = form.watch('region');
+          if (selectedRegionCode) {
+            const filteredLocations = mappedLocations.filter((l: DropdownOption) => 
+              l.regionId === selectedRegionCode
+            );
+            setLocations(filteredLocations);
+          } else {
+            setLocations(mappedLocations);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch locations:', error);
+        toast.error('Failed to load locations');
+        setLocations([]);
+      } finally {
+        setIsLoadingLocations(false);
+      }
+    };
+
+    fetchLocations();
+  }, [form.watch('customer'), form.watch('region'), customers]);
+
+  // Load initial data
+  useEffect(() => {
+    const loadVisits = async () => {
+      try {
+        setIsLoading(true);
+        console.log('🔍 [SiteVisitPage] Loading visits with filters:', { customerId, siteId, currentPage, searchQuery });
+        
+        if (!resolvedCustomerId) {
+          throw new Error('Customer ID is required');
+        }
+
+        const params: any = {
+          page: currentPage,
+          pageSize: itemsPerPage,
+          search: searchQuery,
+          customerId: resolvedCustomerId
+        };
+        
+        // Add site filter if provided
+        if (siteId) params.siteId = siteId;
+        
+        const response = await siteVisitService.getSiteVisits(params);
+        console.log('📤 [SiteVisitPage] Site visits response:', response);
+        setVisits(response.data);
+        setTotalPages(response.totalPages);
+        setTotalCount(response.total);
+      } catch (error) {
+        console.error('❌ [SiteVisitPage] Failed to load visits:', error);
+        toast.error('Failed to load site visits', {
+          position: "top-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (resolvedCustomerId) {
+      loadVisits();
+    }
+  }, [currentPage, itemsPerPage, searchQuery, resolvedCustomerId, siteId]);
+
+  // Server-side pagination is used. "visits" already contains only current page items.
+
+  // Add search handler
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     console.log('=== FORM SUBMISSION STARTED ===')
@@ -577,21 +484,36 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
         trainingInstructionsGivenDate: data.trainingInstructionsGivenDate || data.date,
         recommendations: data.recommendations || '',
         status: 'Completed' as 'Completed' | 'Follow-up Required',
-        // Add display names
-        customerName: mockCustomers.find(c => c.id === data.customer)?.name || data.customer,
-        officerName: mockOfficers.find(o => o.id === data.officerName)?.name || data.officerName,
-        managerName: mockManagers.find(m => m.id === data.managerName)?.name || data.managerName || 'Manager',
-        locationName: mockLocations.find(l => l.id === data.location)?.name || data.location,
-        regionName: mockRegions.find(r => r.id === data.region)?.name || data.region,
       }
 
-      console.log('Transformed data:', commonData)
+      // Find customer by code (data.customer) or by numeric ID
+      const selectedCustomer = customers.find(c => c.id === data.customer || c.customerId?.toString() === data.customer);
+      const customerIdNum = selectedCustomer?.customerId 
+        ? (typeof selectedCustomer.customerId === 'string' ? parseInt(selectedCustomer.customerId, 10) : selectedCustomer.customerId)
+        : resolvedCustomerId;
+
+      // Add display names and customer ID
+      const commonDataWithCustomer = {
+        ...commonData,
+        customerName: selectedCustomer?.name || data.customer,
+        customerId: customerIdNum || resolvedCustomerId || undefined,
+        officerName: data.officerName,
+        managerName: data.managerName,
+        locationName: locations.find(l => l.id === data.location)?.name || data.location,
+        regionName: regions.find(r => r.id === data.region)?.name || data.region,
+      }
+
+      console.log('Transformed data:', commonDataWithCustomer)
+
+      if (!resolvedCustomerId) {
+        throw new Error('Customer ID is required');
+      }
 
       if (editingVisit) {
         console.log('=== UPDATING EXISTING VISIT ===')
         console.log('Calling updateSiteVisit with ID:', editingVisit.id)
         
-        const updated = await siteVisitService.updateSiteVisit(editingVisit.id, commonData)
+        const updated = await siteVisitService.updateSiteVisit(editingVisit.id, commonDataWithCustomer, customerIdNum || resolvedCustomerId)
         console.log('Update successful:', updated)
         
         setVisits(currentVisits => currentVisits.map(visit => visit.id === editingVisit.id ? updated : visit))
@@ -607,7 +529,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
         console.log('=== CREATING NEW VISIT ===')
         console.log('Calling createSiteVisit')
         
-        const created = await siteVisitService.createSiteVisit(commonData)
+        const created = await siteVisitService.createSiteVisit(commonDataWithCustomer, customerIdNum || resolvedCustomerId)
         console.log('Create successful:', created)
         
         setVisits(currentVisits => [created, ...currentVisits])
@@ -696,15 +618,35 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
   // Handle edit site visit
   const handleEditVisit = (visit: any) => {
     setEditingVisit(visit);
+    
+    // Find customer by ID or name
+    const selectedCustomer = customers.find(c => 
+      c.customerId?.toString() === visit.customerId?.toString() || 
+      c.name === visit.customerName
+    );
+    
+    // Find region by ID or name
+    const selectedRegion = regions.find(r => 
+      r.id === visit.region || 
+      r.name === visit.regionName
+    );
+    
+    // Find location by ID or name
+    const selectedLocation = locations.find(l => 
+      l.id === visit.siteId || 
+      l.id === visit.location ||
+      l.name === visit.locationName
+    );
+    
     form.reset({
       actionId: visit.actionId || `ACT-${Date.now()}`,
       siteVisitId: visit.siteVisitId || `SV-${Date.now()}`,
-      customer: mockCustomers.find(c => c.name === visit.customerName)?.id || '',
-      region: mockRegions.find(r => r.name === visit.regionName)?.id || '',
-      location: mockLocations.find(l => l.name === visit.locationName)?.id || '',
+      customer: selectedCustomer?.id || visit.customer || visit.customerId?.toString() || '',
+      region: selectedRegion?.id || visit.region || '',
+      location: selectedLocation?.id || visit.siteId || visit.location || '',
       visitType: visit.visitType || '',
       date: visit.date || '',
-      officerName: mockOfficers.find(o => o.name === visit.officerName)?.id || '',
+      officerName: visit.officerName || '',
       idBadgeExpiry: visit.idBadgeExpiry || '',
       siaLicenceNumber: visit.siaLicenceNumber || '',
       siaLicenceExpiry: visit.siaLicenceExpiry || '',
@@ -734,7 +676,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
       followUpAction: visit.followUpAction || '',
       recommendations: visit.recommendations || '',
       securityOfficerSign: visit.securityOfficerSign || '',
-      managerName: mockManagers.find(m => m.name === visit.managerName)?.id || '',
+      managerName: visit.managerName || '',
     });
     setIsDialogOpen(true);
   };
@@ -749,7 +691,10 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
   const handleDeleteConfirm = async () => {
     if (deleteId) {
       try {
-        await siteVisitService.deleteSiteVisit(deleteId);
+        if (!resolvedCustomerId) {
+          throw new Error('Customer ID is required');
+        }
+        await siteVisitService.deleteSiteVisit(deleteId, resolvedCustomerId);
         setVisits(currentVisits => currentVisits.filter(visit => visit.id !== deleteId));
         setTotalCount(count => Math.max(0, count - 1));
         setIsDeleteDialogOpen(false);
@@ -1064,18 +1009,42 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
           </DialogHeader>
           
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 pb-4 sm:px-6 sm:pb-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 pb-4 sm:px-6 sm:pb-6">
+              <Accordion type="multiple" defaultValue={["basic-info"]} className="space-y-4">
+                {/* Basic Information Section */}
+                <AccordionItem value="basic-info" className="border rounded-lg px-4 bg-white shadow-sm">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                        <Building2 className="h-5 w-5" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-base">Basic Information</h3>
+                        <p className="text-sm text-gray-500">Customer, location, and visit details</p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <Separator className="my-4" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
                 {/* Basic Information */}
                 <FormField
                   control={form.control}
                   name="customer"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Customer</FormLabel>
+                      <FormLabel className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-blue-600" />
+                        Customer
+                      </FormLabel>
                       <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          form.setValue('region', ''); // Reset region when customer changes
+                          form.setValue('location', ''); // Reset location when customer changes
+                        }} 
+                        value={field.value}
+                        disabled={isLoadingCustomers || !!customerId}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -1083,11 +1052,17 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {mockCustomers.map((customer) => (
-                            <SelectItem key={customer.id} value={customer.id}>
-                              {customer.name}
-                            </SelectItem>
-                          ))}
+                          {isLoadingCustomers ? (
+                            <SelectItem value="loading" disabled>Loading customers...</SelectItem>
+                          ) : customers.length === 0 ? (
+                            <SelectItem value="none" disabled>No customers available</SelectItem>
+                          ) : (
+                            customers.map((customer) => (
+                              <SelectItem key={customer.id} value={customer.id}>
+                                {customer.name}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -1100,10 +1075,17 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                   name="region"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Region</FormLabel>
+                      <FormLabel className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-green-600" />
+                        Region
+                      </FormLabel>
                       <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          form.setValue('location', ''); // Reset location when region changes
+                        }} 
+                        value={field.value}
+                        disabled={isLoadingRegions || !form.watch('customer')}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -1111,11 +1093,19 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {mockRegions.map((region) => (
-                            <SelectItem key={region.id} value={region.id}>
-                              {region.name}
+                          {isLoadingRegions ? (
+                            <SelectItem value="loading" disabled>Loading regions...</SelectItem>
+                          ) : regions.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              {form.watch('customer') ? 'No regions available for this customer' : 'Select a customer first'}
                             </SelectItem>
-                          ))}
+                          ) : (
+                            regions.map((region) => (
+                              <SelectItem key={region.id} value={region.id}>
+                                {region.name}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -1128,10 +1118,14 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                   name="location"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Location</FormLabel>
+                      <FormLabel className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-purple-600" />
+                        Location
+                      </FormLabel>
                       <Select 
                         onValueChange={field.onChange} 
-                        defaultValue={field.value}
+                        value={field.value}
+                        disabled={isLoadingLocations || !form.watch('region')}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -1139,11 +1133,19 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {mockLocations.map((location) => (
-                            <SelectItem key={location.id} value={location.id}>
-                              {location.name}
+                          {isLoadingLocations ? (
+                            <SelectItem value="loading" disabled>Loading locations...</SelectItem>
+                          ) : locations.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              {form.watch('customer') ? 'No locations available for this customer' : 'Select a customer first'}
                             </SelectItem>
-                          ))}
+                          ) : (
+                            locations.map((location) => (
+                              <SelectItem key={location.id} value={location.id}>
+                                {location.name}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -1156,10 +1158,13 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                   name="visitType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Visit Type</FormLabel>
+                      <FormLabel className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-amber-600" />
+                        Visit Type
+                      </FormLabel>
                       <Select 
                         onValueChange={field.onChange} 
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -1182,7 +1187,10 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                   name="date"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Date of Visit</FormLabel>
+                      <FormLabel className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-red-600" />
+                        Date of Visit
+                      </FormLabel>
                       <FormControl>
                         <Input type="date" {...field} />
                       </FormControl>
@@ -1196,32 +1204,36 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                   name="officerName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Officer</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select officer" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {mockOfficers.map((officer) => (
-                            <SelectItem key={officer.id} value={officer.id}>
-                              {officer.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-indigo-600" />
+                        Officer Name
+                      </FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter officer name" />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
-              
-              <div className="border rounded-lg p-4">
-                <h3 className="font-medium text-base mb-4">Officer ID Information</h3>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Officer ID Information Section */}
+                <AccordionItem value="officer-id" className="border rounded-lg px-4 bg-white shadow-sm">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-purple-100 text-purple-600">
+                        <CreditCard className="h-5 w-5" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-base">Officer ID Information</h3>
+                        <p className="text-sm text-gray-500">ID badge and SIA licence details</p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <Separator className="my-4" />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
@@ -1264,12 +1276,35 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                       </FormItem>
                     )}
                   />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="border rounded-lg p-4">
-                  <h3 className="font-medium text-base mb-4">Documentation Checks</h3>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Documentation & Appearance Section */}
+                <AccordionItem value="documentation" className="border rounded-lg px-4 bg-white shadow-sm">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-green-100 text-green-600">
+                        <FileCheck className="h-5 w-5" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-base">Documentation & Appearance Checks</h3>
+                        <p className="text-sm text-gray-500">Documentation completeness and uniform standards</p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <Separator className="my-4" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <Card className="border-2">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <FileCheck className="h-4 w-4 text-green-600" />
+                      <CardTitle className="text-base font-semibold">Documentation Checks</CardTitle>
+                    </div>
+                    <CardDescription className="text-xs">Verify documentation completeness</CardDescription>
+                  </CardHeader>
+                  <CardContent>
                   <div className="space-y-4">
                     <FormField
                       control={form.control}
@@ -1411,10 +1446,18 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                       )}
                     />
                   </div>
-                </div>
+                  </CardContent>
+                </Card>
                 
-                <div className="border rounded-lg p-4">
-                  <h3 className="font-medium text-base mb-4">Appearance Checks</h3>
+                <Card className="border-2">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <Shirt className="h-4 w-4 text-blue-600" />
+                      <CardTitle className="text-base font-semibold">Appearance Checks</CardTitle>
+                    </div>
+                    <CardDescription className="text-xs">Uniform and appearance standards</CardDescription>
+                  </CardHeader>
+                  <CardContent>
                   <div className="grid grid-cols-2 gap-3">
                     <FormField
                       control={form.control}
@@ -1640,11 +1683,27 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                       )}
                     />
                   </div>
-                </div>
-              </div>
-              
-              <div className="border rounded-lg p-4">
-                <h3 className="font-medium text-base mb-4">Assignment Instructions in place</h3>
+                  </CardContent>
+                </Card>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Assignment Instructions Section */}
+                <AccordionItem value="assignments" className="border rounded-lg px-4 bg-white shadow-sm">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-amber-100 text-amber-600">
+                        <ClipboardCheck className="h-5 w-5" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-base">Assignment & Safety Instructions</h3>
+                        <p className="text-sm text-gray-500">Instructions in place and compliance dates</p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <Separator className="my-4" />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
@@ -1801,112 +1860,149 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
                       </FormItem>
                     )}
                   />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="trainingInstructions"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Training Instructions/Observations</FormLabel>
-                      <FormControl>
-                        <textarea 
-                          {...field}
-                          className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          placeholder="Enter any training instructions or observations..."
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Training & Follow-up Section */}
+                <AccordionItem value="training" className="border rounded-lg px-4 bg-white shadow-sm">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-indigo-100 text-indigo-600">
+                        <MessageSquare className="h-5 w-5" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-base">Training & Follow-up</h3>
+                        <p className="text-sm text-gray-500">Observations, actions, and recommendations</p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <Separator className="my-4" />
+                    <div className="space-y-4 pt-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="trainingInstructions"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2">
+                                <MessageSquare className="h-4 w-4 text-indigo-600" />
+                                Training Instructions/Observations
+                              </FormLabel>
+                              <FormControl>
+                                <textarea 
+                                  {...field}
+                                  className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                  placeholder="Enter any training instructions or observations..."
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="followUpAction"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Follow-up Action</FormLabel>
-                      <FormControl>
-                        <textarea 
-                          {...field}
-                          className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          placeholder="Enter any follow-up actions required..."
+                        
+                        <FormField
+                          control={form.control}
+                          name="followUpAction"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                Follow-up Action
+                              </FormLabel>
+                              <FormControl>
+                                <textarea 
+                                  {...field}
+                                  className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                  placeholder="Enter any follow-up actions required..."
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      </div>
+                      
+                      <FormField
+                        control={form.control}
+                        name="recommendations"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <Award className="h-4 w-4 text-green-600" />
+                              Recommendations
+                            </FormLabel>
+                            <FormControl>
+                              <textarea 
+                                {...field}
+                                className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                placeholder="Enter any recommendations..."
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Signatures Section */}
+                <AccordionItem value="signatures" className="border rounded-lg px-4 bg-white shadow-sm">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-gray-100 text-gray-600">
+                        <UserCircle className="h-5 w-5" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-base">Signatures</h3>
+                        <p className="text-sm text-gray-500">Security officer and manager details</p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <Separator className="my-4" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                      <FormField
+                        control={form.control}
+                        name="securityOfficerSign"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <UserCircle className="h-4 w-4 text-gray-600" />
+                              Security Officer Signature
+                            </FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Enter security officer signature" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="managerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <UserCircle className="h-4 w-4 text-gray-600" />
+                              Manager Name
+                            </FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Enter manager name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="securityOfficerSign"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Security Officer Signature</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Enter security officer signature" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="managerName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Manager Name</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select manager" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {mockManagers.map((manager) => (
-                            <SelectItem key={manager.id} value={manager.id}>
-                              {manager.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="recommendations"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Recommendations</FormLabel>
-                      <FormControl>
-                        <textarea 
-                          {...field}
-                          className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          placeholder="Enter any recommendations..."
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <DialogFooter className="px-4 pb-4 sm:px-6 sm:pb-6 pt-4 flex flex-col sm:flex-row gap-2 sm:gap-0">
+              <DialogFooter className="px-4 pb-4 sm:px-6 sm:pb-6 pt-6 flex flex-col sm:flex-row gap-2 sm:gap-0 border-t mt-6">
                 <Button variant="outline" type="button" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto order-2 sm:order-1">
                   Cancel
                 </Button>

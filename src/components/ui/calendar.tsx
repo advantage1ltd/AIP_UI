@@ -37,8 +37,8 @@ export function Calendar({
         ...classNames
       }}
       captionLayout="dropdown-buttons"
-      fromYear={1920}
-      toYear={new Date().getFullYear()}
+      fromYear={new Date().getFullYear()}
+      toYear={new Date().getFullYear() + 10}
       {...props}
     />
   );

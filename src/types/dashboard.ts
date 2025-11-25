@@ -2,7 +2,7 @@ import { UserRole } from './user';
 
 export type { UserRole };
 
-export type CustomerRole = 'Administrator' | 'CustomerSiteManager' | 'CustomerHOManager';
+export type CustomerRole = 'administrator' | 'customersitemanager' | 'customerhomanager';
 
 export interface Metric {
   title: string;
@@ -45,8 +45,8 @@ export interface CustomerStoreData {
   name: string;
   customerId: number;
   metrics: {
-    CustomerHOManager: Metric[];
-    CustomerSiteManager: Metric[];
+    customerhomanager: Metric[];
+    customersitemanager: Metric[];
   };
   recentIncidents: RecentIncident[];
   incidentData: {
@@ -99,6 +99,15 @@ export interface SatisfactionDataPoint {
   customerId: number;
   month: string;
   score: number;
+  siteName?: string;
+  siteId?: string;
+}
+
+export interface SatisfactionBySite {
+  siteName: string;
+  siteId?: string;
+  score: number;
+  month: string;
 }
 
 export interface BeSafeDataPoint {

@@ -73,30 +73,25 @@ import { Toaster } from '@/components/ui/toaster'
 // Import the service
 import { mysteryShopperService, type MysteryShopperFilters } from '@/services/mysteryShopperService';
 
-// Mock data
-const mockOfficers = [
-  { id: "OFF001", name: "John Smith" },
-  { id: "OFF002", name: "Sarah Johnson" },
-  { id: "OFF003", name: "Michael Brown" },
-  { id: "OFF004", name: "Emily Davis" },
-  { id: "OFF005", name: "James Wilson" }
-];
+import { customerService } from '@/services/customerService';
+import { employeeService } from '@/services/employeeService';
+import { customerDashboardService } from '@/services/dashboardService';
 
-const mockCustomers = [
-  { id: "CUS001", name: "Walmart Supercenter" },
-  { id: "CUS002", name: "Target Corporation" },
-  { id: "CUS003", name: "Costco Wholesale" },
-  { id: "CUS004", name: "Home Depot" },
-  { id: "CUS005", name: "Best Buy" }
-];
+interface EmployeeOption {
+  id: string;
+  name: string;
+}
 
-const mockLocations = [
-  { id: "LOC001", name: "New York City" },
-  { id: "LOC002", name: "Los Angeles" },
-  { id: "LOC003", name: "Chicago" },
-  { id: "LOC004", name: "Houston" },
-  { id: "LOC005", name: "Phoenix" }
-];
+interface CustomerOption {
+  id: string;
+  name: string;
+}
+
+interface SiteOption {
+  id: string;
+  name: string;
+  customerId: string;
+}
 
 interface EvaluationCriteria {
   id: string;
@@ -156,25 +151,13 @@ const defaultScores = evaluationCriteria.reduce((acc, criteria) => ({
 const formSchema = z.object({
   officerId: z.string({
     required_error: "Please select an officer",
-  }).refine((value) => {
-    return mockOfficers.some(officer => officer.id === value);
-  }, {
-    message: "Please select a valid officer"
-  }),
+  }).min(1, "Please select an officer"),
   customerName: z.string({
     required_error: "Please select a customer",
-  }).refine((value) => {
-    return mockCustomers.some(customer => customer.id === value);
-  }, {
-    message: "Please select a valid customer"
-  }),
+  }).min(1, "Please select a customer"),
   location: z.string({
     required_error: "Please select a location",
-  }).refine((value) => {
-    return mockLocations.some(location => location.id === value);
-  }, {
-    message: "Please select a valid location"
-  }),
+  }).min(1, "Please select a location"),
   mysteryShopperName: z.string({
     required_error: "Mystery shopper name is required",
   }).min(2, "Name must be at least 2 characters")
@@ -182,13 +165,7 @@ const formSchema = z.object({
    .regex(/^[a-zA-Z\s'-]+$/, "Name can only contain letters, spaces, hyphens and apostrophes"),
   date: z.date({
     required_error: "Please select a date",
-  }).refine((date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return date >= today;
-  }, {
-    message: "Date cannot be in the past"
-  }),
+  }), // Date validation for past dates removed as evaluations can be entered retroactively
   time: z.string({
     required_error: "Please select a time",
   }).regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Please enter a valid time"),
@@ -238,6 +215,9 @@ interface MysteryShopperPageProps {
 
 export default function MysteryShopperPage({ customerId, siteId }: MysteryShopperPageProps) {
   const [evaluations, setEvaluations] = useState<any[]>([]);
+  const [officers, setOfficers] = useState<EmployeeOption[]>([]);
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [sites, setSites] = useState<SiteOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<any | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -261,6 +241,48 @@ export default function MysteryShopperPage({ customerId, siteId }: MysteryShoppe
       scores: defaultScores
     }
   });
+
+  // Fetch reference data (Officers, Customers, Sites)
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch Officers
+        const employees = await employeeService.getActiveEmployees();
+        const officerOptions = employees.map((emp: any) => ({
+          id: (emp.id || emp.employeeId).toString(),
+          name: `${emp.firstName} ${emp.surname}`
+        }));
+        setOfficers(officerOptions);
+
+        // Fetch Customers
+        const customerData = await customerService.getAllCustomers();
+        const customerOptions = customerData.map((cust: any) => ({
+          id: cust.id.toString(),
+          name: cust.companyName
+        }));
+        setCustomers(customerOptions);
+
+        // Fetch Sites
+        const siteData = await customerDashboardService.getSites();
+        const siteOptions = siteData.map((site: any) => ({
+          id: site.id.toString(),
+          name: site.locationName,
+          customerId: site.customerId.toString()
+        }));
+        setSites(siteOptions);
+
+      } catch (error) {
+        console.error('Error fetching reference data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load form data. Please refresh the page.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchData();
+  }, [toast]);
 
   // Fetch evaluations from API
   const fetchEvaluations = useCallback(async () => {
@@ -296,6 +318,13 @@ export default function MysteryShopperPage({ customerId, siteId }: MysteryShoppe
     fetchEvaluations();
   }, [fetchEvaluations]);
 
+  // Filter sites based on selected customer
+  const selectedCustomerId = form.watch('customerName');
+  const filteredSites = useMemo(() => {
+    if (!selectedCustomerId) return [];
+    return sites.filter(site => site.customerId === selectedCustomerId);
+  }, [sites, selectedCustomerId]);
+
   const resetForm = useCallback(() => {
     form.reset({
       officerId: '',
@@ -317,11 +346,11 @@ export default function MysteryShopperPage({ customerId, siteId }: MysteryShoppe
   const handleEditEvaluation = (evaluation: any) => {
     form.reset({
       officerId: evaluation.officerId,
-      customerName: evaluation.customerName,
+      customerName: evaluation.customerId?.toString() || '',
       date: new Date(evaluation.date),
       time: evaluation.time,
       mysteryShopperName: evaluation.mysteryShopperName,
-      location: evaluation.location,
+      location: evaluation.siteId || '',
       scores: evaluation.scores
     });
     setSelectedEvaluation(evaluation);
@@ -337,34 +366,83 @@ export default function MysteryShopperPage({ customerId, siteId }: MysteryShoppe
     setIsLoading(true);
     try {
       console.log('💾 [MysteryShopperPage] Saving evaluation:', { data, selectedEvaluation: !!selectedEvaluation });
+      console.log('🔍 [MysteryShopperPage] Scores data:', data.scores);
       
       // Calculate total score and max possible score
-      const total: number = Object.values(data.scores as Record<string, {score: number, comments?: string}>).reduce(
-        (total: number, { score }) => total + (Number(score) || 0),
-        0
-      );
+      // Backend expects: { score: number, comments?: string } in JSON (camelCase)
+      // Form structure: scores.${criteria.id}.score and scores.${criteria.id}.comments
+      const formattedScores: Record<string, {score: number, comments?: string}> = {};
+      let total = 0;
+      
+      Object.entries(data.scores as Record<string, any>).forEach(([key, value]) => {
+        // Debug: Log the raw value structure to identify any field swapping
+        console.log(`🔍 [MysteryShopperPage] Processing ${key}:`, { 
+          rawValue: value, 
+          hasScore: 'score' in value,
+          hasComments: 'comments' in value,
+          scoreValue: value?.score,
+          commentsValue: value?.comments,
+          allKeys: Object.keys(value || {})
+        });
+        
+        // Read score - should be from form field `scores.${criteria.id}.score`
+        // Handle both number and string types, and ensure we're reading the correct property
+        let scoreVal = 0;
+        if (value && typeof value === 'object') {
+          // Explicitly check for 'score' property (the number input field)
+          if ('score' in value) {
+            scoreVal = typeof value.score === 'number' 
+              ? value.score 
+              : (typeof value.score === 'string' && value.score.trim() !== '' ? Number(value.score) || 0 : 0);
+          }
+        }
+        
+        // Read comments - should be from form field `scores.${criteria.id}.comments`
+        // Handle string type, and ensure we're reading the correct property
+        let commentsVal: string | undefined = undefined;
+        if (value && typeof value === 'object') {
+          // Explicitly check for 'comments' property (the text input field)
+          if ('comments' in value && typeof value.comments === 'string' && value.comments.trim() !== '') {
+            commentsVal = value.comments;
+          }
+        }
+        
+        total += scoreVal;
+        
+        // Send in camelCase format (backend will map to C# properties Score and Comments)
+        formattedScores[key] = {
+          score: scoreVal,
+          comments: commentsVal
+        };
+      });
+      
+      console.log('🧮 [MysteryShopperPage] Calculated total:', total);
+      console.log('📤 [MysteryShopperPage] Formatted scores to send:', formattedScores);
+
       const max: number = evaluationCriteria.reduce(
         (sum, criteria) => sum + criteria.maxScore,
         0
       );
 
       // Get names from IDs
-      const selectedOfficer = mockOfficers.find(o => o.id === data.officerId);
-      const selectedCustomer = mockCustomers.find(c => c.id === data.customerName);
-      const selectedLocation = mockLocations.find(l => l.id === data.location);
+      const selectedOfficer = officers.find(o => o.id === data.officerId);
+      const selectedCustomer = customers.find(c => c.id === data.customerName);
+      const selectedLocation = sites.find(l => l.id === data.location);
 
       // Prepare evaluation data
+      // Note: Backend calculates totalScore, maxPossibleScore, and percentage from scores
       const evaluationData = {
-        ...data,
-        customerId: customerId ? parseInt(customerId) : undefined,
-        siteId: siteId,
+        officerId: data.officerId,
         officerName: selectedOfficer?.name || '',
+        customerId: data.customerName ? parseInt(data.customerName) : undefined,
         customerName: selectedCustomer?.name || '',
+        siteId: data.location,
+        location: selectedLocation?.name || '', // Set location to name, not ID
         locationName: selectedLocation?.name || '',
-        totalScore: total,
-        maxPossibleScore: max,
-        percentage: ((total / max) * 100).toFixed(1),
-        date: format(data.date, 'yyyy-MM-dd')
+        date: data.date ? format(data.date, 'yyyy-MM-dd') : undefined,
+        time: data.time,
+        mysteryShopperName: data.mysteryShopperName,
+        scores: formattedScores // Send sanitized scores - backend will calculate totals
       };
 
       if (selectedEvaluation) {
@@ -439,13 +517,24 @@ export default function MysteryShopperPage({ customerId, siteId }: MysteryShoppe
 
   // Calculate stats
   const avgScore = useMemo(() => {
-    if (evaluations.length === 0) return 0;
-    const total = evaluations.reduce((sum, evaluation) => sum + evaluation.totalScore, 0);
+    if (evaluations.length === 0) return '0.0';
+    const total = evaluations.reduce((sum, evaluation) => {
+      // Parse percentage - backend returns it as string like "0.0%" or number
+      const percentage = typeof evaluation.percentage === 'string' 
+        ? parseFloat(evaluation.percentage.replace('%', '')) 
+        : (typeof evaluation.percentage === 'number' ? evaluation.percentage : 0);
+      return sum + percentage;
+    }, 0);
     return (total / evaluations.length).toFixed(1);
   }, [evaluations]);
 
   const highPerformers = useMemo(() => {
-    return evaluations.filter(evaluation => parseFloat(evaluation.percentage) >= 85).length;
+    return evaluations.filter(evaluation => {
+      const percentage = typeof evaluation.percentage === 'string' 
+        ? parseFloat(evaluation.percentage.replace('%', '')) 
+        : (typeof evaluation.percentage === 'number' ? evaluation.percentage : 0);
+      return percentage >= 85;
+    }).length;
   }, [evaluations]);
 
   return (
@@ -548,14 +637,21 @@ export default function MysteryShopperPage({ customerId, siteId }: MysteryShoppe
                           <div className="flex items-center">
                             <span 
                               className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-xs lg:text-sm xl:text-base font-medium ${
-                                parseFloat(evaluation.percentage) >= 85 
-                                  ? 'bg-green-100 text-green-700' 
-                                  : parseFloat(evaluation.percentage) >= 70 
-                                    ? 'bg-yellow-100 text-yellow-700' 
-                                    : 'bg-red-100 text-red-700'
+                                (() => {
+                                  const percentage = typeof evaluation.percentage === 'string' 
+                                    ? parseFloat(evaluation.percentage.replace('%', '')) 
+                                    : (typeof evaluation.percentage === 'number' ? evaluation.percentage : 0);
+                                  return percentage >= 85 
+                                    ? 'bg-green-100 text-green-700' 
+                                    : percentage >= 70 
+                                      ? 'bg-yellow-100 text-yellow-700' 
+                                      : 'bg-red-100 text-red-700';
+                                })()
                               }`}
                             >
-                              {evaluation.percentage}%
+                              {typeof evaluation.percentage === 'string' 
+                                ? evaluation.percentage 
+                                : `${evaluation.percentage?.toFixed(1) || '0.0'}%`}
                             </span>
                           </div>
                         </TableCell>
@@ -701,13 +797,13 @@ export default function MysteryShopperPage({ customerId, siteId }: MysteryShoppe
                               <FormLabel className="text-xs sm:text-sm font-medium">Officer Name</FormLabel>
                             <Select 
                               onValueChange={field.onChange} 
-                              defaultValue={field.value}
+                              value={field.value}
                             >
                                 <SelectTrigger className="h-8 sm:h-9 text-[10px] sm:text-xs">
                                 <SelectValue placeholder="Select an officer" />
                               </SelectTrigger>
                                 <SelectContent className="z-50 text-[10px] sm:text-xs">
-                                {mockOfficers.map((officer) => (
+                                {officers.map((officer) => (
                                   <SelectItem key={officer.id} value={officer.id}>
                                     {officer.name}
                                   </SelectItem>
@@ -726,13 +822,13 @@ export default function MysteryShopperPage({ customerId, siteId }: MysteryShoppe
                               <FormLabel className="text-xs sm:text-sm font-medium">Customer Name</FormLabel>
                             <Select
                               onValueChange={field.onChange}
-                              defaultValue={field.value}
+                              value={field.value}
                             >
                                 <SelectTrigger className="h-8 sm:h-9 text-[10px] sm:text-xs">
                                 <SelectValue placeholder="Select a customer" />
                               </SelectTrigger>
                                 <SelectContent className="z-50 text-[10px] sm:text-xs">
-                                {mockCustomers.map((customer) => (
+                                {customers.map((customer) => (
                                   <SelectItem key={customer.id} value={customer.id}>
                                     {customer.name}
                                   </SelectItem>
@@ -751,15 +847,15 @@ export default function MysteryShopperPage({ customerId, siteId }: MysteryShoppe
                               <FormLabel className="text-xs sm:text-sm font-medium">Location</FormLabel>
                             <Select
                               onValueChange={field.onChange}
-                              defaultValue={field.value}
+                              value={field.value}
                             >
                                 <SelectTrigger className="h-8 sm:h-9 text-[10px] sm:text-xs">
                                 <SelectValue placeholder="Select a location" />
                               </SelectTrigger>
                                 <SelectContent className="z-50 text-[10px] sm:text-xs">
-                                {mockLocations.map((location) => (
-                                  <SelectItem key={location.id} value={location.id}>
-                                    {location.name}
+                                {filteredSites.map((site) => (
+                                  <SelectItem key={site.id} value={site.id}>
+                                    {site.name}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

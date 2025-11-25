@@ -51,7 +51,7 @@ export default function CustomerViewsConfig() {
     loadCustomers()
   }, [])
 
-  const isAdmin = user?.role === 'Administrator'
+  const isAdmin = user?.role === 'administrator'
 
   // Don't render until user is loaded
   if (!user) {

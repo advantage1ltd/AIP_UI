@@ -50,7 +50,7 @@ export const getCurrentCustomerId = (): number | null => {
   try {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     // Admin users should see all customer data, so return null for them
-    if (user.role === 'Administrator') {
+    if (user.role === 'administrator') {
       return null;
     }
     return user.customerId || null;

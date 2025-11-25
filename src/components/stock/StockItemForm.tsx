@@ -20,7 +20,7 @@ export const StockItemForm = ({ item, onSubmit }: StockItemFormProps) => {
       setIsLoadingEmployees(true)
       try {
         // Prefer role-filtered active users if supported by backend
-        const data = await userService.getUsers({ page: 1, pageSize: 1000, role: 'AdvantageOneOfficer', isActive: true })
+        const data = await userService.getUsers({ page: 1, pageSize: 1000, role: 'advantageoneofficer', isActive: true })
         setEmployees(data.items)
       } catch (err) {
         try {

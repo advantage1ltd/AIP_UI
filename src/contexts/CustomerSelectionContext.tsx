@@ -24,7 +24,7 @@ export const CustomerSelectionProvider: React.FC<CustomerSelectionProviderProps>
 	const { user } = useAuth()
 	const [selectedCustomerId, setSelectedCustomerIdState] = useState<number | null>(null)
 
-	const isAdmin = user?.role === 'Administrator'
+	const isAdmin = user?.role === 'administrator'
 	const needsCustomerSelection = isAdmin
 
 	// Load selected customer from localStorage on mount

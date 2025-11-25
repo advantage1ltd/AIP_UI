@@ -46,9 +46,10 @@ import { cn } from "@/lib/utils";
 import { toast } from 'react-toastify';
 import { safeDuressWordsService } from '@/services/safeDuressWordsService';
 import { CodeWord, WordHistory, WordHistoryFilters } from '@/types/safeDuressWords';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Reusable components
-const PageHeader = ({ onShowHistory, onShowUpdateDialog }) => (
+const PageHeader = ({ onShowHistory, onShowUpdateDialog, isAdmin }) => (
   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
     <div className="flex items-center gap-2 sm:gap-3">
       <div className="bg-blue-100 p-1.5 sm:p-2 rounded-lg">
@@ -68,13 +69,24 @@ const PageHeader = ({ onShowHistory, onShowUpdateDialog }) => (
         <History className="w-3.5 h-3.5" />
         <span>View History</span>
       </Button>
-      <Button
-        className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm h-8 sm:h-9 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center"
-        onClick={onShowUpdateDialog}
-      >
-        <KeyRound className="w-3.5 h-3.5" />
-        <span>Update Words</span>
-      </Button>
+      {isAdmin ? (
+        <Button
+          className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm h-8 sm:h-9 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center"
+          onClick={onShowUpdateDialog}
+        >
+          <KeyRound className="w-3.5 h-3.5" />
+          <span>Update Words</span>
+        </Button>
+      ) : (
+        <Button
+          variant="secondary"
+          className="text-xs sm:text-sm h-8 sm:h-9 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center cursor-not-allowed opacity-70"
+          disabled
+        >
+          <KeyRound className="w-3.5 h-3.5" />
+          <span>Admin Only</span>
+        </Button>
+      )}
     </div>
   </div>
 );
@@ -413,6 +425,9 @@ const UsageExampleTable = () => (
 );
 
 const SafeDuressWordsPage: React.FC = () => {
+  const { user } = useAuth();
+  const role = user?.role?.toLowerCase() ?? '';
+  const isAdmin = role === 'administrator';
   // State management
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -425,6 +440,43 @@ const SafeDuressWordsPage: React.FC = () => {
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Data state
+  const fallbackWords = React.useMemo(() => ({
+    safe: {
+      id: 'safe-fallback',
+      word: 'Harbor',
+      type: 'safe' as const,
+      updatedAt: new Date().toISOString(),
+      updatedBy: 'System'
+    },
+    duress: {
+      id: 'duress-fallback',
+      word: 'Falcon Red',
+      type: 'duress' as const,
+      updatedAt: new Date().toISOString(),
+      updatedBy: 'System'
+    }
+  }), []);
+  const fallbackHistory = React.useMemo<WordHistory[]>(() => [
+    {
+      id: 'history-1',
+      type: 'safe',
+      oldWord: 'Horizon',
+      newWord: 'Harbor',
+      changedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      changedBy: 'System',
+      reason: 'Placeholder data while live service is unavailable'
+    },
+    {
+      id: 'history-2',
+      type: 'duress',
+      oldWord: 'Nightfall',
+      newWord: 'Falcon Red',
+      changedAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+      changedBy: 'System',
+      reason: 'Placeholder data while live service is unavailable'
+    }
+  ], []);
+
   const [currentWords, setCurrentWords] = useState<{
     safe: CodeWord;
     duress: CodeWord;
@@ -438,6 +490,12 @@ const SafeDuressWordsPage: React.FC = () => {
   });
   const [historyFilters, setHistoryFilters] = useState<WordHistoryFilters>({});
 
+  useEffect(() => {
+    if (!isAdmin && showUpdateDialog) {
+      setShowUpdateDialog(false);
+    }
+  }, [isAdmin, showUpdateDialog]);
+
   // Fetch current words
   const fetchCurrentWords = async () => {
     try {
@@ -445,8 +503,10 @@ const SafeDuressWordsPage: React.FC = () => {
       const response = await safeDuressWordsService.getCurrentWords();
       setCurrentWords(response.data);
     } catch (error) {
-      console.error('Failed to fetch current words:', error);
-      toast.error('Failed to load current words. Please try again.');
+      const message = error instanceof Error ? error.message : 'Failed to load current words';
+      console.warn('⚠️ [SafeDuressWords] Failed to fetch current words:', message);
+      setCurrentWords(fallbackWords);
+      toast.error('Failed to load current words. Showing placeholder data.');
     } finally {
       setIsLoading(false);
     }
@@ -467,8 +527,14 @@ const SafeDuressWordsPage: React.FC = () => {
         total: response.pagination.total
       }));
     } catch (error) {
-      console.error('Failed to fetch word history:', error);
-      toast.error('Failed to load word history. Please try again.');
+      const message = error instanceof Error ? error.message : 'Failed to load word history';
+      console.warn('⚠️ [SafeDuressWords] Failed to fetch word history:', message);
+      setWordHistory(fallbackHistory);
+      setHistoryPagination(prev => ({
+        ...prev,
+        total: fallbackHistory.length
+      }));
+      toast.error('Failed to load word history. Showing placeholder data.');
     } finally {
       setIsHistoryLoading(false);
     }
@@ -487,6 +553,11 @@ const SafeDuressWordsPage: React.FC = () => {
   }, [showHistory, historyPagination.page, historyPagination.pageSize, historyFilters]);
 
   const handleUpdateWord = async () => {
+    if (!isAdmin) {
+      toast.error('Only administrators can update code words.');
+      return;
+    }
+
     if (!updateType || !newWord || !reason || !authorizedCode) return;
     
     try {
@@ -550,7 +621,14 @@ const SafeDuressWordsPage: React.FC = () => {
         {/* Header Section */}
         <PageHeader 
           onShowHistory={() => setShowHistory(true)} 
-          onShowUpdateDialog={() => setShowUpdateDialog(true)} 
+          onShowUpdateDialog={() => {
+            if (!isAdmin) {
+              toast.error('Only administrators can update code words.');
+              return;
+            }
+            setShowUpdateDialog(true);
+          }} 
+          isAdmin={isAdmin}
         />
 
         {/* Important Notice */}
@@ -613,19 +691,21 @@ const SafeDuressWordsPage: React.FC = () => {
         </Card>
 
         {/* Update Dialog */}
-        <UpdateDialog 
-          isOpen={showUpdateDialog}
-          onClose={() => setShowUpdateDialog(false)}
-          updateType={updateType}
-          setUpdateType={setUpdateType}
-          newWord={newWord}
-          setNewWord={setNewWord}
-          reason={reason}
-          setReason={setReason}
-          authorizedCode={authorizedCode}
-          setAuthorizedCode={setAuthorizedCode}
-          onUpdate={handleUpdateWord}
-        />
+        {isAdmin && (
+          <UpdateDialog 
+            isOpen={showUpdateDialog}
+            onClose={() => setShowUpdateDialog(false)}
+            updateType={updateType}
+            setUpdateType={setUpdateType}
+            newWord={newWord}
+            setNewWord={setNewWord}
+            reason={reason}
+            setReason={setReason}
+            authorizedCode={authorizedCode}
+            setAuthorizedCode={setAuthorizedCode}
+            onUpdate={handleUpdateWord}
+          />
+        )}
 
         {/* History Dialog */}
         <HistoryDialog 

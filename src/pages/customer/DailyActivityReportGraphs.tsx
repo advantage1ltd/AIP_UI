@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { AVAILABLE_CUSTOMERS } from '@/types/user';
 import { dailyActivityAnalyticsService, type AnalyticsResponse } from '@/services/dailyActivityAnalyticsService';
 import { customerDashboardService } from '@/services/dashboardService';
+import { getCustomerMappings, getCustomerNameById } from '@/services/customerMappingService';
 import type { Site } from '@/types/dashboard';
 import { 
   BarChart, 
@@ -104,18 +104,47 @@ const DailyActivityReportGraphs: React.FC = () => {
   const [analyticsData, setAnalyticsData] = React.useState<AnalyticsResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [sites, setSites] = React.useState<Site[]>([]);
+  const [customers, setCustomers] = React.useState<Array<{ id: number; name: string }>>([]);
+  const [customerRegion, setCustomerRegion] = React.useState<string>("Customer Sites");
 
   // Check if user is admin
-  const isAdmin = user?.role === 'Administrator';
+  const isAdmin = user?.role === 'administrator';
 
   // Get customer ID from URL parameter or user's customerId
   const urlCustomerId = searchParams.get('customerId');
   const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined;
   const targetCustomerId = urlCustomerId || userCustomerId;
 
-  // Get customer region data based on authenticated user
-  const customer = AVAILABLE_CUSTOMERS.find(c => c.id === user?.customerId);
-  const customerRegion = customer ? `${customer.name} Sites` : "Customer Sites";
+  // Load customers dynamically
+  React.useEffect(() => {
+    const loadCustomers = async () => {
+      try {
+        const customerMappings = await getCustomerMappings();
+        setCustomers(customerMappings);
+      } catch (error) {
+        console.error('Failed to load customers:', error);
+      }
+    };
+    loadCustomers();
+  }, []);
+
+  // Get customer name dynamically
+  React.useEffect(() => {
+    const loadCustomerName = async () => {
+      if (user?.customerId) {
+        try {
+          const name = await getCustomerNameById(user.customerId);
+          setCustomerRegion(name ? `${name} Sites` : "Customer Sites");
+        } catch (error) {
+          console.error('Failed to load customer name:', error);
+          setCustomerRegion("Customer Sites");
+        }
+      } else {
+        setCustomerRegion("Customer Sites");
+      }
+    };
+    loadCustomerName();
+  }, [user?.customerId]);
 
   // Load sites data
   const loadSites = React.useCallback(async () => {
@@ -489,7 +518,7 @@ const DailyActivityReportGraphs: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Customers</SelectItem>
-                  {AVAILABLE_CUSTOMERS.map((customer) => (
+                  {customers.map((customer) => (
                     <SelectItem key={customer.id} value={customer.id.toString()}>
                       {customer.name}
                     </SelectItem>

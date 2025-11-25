@@ -69,7 +69,7 @@ export const MobileSurveyCard: React.FC<MobileSurveyCardProps> = ({
           </div>
           <div>
             <p className="text-gray-500">Location</p>
-            <p className="font-medium">{survey.location}</p>
+            <p className="font-medium">{survey.siteName}</p>
           </div>
           <div>
             <p className="text-gray-500">Region</p>

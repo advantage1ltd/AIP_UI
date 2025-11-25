@@ -508,7 +508,7 @@ const AdminDashboard = () => {
   }
 
   // Show appropriate dashboard based on role
-  if (effectiveRole === 'AdvantageOneOfficer' || effectiveRole === 'AdvantageOneHOOfficer') {
+  if (effectiveRole === 'advantageoneofficer' || effectiveRole === 'advantageonehoofficer') {
     return (
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-screen">
@@ -521,7 +521,7 @@ const AdminDashboard = () => {
         <OfficerDashboard />
       </Suspense>
     )
-  } else if (effectiveRole === 'CustomerSiteManager' || effectiveRole === 'CustomerHOManager') {
+  } else if (effectiveRole === 'customersitemanager' || effectiveRole === 'customerhomanager') {
     return (
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-screen">
@@ -531,7 +531,7 @@ const AdminDashboard = () => {
           </div>
         </div>
       }>
-        <CustomerDashboard userRole={effectiveRole === 'CustomerSiteManager' ? 'CustomerSiteManager' : 'CustomerHOManager'} />
+        <CustomerDashboard userRole={effectiveRole === 'customersitemanager' ? 'customersitemanager' : 'customerhomanager'} />
       </Suspense>
     )
   }

@@ -19,6 +19,7 @@ import { customerSatisfactionService } from '@/services/customerSatisfactionServ
 import { toast } from 'react-toastify';
 import type { Region, Site } from '@/types/dashboard';
 import { customerDashboardService } from '@/services/dashboardService';
+import { customerService } from '@/services/customerService';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardMetrics } from '@/pages/operations/components/DashboardMetrics';
 import { MobileSurveyCard } from '@/pages/operations/components/MobileSurveyCard';
@@ -64,7 +65,7 @@ const generateCsvData = (data: CustomerSurvey[]): string => {
       survey.date,
       survey.customer,
       survey.region,
-      survey.location,
+      survey.siteName,
       ratings.uniformAndAppearance ?? '',
       ratings.professionalism ?? '',
       ratings.customerServiceApproach ?? '',
@@ -96,7 +97,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
   siteId
 }) => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'Administrator';
+  const isAdmin = user?.role === 'administrator';
   // State management
   const [showForm, setShowForm] = useState(false);
   const [editingSurvey, setEditingSurvey] = useState<CustomerSurvey | null>(null);
@@ -104,6 +105,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
   const [surveys, setSurveys] = useState<CustomerSurvey[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -144,23 +146,48 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
     }
   }, [pagination.currentPage, pagination.pageSize, filters]);
 
-  // Fetch regions and sites
+  // Fetch customers, regions and sites
   useEffect(() => {
-    const fetchRegionsAndSites = async () => {
+    const fetchData = async () => {
       try {
-        const [regionsData, sitesData] = await Promise.all([
+        const [customersData, regionsData, sitesData] = await Promise.all([
+          customerService.getAllCustomers(),
           customerDashboardService.getRegions(),
           customerDashboardService.getSites()
         ]);
-        setRegions(regionsData);
-        setSites(sitesData);
+        
+        // Map customers to form format
+        const mappedCustomers = customersData.map(c => ({
+          id: c.id.toString(),
+          name: c.companyName
+        }));
+        setCustomers(mappedCustomers);
+        
+        // Map regions to form format
+        // Backend uses camelCase JSON serialization, so properties are: regionID, regionName, fkCustomerID
+        const mappedRegions = regionsData.map((r: any) => ({
+          id: (r.regionID ?? r.regionId ?? r.id)?.toString() || '',
+          name: (r.regionName ?? r.name) || '',
+          customerId: (r.fkCustomerID ?? r.fkCustomerId ?? r.customerId)?.toString() || ''
+        })).filter(r => r.id && r.name); // Filter out invalid entries
+        setRegions(mappedRegions);
+        
+        // Map sites to form format
+        // Backend uses camelCase JSON serialization, so properties are: siteID, locationName, fkCustomerID, fkRegionID
+        const mappedSites = sitesData.map((s: any) => ({
+          id: (s.siteID ?? s.siteId ?? s.id)?.toString() || '',
+          name: (s.locationName ?? s.name) || '',
+          customerId: (s.fkCustomerID ?? s.fkCustomerId ?? s.customerId)?.toString() || '',
+          regionId: (s.fkRegionID ?? s.fkRegionId ?? s.regionId)?.toString() || ''
+        })).filter(s => s.id && s.name); // Filter out invalid entries
+        setSites(mappedSites);
       } catch (error) {
-        console.error('Failed to fetch regions and sites:', error);
-        toast.error('Failed to load regions and sites. Please try again.');
+        console.error('Failed to fetch data:', error);
+        toast.error('Failed to load data. Please try again.');
       }
     };
 
-    fetchRegionsAndSites();
+    fetchData();
   }, []);
 
   // Update filters when customerId or siteId props change
@@ -334,11 +361,11 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
       <div className="container mx-auto max-w-[1280px] py-4 md:py-6 lg:py-8 px-2 md:px-4 lg:px-6">
         <PageHeader 
           pageId="customer-satisfaction"
-          title="Customer Satisfaction Surveys"
+          title="Customer Satisfaction Survey"
           description="Manage and track customer satisfaction surveys and feedback"
           showForm={showForm} 
           isEditing={!!editingSurvey}
-          formType="Customer Survey"
+          formType="Customer Satisfaction Survey"
         />
 
         <AnimatePresence mode="wait">
@@ -591,6 +618,9 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
                       initialData={editingSurvey}
                       customerId={customerId}
                       siteId={siteId}
+                      customers={customers}
+                      regions={regions}
+                      sites={sites}
                     />
                   </div>
                 </div>

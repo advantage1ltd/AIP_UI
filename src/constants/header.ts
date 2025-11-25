@@ -17,10 +17,10 @@ export const BUTTON_STYLES = {
 
 // Common class names
 export const COMMON_CLASSES = {
-  mobileHeader: "flex h-18 items-center justify-between px-5 bg-[#334155] lg:hidden",
-  desktopHeader: "hidden lg:flex h-20 items-center px-4 bg-[#334155]",
-  sheetContent: "w-[340px] sm:w-[400px] p-0 flex flex-col h-full bg-blue-950 text-white border-r-blue-900",
-  searchInput: "w-full pl-9 h-9 rounded-full bg-gray-50 border-gray-200 focus-visible:ring-0 focus-visible:ring-offset-0"
+  mobileHeader: "flex h-18 items-center justify-between px-5 bg-header-bg text-header-text lg:hidden border-b border-header-border",
+  desktopHeader: "hidden lg:flex h-20 items-center px-4 bg-header-bg text-header-text border-b border-header-border",
+  sheetContent: "w-[340px] sm:w-[400px] p-0 flex flex-col h-full bg-blue-950 text-white border-r border-blue-900",
+  searchInput: "w-full pl-9 h-10 rounded-full bg-white text-gray-900 placeholder:text-gray-500 border border-gray-200 focus-visible:ring-2 focus-visible:ring-accent-teal/60 focus-visible:ring-offset-0 focus-visible:border-accent-teal"
 } as const;
 
 // Navigation related constants

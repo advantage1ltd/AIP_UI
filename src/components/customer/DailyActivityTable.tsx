@@ -54,7 +54,7 @@ export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, cust
   const [showFilters, setShowFilters] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
 
-  const isAdmin = user?.role === 'Administrator';
+  const isAdmin = user?.role === 'administrator';
 
   // Update filters when customerId or siteId props change
   useEffect(() => {

@@ -38,8 +38,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { mockOfficers } from '@/data/mockOfficers';
-import { mockManagers } from '@/data/mockManagers';
+import { employeeService } from '@/services/employeeService';
+import type { Employee } from '@/types/employee';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -48,7 +48,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Archive, ArchiveRestore } from "lucide-react";
 import { Pencil, Trash2, Eye, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -92,33 +92,68 @@ const formSchema = z.object({
   officerId: z.string().min(1, "Officer is required"),
   startDate: z.date({
     required_error: "Start date is required",
-  }).min(addDays(new Date(), 60), "Start date must be at least 60 days from today")
-    .transform(date => new Date(date.setHours(0, 0, 0, 0))),
+  }).refine((date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dateToCheck = new Date(date);
+    dateToCheck.setHours(0, 0, 0, 0);
+    const minDate = addDays(today, 60);
+    // Start date must be at least 60 days from booking date
+    return dateToCheck >= minDate;
+  }, {
+    message: "Start date must be at least 60 days from the booking date"
+  }).transform(date => new Date(date.setHours(0, 0, 0, 0))),
   endDate: z.date({
     required_error: "End date is required",
   }).transform(date => new Date(date.setHours(0, 0, 0, 0))),
   returnToWorkDate: z.date({
     required_error: "Return to work date is required",
   }).transform(date => new Date(date.setHours(0, 0, 0, 0))),
-  authorisedBy: z.string().min(1, "Authorising manager is required"),
+  authorisedBy: z.string().optional(),
   dateAuthorised: z.date().optional().nullable(),
   status: z.enum(['pending', 'approved', 'denied']).default('pending'),
   comment: z.string().optional(),
 }).refine((data) => {
   if (!data.startDate || !data.endDate) return true;
   
-  const dayDiff = differenceInDays(data.endDate, data.startDate);
+  const start = new Date(data.startDate);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(data.endDate);
+  end.setHours(0, 0, 0, 0);
+  
+  // End date must be on or after start date
+  if (end < start) return false;
+  
+  // End date must be within 14 days of start date (max)
+  const dayDiff = differenceInDays(end, start);
   return dayDiff >= 0 && dayDiff <= 14;
 }, {
-  message: "End date must be within 14 days of start date and cannot be before start date",
+  message: "End date must be on or after start date and within 14 days maximum",
   path: ["endDate"]
 }).refine((data) => {
-  if (!data.endDate || !data.returnToWorkDate) return true;
+  if (!data.startDate || !data.returnToWorkDate) return true;
   
-  const dayDiff = differenceInDays(data.returnToWorkDate, data.endDate);
-  return dayDiff >= 1;
+  const start = new Date(data.startDate);
+  start.setHours(0, 0, 0, 0);
+  const returnDate = new Date(data.returnToWorkDate);
+  returnDate.setHours(0, 0, 0, 0);
+  
+  // Return date must be at least 1 day after end date, but can add up to 3 days to the 14-day window
+  // So max is start date + 17 days (14 days holiday + 3 days buffer for weekends)
+  const maxReturnDate = addDays(start, 17);
+  const endDate = data.endDate ? new Date(data.endDate) : null;
+  
+  if (endDate) {
+    endDate.setHours(0, 0, 0, 0);
+    const minReturnDate = addDays(endDate, 1);
+    // Must be at least 1 day after end date, but not more than start + 17 days
+    return returnDate >= minReturnDate && returnDate <= maxReturnDate;
+  }
+  
+  // If no end date, just check it's within the max window
+  return returnDate <= maxReturnDate;
 }, {
-  message: "Return date must be at least one day after end date",
+  message: "Return date must be at least one day after end date and within 17 days from start date (14 days holiday + 3 days buffer)",
   path: ["returnToWorkDate"]
 });
 
@@ -136,11 +171,39 @@ export default function HolidayRequestPage() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [endDateOpen, setEndDateOpen] = useState(false);
+  const [returnDateOpen, setReturnDateOpen] = useState(false);
   const { currentRole } = usePageAccess();
   const itemsPerPage = 10;
   const { toast } = useToast();
 
   const isAdminRole = currentRole && ['administrator', 'admin'].includes(currentRole.toLowerCase());
+
+  // Fetch employees
+  const fetchEmployees = async () => {
+    try {
+      setIsLoadingEmployees(true);
+      const response = await employeeService.getActiveEmployees();
+      setEmployees(response);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load employees. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingEmployees(false);
+    }
+  };
+
+  // Fetch employees on mount
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
 
   // Fetch holiday requests
   const fetchRequests = async () => {
@@ -218,7 +281,7 @@ export default function HolidayRequestPage() {
       startDate: undefined,
       endDate: undefined,
       returnToWorkDate: undefined,
-      authorisedBy: "",
+      authorisedBy: undefined,
       dateAuthorised: null,
       status: 'pending',
       comment: "",
@@ -236,7 +299,7 @@ export default function HolidayRequestPage() {
         startDate: new Date(editingRequest.startDate),
         endDate: new Date(editingRequest.endDate),
         returnToWorkDate: new Date(editingRequest.returnToWorkDate),
-        authorisedBy: editingRequest.authorisedBy,
+        authorisedBy: editingRequest.authorisedBy || undefined,
         dateAuthorised: editingRequest.dateAuthorised,
         status: editingRequest.status,
         comment: editingRequest.comment,
@@ -248,6 +311,9 @@ export default function HolidayRequestPage() {
   const handleCreateRequest = () => {
     setEditingRequest(null);
     form.reset();
+    setStartDateOpen(false);
+    setEndDateOpen(false);
+    setReturnDateOpen(false);
     setIsDialogOpen(true);
   };
 
@@ -265,11 +331,14 @@ export default function HolidayRequestPage() {
       startDate: new Date(request.startDate),
       endDate: new Date(request.endDate),
       returnToWorkDate: new Date(request.returnToWorkDate),
-      authorisedBy: request.authorisedBy,
+      authorisedBy: request.authorisedBy || undefined,
       dateAuthorised: request.dateAuthorised,
       status: request.status,
       comment: request.comment,
     });
+    setStartDateOpen(false);
+    setEndDateOpen(false);
+    setReturnDateOpen(false);
     setIsDialogOpen(true);
   };
 
@@ -277,9 +346,12 @@ export default function HolidayRequestPage() {
   const handleArchiveRequest = async (id: string) => {
     try {
       await holidayRequestService.archiveHolidayRequest(id);
+      // Update local state
       setRequests(prev => prev.map(r => 
         r.id === id ? { ...r, archived: true } : r
       ));
+      // Refresh from server to ensure consistency
+      await fetchRequests();
       toast({
         title: "Success",
         description: "Holiday request archived successfully.",
@@ -298,9 +370,12 @@ export default function HolidayRequestPage() {
   const handleUnarchiveRequest = async (id: string) => {
     try {
       await holidayRequestService.unarchiveHolidayRequest(id);
+      // Update local state
       setRequests(prev => prev.map(r => 
         r.id === id ? { ...r, archived: false } : r
       ));
+      // Refresh from server to ensure consistency
+      await fetchRequests();
       toast({
         title: "Success",
         description: "Holiday request unarchived successfully.",
@@ -355,20 +430,22 @@ export default function HolidayRequestPage() {
     try {
       setIsSubmitting(true);
 
-      const requestData: CreateHolidayRequestDTO = {
-        officerId: values.officerId,
-        startDate: values.startDate,
-        endDate: values.endDate,
-        returnToWorkDate: values.returnToWorkDate,
-        authorisedBy: values.authorisedBy,
-        comment: values.comment
-      };
-
       if (editingRequest) {
-        // Update existing request
+        // Update existing request - include all fields from the form
+        const updateData: UpdateHolidayRequestDTO = {
+          officerId: values.officerId,
+          startDate: values.startDate,
+          endDate: values.endDate,
+          returnToWorkDate: values.returnToWorkDate,
+          comment: values.comment,
+          status: values.status,
+          authorisedBy: values.authorisedBy,
+          dateAuthorised: values.dateAuthorised,
+        };
+        
         const updatedRequest = await holidayRequestService.updateHolidayRequest(
           editingRequest.id,
-          requestData
+          updateData
         );
         
         setRequests(prev => prev.map(r => r.id === editingRequest.id ? updatedRequest : r));
@@ -378,6 +455,15 @@ export default function HolidayRequestPage() {
         });
       } else {
         // Create new request
+        const requestData: CreateHolidayRequestDTO = {
+          officerId: values.officerId,
+          startDate: values.startDate,
+          endDate: values.endDate,
+          returnToWorkDate: values.returnToWorkDate,
+          comment: values.comment
+          // authorisedBy is only set during admin approval, not when officers create requests
+        };
+        
         const newRequest = await holidayRequestService.createHolidayRequest(requestData);
         setRequests(prev => [newRequest, ...prev]);
         toast({
@@ -389,11 +475,32 @@ export default function HolidayRequestPage() {
       setIsDialogOpen(false);
       setEditingRequest(null);
       form.reset();
-    } catch (error) {
-      console.error('Error submitting holiday request:', error);
+      setStartDateOpen(false);
+      setEndDateOpen(false);
+      setReturnDateOpen(false);
+    } catch (error: any) {
+      const errorDetails = {
+        error,
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        url: error.config?.url,
+        requestData: error.config?.data
+      };
+      
+      console.error('❌ [HolidayRequestPage] Error submitting holiday request:', errorDetails);
+      console.error('❌ [HolidayRequestPage] Full error:', error);
+      
+      // Log response data separately for better visibility
+      if (error.response?.data) {
+        console.error('❌ [HolidayRequestPage] Error response data:', JSON.stringify(error.response.data, null, 2));
+      }
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to save holiday request. Please try again.';
       toast({
         title: "Error",
-        description: "Failed to save holiday request. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -628,7 +735,7 @@ export default function HolidayRequestPage() {
                                   <span className="sr-only">Edit</span>
                                 </Button>
                               )}
-                              {isAdminRole && request.status === 'approved' && !request.archived && new Date() > new Date(request.endDate) && (
+                              {isAdminRole && !request.archived && (request.status === 'approved' || request.status === 'denied') && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -637,7 +744,7 @@ export default function HolidayRequestPage() {
                                   title="Archive Request"
                                   disabled={isLoading}
                                 >
-                                  <CalendarIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 xl:h-5 xl:w-5" />
+                                  <Archive className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 xl:h-5 xl:w-5" />
                                   <span className="sr-only">Archive</span>
                                 </Button>
                               )}
@@ -650,7 +757,7 @@ export default function HolidayRequestPage() {
                                   title="Unarchive Request"
                                   disabled={isLoading}
                                 >
-                                  <CalendarIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 xl:h-5 xl:w-5" />
+                                  <ArchiveRestore className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 xl:h-5 xl:w-5" />
                                   <span className="sr-only">Unarchive</span>
                                 </Button>
                               )}
@@ -759,14 +866,21 @@ export default function HolidayRequestPage() {
       </div>
 
       {/* Create/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        setIsDialogOpen(open);
+        if (!open) {
+          setStartDateOpen(false);
+          setEndDateOpen(false);
+          setReturnDateOpen(false);
+        }
+      }}>
         <DialogContent className="w-[90%] xs:w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] md:max-w-[700px] mx-auto p-3 xs:p-4 sm:p-6 space-y-4 sm:space-y-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader className="space-y-2 sm:space-y-3">
             <DialogTitle className="text-base xs:text-lg sm:text-xl font-semibold text-gray-900">
               {editingRequest ? 'Edit Holiday Request' : 'New Holiday Request'}
             </DialogTitle>
             <DialogDescription className="text-xs xs:text-sm text-gray-500">
-              Please note that holiday requests must be submitted at least 60 days in advance.
+              Please note: Start date must be at least 60 days from booking date. Each holiday can last a maximum of 2 weeks (14 days). Return to work date can add up to 3 days buffer for weekends.
             </DialogDescription>
           </DialogHeader>
 
@@ -794,16 +908,16 @@ export default function HolidayRequestPage() {
                 render={({ field }) => (
                   <FormItem className="space-y-1.5 sm:space-y-2">
                     <FormLabel className="text-xs sm:text-sm font-medium text-gray-700">Officer Name</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingEmployees}>
                       <FormControl>
                         <SelectTrigger className="h-8 xs:h-9 sm:h-10 text-xs sm:text-sm">
-                          <SelectValue placeholder="Select an officer" />
+                          <SelectValue placeholder={isLoadingEmployees ? "Loading employees..." : "Select an employee"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockOfficers.map((officer) => (
-                          <SelectItem key={officer.id} value={officer.id} className="text-xs sm:text-sm">
-                            {officer.name}
+                        {employees.map((employee) => (
+                          <SelectItem key={employee.id.toString()} value={employee.id.toString()} className="text-xs sm:text-sm">
+                            {employee.fullName || `${employee.firstName} ${employee.surname}`}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -822,10 +936,11 @@ export default function HolidayRequestPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-col space-y-1.5 sm:space-y-2">
                       <FormLabel className="text-xs sm:text-sm font-medium text-gray-700">Start Date</FormLabel>
-                      <Popover>
+                      <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
+                              type="button"
                               variant={"outline"}
                               className={cn(
                                 "h-8 xs:h-9 sm:h-10 w-full pl-3 text-left font-normal text-xs sm:text-sm",
@@ -840,23 +955,31 @@ export default function HolidayRequestPage() {
                         <PopoverContent className="w-auto p-0 max-w-[calc(100vw-2rem)]" align="start">
                           <div className="p-2 xs:p-3 border-b border-gray-100">
                             <h4 className="text-xs sm:text-sm font-medium text-gray-900">Select Start Date</h4>
-                            <p className="text-[10px] xs:text-xs text-gray-500 mt-0.5 xs:mt-1">Must be at least 60 days from today</p>
+                            <p className="text-[10px] xs:text-xs text-gray-500 mt-0.5 xs:mt-1">Must be at least 60 days from booking date</p>
                           </div>
                           <Calendar
                             mode="single"
                             selected={field.value}
                             onSelect={(date) => {
-                              field.onChange(date);
-                              form.setValue('endDate', undefined);
-                              form.setValue('returnToWorkDate', undefined);
+                              if (date) {
+                                const normalizedDate = new Date(date);
+                                normalizedDate.setHours(0, 0, 0, 0);
+                                field.onChange(normalizedDate);
+                                form.setValue('endDate', undefined);
+                                form.setValue('returnToWorkDate', undefined);
+                                setStartDateOpen(false);
+                              }
                             }}
+                            initialFocus
                             modifiers={{
                               disabled: (date) => {
+                                // Disable dates before 60 days from today (booking date)
                                 const today = new Date();
                                 today.setHours(0, 0, 0, 0);
+                                const dateToCheck = new Date(date);
+                                dateToCheck.setHours(0, 0, 0, 0);
                                 const minDate = addDays(today, 60);
-                                const maxDate = addYears(today, 1);
-                                return isBefore(date, minDate) || isBefore(maxDate, date);
+                                return isBefore(dateToCheck, minDate);
                               }
                             }}
                             modifiersStyles={{
@@ -885,15 +1008,17 @@ export default function HolidayRequestPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-col space-y-1.5 sm:space-y-2">
                       <FormLabel className="text-xs sm:text-sm font-medium text-gray-700">End Date</FormLabel>
-                      <Popover>
+                      <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
+                              type="button"
                               variant={"outline"}
                               className={cn(
                                 "h-8 xs:h-9 sm:h-10 w-full pl-3 text-left font-normal text-xs sm:text-sm",
                                 !field.value && "text-muted-foreground"
                               )}
+                              disabled={!startDate}
                             >
                               {field.value ? format(field.value, "PPP") : "Select date"}
                               <CalendarIcon className="ml-auto h-3 w-3 xs:h-4 xs:w-4 opacity-50" />
@@ -909,15 +1034,30 @@ export default function HolidayRequestPage() {
                             mode="single"
                             selected={field.value}
                             onSelect={(date) => {
-                              field.onChange(date);
-                              form.setValue('returnToWorkDate', undefined);
+                              if (date) {
+                                const normalizedDate = new Date(date);
+                                normalizedDate.setHours(0, 0, 0, 0);
+                                field.onChange(normalizedDate);
+                                form.setValue('returnToWorkDate', undefined);
+                                setEndDateOpen(false);
+                              }
                             }}
+                            initialFocus
                             modifiers={{
                               disabled: (date) => {
                                 const startDate = form.getValues("startDate");
                                 if (!startDate) return true;
-                                const maxDate = addDays(startDate, 14);
-                                return isBefore(date, startDate) || isBefore(maxDate, date);
+                                
+                                const start = new Date(startDate);
+                                start.setHours(0, 0, 0, 0);
+                                const dateToCheck = new Date(date);
+                                dateToCheck.setHours(0, 0, 0, 0);
+                                const maxDate = addDays(start, 14);
+                                
+                                // Disable dates before start date or after 14 days from start date (inclusive of 14th day)
+                                // isBefore(dateToCheck, start) - disables dates before start
+                                // dateToCheck > maxDate - disables dates after maxDate (more than 14 days)
+                                return isBefore(dateToCheck, start) || dateToCheck > maxDate;
                               }
                             }}
                             modifiersStyles={{
@@ -947,15 +1087,17 @@ export default function HolidayRequestPage() {
                 render={({ field }) => (
                   <FormItem className="flex flex-col space-y-1.5 sm:space-y-2">
                     <FormLabel className="text-xs sm:text-sm font-medium text-gray-700">Return to Work Date</FormLabel>
-                    <Popover>
+                    <Popover open={returnDateOpen} onOpenChange={setReturnDateOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
+                            type="button"
                             variant={"outline"}
                             className={cn(
                               "h-8 xs:h-9 sm:h-10 w-full pl-3 text-left font-normal text-xs sm:text-sm",
                               !field.value && "text-muted-foreground"
                             )}
+                            disabled={!endDate}
                           >
                             {field.value ? format(field.value, "PPP") : "Select date"}
                             <CalendarIcon className="ml-auto h-3 w-3 xs:h-4 xs:w-4 opacity-50" />
@@ -965,19 +1107,40 @@ export default function HolidayRequestPage() {
                       <PopoverContent className="w-auto p-0 max-w-[calc(100vw-2rem)]" align="start">
                         <div className="p-2 xs:p-3 border-b border-gray-100">
                           <h4 className="text-xs sm:text-sm font-medium text-gray-900">Select Return Date</h4>
-                          <p className="text-[10px] xs:text-xs text-gray-500 mt-0.5 xs:mt-1">Must be at least 1 day after end date</p>
+                          <p className="text-[10px] xs:text-xs text-gray-500 mt-0.5 xs:mt-1">Must be at least 1 day after end date, max 17 days from start (14 days + 3 day buffer)</p>
                         </div>
                         <Calendar
                           mode="single"
                           selected={field.value}
-                          onSelect={field.onChange}
+                          onSelect={(date) => {
+                            if (date) {
+                              const normalizedDate = new Date(date);
+                              normalizedDate.setHours(0, 0, 0, 0);
+                              field.onChange(normalizedDate);
+                              setReturnDateOpen(false);
+                            }
+                          }}
+                          initialFocus
                           modifiers={{
                             disabled: (date) => {
+                              const startDate = form.getValues("startDate");
                               const endDate = form.getValues("endDate");
-                              if (!endDate) return true;
-                              const minDate = addDays(endDate, 1);
-                              const maxDate = addDays(endDate, 7);
-                              return isBefore(date, minDate) || isBefore(maxDate, date);
+                              if (!startDate || !endDate) return true;
+                              
+                              const start = new Date(startDate);
+                              start.setHours(0, 0, 0, 0);
+                              const end = new Date(endDate);
+                              end.setHours(0, 0, 0, 0);
+                              const dateToCheck = new Date(date);
+                              dateToCheck.setHours(0, 0, 0, 0);
+                              
+                              // Must be at least 1 day after end date
+                              const minDate = addDays(end, 1);
+                              // Can add up to 3 days to the 14-day window (start + 17 days max)
+                              const maxDate = addDays(start, 17);
+                              
+                              // Disable dates before minDate (1 day after end) or after maxDate (start + 17 days)
+                              return isBefore(dateToCheck, minDate) || dateToCheck > maxDate;
                             }
                           }}
                           modifiersStyles={{
@@ -1047,6 +1210,9 @@ export default function HolidayRequestPage() {
                   onClick={() => {
                     setIsDialogOpen(false);
                     form.reset();
+                    setStartDateOpen(false);
+                    setEndDateOpen(false);
+                    setReturnDateOpen(false);
                   }}
                   className="h-8 xs:h-9 text-xs sm:text-sm"
                   disabled={isSubmitting}
@@ -1132,7 +1298,7 @@ export default function HolidayRequestPage() {
                 <div className="col-span-2">
                   <h4 className="text-[10px] xs:text-xs font-medium text-gray-500">Authorised By</h4>
                   <p className="text-xs sm:text-sm text-gray-900">
-                    {mockManagers.find(m => m.id === viewingRequest.authorisedBy)?.name || 'Not authorised yet'}
+                    {viewingRequest.authorisedBy || 'Not authorised yet'}
                   </p>
                 </div>
                 {viewingRequest.dateAuthorised && (
@@ -1148,6 +1314,13 @@ export default function HolidayRequestPage() {
                   <div className="col-span-2">
                     <h4 className="text-[10px] xs:text-xs font-medium text-gray-500">Comments</h4>
                     <p className="text-xs sm:text-sm text-gray-900">{viewingRequest.comment}</p>
+                  </div>
+                )}
+
+                {viewingRequest.reason && (
+                  <div className="col-span-2">
+                    <h4 className="text-[10px] xs:text-xs font-medium text-gray-500">Reason</h4>
+                    <p className="text-xs sm:text-sm text-gray-900">{viewingRequest.reason}</p>
                   </div>
                 )}
 
@@ -1170,34 +1343,73 @@ export default function HolidayRequestPage() {
                     const formData = new FormData(form);
                     const decision = formData.get('decision') as 'approved' | 'denied';
                     const reason = formData.get('reason') as string;
-                    const daysLeftYTD = Number(formData.get('daysLeftYTD'));
-                    const authorisedBy = formData.get('authorisedBy') as string;
-                    if (decision && reason && viewingRequest && authorisedBy) {
+                    const daysLeftYTD = formData.get('daysLeftYTD') ? Number(formData.get('daysLeftYTD')) : undefined;
+                    if (decision && reason && viewingRequest) {
                       try {
                         setIsSubmitting(true);
+                        const updateData: UpdateHolidayRequestDTO = {
+                          status: decision,
+                          reason: reason,
+                          dateAuthorised: new Date(),
+                          // authorisedBy will be automatically set by backend to current user
+                        };
+                        
+                        // Include daysLeftYTD if provided
+                        if (daysLeftYTD !== undefined && daysLeftYTD !== null && !isNaN(daysLeftYTD)) {
+                          updateData.daysLeftYTD = daysLeftYTD;
+                        }
+                        
                         const updatedRequest = await holidayRequestService.updateHolidayRequest(
                           viewingRequest.id,
-                          {
-                            status: decision,
-                            comment: reason,
-                            dateAuthorised: new Date(),
-                            daysLeftYTD: !isNaN(daysLeftYTD) ? daysLeftYTD : undefined,
-                            authorisedBy,
-                          }
+                          updateData
                         );
                         setRequests(prev => prev.map(r =>
                           r.id === viewingRequest.id ? updatedRequest : r
                         ));
+                        
+                        // Send email notification to employee
+                        const employee = employees.find(e => e.id.toString() === viewingRequest.officerId);
+                        if (employee?.email) {
+                          try {
+                            // In production, this would call the backend email service
+                            // For now, we'll log it (backend should handle email sending)
+                            console.log(`[Email Notification] Holiday request ${decision} for ${employee.fullName || employee.firstName} ${employee.surname} (${employee.email})`);
+                            console.log(`Subject: Holiday Request ${decision === 'approved' ? 'Approved' : 'Denied'}`);
+                            console.log(`Details:`, {
+                              employee: employee.fullName || `${employee.firstName} ${employee.surname}`,
+                              email: employee.email,
+                              startDate: format(viewingRequest.startDate, 'PPP'),
+                              endDate: format(viewingRequest.endDate, 'PPP'),
+                              returnDate: format(viewingRequest.returnToWorkDate, 'PPP'),
+                              status: decision,
+                              reason: reason,
+                              authorisedBy: updatedRequest.authorisedBy || 'System'
+                            });
+                            // TODO: Call backend email service endpoint when available
+                            // await holidayRequestService.sendHolidayRequestNotification(viewingRequest.id, decision);
+                          } catch (emailError) {
+                            console.error('Error sending email notification:', emailError);
+                            // Don't fail the request if email fails
+                          }
+                        }
+                        
                         setIsViewDialogOpen(false);
                         toast({
                           title: "Success",
-                          description: `Holiday request ${decision} successfully.`,
+                          description: `Holiday request ${decision} successfully.${employee?.email ? ' Email notification sent.' : ''}`,
                         });
-                      } catch (error) {
-                        console.error('Error updating holiday request:', error);
+                      } catch (error: any) {
+                        console.error('❌ [HolidayRequestPage] Error updating holiday request:', {
+                          error,
+                          message: error.message,
+                          response: error.response?.data,
+                          status: error.response?.status,
+                          statusText: error.response?.statusText
+                        });
+                        const errorMessage = error.response?.data?.message || error.message || 'Failed to update holiday request. Please try again.';
                         toast({
                           title: "Error",
-                          description: "Failed to update holiday request. Please try again.",
+                          description: errorMessage,
                           variant: "destructive"
                         });
                       } finally {
@@ -1265,20 +1477,14 @@ export default function HolidayRequestPage() {
                       
                       <div>
                         <label className="text-[10px] xs:text-xs font-medium text-gray-700 mb-1 block">Authorising Manager</label>
-                        <select
-                          name="authorisedBy"
-                          required
-                          className="w-full border rounded px-2 py-1 text-xs sm:text-sm"
-                          defaultValue={viewingRequest.authorisedBy || ''}
-                          disabled={isSubmitting}
-                        >
-                          <option value="" disabled>Select a manager</option>
-                          {mockManagers.map((manager) => (
-                            <option key={manager.id} value={manager.id}>
-                              {manager.name} - {manager.role}
-                            </option>
-                          ))}
-                        </select>
+                        <input
+                          type="text"
+                          className="w-full border rounded px-2 py-1 text-xs sm:text-sm bg-gray-50"
+                          value="Current User (You)"
+                          disabled
+                          readOnly
+                        />
+                        <p className="text-[10px] text-gray-500 mt-1">The request will be authorized by your account</p>
                       </div>
                       
                       <div className="flex justify-end gap-2 xs:gap-3">
@@ -1311,14 +1517,58 @@ export default function HolidayRequestPage() {
                 </div>
               )}
               
-              {/* For already approved/denied requests, only show close button */}
+              {/* For already approved/denied requests, show archive/unarchive and close button */}
               {viewingRequest.status !== 'pending' && (
-                <DialogFooter>
+                <DialogFooter className="gap-2 xs:gap-3 pt-2 flex-col sm:flex-row">
+                  <div className="flex gap-2 xs:gap-3 w-full sm:w-auto">
+                    {isAdminRole && !viewingRequest.archived && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            await handleArchiveRequest(viewingRequest.id);
+                            setIsViewDialogOpen(false);
+                            // Refresh the list (already done in handleArchiveRequest, but ensure UI updates)
+                            await fetchRequests();
+                          } catch (error) {
+                            // Error already handled in handleArchiveRequest
+                          }
+                        }}
+                        className="h-7 xs:h-8 sm:h-9 text-[10px] xs:text-xs sm:text-sm text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200 flex-1 sm:flex-initial"
+                        disabled={isSubmitting}
+                      >
+                        <Archive className="h-3 w-3 xs:h-3.5 xs:w-3.5 sm:h-4 sm:w-4 mr-1.5 xs:mr-2" />
+                        Archive
+                      </Button>
+                    )}
+                    {isAdminRole && viewingRequest.archived && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            await handleUnarchiveRequest(viewingRequest.id);
+                            setIsViewDialogOpen(false);
+                            // Refresh the list (already done in handleUnarchiveRequest, but ensure UI updates)
+                            await fetchRequests();
+                          } catch (error) {
+                            // Error already handled in handleUnarchiveRequest
+                          }
+                        }}
+                        className="h-7 xs:h-8 sm:h-9 text-[10px] xs:text-xs sm:text-sm text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 flex-1 sm:flex-initial"
+                        disabled={isSubmitting}
+                      >
+                        <ArchiveRestore className="h-3 w-3 xs:h-3.5 xs:w-3.5 sm:h-4 sm:w-4 mr-1.5 xs:mr-2" />
+                        Unarchive
+                      </Button>
+                    )}
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setIsViewDialogOpen(false)}
-                    className="h-7 xs:h-8 sm:h-9 text-[10px] xs:text-xs sm:text-sm"
+                    className="h-7 xs:h-8 sm:h-9 text-[10px] xs:text-xs sm:text-sm w-full sm:w-auto"
                   >
                     Close
                   </Button>

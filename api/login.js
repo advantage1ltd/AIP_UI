@@ -1,13 +1,9 @@
 // NOTE: This file is not currently used in the application.
-// The application uses MSW (Mock Service Worker) for API mocking.
-// See src/mocks/userHandlers.ts for the actual authentication logic.
-// This file is kept for potential future backend integration.
-
-// In a real backend, this would read from a database
-// For now, this would need to be updated to read from db.json to match MSW behavior
+// The application uses the real .NET backend API for authentication.
+// This file is kept for reference only.
 const users = [
   // This hardcoded array should be replaced with dynamic database loading
-  // when this API is actually used. Currently MSW handles all authentication.
+  // when this API is actually used.
   {
     id: '1',
     username: 'admin',

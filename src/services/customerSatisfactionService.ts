@@ -52,7 +52,13 @@ export const customerSatisfactionService = {
 
   // Create a new survey
   async createSurvey(data: CustomerSurveyRequest): Promise<CustomerSurvey> {
-    const response = await api.post(BASE_URL, data, {
+    // Map location to siteName for backward compatibility with form
+    const requestData: any = { ...data };
+    if ('location' in requestData && !('siteName' in requestData)) {
+      requestData.siteName = requestData.location;
+      delete requestData.location;
+    }
+    const response = await api.post(BASE_URL, requestData, {
       headers: getHeaders()
     });
     return response.data;
@@ -60,7 +66,13 @@ export const customerSatisfactionService = {
 
   // Update an existing survey
   async updateSurvey(id: string, data: CustomerSurveyUpdateRequest): Promise<CustomerSurvey> {
-    const response = await api.put(`${BASE_URL}/${id}`, data, {
+    // Map location to siteName for backward compatibility with form
+    const requestData: any = { ...data };
+    if ('location' in requestData && !('siteName' in requestData)) {
+      requestData.siteName = requestData.location;
+      delete requestData.location;
+    }
+    const response = await api.put(`${BASE_URL}/${id}`, requestData, {
       headers: getHeaders()
     });
     return response.data;

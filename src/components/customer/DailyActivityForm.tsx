@@ -92,7 +92,7 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess, custo
   const [securityChecks, setSecurityChecks] = useState<SecurityCheck[]>([]);
   const [visitorLog, setVisitorLog] = useState<VisitorEntry[]>([]);
 
-  const isAdmin = user?.role === 'Administrator';
+  const isAdmin = user?.role === 'administrator';
 
   // Load sites and initialize form
   useEffect(() => {

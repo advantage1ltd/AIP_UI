@@ -25,7 +25,12 @@ export interface UpdateCustomerPageAccessRequest {
 export const customerPageAccessApi = {
 	getCustomerPageAccess: async (customerId: number): Promise<CustomerPageAccessResponse> => {
 		const response = await api.get<ApiResponse<CustomerPageAccessResponse>>(
-			`/customer-page-access/${customerId}`
+			`/customer-page-access/${customerId}`,
+			{
+				headers: {
+					'X-Customer-Id': customerId.toString()
+				}
+			}
 		)
 		if (!response.data?.data) {
 			throw new Error('Failed to fetch customer page access')

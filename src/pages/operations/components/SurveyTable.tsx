@@ -197,7 +197,7 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
               surveys.map((survey) => (
                 <TableRow key={survey.id}>
                   <TableCell>{survey.customer}</TableCell>
-                  <TableCell>{survey.location}</TableCell>
+                  <TableCell>{survey.siteName}</TableCell>
                   <TableCell>{survey.officerName}</TableCell>
                   <TableCell>{format(new Date(survey.date), 'PP')}</TableCell>
                   <TableCell>{getAverageRating(survey).toFixed(1)}/10</TableCell>

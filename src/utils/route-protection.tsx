@@ -14,9 +14,9 @@ interface RouteConfig {
 const defaultRouteConfig: RouteConfig[] = [
   { path: '/login', requireAuth: false },
   { path: '/dashboard', requireAuth: true },
-  { path: '/admin/*', roles: ['Administrator'], requireAuth: true },
-  { path: '/customer/*', roles: ['CustomerHOManager', 'CustomerSiteManager'], requireAuth: true },
-  { path: '/officer/*', roles: ['AdvantageOneOfficer', 'AdvantageOneHOOfficer'], requireAuth: true },
+  { path: '/admin/*', roles: ['administrator'], requireAuth: true },
+  { path: '/customer/*', roles: ['customerhomanager', 'customersitemanager'], requireAuth: true },
+  { path: '/officer/*', roles: ['advantageoneofficer', 'advantageonehoofficer'], requireAuth: true },
 ];
 
 export function useRouteProtection(customConfig: RouteConfig[] = []) {

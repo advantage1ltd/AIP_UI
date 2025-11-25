@@ -36,7 +36,7 @@ import {
   ArrowLeft,
   MapPin
 } from 'lucide-react';
-import { customerOperations } from '@/mocks/customerStore';
+import { customerService } from '@/services/customerService';
 import { customerPageAccessCache } from '@/services/customerPageAccessCache';
 import { siteService } from '@/services/siteService';
 import type { Site } from '@/types/customer';
@@ -155,18 +155,116 @@ export default function CustomerReportingPage() {
       setError(null);
 
       // Load customer data from customer store (which uses cached data)
-      let customerData = await customerOperations.getAll();
+      let customerData = await customerService.getAllCustomers();
       
       // For officers, filter to only assigned customers
-      if (user.role === 'AdvantageOneOfficer') {
-        const assignedCustomerIds = user.assignedCustomerIds || [];
-        customerData = customerData.filter((customer: any) => 
-          assignedCustomerIds.includes(customer.id)
-        );
-        console.log('🔄 [CustomerReportingPage] Filtered customers for officer:', {
-          assignedCustomerIds,
-          filteredCount: customerData.length
+      if (user.role === 'advantageoneofficer') {
+        let assignedCustomerIds = user.assignedCustomerIds || [];
+        
+        // Debug: Log what we have in user object
+        console.log('🔍 [CustomerReportingPage] User object:', {
+          userId: user.id,
+          role: user.role,
+          assignedCustomerIds: assignedCustomerIds,
+          assignedCustomerIdsType: typeof assignedCustomerIds,
+          isArray: Array.isArray(assignedCustomerIds),
+          assignedCustomerIdsLength: Array.isArray(assignedCustomerIds) ? assignedCustomerIds.length : 'not array'
         });
+        
+        // Try to fetch latest assignments from /Auth/me endpoint (officers can access their own data)
+        // This handles cases where assignments were updated but user session hasn't refreshed
+        try {
+          console.log('🔄 [CustomerReportingPage] Fetching latest user assignments from /Auth/me');
+          const response = await fetch(`${BASE_API_URL}/Auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+          });
+          
+          if (response.ok) {
+            const responseData = await response.json();
+            const userData = responseData.data || responseData;
+            const latestAssignedIds = userData?.AssignedCustomerIds || userData?.assignedCustomerIds || [];
+            
+            console.log('🔍 [CustomerReportingPage] Fetched user data from /Auth/me:', {
+              assignedCustomerIds: latestAssignedIds,
+              isArray: Array.isArray(latestAssignedIds),
+              length: Array.isArray(latestAssignedIds) ? latestAssignedIds.length : 'not array'
+            });
+            
+            // Update user object if assignments changed
+            const currentIds = assignedCustomerIds || [];
+            const idsChanged = JSON.stringify(latestAssignedIds.sort()) !== JSON.stringify(currentIds.sort());
+            
+            if (idsChanged || currentIds.length === 0) {
+              console.log('🔄 [CustomerReportingPage] Assignments changed or were empty, updating user session');
+              const updatedUser = {
+                ...user,
+                assignedCustomerIds: latestAssignedIds
+              };
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+              // Dispatch event to update AuthContext
+              window.dispatchEvent(new CustomEvent('user-assignments-updated', { detail: updatedUser }));
+            }
+            
+            assignedCustomerIds = latestAssignedIds;
+            console.log('✅ [CustomerReportingPage] Using assignedCustomerIds:', assignedCustomerIds);
+          } else {
+            console.warn('⚠️ [CustomerReportingPage] /Auth/me returned status:', response.status, 'using cached assignments');
+          }
+        } catch (error) {
+          console.warn('⚠️ [CustomerReportingPage] Failed to fetch from /Auth/me, using cached assignments:', error);
+          // Continue with cached assignments if API fails
+        }
+        
+        // Normalize IDs to numbers for comparison (customer.id might be string or number)
+        const assignedIdsAsNumbers = assignedCustomerIds.map(id => Number(id)).filter(id => !isNaN(id));
+        
+        console.log('🔍 [CustomerReportingPage] Before filtering:', {
+          totalCustomersInStore: customerData.length,
+          assignedCustomerIds: assignedCustomerIds,
+          assignedIdsAsNumbers: assignedIdsAsNumbers,
+          allCustomerIds: customerData.map((c: any) => ({ id: c.id, idType: typeof c.id, idNumber: Number(c.id) }))
+        });
+        
+        customerData = customerData.filter((customer: any) => {
+          // Use resolveNumericCustomerId to get the actual numeric ID
+          const customerId = resolveNumericCustomerId(customer);
+          const isAssigned = customerId !== null && assignedIdsAsNumbers.includes(customerId);
+          if (import.meta.env.DEV) {
+            console.log(`  - Customer ${customer.companyName || customer.id}: id=${customer.id}, customerId=${(customer as any)?.customerId}, resolvedId=${customerId}, assigned=${isAssigned}`);
+          }
+          return isAssigned;
+        });
+        
+        console.log('🔄 [CustomerReportingPage] Filtered customers for officer:', {
+          assignedCustomerIds: assignedCustomerIds,
+          assignedIdsAsNumbers: assignedIdsAsNumbers,
+          totalCustomers: (await customerService.getAllCustomers()).length,
+          filteredCount: customerData.length,
+          filteredCustomerIds: customerData.map((c: any) => c.id),
+          filteredCustomerNames: customerData.map((c: any) => c.companyName || c.name)
+        });
+        
+        // If no customers found but we have assigned IDs, try fetching from API directly
+        if (customerData.length === 0 && assignedIdsAsNumbers.length > 0) {
+          console.warn('⚠️ [CustomerReportingPage] No customers found in store but have assigned IDs, trying API...');
+          try {
+            const { customerService } = await import('@/services/customerService');
+            const allCustomers = await customerService.getAllCustomers();
+            customerData = allCustomers.filter((customer: any) => {
+              const customerId = Number(customer.customerId || customer.id);
+              const isAssigned = !isNaN(customerId) && assignedIdsAsNumbers.includes(customerId);
+              if (import.meta.env.DEV && isAssigned) {
+                console.log(`✅ [CustomerReportingPage] Found assigned customer from API: ${customer.companyName} (ID: ${customerId})`);
+              }
+              return isAssigned;
+            });
+            console.log('✅ [CustomerReportingPage] Fetched customers from API:', customerData.length);
+          } catch (error) {
+            console.error('❌ [CustomerReportingPage] Failed to fetch from API:', error);
+          }
+        }
       }
       
       setCustomers(customerData);
@@ -195,7 +293,10 @@ export default function CustomerReportingPage() {
             const access = await customerPageAccessCache.get(numericId);
             return [String(numericId), access.assignedPageIds.length] as const;
           } catch (error) {
-            console.error('❌ [CustomerReportingPage] Failed to load assignment count for customer', customer.id, error);
+            // Silently fail - preloading is not critical
+            if (import.meta.env.DEV) {
+              console.warn('⚠️ [CustomerReportingPage] Could not preload assignment count for customer', numericId, ':', error instanceof Error ? error.message : error);
+            }
             return [String(numericId), 0] as const;
           }
         })
@@ -240,6 +341,21 @@ export default function CustomerReportingPage() {
 
   useEffect(() => {
     fetchCustomerReportingData();
+  }, [user, user?.assignedCustomerIds]);
+
+  // Listen for user assignment updates from User Setup page
+  useEffect(() => {
+    const handleUserAssignmentUpdate = (event: CustomEvent) => {
+      console.log('🔄 [CustomerReportingPage] Received user assignment update:', event.detail);
+      // Refresh customer data when assignments change
+      fetchCustomerReportingData();
+    };
+
+    window.addEventListener('user-customer-assignment-updated', handleUserAssignmentUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('user-customer-assignment-updated', handleUserAssignmentUpdate as EventListener);
+    };
   }, [user]);
 
   const getIcon = (iconName: string | undefined) => {
@@ -270,6 +386,11 @@ export default function CustomerReportingPage() {
         error: null,
         pages: assignedPages
       });
+
+      setAssignedPageCounts(prev => ({
+        ...prev,
+        [String(customerId)]: assignedPages.length
+      }));
 
       console.log('✅ [CustomerReportingPage] Loaded assigned pages:', {
         customerId,
@@ -339,19 +460,66 @@ export default function CustomerReportingPage() {
   };
 
   const handleNavigateToReport = () => {
-    if (!selectedCustomer || !selectedPage || !selectedSite) return;
+    if (!selectedCustomer || !selectedPage || !selectedSite) {
+      console.group('⚠️ [CustomerReportingPage] Navigation Blocked: Missing Selection');
+      console.log('📋 Missing Selection:', {
+       	hasCustomer: !!selectedCustomer,
+       	hasPage: !!selectedPage,
+       	hasSite: !!selectedSite,
+       	customerId: selectedCustomer?.id,
+       	pagePath: selectedPage?.path,
+       	siteId: selectedSite?.siteID
+      });
+      console.groupEnd();
+      return;
+    }
     
     const numericCustomerId = resolveNumericCustomerId(selectedCustomer);
     const customerIdForUrl = numericCustomerId ?? selectedCustomer.id;
     
     if (!customerIdForUrl) {
-      console.error('❌ [CustomerReportingPage] Unable to resolve customer ID for navigation');
+      console.group('❌ [CustomerReportingPage] Navigation Blocked: Unable to Resolve Customer ID');
+      console.log('📋 Customer ID Resolution:', {
+       	selectedCustomer,
+       	numericCustomerId,
+       	customerIdForUrl: null,
+       	reason: 'Unable to resolve customer ID'
+      });
+      console.groupEnd();
       return;
     }
     
     // Navigate to the selected page with customer and site context
     const url = `${selectedPage.path}?customerId=${customerIdForUrl}&siteId=${selectedSite.siteID}`;
-    console.log('🚀 [CustomerReportingPage] Navigating to:', url);
+    
+    console.group('🚀 [CustomerReportingPage] NAVIGATION TRIGGERED');
+    console.log('📍 Navigation Details:', {
+     	from: location.pathname + location.search,
+     	to: url,
+     	timestamp: new Date().toISOString()
+    });
+    console.log('📋 Selection Context:', {
+     	customer: {
+       		id: selectedCustomer.id,
+       		companyName: selectedCustomer.companyName,
+       		resolvedCustomerId: customerIdForUrl
+     	},
+     	page: {
+       		id: selectedPage.id,
+       		path: selectedPage.path,
+       		title: selectedPage.title
+     	},
+     	site: {
+       		siteID: selectedSite.siteID,
+       		name: selectedSite.siteName
+     	}
+    });
+    console.log('🔐 Access Context (Before Navigation):', {
+     	userRole: user?.role,
+     	currentPath: location.pathname
+    });
+    console.groupEnd();
+    
     navigate(url);
   };
 
@@ -500,9 +668,43 @@ export default function CustomerReportingPage() {
             <div className="text-center py-12">
               <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No customers found</h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 mb-4">
                 {searchTerm ? 'Try adjusting your search criteria.' : 'No customers are available for reporting.'}
               </p>
+              {user?.role === 'AdvantageOneOfficer' && (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600">
+                    If you were recently assigned customers, you may need to refresh your session.
+                  </p>
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`${BASE_API_URL}/User/${user.id}`, {
+                          headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                          }
+                        });
+                        if (response.ok) {
+                          const userData = await response.json();
+                          const updatedUser = {
+                            ...user,
+                            assignedCustomerIds: userData.data?.AssignedCustomerIds || userData.data?.assignedCustomerIds || []
+                          };
+                          localStorage.setItem('user', JSON.stringify(updatedUser));
+                          window.location.reload();
+                        }
+                      } catch (error) {
+                        console.error('Failed to refresh user data:', error);
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh Customer Assignments
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
