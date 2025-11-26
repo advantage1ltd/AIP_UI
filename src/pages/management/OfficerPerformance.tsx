@@ -1,8 +1,12 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Users, TrendingUp, AlertCircle, PoundSterling } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
   SelectContent,
@@ -10,22 +14,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ChevronLeft, ChevronRight, Users, TrendingUp, AlertCircle, PoundSterling } from 'lucide-react'
+import { useToast } from '@/components/ui/use-toast'
+import { officerPerformanceApi } from '@/services/api/officerPerformance'
+import { customerService } from '@/services/customerService'
+import type {
+  OfficerPerformanceCategory,
+  OfficerPerformanceRecordLimit,
+  OfficerPerformanceItem,
+} from '@/types/officerPerformance'
 
-// Types
-type PerformanceStatus = 'Excellent' | 'Good' | 'Needs Improvement' | 'Non-Reporter'
-
-interface OfficerData {
-  name: string
-  incidents: number
-  valueSaved: number
-  responseRate: number
-  status: PerformanceStatus
-}
-
-interface StatCardProps {
+type StatCardProps = {
   title: string
   value: string | number
   subtitle: string
@@ -34,46 +32,31 @@ interface StatCardProps {
   iconColor: string
 }
 
-interface TableHeaderProps {
-  headers: string[]
-}
-
-// Constants
-const STATUS_STYLES = {
+const STATUS_STYLES: Record<string, string> = {
   'Excellent': 'bg-green-100 text-green-800',
   'Good': 'bg-blue-100 text-blue-800',
   'Needs Improvement': 'bg-yellow-100 text-yellow-800',
-  'Non-Reporter': 'bg-red-100 text-red-800'
-} as const
+  'Non-Reporter': 'bg-red-100 text-red-800',
+  default: 'bg-gray-100 text-gray-700',
+}
 
 const PROGRESS_COLORS = {
   high: 'bg-green-500',
   good: 'bg-blue-500',
   medium: 'bg-yellow-500',
-  low: 'bg-red-500'
+  low: 'bg-red-500',
 } as const
 
-const CUSTOMERS = [
-  { id: '1', name: 'Central England Co-Operative' },
-  { id: '2', name: 'Tesco' },
-  { id: '3', name: "Sainsbury's" }
-] as const
+const CATEGORY_TABS: OfficerPerformanceCategory[] = ['top-performers', 'non-reporters']
+const RECORD_LIMIT_OPTIONS: OfficerPerformanceRecordLimit[] = [10, 20, 100]
+const PAGE_SIZE = 10
 
-// Sample Data
-const sampleData: OfficerData[] = [
-  { name: 'John Smith', incidents: 85, valueSaved: 145000, responseRate: 98, status: 'Excellent' },
-  { name: 'Sarah Wilson', incidents: 78, valueSaved: 132000, responseRate: 97, status: 'Excellent' },
-  { name: 'Mike Johnson', incidents: 72, valueSaved: 128000, responseRate: 95, status: 'Excellent' },
-  { name: 'Lisa Anderson', incidents: 65, valueSaved: 115000, responseRate: 94, status: 'Good' },
-  { name: 'David Chen', incidents: 62, valueSaved: 108000, responseRate: 92, status: 'Good' },
-  { name: 'Tom Wilson', incidents: 12, valueSaved: 18000, responseRate: 40, status: 'Non-Reporter' },
-  { name: 'Chris Brown', incidents: 18, valueSaved: 28000, responseRate: 45, status: 'Non-Reporter' },
-  { name: 'Alex Turner', incidents: 15, valueSaved: 22000, responseRate: 65, status: 'Non-Reporter' },
-  { name: 'Maria Garcia', incidents: 22, valueSaved: 35000, responseRate: 72, status: 'Needs Improvement' },
-  { name: 'Emily Davis', incidents: 25, valueSaved: 42000, responseRate: 75, status: 'Needs Improvement' }
-]
+const subtractMonths = (date: Date, months: number) => {
+  const clone = new Date(date)
+  clone.setMonth(clone.getMonth() - months)
+  return clone
+}
 
-// Utility Functions
 const getProgressColor = (rate: number): string => {
   if (rate >= 95) return PROGRESS_COLORS.high
   if (rate >= 85) return PROGRESS_COLORS.good
@@ -81,7 +64,9 @@ const getProgressColor = (rate: number): string => {
   return PROGRESS_COLORS.low
 }
 
-// Components
+const formatCurrency = (value: number) =>
+  `£${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
 const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, icon, iconBgColor, iconColor }) => (
   <Card className={`${iconBgColor} hover:opacity-95 transition-all h-full`}>
     <CardContent className="p-1.5 xs:p-2 sm:p-4 lg:p-6">
@@ -92,102 +77,253 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, icon, iconB
           <p className="text-[8px] xs:text-xs sm:text-sm lg:text-base text-white/70 mt-0.5 lg:mt-1 truncate">{subtitle}</p>
         </div>
         <div className={`${iconColor} p-1 xs:p-2.5 sm:p-3 lg:p-4 rounded-full bg-white/10 flex-shrink-0`}>
-          {React.cloneElement(icon as React.ReactElement, { className: `h-3 w-3 xs:h-5 xs:w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-white` })}
+          {React.cloneElement(icon as React.ReactElement, { className: 'h-3 w-3 xs:h-5 xs:w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-white' })}
         </div>
       </div>
     </CardContent>
   </Card>
 )
 
-const TableHeader: React.FC<TableHeaderProps> = ({ headers }) => (
-  <tr className="border-b">
-    {headers.map((header, index) => (
-      <th key={index} className="px-2 py-2.5 xs:px-3 xs:py-3 sm:px-4 md:px-6 text-xs whitespace-nowrap">{header}</th>
-    ))}
-  </tr>
-)
+const defaultEndDate = new Date()
+const defaultStartDate = subtractMonths(defaultEndDate, 3)
 
 const OfficerPerformance = () => {
-  const [startDate, setStartDate] = useState<Date>(new Date('2024-02-02'))
-  const [endDate, setEndDate] = useState<Date>(new Date('2025-02-19'))
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('1')
+  const { toast } = useToast()
+  const [startDate, setStartDate] = useState<Date | undefined>(defaultStartDate)
+  const [endDate, setEndDate] = useState<Date | undefined>(defaultEndDate)
+  const [selectedCustomer, setSelectedCustomer] = useState<string>('')
+  const [activeTab, setActiveTab] = useState<OfficerPerformanceCategory>('top-performers')
   const [currentPage, setCurrentPage] = useState(1)
-  const [activeTab, setActiveTab] = useState('top-performers')
-  
-  const pageSize = 10
+  const [recordLimits, setRecordLimits] = useState<Record<OfficerPerformanceCategory, OfficerPerformanceRecordLimit>>({
+    'top-performers': 10,
+    'non-reporters': 10,
+  })
+  const [appliedFilters, setAppliedFilters] = useState<{
+    customerId: string
+    startDate?: string
+    endDate?: string
+  }>({
+    customerId: '',
+    startDate: defaultStartDate.toISOString(),
+    endDate: defaultEndDate.toISOString(),
+  })
 
-  // Filtered and paginated data
-  const filteredData = sampleData.filter(officer => 
-    activeTab === 'top-performers' ? officer.responseRate >= 85 : officer.responseRate < 85
-  )
+  const { data: customers = [], isLoading: isLoadingCustomers } = useQuery({
+    queryKey: ['customers', 'officer-performance'],
+    queryFn: () => customerService.getAvailableCustomers(),
+  })
 
-  const totalPages = Math.ceil(filteredData.length / pageSize)
-  const startIndex = (currentPage - 1) * pageSize
-  const paginatedData = filteredData.slice(startIndex, startIndex + pageSize)
+  useEffect(() => {
+    if (!selectedCustomer && customers.length > 0) {
+      const firstCustomerId = customers[0].id.toString()
+      setSelectedCustomer(firstCustomerId)
+      setAppliedFilters((prev) => ({
+        ...prev,
+        customerId: firstCustomerId,
+      }))
+    }
+  }, [customers, selectedCustomer])
 
-  // Statistics
-  const stats = {
-    totalOfficers: sampleData.length,
-    activeOfficers: sampleData.filter(o => o.responseRate >= 70).length,
-    totalIncidents: sampleData.reduce((sum, o) => sum + o.incidents, 0),
-    totalValueSaved: sampleData.reduce((sum, o) => sum + o.valueSaved, 0),
-    averageResponseRate: Math.round(sampleData.reduce((sum, o) => sum + o.responseRate, 0) / sampleData.length)
+  const activeRecordLimit = recordLimits[activeTab]
+  const canQuery = Boolean(appliedFilters.customerId)
+
+  const {
+    data: performanceData,
+    isLoading: isPerformanceLoading,
+    isFetching: isPerformanceFetching,
+    error: performanceError,
+  } = useQuery({
+    queryKey: [
+      'officer-performance',
+      appliedFilters.customerId,
+      appliedFilters.startDate,
+      appliedFilters.endDate,
+      activeTab,
+      currentPage,
+      activeRecordLimit,
+      PAGE_SIZE,
+    ],
+    queryFn: () =>
+      officerPerformanceApi.getPerformance({
+        customerId: Number(appliedFilters.customerId),
+        startDate: appliedFilters.startDate,
+        endDate: appliedFilters.endDate,
+        category: activeTab,
+        page: currentPage,
+        pageSize: PAGE_SIZE,
+        maxRecords: activeRecordLimit,
+      }),
+    enabled: canQuery,
+    keepPreviousData: true,
+  })
+
+  const stats = performanceData?.stats ?? {
+    totalOfficers: 0,
+    activeOfficers: 0,
+    totalIncidents: 0,
+    totalValueSaved: 0,
+    averageResponseRate: 0,
   }
 
-  const statCards = [
-    {
-      title: 'Total Officers',
-      value: stats.totalOfficers,
-      subtitle: `${stats.activeOfficers} active officers`,
-      icon: <Users />,
-      iconBgColor: 'bg-blue-600',
-      iconColor: 'bg-blue-500/20'
-    },
-    {
-      title: 'Total Incidents',
-      value: stats.totalIncidents,
-      subtitle: 'Across all officers',
-      icon: <AlertCircle />,
-      iconBgColor: 'bg-rose-600',
-      iconColor: 'bg-rose-500/20'
-    },
-    {
-      title: 'Value Saved',
-      value: `£${stats.totalValueSaved.toLocaleString()}`,
-      subtitle: 'Total amount recovered',
-      icon: <PoundSterling />,
-      iconBgColor: 'bg-emerald-600',
-      iconColor: 'bg-emerald-500/20'
-    },
-    {
-      title: 'Average Response',
-      value: `${stats.averageResponseRate}%`,
-      subtitle: 'Overall response rate',
-      icon: <TrendingUp />,
-      iconBgColor: 'bg-violet-600',
-      iconColor: 'bg-violet-500/20'
+  const statCards = useMemo(
+    () => [
+      {
+        title: 'Total Officers',
+        value: stats.totalOfficers,
+        subtitle: `${stats.activeOfficers} active officers`,
+        icon: <Users />,
+        iconBgColor: 'bg-blue-600',
+        iconColor: 'bg-blue-500/20',
+      },
+      {
+        title: 'Total Incidents',
+        value: stats.totalIncidents,
+        subtitle: 'Across selected range',
+        icon: <AlertCircle />,
+        iconBgColor: 'bg-rose-600',
+        iconColor: 'bg-rose-500/20',
+      },
+      {
+        title: 'Value Saved',
+        value: formatCurrency(stats.totalValueSaved),
+        subtitle: 'Recovered amount',
+        icon: <PoundSterling />,
+        iconBgColor: 'bg-emerald-600',
+        iconColor: 'bg-emerald-500/20',
+      },
+      {
+        title: 'Average Response',
+        value: `${stats.averageResponseRate}%`,
+        subtitle: 'Overall response rate',
+        icon: <TrendingUp />,
+        iconBgColor: 'bg-violet-600',
+        iconColor: 'bg-violet-500/20',
+      },
+    ],
+    [stats],
+  )
+
+  const handleApplyFilters = () => {
+    if (!selectedCustomer) {
+      toast({
+        title: 'Customer Required',
+        description: 'Please select a customer before fetching performance metrics.',
+        variant: 'destructive',
+      })
+      return
     }
-  ]
+
+    if (startDate && endDate && startDate > endDate) {
+      toast({
+        title: 'Invalid Date Range',
+        description: 'Start date must be before the end date.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setAppliedFilters({
+      customerId: selectedCustomer,
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+    })
+    setCurrentPage(1)
+  }
+
+  const handleRecordLimitChange = (category: OfficerPerformanceCategory, value: string) => {
+    const parsedValue = Number(value) as OfficerPerformanceRecordLimit
+    setRecordLimits((prev) => ({
+      ...prev,
+      [category]: parsedValue,
+    }))
+    setCurrentPage(1)
+  }
+
+  const activePagination = performanceData?.results.pagination
+  const totalPages = activePagination?.totalPages ?? 1
+  const showingStart =
+    activePagination && activePagination.totalCount > 0
+      ? (activePagination.currentPage - 1) * activePagination.pageSize + 1
+      : 0
+  const showingEnd =
+    activePagination && activePagination.totalCount > 0
+      ? Math.min(activePagination.currentPage * activePagination.pageSize, activePagination.totalCount)
+      : 0
+
+  const tableItems = performanceData?.results.items ?? []
+  const isLoadingData = isPerformanceLoading || isPerformanceFetching
+
+  const renderTableRows = (items: OfficerPerformanceItem[], isLoading: boolean) => {
+    if (isLoading) {
+      return (
+        <tr>
+          <td colSpan={5} className="px-4 py-6 text-center text-xs sm:text-sm text-gray-500">
+            Loading officer performance...
+          </td>
+        </tr>
+      )
+    }
+
+    if (!items.length) {
+      return (
+        <tr>
+          <td colSpan={5} className="px-4 py-6 text-center text-xs sm:text-sm text-gray-500">
+            No officers found for the selected filters.
+          </td>
+        </tr>
+      )
+    }
+
+    return items.map((officer, index) => {
+      const statusClass = STATUS_STYLES[officer.status] ?? STATUS_STYLES.default
+      return (
+        <tr key={`${officer.officerName}-${index}`} className="bg-white hover:bg-gray-50">
+          <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs sm:text-sm lg:text-base font-medium">
+            {officer.officerName}
+          </td>
+          <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs sm:text-sm lg:text-base">
+            {officer.incidentCount}
+          </td>
+          <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs sm:text-sm lg:text-base">
+            {formatCurrency(officer.totalValueSaved)}
+          </td>
+          <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6">
+            <div className="flex items-center gap-1 xs:gap-2 lg:gap-3">
+              <Progress
+                value={officer.responseRate}
+                className={`h-1 xs:h-1.5 sm:h-2 lg:h-2.5 w-6 xs:w-16 sm:w-24 lg:w-32 ${getProgressColor(officer.responseRate)}`}
+              />
+              <span className="text-[9px] xs:text-xs sm:text-sm lg:text-base">{officer.responseRate}%</span>
+            </div>
+          </td>
+          <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6">
+            <Badge className={`${statusClass} text-[8px] xs:text-xs sm:text-sm lg:text-base px-1 py-0.5 xs:px-2 lg:px-3`}>
+              {officer.status}
+            </Badge>
+          </td>
+        </tr>
+      )
+    })
+  }
 
   return (
     <div className="container mx-auto px-1 xs:px-3 sm:px-4 py-2 xs:py-4 sm:py-6 md:px-6 lg:px-8 xl:px-12 2xl:px-16 max-w-screen-2xl">
       <div className="space-y-2 xs:space-y-4 sm:space-y-6">
-        {/* Header */}
         <div className="flex flex-col xs:flex-row justify-between xs:items-center gap-2">
           <div>
             <h1 className="text-base xs:text-xl sm:text-2xl lg:text-3xl font-bold">Officer Performance</h1>
-            <p className="text-[9px] xs:text-xs sm:text-sm lg:text-base text-gray-500 mt-0.5 lg:mt-1">Top performing officers and reporting status</p>
+            <p className="text-[9px] xs:text-xs sm:text-sm lg:text-base text-gray-500 mt-0.5 lg:mt-1">
+              Monitor top performers and non-reporters across customers
+            </p>
           </div>
         </div>
 
-        {/* Statistics Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-1 xs:gap-3 sm:gap-4 lg:gap-6">
           {statCards.map((card, index) => (
-            <StatCard key={index} {...card} />
+            <StatCard key={card.title} {...card} />
           ))}
         </div>
 
-        {/* Filters */}
         <Card className="border-none shadow-sm">
           <CardContent className="p-1.5 xs:p-3 sm:p-4 lg:p-6">
             <div className="flex flex-col sm:flex-row sm:items-end gap-2 xs:gap-4 lg:gap-6">
@@ -208,13 +344,21 @@ const OfficerPerformance = () => {
                   <label className="block text-[9px] xs:text-xs sm:text-sm lg:text-base font-medium text-gray-600 mb-0.5 xs:mb-1 lg:mb-2">
                     Customer
                   </label>
-                  <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                  <Select
+                    value={selectedCustomer}
+                    onValueChange={setSelectedCustomer}
+                    disabled={isLoadingCustomers || !customers.length}
+                  >
                     <SelectTrigger className="w-full h-7 xs:h-8 sm:h-9 lg:h-10 text-[9px] xs:text-xs sm:text-sm lg:text-base">
-                      <SelectValue placeholder="Select Customer" />
+                      <SelectValue placeholder={isLoadingCustomers ? 'Loading customers...' : 'Select Customer'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {CUSTOMERS.map(customer => (
-                        <SelectItem key={customer.id} value={customer.id} className="text-[9px] xs:text-xs sm:text-sm lg:text-base">
+                      {customers.map((customer) => (
+                        <SelectItem
+                          key={customer.id}
+                          value={customer.id.toString()}
+                          className="text-[9px] xs:text-xs sm:text-sm lg:text-base"
+                        >
                           {customer.name}
                         </SelectItem>
                       ))}
@@ -222,70 +366,92 @@ const OfficerPerformance = () => {
                   </Select>
                 </div>
               </div>
-              <Button className="w-full sm:w-auto h-7 xs:h-8 sm:h-9 lg:h-10 text-[9px] xs:text-xs sm:text-sm lg:text-base">Search</Button>
+              <Button
+                className="w-full sm:w-auto h-7 xs:h-8 sm:h-9 lg:h-10 text-[9px] xs:text-xs sm:text-sm lg:text-base"
+                onClick={handleApplyFilters}
+                disabled={!selectedCustomer}
+              >
+                Search
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Performance Tabs */}
+        {performanceError && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-xs sm:text-sm text-red-700">
+            {(performanceError as Error).message ?? 'Unable to load officer performance data.'}
+          </div>
+        )}
+
         <div className="space-y-2 xs:space-y-3 sm:space-y-4 lg:space-y-6">
-          <Tabs defaultValue="top-performers" onValueChange={value => {
-            setActiveTab(value)
-            setCurrentPage(1)
-          }}>
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => {
+              setActiveTab(value as OfficerPerformanceCategory)
+              setCurrentPage(1)
+            }}
+          >
             <TabsList className="w-full xs:w-auto h-7 xs:h-8 sm:h-9 lg:h-10">
-              <TabsTrigger value="top-performers" className="flex-1 xs:flex-none text-[9px] xs:text-xs sm:text-sm lg:text-base h-6 xs:h-7 sm:h-8 lg:h-9">
-                Top Performers
-              </TabsTrigger>
-              <TabsTrigger value="non-reporters" className="flex-1 xs:flex-none text-[9px] xs:text-xs sm:text-sm lg:text-base h-6 xs:h-7 sm:h-8 lg:h-9">
-                Non-Reporters
-              </TabsTrigger>
+              {CATEGORY_TABS.map((tab) => (
+                <TabsTrigger
+                  key={tab}
+                  value={tab}
+                  className="flex-1 xs:flex-none text-[9px] xs:text-xs sm:text-sm lg:text-base h-6 xs:h-7 sm:h-8 lg:h-9 capitalize"
+                >
+                  {tab === 'top-performers' ? 'Top Performers' : 'Non-Reporters'}
+                </TabsTrigger>
+              ))}
             </TabsList>
-            
-            {['top-performers', 'non-reporters'].map((tab) => (
+
+            {CATEGORY_TABS.map((tab) => (
               <TabsContent key={tab} value={tab} className="mt-2 lg:mt-4">
                 <Card>
-                  <CardContent className="p-0 sm:p-4 lg:p-6">
-                    <div className="relative overflow-x-auto -mx-1 xs:mx-0">
+                  <CardContent className="p-0">
+                    <div className="flex flex-col gap-2 border-b border-gray-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-500">Records to fetch</p>
+                        <p className="text-sm font-semibold">
+                          {tab === activeTab ? performanceData?.results.recordLimit ?? recordLimits[tab] : recordLimits[tab]}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase tracking-wide text-gray-500">Display</span>
+                        <Select
+                          value={recordLimits[tab].toString()}
+                          onValueChange={(value) => handleRecordLimitChange(tab, value)}
+                          disabled={tab !== activeTab}
+                        >
+                          <SelectTrigger className="w-24 h-7 text-xs">
+                            <SelectValue placeholder="10" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {RECORD_LIMIT_OPTIONS.map((option) => (
+                              <SelectItem key={option} value={option.toString()} className="text-xs">
+                                {option} records
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="relative overflow-x-auto">
                       <div className="min-w-[360px] xs:min-w-full">
                         <table className="w-full text-left">
                           <thead className="bg-gray-50">
                             <tr className="border-b">
-                              {['Officer', 'Incidents', 'Value Saved', 'Response Rate', 'Status'].map((header, index) => (
-                                <th key={index} className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs lg:text-sm whitespace-nowrap">
+                              {['Officer', 'Incidents', 'Value Saved', 'Response Rate', 'Status'].map((header) => (
+                                <th
+                                  key={header}
+                                  className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs lg:text-sm whitespace-nowrap"
+                                >
                                   {header}
                                 </th>
                               ))}
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
-                            {paginatedData.map((officer, index) => (
-                              <tr key={index} className="bg-white hover:bg-gray-50">
-                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs sm:text-sm lg:text-base font-medium">
-                                  {officer.name}
-                                </td>
-                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs sm:text-sm lg:text-base">
-                                  {officer.incidents}
-                                </td>
-                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs sm:text-sm lg:text-base">
-                                  £{officer.valueSaved.toLocaleString()}
-                                </td>
-                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6">
-                                  <div className="flex items-center gap-1 xs:gap-2 lg:gap-3">
-                                    <Progress 
-                                      value={officer.responseRate} 
-                                      className={`h-1 xs:h-1.5 sm:h-2 lg:h-2.5 w-6 xs:w-16 sm:w-24 lg:w-32 ${getProgressColor(officer.responseRate)}`}
-                                    />
-                                    <span className="text-[9px] xs:text-xs sm:text-sm lg:text-base">{officer.responseRate}%</span>
-                                  </div>
-                                </td>
-                                <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6">
-                                  <Badge className={`${STATUS_STYLES[officer.status]} text-[8px] xs:text-xs sm:text-sm lg:text-base px-1 py-0.5 xs:px-2 lg:px-3`}>
-                                    {officer.status}
-                                  </Badge>
-                                </td>
-                              </tr>
-                            ))}
+                            {renderTableRows(tab === activeTab ? tableItems : [], isLoadingData && tab === activeTab)}
                           </tbody>
                         </table>
                       </div>
@@ -297,29 +463,32 @@ const OfficerPerformance = () => {
           </Tabs>
         </div>
 
-        {/* Pagination */}
         <div className="flex flex-col xs:flex-row items-center justify-between gap-2 px-1 xs:px-2 lg:px-4">
           <div className="text-[9px] xs:text-xs sm:text-sm lg:text-base text-gray-500 order-2 xs:order-1">
-            Showing {startIndex + 1} to {Math.min(startIndex + pageSize, filteredData.length)} of {filteredData.length} entries
+            {activePagination && activePagination.totalCount > 0 ? (
+              <>Showing {showingStart} to {showingEnd} of {activePagination.totalCount} entries</>
+            ) : (
+              'No entries to display'
+            )}
           </div>
           <div className="flex items-center space-x-1 xs:space-x-2 lg:space-x-3 order-1 xs:order-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={!activePagination || !activePagination.hasPrevious}
               className="h-5 w-5 xs:h-8 xs:w-8 lg:h-10 lg:w-10"
             >
               <ChevronLeft className="h-2.5 w-2.5 xs:h-4 xs:w-4 lg:h-5 lg:w-5" />
             </Button>
             <div className="text-[9px] xs:text-xs sm:text-sm lg:text-base min-w-[60px] xs:min-w-[100px] lg:min-w-[120px] text-center">
-              Page {currentPage} of {totalPages}
+              Page {activePagination?.currentPage ?? 1} of {totalPages}
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={!activePagination || !activePagination.hasNext}
               className="h-5 w-5 xs:h-8 xs:w-8 lg:h-10 lg:w-10"
             >
               <ChevronRight className="h-2.5 w-2.5 xs:h-4 xs:w-4 lg:h-5 lg:w-5" />
@@ -331,4 +500,4 @@ const OfficerPerformance = () => {
   )
 }
 
-export default OfficerPerformance 
+export default OfficerPerformance

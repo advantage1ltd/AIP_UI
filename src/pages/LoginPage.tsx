@@ -76,19 +76,18 @@ export default function LoginPage() {
 
     setLoading(true)
     try {
-      await login(username, password)
-      const user = JSON.parse(localStorage.getItem('user') || '{}')
+      const loggedInUser = await login(username, password)
       
       console.log('✅ Login successful:', {
-        username: user.username,
-        role: user.role,
+        username: loggedInUser.username,
+        role: loggedInUser.role,
         timestamp: new Date().toISOString()
       })
 
       // Set the page access role - use role if pageAccessRole is not available
-      const roleToSet = user.role
+      const roleToSet = loggedInUser.role
       console.log('🔑 Setting role for page access:', roleToSet)
-      console.log('🔍 Full user object from login:', user)
+      console.log('🔍 Full user object from login:', loggedInUser)
       
       // Set role (don't await - let it load in background)
       setCurrentRole(roleToSet).catch(err => {

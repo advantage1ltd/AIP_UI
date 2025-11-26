@@ -97,15 +97,13 @@ const UserSetup = () => {
   // Check authentication on component mount
   useEffect(() => {
     const token = localStorage.getItem('authToken')
-    const user = localStorage.getItem('user')
     
     console.log('🔍 [UserSetup] Authentication check:', { 
-      hasToken: !!token, 
-      hasUser: !!user,
+      hasToken: !!token,
       currentPath: window.location.pathname 
     })
     
-    if (!token || !user) {
+    if (!token) {
       console.warn('⚠️ [UserSetup] No authentication found, redirecting to login')
       window.location.href = '/login'
       return

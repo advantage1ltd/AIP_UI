@@ -22,7 +22,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { format } from "date-fns"
-import { CalendarIcon, PlusCircle, Trash2, Package, QrCode } from "lucide-react"
+import { CalendarIcon, PlusCircle, Trash2, Package, QrCode, Hash, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -129,17 +129,20 @@ const incidentInvolved: IncidentInvolved[] = [
 const retailCategories = {
   'COOP': [
     { id: 'alcohol', label: 'Alcohol' },
+    { id: 'ambient', label: 'Ambient' },
     { id: 'tobacco', label: 'Tobacco' },
     { id: 'meat', label: 'Meat' },
     { id: 'fish', label: 'Fish' },
     { id: 'dairy', label: 'Dairy' },
     { id: 'confectionery', label: 'Confectionery' },
+    { id: 'fresh', label: 'Fresh' },
     { id: 'health-beauty', label: 'Health & Beauty' },
     { id: 'household', label: 'Household' },
     { id: 'grocery', label: 'Grocery' },
     { id: 'frozen', label: 'Frozen' },
     { id: 'produce', label: 'Produce' },
     { id: 'bakery', label: 'Bakery' },
+    { id: 'non-food', label: 'Non Food' },
     { id: 'other', label: 'Other' }
   ],
   'Tesco': [
@@ -158,12 +161,13 @@ export interface IncidentFormProps {
   onSubmit: (incident: Incident) => void
   onCancel: () => void
   onScanBarcode: () => void
+  onBarcodeScanned?: (barcode: string) => void
   isLoading?: boolean
   customerId?: string
   siteId?: string | null
 }
 
-const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit, onCancel, onScanBarcode, isLoading = false, customerId: propCustomerId, siteId: propSiteId }) => {
+const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit, onCancel, onScanBarcode, onBarcodeScanned, isLoading = false, customerId: propCustomerId, siteId: propSiteId }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'administrator';
   
@@ -195,6 +199,10 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   // State for counties from lookup table
   const [counties, setCounties] = useState<LookupTableItem[]>([])
   const [isLoadingCounties, setIsLoadingCounties] = useState(false)
+  
+  // State for manual barcode entry
+  const [manualBarcode, setManualBarcode] = useState('')
+  const [isProcessingBarcode, setIsProcessingBarcode] = useState(false)
 
   const searchOffender = async (name: string, dob?: Date, marks?: string) => {
     setIsSearchingOffender(true);
@@ -730,9 +738,41 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
     setStolenItems(stolenItems.filter((_, i) => i !== index))
   }
 
+  const handleManualBarcodeEntry = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    
+    const barcode = manualBarcode.trim()
+    
+    if (!barcode) {
+      return
+    }
+    
+    if (!onBarcodeScanned) {
+      console.warn('onBarcodeScanned handler not provided')
+      return
+    }
+    
+    setIsProcessingBarcode(true)
+    try {
+      await onBarcodeScanned(barcode)
+      setManualBarcode('') // Clear input on success
+    } catch (error) {
+      console.error('Error processing manual barcode:', error)
+    } finally {
+      setIsProcessingBarcode(false)
+    }
+  }
+
+  const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleManualBarcodeEntry()
+    }
+  }
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="bg-[#F8F3F1]">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="bg-gradient-to-br from-gray-50 to-gray-100/50 min-h-full">
         <div className="w-full max-w-[98%] mx-auto px-4 py-4">
           {/* Header */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
@@ -1676,6 +1716,54 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                   </Button>
                 </div>
               </div>
+
+              {/* Manual Barcode Entry */}
+              {onBarcodeScanned && (
+                <div className="mb-4 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <Label htmlFor="manual-barcode" className="text-sm font-medium text-gray-700 mb-2 block">
+                    Or enter barcode number manually
+                  </Label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="manual-barcode"
+                        type="text"
+                        value={manualBarcode}
+                        onChange={(e) => setManualBarcode(e.target.value)}
+                        onKeyDown={handleBarcodeKeyDown}
+                        placeholder="Enter barcode number"
+                        disabled={isProcessingBarcode}
+                        className="pl-10 h-11 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg"
+                        aria-label="Manual barcode entry"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleManualBarcodeEntry}
+                      disabled={!manualBarcode.trim() || isProcessingBarcode}
+                      variant="default"
+                      size="lg"
+                      className="min-h-[44px] sm:w-auto w-full"
+                    >
+                      {isProcessingBarcode ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Package className="h-4 w-4 mr-2" />
+                          Add Product
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Enter the barcode number and press Enter or click "Add Product" to automatically add the product
+                  </p>
+                </div>
+              )}
 
               {/* Validation Error Display */}
               {form.formState.errors.root && (

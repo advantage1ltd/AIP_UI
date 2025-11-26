@@ -30,6 +30,7 @@ import {
 	Wallet,
 	Building,
 	Cog,
+	Brain,
 } from 'lucide-react'
 
 import type { LucideIcon } from 'lucide-react'
@@ -71,6 +72,11 @@ export const SIDEBAR_TOP_LINKS: SidebarNavLink[] = [
 		label: 'Customer Reporting',
 		icon: BarChart3,
 		guard: (context) => context.hasAccess('/management/customer-reporting'),
+	},
+	{
+		path: '/analytics/data-analytics-hub',
+		label: 'Data Analytics Hub',
+		icon: Brain,
 	},
 ]
 
@@ -235,6 +241,11 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 				path: '/management/officer-performance',
 				label: 'Officer Performance',
 				icon: UserCheck,
+			},
+			{
+				path: '/analytics/data-analytics-hub',
+				label: 'Data Analytics Hub',
+				icon: Brain,
 			},
 		],
 	},

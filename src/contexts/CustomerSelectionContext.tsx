@@ -27,18 +27,10 @@ export const CustomerSelectionProvider: React.FC<CustomerSelectionProviderProps>
 	const isAdmin = user?.role === 'administrator'
 	const needsCustomerSelection = isAdmin
 
-	// Load selected customer from localStorage on mount
 	useEffect(() => {
 		if (isAdmin) {
-			const stored = localStorage.getItem('adminSelectedCustomerId')
-			if (stored) {
-				const customerId = parseInt(stored, 10)
-				if (!isNaN(customerId)) {
-					setSelectedCustomerIdState(customerId)
-				}
-			}
+			setSelectedCustomerIdState(null)
 		} else {
-			// For non-admin users, use their customerId
 			const customerId = user && 'customerId' in user ? (user as any).customerId : null
 			if (customerId) {
 				setSelectedCustomerIdState(typeof customerId === 'string' ? parseInt(customerId, 10) : customerId)
@@ -48,18 +40,10 @@ export const CustomerSelectionProvider: React.FC<CustomerSelectionProviderProps>
 
 	// URL sync is now handled by CustomerSelectionUrlSync component inside Router context
 
-	// Store selected customer in localStorage when it changes
-	// Use useCallback to ensure stable function reference
+	// Store selected customer in context state
 	const setSelectedCustomerId = useCallback((customerId: number | null) => {
 		setSelectedCustomerIdState(customerId)
-		if (isAdmin) {
-			if (customerId !== null) {
-				localStorage.setItem('adminSelectedCustomerId', customerId.toString())
-			} else {
-				localStorage.removeItem('adminSelectedCustomerId')
-			}
-		}
-	}, [isAdmin])
+	}, [])
 
 	// For now, we'll fetch customer details when needed
 	// In a real scenario, you might want to cache this

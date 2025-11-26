@@ -18,7 +18,7 @@ export const CreateReportButton = ({ className = '', fullWidth = false }: Create
         <div className="bg-red-500 rounded-full p-0.5">
           <Plus className="h-3.5 w-3.5 text-white" />
         </div>
-        <span className="text-xs font-medium">Create Report</span>
+        <span className="text-xs font-medium">Data Analysis Hub</span>
       </Link>
     </Button>
   );

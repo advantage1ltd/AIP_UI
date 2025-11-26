@@ -74,12 +74,7 @@ export const CustomerSelector: React.FC = () => {
 		}
 		const customerId = parseInt(value, 10)
 		if (!isNaN(customerId)) {
-			// Force update to ensure the change is applied
 			setSelectedCustomerId(customerId)
-			// Also update localStorage immediately
-			if (isAdmin) {
-				localStorage.setItem('adminSelectedCustomerId', customerId.toString())
-			}
 		}
 	}
 

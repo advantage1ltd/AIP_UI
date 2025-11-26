@@ -221,9 +221,10 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
       }
       
       // Create stolen item from product data
-      // Map Excel categories (Fresh, Non Food, Ambient, etc.) to form categories
+      // Map Excel categories to form categories
+      // Note: Ambient, Fresh, and Non Food are now direct categories in the form dropdown
       const categoryMap: Record<string, string> = {
-        // Direct matches
+        // Direct matches - categories that exist in the form dropdown
         'alcohol': 'alcohol',
         'tobacco': 'tobacco',
         'meat': 'meat',
@@ -236,26 +237,49 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
         'frozen': 'frozen',
         'produce': 'produce',
         'bakery': 'bakery',
-        // Excel category mappings
-        'fresh': 'produce', // Fresh category from Excel -> Produce in form
-        'non food': 'household', // Non Food from Excel -> Household in form
-        'ambient': 'grocery', // Ambient from Excel -> Grocery in form
-        'non-food': 'household',
-        'nonfood': 'household',
+        // These categories are now direct options - keep as-is
+        'ambient': 'ambient',
+        'fresh': 'fresh',
+        'non-food': 'non-food',
+        // Handle variations for non-food (with spaces)
+        'non food': 'non-food',
+        'nonfood': 'non-food',
       }
       
-      // Try to map the category from Excel to form category
-      let mappedCategory = productData.category?.toLowerCase().trim() || ''
+      // Get original category from backend and normalize
+      const originalCategory = productData.category || ''
+      let mappedCategory = originalCategory.toLowerCase().trim() || ''
+      
+      // Debug log to help troubleshoot
+      if (import.meta.env.DEV) {
+        console.log('🏷️ [Barcode] Category mapping started:', {
+          original: originalCategory,
+          normalized: mappedCategory,
+          productName: productData.productName
+        })
+      }
       
       if (mappedCategory) {
-        // Check for direct match first
+        // Handle "non food" variations first (with spaces) - normalize to "non-food"
+        if (mappedCategory.includes('non') && mappedCategory.includes('food')) {
+          mappedCategory = 'non-food'
+        }
+        // Normalize spaces to dashes for categories that might have spaces (e.g., "health beauty" -> "health-beauty")
+        else if (mappedCategory.includes(' ')) {
+          mappedCategory = mappedCategory.replace(/\s+/g, '-')
+        }
+        
+        // Check for exact match in the category map
         if (categoryMap[mappedCategory]) {
           mappedCategory = categoryMap[mappedCategory]
         } else {
-          // Try to find a partial match (case-insensitive)
-          const matchedKey = Object.keys(categoryMap).find(key => 
-            mappedCategory.includes(key.toLowerCase()) || key.toLowerCase().includes(mappedCategory)
-          )
+          // Try to find a partial match
+          const matchedKey = Object.keys(categoryMap).find(key => {
+            const normalizedKey = key.toLowerCase().trim().replace(/\s+/g, '-')
+            return mappedCategory === normalizedKey || 
+                   mappedCategory.includes(normalizedKey) || 
+                   normalizedKey.includes(mappedCategory)
+          })
           if (matchedKey) {
             mappedCategory = categoryMap[matchedKey]
           } else {
@@ -266,6 +290,11 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
       } else {
         // No category provided, default to 'other'
         mappedCategory = 'other'
+      }
+      
+      // Final debug log
+      if (import.meta.env.DEV) {
+        console.log('✅ [Barcode] Final mapped category:', mappedCategory, 'from original:', originalCategory)
       }
 
       const newItem: StolenItem = {
@@ -415,8 +444,8 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
             }
           }}
         >
-          <DialogContent className="max-w-[65vw] md:max-w-[60vw] lg:max-w-[50vw] h-[90vh] p-0">
-            <DialogHeader className="px-4 py-3 border-b">
+          <DialogContent className="max-w-[65vw] md:max-w-[60vw] lg:max-w-[50vw] h-[90vh] p-0 bg-white">
+            <DialogHeader className="px-4 py-3 border-b bg-white">
               <DialogTitle className="text-xl font-bold">
                 {editingIncident ? 'Edit Incident Report' : 'New Incident Report'}
               </DialogTitle>
@@ -424,7 +453,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                 {editingIncident ? 'Update the incident details below' : 'Fill in the incident details below'}
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto bg-gray-50">
               <IncidentForm
                 initialData={editingIncident}
                 onSubmit={handleSubmit}
@@ -433,6 +462,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                   setEditingIncident(null)
                 }}
                 onScanBarcode={() => setScanningBarcode(true)}
+                onBarcodeScanned={handleBarcodeScanned}
                 isLoading={mutation.isPending}
                 customerId={customerId}
                 siteId={siteId}
@@ -734,8 +764,8 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
           }
         }}
       >
-        <DialogContent className="max-w-[65vw] md:max-w-[60vw] lg:max-w-[50vw] h-[90vh] p-0">
-          <DialogHeader className="px-4 py-3 border-b">
+        <DialogContent className="max-w-[65vw] md:max-w-[60vw] lg:max-w-[50vw] h-[90vh] p-0 bg-white">
+          <DialogHeader className="px-4 py-3 border-b bg-white">
             <DialogTitle className="text-xl font-bold">
               {editingIncident ? 'Edit Incident Report' : 'New Incident Report'}
             </DialogTitle>
@@ -743,7 +773,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
               {editingIncident ? 'Update the incident details below' : 'Fill in the incident details below'}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto bg-gray-50">
             <IncidentForm
               initialData={editingIncident}
               onSubmit={handleSubmit}
@@ -752,6 +782,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                 setEditingIncident(null)
               }}
               onScanBarcode={() => setScanningBarcode(true)}
+              onBarcodeScanned={handleBarcodeScanned}
               isLoading={mutation.isPending}
               customerId={customerId}
               siteId={siteId}

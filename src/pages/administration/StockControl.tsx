@@ -196,30 +196,11 @@ const StockControl = () => {
     }
   }
 
-  const handleTestEmail = async () => {
-    try {
-      await stockService.testEmail()
-      toast({ 
-        title: 'Test Email Sent', 
-        description: 'Test email notifications sent. Check the backend logs for details.' 
-      })
-    } catch (error) {
-      toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' })
-    }
-  }
-
   return (
     <div className="w-full max-w-[100vw] overflow-x-hidden px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
         <h1 className="text-2xl sm:text-3xl font-bold text-[#303D51]">Stock Control</h1>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <Button 
-            variant="outline"
-            onClick={handleTestEmail}
-            className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 w-full sm:w-auto"
-          >
-            <AlertTriangle className="mr-2 h-4 w-4" /> Test Email
-          </Button>
           <Button 
             variant="outline"
             onClick={handleCheckLowStock}

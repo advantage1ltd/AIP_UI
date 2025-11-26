@@ -685,11 +685,11 @@ const AdminDashboard = () => {
             // Define gradient backgrounds based on color
             const getGradientClass = (color: string) => {
               switch(color) {
-                case 'green': return 'bg-gradient-to-br from-emerald-500 to-emerald-700';
-                case 'yellow': return 'bg-gradient-to-br from-amber-500 to-amber-700';
-                case 'red': return 'bg-gradient-to-br from-rose-400 to-rose-600';
-                case 'blue': return 'bg-gradient-to-br from-blue-400 to-blue-600';
-                default: return 'bg-gradient-to-br from-slate-600 to-slate-800';
+                case 'green': return 'bg-[#198754]';
+                case 'yellow': return 'bg-[#FFC107]';
+                case 'red': return 'bg-[#DC3545]';
+                case 'blue': return 'bg-[#0D6EFD]';
+                default: return 'bg-[#423A8E]';
               }
             };
             

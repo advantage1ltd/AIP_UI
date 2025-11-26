@@ -291,22 +291,27 @@ export const pageAccessApi = {
 			}
 			
 			console.log(`💾 [PageAccess API] Making PUT request to /PageAccess/settings`);
-			const response = await api.put<ApiResponse<BackendPageAccessSettingsDto>>(
+			const response = await api.put<any>(
 				'/PageAccess/settings',
 				{ pageAccessByRole }
 			);
 			
+			// Backend returns ApiResponseDto with capital Data, Success, Message
+			const apiResponse = response.data;
+			const responseData = apiResponse?.Data || apiResponse?.data;
+			const isSuccess = apiResponse?.Success ?? apiResponse?.success ?? false;
+			
 			console.log(`💾 [PageAccess API] Received response:`, {
 				status: response.status,
-				hasData: !!response.data?.data,
-				success: response.data?.success
+				hasData: !!responseData,
+				success: isSuccess
 			});
 			
-			if (response.data?.data) {
-				const savedRoleCount = Object.keys(response.data.data.pageAccessByRole).length;
-				const savedTotalPages = Object.values(response.data.data.pageAccessByRole).reduce((sum, pages) => sum + pages.length, 0);
+			if (responseData && isSuccess) {
+				const savedRoleCount = Object.keys(responseData.pageAccessByRole).length;
+				const savedTotalPages = Object.values(responseData.pageAccessByRole).reduce((sum, pages) => sum + pages.length, 0);
 				console.log(`✅ [PageAccess API] Settings saved successfully: ${savedRoleCount} roles, ${savedTotalPages} total page assignments`);
-				return normalizeSettings(response.data.data);
+				return normalizeSettings(responseData);
 			}
 			
 			console.warn('⚠️ [PageAccess API] Save response missing data field');
@@ -325,10 +330,15 @@ export const pageAccessApi = {
 
 	getSettings: async (): Promise<PageAccessSettings> => {
 		try {
-			const response = await api.get<ApiResponse<BackendPageAccessSettingsDto>>('/PageAccess/settings');
+			const response = await api.get<any>('/PageAccess/settings');
 			
-			if (response.data?.success && response.data?.data) {
-				const normalized = normalizeSettings(response.data.data);
+			// Backend returns ApiResponseDto with capital Data, Success, Message
+			const apiResponse = response.data;
+			const responseData = apiResponse?.Data || apiResponse?.data;
+			const isSuccess = apiResponse?.Success ?? apiResponse?.success ?? false;
+			
+			if (isSuccess && responseData) {
+				const normalized = normalizeSettings(responseData);
 				
 				// Log if we're getting defaults from backend (check for default customer pages in officer role)
 				if (import.meta.env.DEV) {
@@ -351,9 +361,9 @@ export const pageAccessApi = {
 			// If response is not successful, log and fall back
 			console.error('⚠️ [PageAccess API] Invalid response structure, falling back to defaults');
 			console.error('⚠️ [PageAccess API] Response:', {
-				success: response.data?.success,
-				hasData: !!response.data?.data,
-				message: response.data?.message
+				success: isSuccess,
+				hasData: !!responseData,
+				message: apiResponse?.Message || apiResponse?.message
 			});
 			return buildDefaultSettings();
 		} catch (error) {
@@ -383,14 +393,18 @@ export const pageAccessApi = {
 				}))
 			};
 
-			const response = await api.post<ApiResponse<{ created: number; updated: number; total: number; message: string }>>(
+			const response = await api.post<any>(
 				'/PageAccess/sync-pages',
 				syncRequest
 			);
 
-			if (response.data?.data) {
-				console.log('✅ [PageAccess API] Pages synced successfully:', response.data.data);
-				return response.data.data;
+			// Backend returns ApiResponseDto with capital Data, Success, Message
+			const apiResponse = response.data;
+			const responseData = apiResponse?.Data || apiResponse?.data;
+			
+			if (responseData) {
+				console.log('✅ [PageAccess API] Pages synced successfully:', responseData);
+				return responseData;
 			}
 
 			throw new Error('Invalid response from sync endpoint');

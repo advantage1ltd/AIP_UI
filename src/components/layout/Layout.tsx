@@ -35,7 +35,7 @@ export const Layout = ({ children }: LayoutProps) => {
     <div className="min-h-screen flex flex-col overflow-hidden">
       <div className="flex flex-1">
         {/* Desktop Sidebar - hidden on mobile */}
-        <aside className="hidden lg:flex w-64 flex-col fixed h-screen bg-[#1A1A1A] text-white border-r border-[#2A2A2A] z-30">
+        <aside className="hidden lg:flex w-64 flex-col fixed h-screen bg-[#1A1A1A] text-white border-r border-[#2A2A2A] z-30" style={{ backgroundColor: '#1A1A1A' }}>
           {/* Logo Section */}
           <div className="h-[var(--header-height)] border-b border-[#2A2A2A] px-6 pt-[27px] flex items-center">
             <Logo />
@@ -60,7 +60,7 @@ export const Layout = ({ children }: LayoutProps) => {
 
         {/* Mobile Sidebar */}
         {isMobileOpen && (
-          <aside className="fixed inset-y-0 left-0 z-50 lg:hidden w-64 flex flex-col bg-[#1A1A1A] text-white border-r border-[#2A2A2A]">
+          <aside className="fixed inset-y-0 left-0 z-50 lg:hidden w-64 flex flex-col bg-[#1A1A1A] text-white border-r border-[#2A2A2A]" style={{ backgroundColor: '#1A1A1A' }}>
             {/* Logo Section */}
             <div className="h-[var(--header-height)] border-b border-[#2A2A2A] px-6 pt-[27px] flex items-center justify-between">
               <Logo />

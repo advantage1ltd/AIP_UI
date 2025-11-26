@@ -167,7 +167,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   // If context is not available, return minimal header
   if (!pageAccessContext) {
     return (
-      <header className="h-[var(--header-height)] border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+      <header className="h-[var(--header-height)] border-b border-gray-200 dark:border-gray-800 bg-header-bg dark:bg-gray-900" style={{ backgroundColor: '#F9F9F9' }}>
         <div className="flex items-center justify-between h-full px-4">
           <div className="text-sm text-gray-500">Loading...</div>
         </div>
@@ -472,9 +472,9 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-header-bg border-b border-header-border shadow-sm text-header-text">
+    <header className="sticky top-0 z-50 w-full bg-header-bg border-b border-header-border shadow-sm text-header-text" style={{ backgroundColor: '#F9F9F9' }}>
       {/* Mobile Header */}
-      <div className="w-full h-[80px] bg-header-bg flex lg:hidden justify-between items-center px-5 py-4">
+      <div className="w-full h-[80px] bg-header-bg flex lg:hidden justify-between items-center px-5 py-4" style={{ backgroundColor: '#F9F9F9' }}>
         {/* Left: Hamburger Menu */}
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
           <SheetTrigger asChild>
@@ -565,7 +565,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
       </div>
 
       {/* Desktop Header */}
-      <div className={COMMON_CLASSES.desktopHeader}>
+      <div className={COMMON_CLASSES.desktopHeader} style={{ backgroundColor: '#F9F9F9' }}>
         {/* Left: Logo */}
         <div className="flex items-center text-header-text">
           <Logo variant="desktop" />
@@ -603,7 +603,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
 
       {/* Mobile Search Overlay */}
       {isSearchExpanded && (
-        <div className="lg:hidden absolute top-full left-0 right-0 bg-header-bg border-b border-header-border p-4 z-40">
+        <div className="lg:hidden absolute top-full left-0 right-0 bg-header-bg border-b border-header-border p-4 z-40" style={{ backgroundColor: '#F9F9F9' }}>
           <SearchInput />
         </div>
       )}

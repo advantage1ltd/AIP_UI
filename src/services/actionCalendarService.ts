@@ -129,7 +129,6 @@ class ActionCalendarService {
     if (!response.ok) {
       if (response.status === 401) {
         localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
         window.location.replace('/login');
         throw new Error('Unauthorized');
       }

@@ -551,15 +551,7 @@ export default function CRMDashboard() {
       notificationSent: false
     };
 
-    setScheduledEvents(prev => {
-      const updated = [...prev, newEvent];
-      try {
-        localStorage.setItem('crm_scheduled_events', JSON.stringify(updated));
-      } catch (error) {
-        console.error('Error saving events:', error);
-      }
-      return updated;
-    });
+    setScheduledEvents(prev => [...prev, newEvent]);
     
     toast({
       title: "Event scheduled successfully",
@@ -582,25 +574,7 @@ export default function CRMDashboard() {
 
   // Helper functions
   const loadScheduledEvents = useCallback(() => {
-    try {
-      const storedEvents = localStorage.getItem('crm_scheduled_events');
-      if (storedEvents) {
-        const parsedEvents = JSON.parse(storedEvents);
-        const eventsWithDates = parsedEvents.map((event: any) => ({
-          ...event,
-          date: new Date(event.date)
-        }));
-        setScheduledEvents(eventsWithDates);
-      } else {
-        // If no stored events, initialize with sample events and save them
-        localStorage.setItem('crm_scheduled_events', JSON.stringify(sampleEvents));
-        setScheduledEvents(sampleEvents);
-      }
-    } catch (error) {
-      console.error('Error loading events:', error);
-      // Fallback to sample events if there's an error
-      setScheduledEvents(sampleEvents);
-    }
+    setScheduledEvents(sampleEvents);
   }, []);
 
   // Navigation functions

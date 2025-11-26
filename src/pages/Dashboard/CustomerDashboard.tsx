@@ -106,7 +106,7 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
         if (!isActive) return;
         
         // Check if user is a customer role - try multiple sources
-        const userRoleRaw = user?.role || (user as any)?.Role || localStorage.getItem('userRole') || '';
+        const userRoleRaw = user?.role || (user as any)?.Role || '';
         const userRole = userRoleRaw.toLowerCase();
         const isCustomerRole = userRole === 'customersitemanager' || userRole === 'customerhomanager';
         
@@ -117,8 +117,7 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
           userRoleRaw: userRoleRaw,
           userRoleNormalized: userRole,
           isCustomerRole,
-          userKeys: user ? Object.keys(user) : [],
-          localStorageUserRole: localStorage.getItem('userRole')
+          userKeys: user ? Object.keys(user) : []
         });
         
         if (!isCustomerRole) {
@@ -145,20 +144,7 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
               customerId: user.customerId,
               hasCustomerId: 'customerId' in user,
               assignedCustomerIds: (user as any).assignedCustomerIds || (user as any).AssignedCustomerIds
-            } : null,
-            localStorageUser: (() => {
-              try {
-                const stored = JSON.parse(localStorage.getItem('user') || '{}');
-                return {
-                  role: stored.role,
-                  customerId: stored.customerId,
-                  CustomerId: stored.CustomerId,
-                  companyId: stored.companyId
-                };
-              } catch {
-                return null;
-              }
-            })()
+            } : null
           });
           
           setError('Customer ID not found. Please log out and log in again to refresh your session.');
@@ -520,10 +506,10 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
                 className={cn(
                   "relative overflow-hidden border-none shadow-lg transition-transform hover:scale-[1.02]",
                   metrics.length % 2 !== 0 && index === metrics.length - 1 ? "col-span-2 sm:col-span-1" : "",
-                  metric.color === 'green' ? 'bg-gradient-to-br from-emerald-500 to-emerald-700' :
-                  metric.color === 'amber' ? 'bg-gradient-to-br from-amber-500 to-amber-700' :
-                  metric.color === 'blue' ? 'bg-gradient-to-br from-blue-500 to-blue-700' :
-                  'bg-gradient-to-br from-purple-500 to-purple-700'
+                  metric.color === 'green' ? 'bg-[#198754]' :
+                  metric.color === 'amber' ? 'bg-[#FFC107]' :
+                  metric.color === 'blue' ? 'bg-[#0D6EFD]' :
+                  'bg-[#DC3545]'
                 )}
               >
                 <CardHeader className="pb-2 sm:pb-3">

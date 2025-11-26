@@ -3,8 +3,17 @@ import axios from 'axios';
 import { BASE_API_URL, api, type ApiResponse } from '@/config/api';
 import { extractApiResponseData } from '@/utils/apiResponseHelper';
 import { extractCustomerId } from '@/utils/customerId';
+import { sessionStore } from '@/state/sessionStore';
 
 const API_BASE_URL = BASE_API_URL;
+
+const getActiveUser = () => {
+  const activeUser = sessionStore.getUser()
+  if (!activeUser) {
+    throw new Error('User session is not available')
+  }
+  return activeUser
+}
 const FALLBACK_OFFICER_DASHBOARD: OfficerDashboardData = {
   name: 'Advantage Officer',
   badgeNumber: 'AIP-2045',
@@ -246,7 +255,7 @@ export const dashboardApi = {
 
 // Helper function to get customer ID from auth context
 const getCustomerIdFromAuth = () => {
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const user = getActiveUser();
   return user.customerId || 21; // Default to Central England COOP if no customerId found
 };
 
@@ -504,7 +513,7 @@ class CustomerDashboardService {
 
   private getHeaders() {
     const token = localStorage.getItem('authToken');
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = getActiveUser();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
@@ -517,7 +526,7 @@ class CustomerDashboardService {
     // Use extractCustomerId utility for consistent extraction
     // Ensure user object has role if missing
     if (!user.role && !user.Role) {
-      const storedRole = localStorage.getItem('userRole');
+      const storedRole = sessionStore.getUser()?.role || null;
       if (storedRole) {
         user.role = storedRole;
       }
@@ -532,7 +541,7 @@ class CustomerDashboardService {
       console.warn('⚠️ [DashboardService] No customerId found in user object:', {
         user,
         userRole: user.role || user.Role,
-        localStorageUserRole: localStorage.getItem('userRole')
+        localStorageUserRole: sessionStore.getUser()?.role
       });
     }
     
@@ -607,7 +616,7 @@ class CustomerDashboardService {
 
   async getRegions(signal?: AbortSignal): Promise<Region[]> {
     // Get all regions by requesting a large page size from real backend API
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = getActiveUser();
     const customerId = user.customerId || user.CustomerId || user.companyId;
     const url = customerId 
       ? `/region?page=1&pageSize=1000&customerId=${customerId}`
@@ -633,7 +642,7 @@ class CustomerDashboardService {
 
   async getSites(signal?: AbortSignal): Promise<Site[]> {
     // Get all sites by requesting a large page size from real backend API
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = getActiveUser();
     const customerId = user.customerId || user.CustomerId || user.companyId;
     const url = customerId 
       ? `/site?page=1&pageSize=1000&customerId=${customerId}`
@@ -681,7 +690,7 @@ class CustomerDashboardService {
     const siteName = site.LocationName || site.locationName || site.name || '';
     
     // Get incidents for this site - fetch more for chart data calculation
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = getActiveUser();
     const userCustomerId = user.customerId || user.CustomerId || user.companyId || customerId;
     
     let recentIncidents: RecentIncident[] = [];
@@ -770,7 +779,7 @@ class CustomerDashboardService {
 
   async getSatisfactionData(siteIds?: string[], signal?: AbortSignal): Promise<SatisfactionDataPoint[]> {
     // Use real backend API for customer satisfaction from customerSatisfactionSurveys table
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = getActiveUser();
     const customerId = user.customerId || user.CustomerId || user.companyId;
     const url = customerId 
       ? `/customer-satisfaction?page=1&pageSize=1000&customerId=${customerId}`
@@ -910,7 +919,7 @@ class CustomerDashboardService {
     // Be Safe Be Secure data from DailyActivityReports table
     // This data represents compliance metrics from daily activity reports
     // Uses the same parameters as Daily Activity Reports for consistency
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = getActiveUser();
     const customerId = user.customerId || user.CustomerId || user.companyId;
     
     // Build URL with same parameters as getDailyActivities
@@ -1081,7 +1090,7 @@ class CustomerDashboardService {
 
   async getDailyActivities(signal?: AbortSignal): Promise<DailyActivity[]> {
     // Use real backend API for daily activity reports
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = getActiveUser();
     const customerId = user.customerId || user.CustomerId || user.companyId;
     const url = customerId 
       ? `/daily-activity-reports?page=1&pageSize=1000&customerId=${customerId}`
@@ -1110,7 +1119,7 @@ class CustomerDashboardService {
   async getAggregatedSitesData(siteIds: string[], signal?: AbortSignal): Promise<CustomerStoreData> {
     // Aggregate data from multiple sites
     // Fetch all sites and their incidents, then aggregate
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = getActiveUser();
     const customerId = user.customerId || user.CustomerId || user.companyId;
     
     // Fetch all sites

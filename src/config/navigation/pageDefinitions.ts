@@ -367,6 +367,14 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
 		description: 'Officer performance tracking',
 		sortOrder: 43,
 	},
+	{
+		pageId: 'data-analytics-hub',
+		title: 'Data Analytics Hub',
+		path: '/analytics/data-analytics-hub',
+		category: 'Management',
+		description: 'Comprehensive crime analytics and intelligence dashboard',
+		sortOrder: 44,
+	},
 
 	// Compliance
 	{

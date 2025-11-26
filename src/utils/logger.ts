@@ -12,13 +12,8 @@ class Logger {
   private logs: LogEntry[] = [];
   private readonly maxLogs: number = 1000;
   private readonly shouldConsoleLog: boolean = true;
-  private readonly shouldSaveToStorage: boolean = true;
 
   private constructor() {
-    // Load any existing logs from localStorage
-    this.loadLogsFromStorage();
-    
-    // Clear old logs on startup
     this.clearOldLogs();
   }
 
@@ -42,33 +37,9 @@ class Logger {
     };
   }
 
-  private saveToStorage(): void {
-    if (this.shouldSaveToStorage) {
-      try {
-        localStorage.setItem('app_logs', JSON.stringify(this.logs));
-      } catch (error) {
-        console.error('Failed to save logs to localStorage:', error);
-      }
-    }
-  }
-
-  private loadLogsFromStorage(): void {
-    if (this.shouldSaveToStorage) {
-      try {
-        const savedLogs = localStorage.getItem('app_logs');
-        if (savedLogs) {
-          this.logs = JSON.parse(savedLogs);
-        }
-      } catch (error) {
-        console.error('Failed to load logs from localStorage:', error);
-      }
-    }
-  }
-
   private clearOldLogs(): void {
     if (this.logs.length > this.maxLogs) {
       this.logs = this.logs.slice(-this.maxLogs);
-      this.saveToStorage();
     }
   }
 
@@ -82,7 +53,6 @@ class Logger {
     }
 
     this.clearOldLogs();
-    this.saveToStorage();
   }
 
   public info(message: string, data?: any): void {
@@ -109,7 +79,6 @@ class Logger {
 
   public clearLogs(): void {
     this.logs = [];
-    this.saveToStorage();
   }
 
   public downloadLogs(): void {

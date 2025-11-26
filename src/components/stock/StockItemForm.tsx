@@ -1,40 +1,65 @@
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { StockItem } from "@/types/stock"
-import { useEffect, useState } from "react"
-import { userService, type UserDetailResponse } from "@/services/userService"
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { StockItem } from '@/types/stock'
+import { useEffect, useState } from 'react'
+import { employeeService } from '@/services/employeeService'
+import { type Employee } from '@/types/employee'
 
 interface StockItemFormProps {
   item?: StockItem
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
 }
 
+const getEmployeeDisplayName = (employee: Employee) => {
+  if (employee.fullName) return employee.fullName
+  if (employee.firstName && employee.surname) {
+    return `${employee.firstName} ${employee.surname}`
+  }
+  return employee.employeeNumber
+}
+
+const getIssuedByValue = (employee: Employee) =>
+  employee.fullName ?? employee.employeeNumber ?? employee.id.toString()
+
 export const StockItemForm = ({ item, onSubmit }: StockItemFormProps) => {
-  const [employees, setEmployees] = useState<UserDetailResponse[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadEmployees = async () => {
       setIsLoadingEmployees(true)
+      setLoadError(null)
+
       try {
-        // Prefer role-filtered active users if supported by backend
-        const data = await userService.getUsers({ page: 1, pageSize: 1000, role: 'advantageoneofficer', isActive: true })
-        setEmployees(data.items)
-      } catch (err) {
-        try {
-          const data = await userService.getUsers({ page: 1, pageSize: 1000, isActive: true })
-          setEmployees(data.items)
-        } catch (_err) {
-          setEmployees([])
-        }
+        const response = await employeeService.getEmployeesAsFrontendInterface({
+          page: 1,
+          pageSize: 1000,
+          status: 'active'
+        })
+
+        setEmployees(response.employees)
+      } catch (error) {
+        console.error('❌ [StockItemForm] Failed to load employees', error)
+        setEmployees([])
+        setLoadError('Unable to load employees')
       } finally {
         setIsLoadingEmployees(false)
       }
     }
+
     loadEmployees()
   }, [])
+
+  const employeePlaceholder = loadError
+    ? loadError
+    : isLoadingEmployees
+      ? 'Loading employees...'
+      : employees.length
+        ? 'Select employee'
+        : 'No employees available'
 
   return (
     <form onSubmit={onSubmit} className="space-y-3 sm:space-y-4">
@@ -81,13 +106,15 @@ export const StockItemForm = ({ item, onSubmit }: StockItemFormProps) => {
             name="issuedBy"
             defaultValue={item?.issuedBy || ''}
             required
-            disabled={isLoadingEmployees}
+            disabled={isLoadingEmployees || !!loadError}
+            aria-busy={isLoadingEmployees}
+            aria-invalid={!!loadError}
             className="h-8 sm:h-10 text-sm sm:text-base w-full rounded-md border border-input bg-background px-3 py-2 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <option value="" disabled>{isLoadingEmployees ? 'Loading employees...' : 'Select employee'}</option>
-            {employees.map((u) => (
-              <option key={u.id} value={u.username}>
-                {u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.username}
+            <option value="" disabled>{employeePlaceholder}</option>
+            {employees.map((employee) => (
+              <option key={employee.id} value={getIssuedByValue(employee)}>
+                {getEmployeeDisplayName(employee)}
               </option>
             ))}
           </select>

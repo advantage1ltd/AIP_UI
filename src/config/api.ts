@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { sessionStore } from '@/state/sessionStore'
 
 // Base API URL for the .NET backend
 // Configure via VITE_API_BASE_URL environment variable or defaults to http://localhost:5128/api
@@ -16,7 +17,7 @@ export const api = axios.create({
 // Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken')
+    const token = sessionStore.getToken()
     if (import.meta.env.DEV) {
       console.log('🔄 [API Interceptor] Making request', { 
         url: config.url, 
@@ -34,7 +35,9 @@ api.interceptors.request.use(
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
-      console.log('🔑 [API Interceptor] Added Authorization header:', `Bearer ${token.substring(0, 20)}...`)
+      if (import.meta.env.DEV) {
+        console.log('🔑 [API Interceptor] Added Authorization header:', `Bearer ${token.substring(0, 20)}...`)
+      }
     } else if (import.meta.env.DEV) {
       console.info('ℹ️ [API Interceptor] Skipping Authorization header; no auth token for request:', config.url)
     }
@@ -105,11 +108,10 @@ api.interceptors.response.use(
       // 1. Not the settings endpoint (which allows anonymous access)
       // 2. Not already on the login page
       // 3. Has an auth token (meaning user was authenticated but token expired)
-      const hasToken = localStorage.getItem('authToken')
+      const hasToken = sessionStore.getToken()
       if (!isSettingsEndpoint && !isLoginPage && hasToken) {
         console.warn('⚠️ [API Interceptor] Redirecting to login due to expired/invalid token')
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('user')
+        sessionStore.clearAll()
         window.location.href = '/login'
       }
     }

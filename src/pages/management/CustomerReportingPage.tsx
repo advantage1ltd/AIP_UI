@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { CustomerWithRelations, CustomerPage } from '@/types/customer';
 import { CUSTOMER_PAGES } from '@/config/customerPages';
-import { BASE_API_URL } from '@/config/api';
+import { BASE_API_URL, api } from '@/config/api';
+import { ApiResponse } from '@/types/api';
+import { User } from '@/types/user';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -120,7 +122,7 @@ const buildCustomerKey = (customer: CustomerWithRelations, index: number): strin
   return `customer-index-${index}`;
 };
 
-export default function CustomerReportingPage() {
+export default function CustomerReportingPage(): React.JSX.Element {
   const [customers, setCustomers] = useState<CustomerWithRelations[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -175,16 +177,11 @@ export default function CustomerReportingPage() {
         // This handles cases where assignments were updated but user session hasn't refreshed
         try {
           console.log('🔄 [CustomerReportingPage] Fetching latest user assignments from /Auth/me');
-          const response = await fetch(`${BASE_API_URL}/Auth/me`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-          });
+          const response = await api.get<ApiResponse<User>>('/Auth/me');
+          const userData = response.data;
           
-          if (response.ok) {
-            const responseData = await response.json();
-            const userData = responseData.data || responseData;
-            const latestAssignedIds = userData?.AssignedCustomerIds || userData?.assignedCustomerIds || [];
+          if (userData && response.data) {
+            const latestAssignedIds = (userData as any)?.AssignedCustomerIds || (userData as any)?.assignedCustomerIds || [];
             
             console.log('🔍 [CustomerReportingPage] Fetched user data from /Auth/me:', {
               assignedCustomerIds: latestAssignedIds,
@@ -202,15 +199,13 @@ export default function CustomerReportingPage() {
                 ...user,
                 assignedCustomerIds: latestAssignedIds
               };
-              localStorage.setItem('user', JSON.stringify(updatedUser));
-              // Dispatch event to update AuthContext
               window.dispatchEvent(new CustomEvent('user-assignments-updated', { detail: updatedUser }));
             }
             
             assignedCustomerIds = latestAssignedIds;
             console.log('✅ [CustomerReportingPage] Using assignedCustomerIds:', assignedCustomerIds);
           } else {
-            console.warn('⚠️ [CustomerReportingPage] /Auth/me returned status:', response.status, 'using cached assignments');
+            console.warn('⚠️ [CustomerReportingPage] /Auth/me returned unexpected data, using cached assignments');
           }
         } catch (error) {
           console.warn('⚠️ [CustomerReportingPage] Failed to fetch from /Auth/me, using cached assignments:', error);
@@ -679,22 +674,16 @@ export default function CustomerReportingPage() {
                   <Button
                     onClick={async () => {
                       try {
-                        const response = await fetch(`${BASE_API_URL}/User/${user.id}`, {
-                          headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-                          }
-                        });
-                        if (response.ok) {
-                          const userData = await response.json();
-                          const updatedUser = {
-                            ...user,
-                            assignedCustomerIds: userData.data?.AssignedCustomerIds || userData.data?.assignedCustomerIds || []
-                          };
-                          localStorage.setItem('user', JSON.stringify(updatedUser));
-                          window.location.reload();
+                        const response = await api.get<ApiResponse<User>>(`/User/${user.id}`)
+                        const userData = response.data
+                        const updatedUser = {
+                          ...user,
+                          assignedCustomerIds: (userData as any)?.AssignedCustomerIds || (userData as any)?.assignedCustomerIds || []
                         }
+                        window.dispatchEvent(new CustomEvent('user-assignments-updated', { detail: updatedUser }))
+                        window.location.reload()
                       } catch (error) {
-                        console.error('Failed to refresh user data:', error);
+                        console.error('Failed to refresh user data:', error)
                       }
                     }}
                     variant="outline"

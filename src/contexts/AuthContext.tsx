@@ -1,33 +1,98 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, AuthResponse } from '@/types/user';
-import { BASE_API_URL } from '@/config/api';
-import { authService } from '@/services/authService';
-import { extractCustomerId } from '@/utils/customerId';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { User } from '@/types/user';
+import { api } from '@/config/api';
+import { sessionStore } from '@/state/sessionStore';
+import { ApiResponse } from '@/types/api';
+
+// Backend ApiResponseDto structure (capital case)
+interface BackendApiResponse<T> {
+	Success: boolean;
+	Message: string;
+	Data: T;
+	Errors?: string[];
+	Timestamp?: string;
+}
+
+type LoginResponsePayload = {
+	AccessToken: string;
+	RefreshToken?: string;
+	ExpiresAt?: string;
+	User: User;
+	Success?: boolean;
+	Message?: string;
+}
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   error: string | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<User>;
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  // Initialize user from localStorage immediately to prevent login on refresh
+  const [user, setUser] = useState<User | null>(() => sessionStore.getUser());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Listen for user assignment updates
+  const fetchCurrentUser = useCallback(async () => {
+    const token = sessionStore.getToken();
+    if (!token) {
+      setUser(null);
+      sessionStore.setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
+    // Restore user from localStorage first for immediate UI rendering
+    const cachedUser = sessionStore.getUser();
+    if (cachedUser) {
+      setUser(cachedUser);
+      setIsLoading(false);
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await api.get<BackendApiResponse<User>>('/Auth/me');
+      // Backend returns ApiResponseDto with capital Data property
+      const apiResponse = response.data;
+      if (apiResponse.Success && apiResponse.Data) {
+        setUser(apiResponse.Data);
+        sessionStore.setUser(apiResponse.Data);
+        setError(null);
+      } else {
+        throw new Error(apiResponse.Message || 'Failed to fetch user data');
+      }
+    } catch (err: any) {
+      // Only clear token if it's a 401 (unauthorized) - token is invalid
+      // For other errors (network, 500, etc.), keep the cached user
+      const isUnauthorized = err?.response?.status === 401;
+      
+      if (isUnauthorized) {
+        console.error('Failed to fetch current user - unauthorized:', err);
+        sessionStore.clearToken();
+        setUser(null);
+        sessionStore.setUser(null);
+      } else {
+        // For other errors, keep the cached user and just log the error
+        console.warn('Failed to fetch current user (keeping cached user):', err);
+        // Keep the cached user, don't clear it
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const handleUserAssignmentsUpdate = (event: CustomEvent) => {
+    const handleUserAssignmentsUpdate = (event: CustomEvent<User>) => {
       const updatedUser = event.detail;
       if (updatedUser && updatedUser.id === user?.id) {
         console.log('🔄 [AuthContext] Updating user assignments from event');
         setUser(updatedUser);
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        authService.setCurrentUser(updatedUser);
+        sessionStore.setUser(updatedUser);
       }
     };
 
@@ -39,183 +104,133 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    // Check for existing session
-    const token = localStorage.getItem('authToken');
-    const storedUser = localStorage.getItem('user');
-    
-    const restoreSession = async () => {
-      if (token && storedUser) {
-        try {
-          const userData = JSON.parse(storedUser);
-          
-          // Ensure customerId is set for customer roles (backward compatibility)
-          const userRoleRaw = userData.role || userData.Role;
-          const userRole = (userRoleRaw?.toLowerCase() || '') as UserRole;
-          const isAdvantageOneRole = ['advantageoneofficer', 'advantageonehoofficer', 'administrator'].includes(userRole);
-          
-          if (!isAdvantageOneRole) {
-            // Normalize CustomerId from API response (PascalCase) to customerId (camelCase)
-            // The data in localStorage came from the API, so trust it
-            const apiCustomerId = (userData as any).CustomerId ?? userData.customerId;
-            if (apiCustomerId !== null && apiCustomerId !== undefined && apiCustomerId !== 0) {
-              (userData as any).customerId = apiCustomerId;
-              // Preserve both formats for compatibility
-              (userData as any).CustomerId = apiCustomerId;
-              console.log('🔧 [AuthContext] Normalized CustomerId from API during session restore:', apiCustomerId);
-              // Update localStorage with normalized data
-              localStorage.setItem('user', JSON.stringify(userData));
-            } else {
-              console.warn('⚠️ [AuthContext] No CustomerId found in stored user data. User may need to log in again.', {
-                role: userRole,
-                userId: userData.id || userData.Id,
-                userDataKeys: Object.keys(userData)
-              });
-            }
-          }
-          
-          // NEW: Update unified auth service with existing session
-          authService.setCurrentUser(userData);
-          
-          setUser(userData);
-          // Ensure role is set in localStorage
-          if (userData.role) {
-            localStorage.setItem('userRole', userData.role);
-          }
-        } catch (err) {
-          console.error('Failed to parse stored user:', err);
-        }
-      }
-      
-      setIsLoading(false);
-    };
+    fetchCurrentUser();
+  }, [fetchCurrentUser]);
 
-    restoreSession();
-  }, []);
-
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string): Promise<User> => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(`${BASE_API_URL}/Auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          email: username, // Backend expects 'email' field
-          password: password 
-        }),
+      let response;
+      try {
+        response = await api.post<any>('/Auth/login', {
+          email: username,
+          password
+        });
+      } catch (axiosError: any) {
+        // Axios throws errors for non-2xx responses, but we might have error data
+        const errorResponse = axiosError?.response;
+        if (errorResponse?.data) {
+          // Backend returns error in ApiResponseDto format
+          const errorData = errorResponse.data;
+          const errorMessage = errorData?.Message ?? errorData?.message ?? 'Invalid email or password';
+          
+          console.error('❌ [AuthContext] Login failed (HTTP error):', {
+            status: errorResponse.status,
+            message: errorMessage,
+            errorData
+          });
+          
+          setError(errorMessage);
+          throw new Error(errorMessage);
+        }
+        // Re-throw if we can't extract error message
+        throw axiosError;
+      }
+
+      // Log the raw response for debugging
+      if (import.meta.env.DEV) {
+        console.log('🔍 [AuthContext] Login response:', {
+          status: response.status,
+          data: response.data,
+          dataKeys: response.data ? Object.keys(response.data) : [],
+          hasSuccess: 'Success' in (response.data || {}),
+          hasData: 'Data' in (response.data || {})
+        });
+      }
+
+      // Backend returns ApiResponseDto<LoginResponseDto> with capital Data property
+      // Handle both capital and lowercase properties for compatibility
+      const apiResponse = response.data;
+      const isSuccess = apiResponse?.Success ?? apiResponse?.success ?? false;
+      const responseData = apiResponse?.Data ?? apiResponse?.data;
+      const message = apiResponse?.Message ?? apiResponse?.message ?? 'Invalid response from server';
+
+      if (!isSuccess || !responseData) {
+        console.error('❌ [AuthContext] Login failed:', {
+          isSuccess,
+          hasResponseData: !!responseData,
+          message,
+          fullResponse: apiResponse
+        });
+        throw new Error(message);
+      }
+
+      // Backend LoginResponseDto has AccessToken (capital A) and User (capital U)
+      // Handle both capital and lowercase for compatibility
+      const loginData = responseData;
+      const accessToken = loginData?.AccessToken ?? loginData?.accessToken;
+      const user = loginData?.User ?? loginData?.user;
+
+      if (!accessToken || !user) {
+        console.error('❌ [AuthContext] Missing token or user in response:', {
+          hasAccessToken: !!accessToken,
+          hasUser: !!user,
+          loginDataKeys: loginData ? Object.keys(loginData) : [],
+          loginData
+        });
+        throw new Error('Invalid response from server: missing token or user data');
+      }
+
+      sessionStore.setToken(accessToken);
+      setUser(user);
+      sessionStore.setUser(user);
+      setError(null);
+      
+      if (import.meta.env.DEV) {
+        console.log('✅ [AuthContext] Login successful:', {
+          username: user.username,
+          userId: user.id,
+          role: user.role
+        });
+      }
+      
+      return user;
+    } catch (err: any) {
+      // If error is already an Error with a message, use it
+      if (err instanceof Error && err.message && !err.message.includes('Invalid response from server')) {
+        const errorMessage = err.message;
+        setError(errorMessage);
+        console.error('❌ [AuthContext] Login error:', err);
+        throw err;
+      }
+      
+      // Otherwise, try to extract error message from response
+      const errorMessage = err?.response?.data?.Message 
+        ?? err?.response?.data?.message 
+        ?? err?.message 
+        ?? 'An error occurred during login';
+      
+      setError(errorMessage);
+      
+      // Log detailed error information
+      console.error('❌ [AuthContext] Login error:', {
+        message: errorMessage,
+        error: err,
+        response: err?.response?.data,
+        status: err?.response?.status,
+        statusText: err?.response?.statusText
       });
-
-      console.log('🔍 [AuthContext] Response status:', response.status);
-      console.log('🔍 [AuthContext] Response headers:', Object.fromEntries(response.headers.entries()));
-
-      const data: AuthResponse = await response.json();
-
-      console.log('🔍 [AuthContext] Backend response:', data);
-      console.log('🔍 [AuthContext] Data object:', data.data);
-      console.log('🔍 [AuthContext] Data object keys:', Object.keys(data.data || {}));
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      // Handle real backend response format
-      if (data.success && data.data) {
-        // The backend returns a nested structure where data.data contains the actual response
-        const loginData = data.data;
-        // Support both 'accessToken' and 'token' for backward compatibility
-        const accessToken = loginData.accessToken || loginData.token;
-        const userData = loginData.user;
-        
-        console.log('🔍 [AuthContext] Full loginData structure:', loginData);
-        console.log('🔍 [AuthContext] User data:', userData);
-        console.log('🔍 [AuthContext] User data customerId (direct):', (userData as any)?.customerId);
-        console.log('🔍 [AuthContext] User data CustomerId (PascalCase):', (userData as any)?.CustomerId);
-        
-        if (!userData) {
-          throw new Error('User data is missing from response');
-        }
-        
-        if (!accessToken) {
-          throw new Error('Access token is missing from response');
-        }
-        
-        // Type-safe user assignment based on role
-        const userRoleRaw = userData.Role || userData.role || userData.Roles?.[0] || 'customersitemanager';
-        const userRole = (userRoleRaw?.toLowerCase() || 'customersitemanager') as UserRole;
-        const isAdvantageOneRole = ['advantageoneofficer', 'advantageonehoofficer', 'administrator'].includes(userRole);
-        
-        console.log('🔍 [AuthContext] Extracted role (raw):', userRoleRaw);
-        console.log('🔍 [AuthContext] Extracted role (normalized):', userRole);
-        console.log('🔍 [AuthContext] Is AdvantageOne role:', isAdvantageOneRole);
-        
-        localStorage.setItem('authToken', accessToken);
-        localStorage.setItem('userRole', userRole);
-        
-        // Build the complete user object with all necessary fields BEFORE storing in localStorage
-        let completeUserData: User;
-        
-        if (isAdvantageOneRole) {
-          completeUserData = {
-            ...userData,
-            role: userRole as 'advantageoneofficer' | 'advantageonehoofficer' | 'administrator',
-            assignedCustomerIds: (userData as any).AssignedCustomerIds || (userData as any).assignedCustomerIds || []
-          };
-        } else {
-          // For customer users: API returns CustomerId (PascalCase) - normalize to customerId (camelCase)
-          // Trust the API response directly - it comes from the database
-          const apiCustomerId = (userData as any).CustomerId ?? (userData as any).customerId;
-          
-          if (!apiCustomerId || apiCustomerId === 0) {
-            console.error('❌ [AuthContext] API did not return CustomerId for customer user:', {
-              role: userRole,
-              userId: userData.id || userData.Id,
-              userDataKeys: Object.keys(userData),
-              rawUserData: userData
-            });
-            throw new Error('Customer ID is required for customer users but was not provided by the API');
-          }
-          
-          // Normalize: store as both customerId (camelCase) and CustomerId (PascalCase) for compatibility
-          completeUserData = {
-            ...userData,
-            role: userRole as 'customersitemanager' | 'customerhomanager',
-            customerId: apiCustomerId
-          };
-          (completeUserData as any).CustomerId = apiCustomerId;
-          
-          console.log('✅ [AuthContext] Customer user logged in with CustomerId from API:', apiCustomerId);
-        }
-        
-        // Store the complete user object (with customerId and CustomerId) in localStorage
-        localStorage.setItem('user', JSON.stringify(completeUserData));
-        
-        // Update unified auth service with complete user data
-        authService.setCurrentUser(completeUserData);
-        
-        // Set user state
-        setUser(completeUserData);
-      } else {
-        throw new Error(data.message || 'Invalid response from server');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      throw err;
+      
+      throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
   const logout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    localStorage.removeItem('userRole'); // Also remove userRole on logout
-    
-    // NEW: Clear unified auth service
-    authService.clearCurrentUser();
-    
+    sessionStore.clearAll();
     setUser(null);
   };
 

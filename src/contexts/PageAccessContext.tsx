@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { PageAccess, PageAccessSettings, pageAccessApi } from '@/api/pageAccess';
-import { useAuth } from '@/contexts/AuthContext';
+import { AuthContext } from '@/contexts/AuthContext';
 import { customerPageAccessCache } from '@/services/customerPageAccessCache';
 import { PAGE_DEFINITIONS } from '@/config/navigation/pageDefinitions';
+import { sessionStore } from '@/state/sessionStore';
 
 interface PageAccessContextType {
 	hasAccess: (path: string) => boolean;
@@ -39,25 +40,28 @@ export const usePageAccess = () => {
 };
 
 export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-	const { user } = useAuth();
+	// Safely get user from auth context, fallback to sessionStore if context not available
+	const authContext = useContext(AuthContext);
+	const user = authContext?.user || sessionStore.getUser();
 	
 	const [currentRole, setCurrentRoleState] = useState<string | null>(() => {
-		// Try to get role from localStorage user data on initial mount
-		try {
-			const storedUser = localStorage.getItem('user');
-			if (storedUser) {
-				const userData = JSON.parse(storedUser);
-				const userRole = userData.pageAccessRole || userData.role || userData.Role || null;
-				if (userRole) {
-					// Backend returns roles in lowercase, just ensure it's lowercase
-					return userRole.trim().toLowerCase();
-				}
-			}
-		} catch {
-			// Ignore errors parsing localStorage
-		}
+		// Initialize from sessionStore if available
+		const initialUser = sessionStore.getUser();
+		if (initialUser?.pageAccessRole) return initialUser.pageAccessRole.trim().toLowerCase();
+		if (initialUser?.role) return initialUser.role.trim().toLowerCase();
 		return null;
 	});
+	
+	useEffect(() => {
+		if (user?.pageAccessRole) {
+			setCurrentRoleState(user.pageAccessRole.trim().toLowerCase());
+		} else if (user?.role) {
+			setCurrentRoleState(user.role.trim().toLowerCase());
+		} else {
+			setCurrentRoleState(null);
+		}
+	}, [user]);
+
 	const [pageAccessByRole, setPageAccessByRole] = useState<Record<string, string[]>>({});
 	const [availablePages, setAvailablePages] = useState<PageAccess[]>([]);
 	const [customerAssignedPageIds, setCustomerAssignedPageIds] = useState<Set<string>>(new Set());
@@ -74,7 +78,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 	// Stable check for auth token
 	const hasAuthToken = useCallback((): boolean => {
 		try {
-			return Boolean(localStorage.getItem('authToken'));
+			return Boolean(sessionStore.getToken());
 		} catch {
 			return false;
 		}

@@ -49,10 +49,21 @@ export interface BackendUserResponse {
 }
 
 export interface BackendUserListResponse {
-  users: BackendUserResponse[]
-  totalCount: number
-  page: number
-  pageSize: number
+  users?: BackendUserResponse[]
+  totalCount?: number
+  page?: number
+  pageSize?: number
+}
+
+export interface UsersQueryParams {
+  page?: number
+  pageSize?: number
+  searchTerm?: string
+  role?: string
+  isActive?: boolean
+  includeDeleted?: boolean
+  assignedCustomerId?: number
+  employeeId?: number
 }
 
 class UserService {
@@ -117,24 +128,31 @@ class UserService {
   }
 
   /**
-   * Gets all users with pagination
+   * Gets all users with pagination and optional filtering
    */
-  async getUsers(params?: { page?: number; pageSize?: number; searchTerm?: string }): Promise<UsersResponse> {
+  async getUsers(params: UsersQueryParams = {}): Promise<UsersResponse> {
     try {
       console.log('🔄 [UserService] Fetching users with params:', params)
-      const response = await api.get(`${this.baseUrl}/list`, {
-        params: { 
-          page: params?.page || 1, 
-          pageSize: params?.pageSize || 10 
-        }
-      })
+      const queryParams = {
+        page: params.page ?? 1,
+        pageSize: params.pageSize ?? 10,
+        ...(params.searchTerm ? { searchTerm: params.searchTerm } : {}),
+        ...(params.role ? { role: params.role } : {}),
+        ...(typeof params.isActive === 'boolean' ? { isActive: params.isActive } : {}),
+        ...(typeof params.includeDeleted === 'boolean' ? { includeDeleted: params.includeDeleted } : {}),
+        ...(typeof params.assignedCustomerId === 'number' ? { assignedCustomerId: params.assignedCustomerId } : {}),
+        ...(typeof params.employeeId === 'number' ? { employeeId: params.employeeId } : {})
+      }
+
+      const response = await api.get(`${this.baseUrl}/list`, { params: queryParams })
       console.log('✅ [UserService] Raw backend response:', response.data)
       
       // Transform backend response to frontend format
       const backendResponse = response.data as BackendUserListResponse
-      console.log('✅ [UserService] Backend response users:', backendResponse.users)
+      const backendUsers = Array.isArray(backendResponse.users) ? backendResponse.users : []
+      console.log('✅ [UserService] Backend response users:', backendUsers)
       
-      const transformedUsers = backendResponse.users.map(user => {
+      const transformedUsers = backendUsers.map(user => {
         // Backend returns roles in lowercase, use directly
         const normalizedRole = (user.role?.toLowerCase() || '') as UserRole;
         const isCustomerRole = normalizedRole === 'customersitemanager' || normalizedRole === 'customerhomanager';
@@ -196,14 +214,17 @@ class UserService {
       })
       
       console.log('✅ [UserService] Transformed users:', transformedUsers)
+      const resolvedPageSize = backendResponse.pageSize ?? queryParams.pageSize ?? 10
+      const resolvedTotalCount = backendResponse.totalCount ?? transformedUsers.length
+
       return {
         success: true,
         data: transformedUsers,
         pagination: {
-          currentPage: backendResponse.page,
-          totalPages: Math.ceil(backendResponse.totalCount / backendResponse.pageSize),
-          pageSize: backendResponse.pageSize,
-          totalCount: backendResponse.totalCount
+          currentPage: backendResponse.page ?? queryParams.page ?? 1,
+          totalPages: Math.ceil(resolvedTotalCount / Math.max(resolvedPageSize, 1)),
+          pageSize: resolvedPageSize,
+          totalCount: resolvedTotalCount
         }
       }
     } catch (error) {

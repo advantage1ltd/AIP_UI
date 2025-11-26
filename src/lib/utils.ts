@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { sessionStore } from '@/state/sessionStore'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -47,14 +48,10 @@ Date.prototype.getWeek = function(): number {
 
 // Utility to get authenticated user's customer ID
 export const getCurrentCustomerId = (): number | null => {
-  try {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    // Admin users should see all customer data, so return null for them
-    if (user.role === 'administrator') {
-      return null;
-    }
-    return user.customerId || null;
-  } catch {
-    return null;
+  const user = sessionStore.getUser()
+  if (!user) return null
+  if (user.role === 'administrator') {
+    return null
   }
+  return (user as any).customerId ?? null
 };

@@ -32,14 +32,27 @@ export default {
 		},
 		extend: {
 			colors: {
-				'header-bg': '#F3F4F6',
+				// Template color palette
+				'primary-purple': '#423A8E',
+				'primary-teal': '#00CCCD',
+				'support-yellow': '#FFC107',
+				'support-red': '#DC3545',
+				'support-green': '#198754',
+				'support-blue': '#0D6EFD',
+				// Header colors
+				'header-bg': '#F9F9F9',
 				'header-text': '#1F2937',
-				'header-border': '#CBD5F5',
-				'sidebar-bg': '#242932',
-				'sidebar-text': '#D9D9D9',
-				'sidebar-border': '#2F3542',
-				'accent-teal': '#00A8A8',
-				'accent-teal-hover': '#00C2C2',
+				'header-border': '#E5E7EB',
+				// Sidebar colors (dark theme)
+				'sidebar-bg': '#1A1A1A',
+				'sidebar-text': '#FFFFFF',
+				'sidebar-border': '#2A2A2A',
+				// Template primary colors for use throughout app
+				'template-primary': '#423A8E',
+				'template-teal': '#00CCCD',
+				// Legacy accent colors (keeping for compatibility)
+				'accent-teal': '#00CCCD',
+				'accent-teal-hover': '#00B8B9',
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',

@@ -13,8 +13,9 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 246 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 248 42% 38%;
+    --primary-foreground: 0 0% 100%;
+    /* Template colors - using HSL values for #423A8E (primary purple) */
 
     --secondary: 246 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;

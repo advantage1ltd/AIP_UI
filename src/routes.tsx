@@ -121,6 +121,7 @@ import DisciplinaryPage from '@/pages/employee/DisciplinaryPage';
 import EmployeeDiaryPage from '@/pages/employee/EmployeeDiaryPage';
 import ManagerSupportPage from '@/pages/management/ManagerSupportPage';
 import OfficerPerformance from '@/pages/management/OfficerPerformance';
+import DataAnalyticsHub from '@/pages/analytics/DataAnalyticsHub';
 import Settings from '@/pages/Settings';
 import Profile from '@/pages/Profile';
 
@@ -382,6 +383,18 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer', 'customerhomanager'] as UserRole[]}>
                 <OfficerPerformance />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'analytics/data-analytics-hub',
+            element: (
+              <ProtectedRoute 
+                allowedRoles={['administrator', 'advantageonehoofficer', 'customerhomanager'] as UserRole[]}
+                accessPath="/analytics/data-analytics-hub"
+                enforcePageAccess={false}
+              >
+                <DataAnalyticsHub />
               </ProtectedRoute>
             ),
           },
