@@ -668,7 +668,7 @@ export default function CRMDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#EFF4FF]">
       <div className="container mx-auto px-1 sm:px-2 md:px-4 lg:px-6 py-2 md:py-4 lg:py-6">
         {/* Header */}
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between bg-white p-2 md:p-4 rounded-lg shadow-sm border border-border/40">

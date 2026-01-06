@@ -70,7 +70,7 @@ const TakeTest = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 w-full overflow-x-hidden">
+    <div className="min-h-screen bg-[#EFF4FF] w-full overflow-x-hidden">
       <div className="container mx-auto px-3 py-3 sm:p-4 md:p-5 lg:p-6 space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6 max-w-full md:max-w-[95%] lg:max-w-7xl">
         {/* Header */}
         <Card className="shadow-sm border border-border/40">
@@ -197,7 +197,7 @@ const TakeTest = () => {
                             </div>
                           </div>
                           
-                          <div className="p-4 bg-slate-50">
+                          <div className="p-4 bg-[#EFF4FF]">
                             <div className="flex items-center justify-between text-sm">
                               <div className="space-y-2">
                                 <div className="flex items-center gap-1.5">
@@ -252,7 +252,7 @@ const TakeTest = () => {
                         </thead>
                         <tbody className="divide-y">
                           {completedTests.map(result => (
-                            <tr key={result.id} className="hover:bg-slate-50">
+                            <tr key={result.id} className="hover:bg-[#EFF4FF]">
                               <td className="px-4 py-3">{result.quizTitle}</td>
                               <td className="px-4 py-3">{formatDate(result.endTime)}</td>
                               <td className="px-4 py-3">

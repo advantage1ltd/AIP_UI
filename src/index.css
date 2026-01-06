@@ -43,6 +43,11 @@
     --sidebar-accent-foreground: 246 5.9% 10%;
     --sidebar-border: 246 13% 91%;
     --sidebar-ring: 246 91.2% 59.8%;
+
+    /* Header colors - #F9F9F9 */
+    --header-bg: 0 0% 97.6%;
+    --header-text: 222.2 84% 4.9%;
+    --header-border: 220 13% 91%;
   }
 
   .dark {
@@ -82,6 +87,11 @@
     --sidebar-accent-foreground: 246 4.8% 95.9%;
     --sidebar-border: 246 3.7% 15.9%;
     --sidebar-ring: 246 91.2% 59.8%;
+
+    /* Header colors - dark mode */
+    --header-bg: 222.2 84% 4.9%;
+    --header-text: 210 40% 98%;
+    --header-border: 217.2 32.6% 17.5%;
   }
 
   input[type="text"],

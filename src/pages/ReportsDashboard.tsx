@@ -463,7 +463,7 @@ const ReportsDashboard = () => {
   )
   
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-[#EFF4FF] p-6">
       <div className="mb-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
@@ -865,7 +865,7 @@ const ReportsDashboard = () => {
                 </div>
               </div>
               
-              <div className="bg-slate-50 p-4 rounded-lg border">
+              <div className="bg-[#EFF4FF] p-4 rounded-lg border">
                 <h3 className="text-sm font-medium mb-2">Executive Summary</h3>
                 <p className="text-sm text-slate-700 mb-3">
                   Your security posture shows moderate risk levels with concerning trends in high-value retail theft. 
@@ -1067,7 +1067,7 @@ const ReportsDashboard = () => {
             </div>
             
             <div className="space-y-4">
-              <div className="bg-slate-50 rounded-lg p-4 border">
+              <div className="bg-[#EFF4FF] rounded-lg p-4 border">
                 <h3 className="text-sm font-semibold mb-3">High-Risk Insights</h3>
                 <div className="space-y-4">
                   <div>
@@ -1836,7 +1836,7 @@ const ReportsDashboard = () => {
                               <div className="h-0.5 w-4 bg-slate-400 mx-auto" />;
                             
                             return (
-                              <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                              <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-[#EFF4FF]'}>
                                 <td className="px-4 py-3 text-sm font-medium text-slate-900">{store.name}</td>
                                 <td className="px-4 py-3 text-sm text-center">{store.incidents}</td>
                                 <td className="px-4 py-3 text-center">
@@ -2145,7 +2145,7 @@ const ReportsDashboard = () => {
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="mt-4 p-3 bg-slate-50 rounded-lg border">
+                    <div className="mt-4 p-3 bg-[#EFF4FF] rounded-lg border">
                       <h4 className="text-sm font-medium mb-2">Effectiveness Analysis</h4>
                       <p className="text-xs text-slate-700">
                         Security guards provide the highest effectiveness but with significant cost implications. CCTV systems
@@ -2513,7 +2513,7 @@ const ReportsDashboard = () => {
                     </div>
                     
                     <div className="lg:col-span-2">
-                      <div className="bg-slate-50 h-full p-4 rounded-lg border">
+                      <div className="bg-[#EFF4FF] h-full p-4 rounded-lg border">
                         <h3 className="text-sm font-medium mb-3">ROI Summary</h3>
                         <div className="space-y-3">
                           <div>

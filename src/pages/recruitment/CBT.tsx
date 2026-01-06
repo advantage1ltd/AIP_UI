@@ -503,7 +503,7 @@ const CBT = () => {
           {currentQuiz.questions.length > 0 ? (
             <div className="divide-y">
               {currentQuiz.questions.map((question, index) => (
-                <div key={question.id} className="p-4 hover:bg-slate-50">
+                <div key={question.id} className="p-4 hover:bg-[#EFF4FF]">
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-2">
@@ -670,7 +670,7 @@ const CBT = () => {
               <tbody className="divide-y">
                 {filteredResults.length > 0 ? (
                   filteredResults.map(result => (
-                    <tr key={result.id} className="hover:bg-slate-50">
+                    <tr key={result.id} className="hover:bg-[#EFF4FF]">
                       <td className="px-4 py-3">{result.officerName}</td>
                       <td className="px-4 py-3">{result.quizTitle}</td>
                       <td className="px-4 py-3">{formatDate(result.endTime)}</td>
@@ -723,7 +723,7 @@ const CBT = () => {
   };
   
   return (
-    <div className="min-h-screen bg-slate-50 w-full overflow-x-hidden">
+    <div className="min-h-screen bg-[#EFF4FF] w-full overflow-x-hidden">
       <div className="container mx-auto px-3 py-3 sm:p-4 md:p-5 lg:p-6 space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6 max-w-full md:max-w-[95%] lg:max-w-7xl">
         {/* Header Card */}
         <Card className="shadow-sm border border-border/40">
@@ -1271,7 +1271,7 @@ const CBT = () => {
                     <CardTitle className="text-base">Feedback & Comments</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="p-3 bg-slate-50 rounded border text-sm">
+                    <div className="p-3 bg-[#EFF4FF] rounded border text-sm">
                       {currentResult.feedback}
                     </div>
                   </CardContent>

@@ -324,7 +324,7 @@ const TestSession = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#EFF4FF] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-slate-600">Loading test...</p>
@@ -335,7 +335,7 @@ const TestSession = () => {
 
   if (!quiz) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#EFF4FF] flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 pb-4 px-6">
             <div className="text-center">
@@ -353,7 +353,7 @@ const TestSession = () => {
   // If the test is finished, show results
   if (showResults && testResult) {
     return (
-      <div className="min-h-screen bg-slate-50 p-4 sm:p-6 md:p-8">
+      <div className="min-h-screen bg-[#EFF4FF] p-4 sm:p-6 md:p-8">
         <Card className="w-full max-w-4xl mx-auto shadow-lg">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -453,7 +453,7 @@ const TestSession = () => {
   // Test intro screen (before starting)
   if (!testStarted) {
     return (
-      <div className="min-h-screen bg-slate-50 p-4 sm:p-6 md:p-8">
+      <div className="min-h-screen bg-[#EFF4FF] p-4 sm:p-6 md:p-8">
         <Card className="w-full max-w-3xl mx-auto shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl sm:text-2xl">{quiz.title}</CardTitle>
@@ -530,7 +530,7 @@ const TestSession = () => {
 
   // Active test view
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#EFF4FF]">
       {/* Timer bar */}
       <div className="fixed top-0 left-0 right-0 bg-white shadow-md z-10">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
@@ -592,7 +592,7 @@ const TestSession = () => {
                 className="space-y-3"
               >
                 {quiz.questions[currentQuestionIndex].options.map((option, index) => (
-                  <div key={index} className="flex items-center space-x-2 border p-3 rounded-md hover:bg-slate-50">
+                  <div key={index} className="flex items-center space-x-2 border p-3 rounded-md hover:bg-[#EFF4FF]">
                     <RadioGroupItem value={option} id={`option-${index}`} />
                     <Label htmlFor={`option-${index}`} className="flex-grow cursor-pointer">{option}</Label>
                   </div>
@@ -607,11 +607,11 @@ const TestSession = () => {
                 onValueChange={(value) => handleAnswerChange(quiz.questions[currentQuestionIndex].id, value)}
                 className="space-y-3"
               >
-                <div className="flex items-center space-x-2 border p-3 rounded-md hover:bg-slate-50">
+                <div className="flex items-center space-x-2 border p-3 rounded-md hover:bg-[#EFF4FF]">
                   <RadioGroupItem value="true" id="true" />
                   <Label htmlFor="true" className="flex-grow cursor-pointer">True</Label>
                 </div>
-                <div className="flex items-center space-x-2 border p-3 rounded-md hover:bg-slate-50">
+                <div className="flex items-center space-x-2 border p-3 rounded-md hover:bg-[#EFF4FF]">
                   <RadioGroupItem value="false" id="false" />
                   <Label htmlFor="false" className="flex-grow cursor-pointer">False</Label>
                 </div>
@@ -646,7 +646,7 @@ const TestSession = () => {
                   <span className="text-sm text-muted-foreground">Select all that apply</span>
                 </div>
                 {quiz.questions[currentQuestionIndex].options.map((option, index) => (
-                  <div key={index} className="flex items-center space-x-2 border p-3 rounded-md hover:bg-slate-50">
+                  <div key={index} className="flex items-center space-x-2 border p-3 rounded-md hover:bg-[#EFF4FF]">
                     <Checkbox 
                       id={`option-${index}`} 
                       checked={

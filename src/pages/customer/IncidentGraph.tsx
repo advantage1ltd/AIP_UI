@@ -833,7 +833,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 	}
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+		<div className="min-h-screen bg-[#EFF4FF]">
 			<div className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8">
 				<div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 p-3 sm:p-4 md:p-8 backdrop-blur-sm border border-white/10">
 					<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 sm:gap-4">

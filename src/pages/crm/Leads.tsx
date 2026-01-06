@@ -363,7 +363,7 @@ export default function Leads() {
 
   // Main component return with optimized layout for mobile
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#EFF4FF]">
       <div className="container mx-auto px-3 py-3 sm:py-4 max-w-full">
         <div className="space-y-3 sm:space-y-4">
           <LeadsHeader 
@@ -422,7 +422,7 @@ export default function Leads() {
                     <>
                       {Object.entries(groupedLeads).map(([group, leads]) => (
                         <div key={group}>
-                          <div className="p-2 bg-slate-50 font-medium text-xs text-primary border-t border-b border-slate-200">
+                          <div className="p-2 bg-[#EFF4FF] font-medium text-xs text-primary border-t border-b border-slate-200">
                             {group}
                           </div>
                           <LeadTable 

@@ -26,10 +26,10 @@ export const COMMON_CLASSES = {
 // Navigation related constants
 export const NOTIFICATION_COUNT = 3;
 export const LOGO_SIZES = {
-  mobile: "h-28",
-  sheet: "h-32",
-  ipad: "h-34",
-  desktop: "h-20"
+  mobile: "h-48",
+  sheet: "h-56",
+  ipad: "h-64",
+  desktop: "h-34"
 } as const;
 
 export const NAVIGATION_ITEMS = [

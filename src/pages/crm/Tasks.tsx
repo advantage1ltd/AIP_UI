@@ -305,7 +305,7 @@ function Tasks() {
   const completionRate = Math.round((taskStats.done / taskStats.total) * 100) || 0
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#EFF4FF]">
       <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6 space-y-3 sm:space-y-4 lg:space-y-6 max-w-[1600px] mx-auto">
         {/* Header with Title and Add Button */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 bg-white p-3 sm:p-4 lg:p-6 rounded-lg shadow-sm border border-border/40">

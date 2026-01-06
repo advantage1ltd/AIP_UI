@@ -107,7 +107,7 @@ export default function EmployeeRegistration() {
   }
 
   return (
-    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-indigo-100/80 via-purple-50/80 to-pink-100/80">
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#EFF4FF]">
       <div className="container mx-auto px-2 md:px-6 lg:px-8 xl:px-10 2xl:px-12 py-4 md:py-6 lg:py-8 xl:py-10 2xl:py-12 space-y-4 md:space-y-6 xl:space-y-8 max-w-screen-2xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 xl:gap-6">
           <div className="space-y-1 xl:space-y-2">

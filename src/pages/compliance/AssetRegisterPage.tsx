@@ -1,652 +1,851 @@
-import React, { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import React, { useState, useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
 } from '@/components/ui/select'
-import { 
-  Search, 
-  Laptop, 
-  Smartphone, 
-  Monitor, 
-  Printer,
-  AlertCircle, 
-  Package, 
-  Pencil, 
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  Plus
+import {
+	Search,
+	Laptop,
+	Smartphone,
+	Monitor,
+	Printer,
+	AlertCircle,
+	Package,
+	Pencil,
+	Trash2,
+	ChevronLeft,
+	ChevronRight,
+	Plus,
+	Loader2,
+	Tablet,
+	HardDrive,
+	Box,
+	Wrench,
+	CheckCircle2,
+	Archive,
+	LayoutGrid,
+	List
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { AssetForm } from '@/components/compliance/AssetForm'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
-
-interface Asset {
-  id: string
-  assetTag: string
-  assetType: 'Laptop' | 'Phone' | 'Tablet' | 'Desktop' | 'Monitor' | 'Printer' | 'Other'
-  make: string
-  model: string
-  serialNumber: string
-  purchaseDate: Date
-  assignedTo?: string
-  location: string
-  status: 'In Use' | 'In Stock' | 'In Repair' | 'Disposed'
-  notes?: string
-}
-
-const sampleData: Asset[] = [
-  {
-    id: '1',
-    assetTag: 'LAP001',
-    assetType: 'Laptop',
-    make: 'Dell',
-    model: 'Latitude 5520',
-    serialNumber: 'DL123456789',
-    purchaseDate: new Date('2023-01-15'),
-    assignedTo: 'John Smith',
-    location: 'Head Office',
-    status: 'In Use',
-    notes: 'Company standard laptop'
-  },
-  {
-    id: '2',
-    assetTag: 'PHN002',
-    assetType: 'Phone',
-    make: 'iPhone',
-    model: '13 Pro',
-    serialNumber: 'IP987654321',
-    purchaseDate: new Date('2023-03-20'),
-    assignedTo: 'Sarah Wilson',
-    location: 'Field',
-    status: 'In Use',
-  },
-  {
-    id: '3',
-    assetTag: 'MON003',
-    assetType: 'Monitor',
-    make: 'Dell',
-    model: 'P2419H',
-    serialNumber: 'MN456789123',
-    purchaseDate: new Date('2023-06-10'),
-    location: 'Storage',
-    status: 'In Stock',
-  }
-]
+import { useToast } from '@/hooks/use-toast'
+import { assetRegisterService } from '@/services/assetRegisterService'
+import type { AssetRegister, AssetStatus, CreateAssetRegisterRequest, UpdateAssetRegisterRequest } from '@/types/assetRegister'
 
 const AssetRegisterPage = () => {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedType, setSelectedType] = useState<string>('all')
-  const [selectedStatus, setSelectedStatus] = useState<string>('all')
-  const [assets, setAssets] = useState<Asset[]>(sampleData)
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const pageSize = 10
+	const queryClient = useQueryClient()
+	const { toast } = useToast()
+	const [searchTerm, setSearchTerm] = useState('')
+	const [selectedType, setSelectedType] = useState<string>('all')
+	const [selectedStatus, setSelectedStatus] = useState<string>('all')
+	const [isFormOpen, setIsFormOpen] = useState(false)
+	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+	const [selectedAsset, setSelectedAsset] = useState<AssetRegister | null>(null)
+	const [currentPage, setCurrentPage] = useState(1)
+	const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
+	const pageSize = 10
 
-  // Calculate statistics
-  const stats = [
-    {
-      title: 'Total Assets',
-      value: assets.length,
-      icon: Package,
-      color: 'bg-indigo-700',
-      iconBg: 'bg-indigo-600/40'
-    },
-    {
-      title: 'In Use',
-      value: assets.filter(a => a.status === 'In Use').length,
-      icon: Laptop,
-      color: 'bg-emerald-700',
-      iconBg: 'bg-emerald-600/40'
-    },
-    {
-      title: 'In Stock',
-      value: assets.filter(a => a.status === 'In Stock').length,
-      icon: Package,
-      color: 'bg-blue-700',
-      iconBg: 'bg-blue-600/40'
-    },
-    {
-      title: 'In Repair',
-      value: assets.filter(a => a.status === 'In Repair').length,
-      icon: AlertCircle,
-      color: 'bg-amber-600',
-      iconBg: 'bg-amber-500/40'
-    }
-  ];
+	// Fetch assets using the API service
+	const { data: assetsResponse, isLoading, error } = useQuery({
+		queryKey: ['assets', currentPage, searchTerm, selectedType, selectedStatus],
+		queryFn: () => assetRegisterService.getAssets({
+			page: currentPage,
+			pageSize,
+			searchTerm: searchTerm || undefined,
+			assetType: selectedType !== 'all' ? selectedType : undefined,
+			status: selectedStatus !== 'all' ? selectedStatus : undefined,
+		}),
+	})
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'In Use':
-        return 'bg-green-100 text-green-800'
-      case 'In Stock':
-        return 'bg-blue-100 text-blue-800'
-      case 'In Repair':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'Disposed':
-        return 'bg-gray-100 text-gray-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
+	// Create asset mutation
+	const createMutation = useMutation({
+		mutationFn: (data: CreateAssetRegisterRequest) => assetRegisterService.createAsset(data),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['assets'] })
+			setIsFormOpen(false)
+			toast({
+				title: 'Asset Created',
+				description: 'The asset has been successfully added to the register.',
+			})
+		},
+		onError: (error: Error) => {
+			toast({
+				title: 'Error',
+				description: error.message || 'Failed to create asset',
+				variant: 'destructive',
+			})
+		},
+	})
 
-  const getAssetTypeIcon = (assetType: string) => {
-    switch (assetType) {
-      case 'Laptop':
-        return <Laptop className="h-5 w-5" />
-      case 'Phone':
-        return <Smartphone className="h-5 w-5" />
-      case 'Monitor':
-        return <Monitor className="h-5 w-5" />
-      case 'Printer':
-        return <Printer className="h-5 w-5" />
-      default:
-        return <Package className="h-5 w-5" />
-    }
-  };
+	// Update asset mutation
+	const updateMutation = useMutation({
+		mutationFn: ({ id, data }: { id: number; data: UpdateAssetRegisterRequest }) =>
+			assetRegisterService.updateAsset(id, data),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['assets'] })
+			setIsFormOpen(false)
+			setSelectedAsset(null)
+			toast({
+				title: 'Asset Updated',
+				description: 'The asset has been successfully updated.',
+			})
+		},
+		onError: (error: Error) => {
+			toast({
+				title: 'Error',
+				description: error.message || 'Failed to update asset',
+				variant: 'destructive',
+			})
+		},
+	})
 
-  const handleAddAsset = (data: any) => {
-    const newAsset: Asset = {
-      id: Date.now().toString(),
-      ...data,
-    }
-    setAssets([...assets, newAsset])
-    setIsFormOpen(false)
-  }
+	// Delete asset mutation
+	const deleteMutation = useMutation({
+		mutationFn: (id: number) => assetRegisterService.deleteAsset(id),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['assets'] })
+			setIsDeleteDialogOpen(false)
+			setSelectedAsset(null)
+			toast({
+				title: 'Asset Deleted',
+				description: 'The asset has been successfully removed from the register.',
+			})
+		},
+		onError: (error: Error) => {
+			toast({
+				title: 'Error',
+				description: error.message || 'Failed to delete asset',
+				variant: 'destructive',
+			})
+		},
+	})
 
-  const handleEditAsset = (data: any) => {
-    if (!selectedAsset) return
-    
-    const updatedAssets = assets.map(asset => 
-      asset.id === selectedAsset.id 
-        ? { ...asset, ...data }
-        : asset
-    )
-    setAssets(updatedAssets)
-    setIsFormOpen(false)
-    setSelectedAsset(null)
-  }
+	const assets = assetsResponse?.items ?? []
+	const stats = assetsResponse?.stats ?? { totalAssets: 0, inUse: 0, inStock: 0, inRepair: 0, disposed: 0, totalValue: 0 }
+	const pagination = assetsResponse?.pagination ?? { currentPage: 1, totalPages: 1, totalCount: 0, pageSize: 10, hasPrevious: false, hasNext: false }
 
-  const handleDeleteAsset = () => {
-    if (!selectedAsset) return
-    
-    const updatedAssets = assets.filter(asset => asset.id !== selectedAsset.id)
-    setAssets(updatedAssets)
-    setIsDeleteDialogOpen(false)
-    setSelectedAsset(null)
-  }
+	// Statistics cards configuration
+	const statCards = [
+		{
+			title: 'Total Assets',
+			value: stats.totalAssets,
+			icon: Package,
+			gradient: 'from-violet-600 to-indigo-600',
+			iconBg: 'bg-white/20',
+			ring: 'ring-violet-500/20'
+		},
+		{
+			title: 'In Use',
+			value: stats.inUse,
+			icon: CheckCircle2,
+			gradient: 'from-emerald-500 to-teal-600',
+			iconBg: 'bg-white/20',
+			ring: 'ring-emerald-500/20'
+		},
+		{
+			title: 'In Stock',
+			value: stats.inStock,
+			icon: Box,
+			gradient: 'from-sky-500 to-blue-600',
+			iconBg: 'bg-white/20',
+			ring: 'ring-sky-500/20'
+		},
+		{
+			title: 'In Repair',
+			value: stats.inRepair,
+			icon: Wrench,
+			gradient: 'from-amber-500 to-orange-600',
+			iconBg: 'bg-white/20',
+			ring: 'ring-amber-500/20'
+		}
+	]
 
-  const openEditForm = (asset: Asset) => {
-    setSelectedAsset(asset)
-    setIsFormOpen(true)
-  }
+	const getStatusConfig = (status: AssetStatus) => {
+		switch (status) {
+			case 'In Use':
+				return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle2 }
+			case 'In Stock':
+				return { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: Box }
+			case 'In Repair':
+				return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Wrench }
+			case 'Disposed':
+				return { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-300', icon: Archive }
+			default:
+				return { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200', icon: Package }
+		}
+	}
 
-  const openDeleteDialog = (asset: Asset) => {
-    setSelectedAsset(asset)
-    setIsDeleteDialogOpen(true)
-  }
+	const getAssetTypeIcon = (assetType: string, className = 'h-5 w-5') => {
+		const iconProps = { className }
+		switch (assetType) {
+			case 'Laptop':
+				return <Laptop {...iconProps} />
+			case 'Phone':
+				return <Smartphone {...iconProps} />
+			case 'Tablet':
+				return <Tablet {...iconProps} />
+			case 'Desktop':
+				return <HardDrive {...iconProps} />
+			case 'Monitor':
+				return <Monitor {...iconProps} />
+			case 'Printer':
+				return <Printer {...iconProps} />
+			default:
+				return <Package {...iconProps} />
+		}
+	}
 
-  // Filter assets
-  const filteredAssets = assets.filter(asset => {
-    const matchesSearch = 
-      asset.assetTag.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (asset.assignedTo?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
-    
-    const matchesType = selectedType === 'all' || asset.assetType === selectedType
-    const matchesStatus = selectedStatus === 'all' || asset.status === selectedStatus
+	const getAssetTypeColor = (assetType: string) => {
+		switch (assetType) {
+			case 'Laptop':
+				return 'bg-violet-100 text-violet-700'
+			case 'Phone':
+				return 'bg-pink-100 text-pink-700'
+			case 'Tablet':
+				return 'bg-cyan-100 text-cyan-700'
+			case 'Desktop':
+				return 'bg-indigo-100 text-indigo-700'
+			case 'Monitor':
+				return 'bg-blue-100 text-blue-700'
+			case 'Printer':
+				return 'bg-orange-100 text-orange-700'
+			default:
+				return 'bg-slate-100 text-slate-700'
+		}
+	}
 
-    return matchesSearch && matchesType && matchesStatus
-  })
+	const handleAddAsset = useCallback((data: {
+		assetTag: string
+		assetType: string
+		make: string
+		model: string
+		serialNumber: string
+		purchaseDate: Date
+		assignedTo?: string
+		location: string
+		status: string
+		notes?: string
+	}) => {
+		const request: CreateAssetRegisterRequest = {
+			assetTag: data.assetTag,
+			assetType: data.assetType,
+			make: data.make,
+			model: data.model,
+			serialNumber: data.serialNumber,
+			purchaseDate: data.purchaseDate.toISOString(),
+			assignedTo: data.assignedTo || undefined,
+			location: data.location,
+			status: data.status,
+			notes: data.notes,
+		}
+		createMutation.mutate(request)
+	}, [createMutation])
 
-  // Pagination
-  const totalPages = Math.ceil(filteredAssets.length / pageSize)
-  const startIndex = (currentPage - 1) * pageSize
-  const paginatedAssets = filteredAssets.slice(startIndex, startIndex + pageSize)
+	const handleEditAsset = useCallback((data: {
+		assetTag: string
+		assetType: string
+		make: string
+		model: string
+		serialNumber: string
+		purchaseDate: Date
+		assignedTo?: string
+		location: string
+		status: string
+		notes?: string
+	}) => {
+		if (!selectedAsset) return
 
-  return (
-    <div className="min-h-screen bg-slate-50 w-full overflow-x-hidden">
-      <div className="container mx-auto px-3 py-3 sm:p-4 md:p-5 lg:p-6 space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6 max-w-full md:max-w-[95%] lg:max-w-7xl">
-        
-        {/* Header Card */}
-        <Card className="shadow-sm border border-border/40">
-          <CardHeader className="pb-3 sm:pb-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
-          <div>
-                <CardTitle className="text-xl sm:text-2xl font-bold text-primary">Asset Register</CardTitle>
-                <CardDescription className="mt-1 text-xs sm:text-sm">Track and manage company assets</CardDescription>
-          </div>
-          <Button 
-            onClick={() => setIsFormOpen(true)}
-                className="w-full sm:w-auto h-9 text-xs sm:text-sm"
-          >
-                <Plus className="h-5 w-5 mr-1 sm:mr-2" />
-                <span className="sm:hidden">Add New</span>
-                <span className="hidden sm:inline">Add New Asset</span>
-          </Button>
-        </div>
-          </CardHeader>
-        </Card>
+		const request: UpdateAssetRegisterRequest = {
+			assetTag: data.assetTag,
+			assetType: data.assetType,
+			make: data.make,
+			model: data.model,
+			serialNumber: data.serialNumber,
+			purchaseDate: data.purchaseDate.toISOString(),
+			assignedTo: data.assignedTo || undefined,
+			location: data.location,
+			status: data.status,
+			notes: data.notes,
+		}
+		updateMutation.mutate({ id: selectedAsset.id, data: request })
+	}, [selectedAsset, updateMutation])
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-          {stats.map((stat, index) => (
-            <Card 
-              key={stat.title} 
-              className={cn(
-                "text-white hover:shadow-lg transition-shadow rounded-lg",
-                stat.color 
-              )}
-            >
-              <CardContent className="pt-3 pb-2 px-3 md:pt-4 md:pb-3 md:px-4">
-              <div className="flex items-center justify-between">
-                <div>
-                    <p className="text-xs md:text-sm font-medium text-white/80">{stat.title}</p>
-                    <p className="text-lg md:text-xl lg:text-2xl font-bold mt-0 md:mt-1">{stat.value}</p>
-                </div>
-                  <div className={cn("p-2 rounded-full", stat.iconBg)}>
-                    <stat.icon className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          ))}
-        </div>
+	const handleDeleteAsset = useCallback(() => {
+		if (!selectedAsset) return
+		deleteMutation.mutate(selectedAsset.id)
+	}, [selectedAsset, deleteMutation])
 
-        {/* Filters Card */}
-        <Card className="border border-border/40 shadow-sm">
-          <CardContent className="pt-3 pb-3 px-3 sm:pt-4 sm:pb-4 sm:px-4">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="relative flex-grow">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search assets..."
-                  className="pl-9 h-9 sm:h-10 w-full"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:gap-3">
-              <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm min-w-[120px]">
-                  <SelectValue placeholder="Asset type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="Laptop">Laptop</SelectItem>
-                  <SelectItem value="Phone">Phone</SelectItem>
-                  <SelectItem value="Tablet">Tablet</SelectItem>
-                  <SelectItem value="Desktop">Desktop</SelectItem>
-                  <SelectItem value="Monitor">Monitor</SelectItem>
-                  <SelectItem value="Printer">Printer</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm min-w-[120px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="In Use">In Use</SelectItem>
-                  <SelectItem value="In Stock">In Stock</SelectItem>
-                  <SelectItem value="In Repair">In Repair</SelectItem>
-                  <SelectItem value="Disposed">Disposed</SelectItem>
-                </SelectContent>
-              </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+	const openEditForm = useCallback((asset: AssetRegister) => {
+		setSelectedAsset(asset)
+		setIsFormOpen(true)
+	}, [])
 
-        {/* Card-based layout for smaller screens */}
-        <div className="block sm:hidden space-y-2">
-          {paginatedAssets.length > 0 ? (
-            paginatedAssets.map((asset) => (
-              <Card key={asset.id} className="overflow-hidden shadow-sm hover:shadow-md transition-all">
-                <CardContent className="p-0">
-                  {/* Header with Asset Tag & Type */}
-                  <div className="flex justify-between items-center p-3 bg-slate-50 border-b">
-                    <div className="flex items-center gap-2">
-                      <Badge className="px-1.5 py-0.5">
-                        {asset.assetType}
-                        </Badge>
-                      <h3 className="font-medium text-sm">{asset.assetTag}</h3>
-                    </div>
-                    <div className="flex gap-1.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditForm(asset)}
-                        className="h-8 w-8 rounded-full p-0 text-blue-600"
-                          >
-                        <Pencil className="h-5 w-5" />
-                        <span className="sr-only">Edit</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openDeleteDialog(asset)}
-                        className="h-8 w-8 rounded-full p-0 text-red-600"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Asset Details */}
-                  <div className="divide-y divide-slate-100">
-                    {/* Make/Model Row */}
-                    <div className="flex items-center p-3">
-                      <div className="w-1/3 text-xs text-slate-500">Make/Model</div>
-                      <div className="w-2/3 text-xs font-medium truncate">{`${asset.make} ${asset.model}`}</div>
-                    </div>
-                    
-                    {/* Serial Number Row */}
-                    <div className="flex items-center p-3">
-                      <div className="w-1/3 text-xs text-slate-500">Serial</div>
-                      <div className="w-2/3 text-xs font-medium truncate">{asset.serialNumber}</div>
-                    </div>
-                    
-                    {/* Status Row */}
-                    <div className="flex items-center p-3">
-                      <div className="w-1/3 text-xs text-slate-500">Status</div>
-                      <div className="w-2/3">
-                        <Badge className={getStatusColor(asset.status)}>
-                          {asset.status}
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    {/* Assigned To Row - if present */}
-                    {asset.assignedTo && (
-                      <div className="flex items-center p-3">
-                        <div className="w-1/3 text-xs text-slate-500">Assigned To</div>
-                        <div className="w-2/3 text-xs truncate">{asset.assignedTo}</div>
-                      </div>
-                    )}
-                    
-                    {/* Location Row */}
-                    <div className="flex items-center p-3">
-                      <div className="w-1/3 text-xs text-slate-500">Location</div>
-                      <div className="w-2/3 text-xs truncate">{asset.location}</div>
-                    </div>
-                    
-                    {/* Purchase Date Row */}
-                    <div className="flex items-center p-3">
-                      <div className="w-1/3 text-xs text-slate-500">Purchased</div>
-                      <div className="w-2/3 text-xs">{format(asset.purchaseDate, 'dd/MM/yyyy')}</div>
-                    </div>
-                    
-                    {/* Notes Row - if present */}
-                    {asset.notes && (
-                      <div className="p-3">
-                        <div className="text-xs text-slate-500 mb-1">Notes</div>
-                        <div className="text-xs">{asset.notes}</div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <div className="text-center py-8 px-4 bg-white rounded-lg border border-border/40 shadow-sm">
-              <p className="text-sm text-slate-500">No assets found matching your search.</p>
-            </div>
-          )}
-          
-          {/* Mobile Pagination */}
-          {totalPages > 1 && (
-            <div className="py-3 flex flex-col items-center gap-2">
-              <div className="text-xs text-slate-500">
-                Showing {startIndex + 1}-{Math.min(startIndex + pageSize, filteredAssets.length)} of {filteredAssets.length}
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-                {[
-                  ...currentPage > 2 ? [1] : [],
-                  ...currentPage > 3 ? [-1] : [],
-                  ...Array.from(
-                    { length: Math.min(3, totalPages) },
-                    (_, i) => Math.min(Math.max(currentPage - 1 + i, 1 + (currentPage > 2 ? 1 : 0) + (currentPage > 3 ? 1 : 0)), totalPages - (currentPage < totalPages - 2 ? 1 : 0) - (currentPage < totalPages - 3 ? 1 : 0))
-                  ),
-                  ...currentPage < totalPages - 2 ? [-2] : [],
-                  ...currentPage < totalPages - 1 ? [totalPages] : []
-                ].map((page, i) => 
-                  page < 0 ? (
-                    <span key={`ellipsis-${i}`} className="h-8 w-8 flex items-center justify-center text-xs text-slate-400">...</span>
-                  ) : (
-                    <Button
-                      key={page}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(page)}
-                      className={`h-8 w-8 p-0 ${currentPage === page ? 'bg-primary text-primary-foreground' : ''}`}
-                    >
-                      {page}
-                    </Button>
-                  )
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+	const openDeleteDialog = useCallback((asset: AssetRegister) => {
+		setSelectedAsset(asset)
+		setIsDeleteDialogOpen(true)
+	}, [])
 
-        {/* Table layout for iPad and larger screens */}
-        <Card className="hidden sm:block border border-border/40 shadow-sm overflow-hidden">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto scrollbar-thin">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-100 text-slate-600">
-                  <tr>
-                    <th className="px-2 md:px-3 lg:px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Asset Tag</th>
-                    <th className="px-2 md:px-3 lg:px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Type</th>
-                    <th className="px-2 md:px-3 lg:px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Make/Model</th>
-                    <th className="hidden md:table-cell px-2 md:px-3 lg:px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Serial</th>
-                    <th className="hidden lg:table-cell px-2 md:px-3 lg:px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Purchase</th>
-                    <th className="px-2 md:px-3 lg:px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Assigned</th>
-                    <th className="hidden lg:table-cell px-2 md:px-3 lg:px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Location</th>
-                    <th className="px-2 md:px-3 lg:px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Status</th>
-                    <th className="px-2 md:px-3 lg:px-4 py-3 text-center md:text-right text-xs font-semibold uppercase tracking-wider w-[100px] md:w-[110px] lg:w-[150px]">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {paginatedAssets.length > 0 ? (
-                    paginatedAssets.map((asset) => (
-                      <tr key={asset.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-2 md:px-3 lg:px-4 py-3 whitespace-nowrap font-medium">{asset.assetTag}</td>
-                        <td className="px-2 md:px-3 lg:px-4 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-slate-600">
-                              {getAssetTypeIcon(asset.assetType)}
-                            </span>
-                            <span className="hidden md:inline">{asset.assetType}</span>
-                          </div>
-                        </td>
-                        <td className="px-2 md:px-3 lg:px-4 py-3 whitespace-nowrap">{`${asset.make} ${asset.model}`}</td>
-                        <td className="hidden md:table-cell px-2 md:px-3 lg:px-4 py-3 whitespace-nowrap font-mono text-xs">{asset.serialNumber}</td>
-                        <td className="hidden lg:table-cell px-2 md:px-3 lg:px-4 py-3 whitespace-nowrap">{format(asset.purchaseDate, 'dd/MM/yyyy')}</td>
-                        <td className="px-2 md:px-3 lg:px-4 py-3 whitespace-nowrap">{asset.assignedTo || '-'}</td>
-                        <td className="hidden lg:table-cell px-2 md:px-3 lg:px-4 py-3 whitespace-nowrap">{asset.location}</td>
-                        <td className="px-2 md:px-3 lg:px-4 py-3 whitespace-nowrap">
-                          <Badge className={getStatusColor(asset.status)}>
-                            {asset.status}
-                          </Badge>
-                        </td>
-                        <td className="px-2 md:px-3 lg:px-4 py-3 whitespace-nowrap text-center md:text-right">
-                          <div className="inline-flex items-center gap-2 ml-auto">
-                            <Button
-                              variant="outline"
-                              onClick={() => openEditForm(asset)}
-                              className="bg-blue-50 hover:bg-blue-100 border-blue-200 h-9 w-9 md:w-10 lg:w-[75px] flex items-center justify-center gap-1"
-                            >
-                              <Pencil className="h-5 w-5 md:h-6 md:w-6 text-blue-600" strokeWidth={2} />
-                              <span className="hidden lg:inline text-xs text-blue-600">Edit</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => openDeleteDialog(asset)}
-                              className="bg-red-50 hover:bg-red-100 border-red-200 h-9 w-9 md:w-10 lg:w-[75px] flex items-center justify-center gap-1"
-                            >
-                              <Trash2 className="h-5 w-5 md:h-6 md:w-6 text-red-600" strokeWidth={2} />
-                              <span className="hidden lg:inline text-xs text-red-600">Delete</span>
-                          </Button>
-                        </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={9} className="text-center py-10 text-sm text-slate-500">
-                        No assets found matching your search.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+	// Transform selected asset for form
+	const getFormInitialData = useCallback(() => {
+		if (!selectedAsset) return undefined
+		return {
+			assetTag: selectedAsset.assetTag,
+			assetType: selectedAsset.assetType as 'Laptop' | 'Phone' | 'Tablet' | 'Desktop' | 'Monitor' | 'Printer' | 'Other',
+			make: selectedAsset.make,
+			model: selectedAsset.model,
+			serialNumber: selectedAsset.serialNumber,
+			purchaseDate: parseISO(selectedAsset.purchaseDate),
+			assignedTo: selectedAsset.assignedTo || '',
+			location: selectedAsset.location,
+			status: selectedAsset.status as 'In Use' | 'In Stock' | 'In Repair' | 'Disposed',
+			notes: selectedAsset.notes || '',
+		}
+	}, [selectedAsset])
 
-            {/* Tablet/Desktop Pagination */}
-            {totalPages > 1 && (
-              <div className="border-t border-slate-200 px-3 py-3 sm:px-3 md:px-4">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-                  <div className="text-xs text-slate-500 order-2 sm:order-1">
-                    Showing {startIndex + 1}-{Math.min(startIndex + pageSize, filteredAssets.length)} of {filteredAssets.length}
-                </div>
-                  <div className="flex items-center gap-1 order-1 sm:order-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                      className="h-9 w-9 p-0"
-                  >
-                      <ChevronLeft className="h-5 w-5" />
-                  </Button>
-                    {totalPages <= 5 ? (
-                      // Show all pages if 5 or fewer
-                      Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <Button
-                        key={page}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(page)}
-                          className={`h-9 w-9 p-0 ${currentPage === page ? 'bg-primary text-primary-foreground' : ''}`}
-                        >
-                          {page}
-                        </Button>
-                      ))
-                    ) : (
-                      // Show limited pages with ellipsis for larger page counts
-                      <>
-                        {[
-                          1,
-                          currentPage > 3 ? '...' : 2,
-                          currentPage > 2 && currentPage < totalPages - 1 ? currentPage : null,
-                          currentPage < totalPages - 2 ? '...' : totalPages - 1,
-                          totalPages
-                        ].filter(Boolean).map((page, i) => 
-                          page === '...' ? (
-                            <span key={`ellipsis-${i}`} className="h-9 w-9 flex items-center justify-center text-xs text-slate-400">...</span>
-                          ) : (
-                            <Button
-                              key={page}
-                              variant={currentPage === page ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => typeof page === 'number' && setCurrentPage(page)}
-                              className={`h-9 w-9 p-0 ${currentPage === page ? 'bg-primary text-primary-foreground' : ''}`}
-                      >
-                        {page}
-                      </Button>
-                          )
-                        )}
-                      </>
-                    )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                      className="h-9 w-9 p-0"
-                  >
-                      <ChevronRight className="h-5 w-5" />
-                  </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+	if (error) {
+		return (
+			<div className="min-h-screen bg-[#EFF4FF] p-4 sm:p-6">
+				<div className="max-w-2xl mx-auto">
+					<Card className="border-red-200 bg-red-50/50 shadow-lg">
+						<CardContent className="pt-8 pb-8">
+							<div className="flex flex-col items-center text-center gap-4">
+								<div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center">
+									<AlertCircle className="h-8 w-8 text-red-600" />
+								</div>
+								<div>
+									<h3 className="font-semibold text-lg text-red-800">Error loading assets</h3>
+									<p className="text-sm text-red-600 mt-1">{(error as Error).message}</p>
+								</div>
+								<Button
+									variant="outline"
+									className="mt-2 border-red-200 text-red-700 hover:bg-red-100"
+									onClick={() => queryClient.invalidateQueries({ queryKey: ['assets'] })}
+								>
+									Try Again
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				</div>
+			</div>
+		)
+	}
 
-      {/* Forms and Dialogs */}
-      <AssetForm
-        open={isFormOpen}
-        onClose={() => {
-          setIsFormOpen(false)
-          setSelectedAsset(null)
-        }}
-        onSubmit={selectedAsset ? handleEditAsset : handleAddAsset}
-        initialData={selectedAsset || undefined}
-      />
+	return (
+		<div className="min-h-screen bg-[#EFF4FF]">
+			<div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6 max-w-7xl">
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete this asset record.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteAsset} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  )
+				{/* Header Section */}
+				<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+					<div className="space-y-1">
+						<h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-slate-900 via-slate-700 to-slate-800 bg-clip-text text-transparent">
+							Asset Register
+						</h1>
+						<p className="text-slate-500 text-sm sm:text-base">
+							Track and manage your company's assets inventory
+						</p>
+					</div>
+					<Button
+						onClick={() => {
+							setSelectedAsset(null)
+							setIsFormOpen(true)
+						}}
+						className="w-full lg:w-auto bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/30 hover:-translate-y-0.5"
+					>
+						<Plus className="h-5 w-5 mr-2" />
+						Add New Asset
+					</Button>
+				</div>
+
+				{/* Statistics Cards */}
+				<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+					{statCards.map((stat, index) => (
+						<Card
+							key={stat.title}
+							className={cn(
+								'relative overflow-hidden border-0 shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1',
+								`ring-1 ${stat.ring}`
+							)}
+							style={{ animationDelay: `${index * 100}ms` }}
+						>
+							<div className={cn('absolute inset-0 bg-gradient-to-br opacity-95', stat.gradient)} />
+							<CardContent className="relative pt-5 pb-4 px-5">
+								<div className="flex items-center justify-between">
+									<div className="space-y-1">
+										<p className="text-xs sm:text-sm font-medium text-white/80">{stat.title}</p>
+										<p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{stat.value}</p>
+									</div>
+									<div className={cn('p-3 rounded-xl', stat.iconBg)}>
+										<stat.icon className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+									</div>
+								</div>
+							</CardContent>
+						</Card>
+					))}
+				</div>
+
+				{/* Filters Section */}
+				<Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+					<CardContent className="p-4">
+						<div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-4">
+							{/* Search */}
+							<div className="relative flex-grow">
+								<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+								<Input
+									type="text"
+									placeholder="Search by tag, make, model, or assignee..."
+									className="pl-10 h-11 bg-slate-50/50 border-slate-200 focus:bg-white transition-colors"
+									value={searchTerm}
+									onChange={(e) => {
+										setSearchTerm(e.target.value)
+										setCurrentPage(1)
+									}}
+								/>
+							</div>
+
+							{/* Filters */}
+							<div className="flex flex-wrap gap-3">
+								<Select value={selectedType} onValueChange={(value) => {
+									setSelectedType(value)
+									setCurrentPage(1)
+								}}>
+									<SelectTrigger className="w-full sm:w-[160px] h-11 bg-slate-50/50 border-slate-200">
+										<SelectValue placeholder="Asset type" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="all">All Types</SelectItem>
+										<SelectItem value="Laptop">Laptop</SelectItem>
+										<SelectItem value="Phone">Phone</SelectItem>
+										<SelectItem value="Tablet">Tablet</SelectItem>
+										<SelectItem value="Desktop">Desktop</SelectItem>
+										<SelectItem value="Monitor">Monitor</SelectItem>
+										<SelectItem value="Printer">Printer</SelectItem>
+										<SelectItem value="Other">Other</SelectItem>
+									</SelectContent>
+								</Select>
+								<Select value={selectedStatus} onValueChange={(value) => {
+									setSelectedStatus(value)
+									setCurrentPage(1)
+								}}>
+									<SelectTrigger className="w-full sm:w-[140px] h-11 bg-slate-50/50 border-slate-200">
+										<SelectValue placeholder="Status" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="all">All Status</SelectItem>
+										<SelectItem value="In Use">In Use</SelectItem>
+										<SelectItem value="In Stock">In Stock</SelectItem>
+										<SelectItem value="In Repair">In Repair</SelectItem>
+										<SelectItem value="Disposed">Disposed</SelectItem>
+									</SelectContent>
+								</Select>
+
+								{/* View Toggle - Desktop only */}
+								<div className="hidden lg:flex border rounded-lg p-1 bg-slate-100/50">
+									<Button
+										variant="ghost"
+										size="sm"
+										className={cn(
+											'h-9 px-3',
+											viewMode === 'table' && 'bg-white shadow-sm'
+										)}
+										onClick={() => setViewMode('table')}
+									>
+										<List className="h-4 w-4" />
+									</Button>
+									<Button
+										variant="ghost"
+										size="sm"
+										className={cn(
+											'h-9 px-3',
+											viewMode === 'grid' && 'bg-white shadow-sm'
+										)}
+										onClick={() => setViewMode('grid')}
+									>
+										<LayoutGrid className="h-4 w-4" />
+									</Button>
+								</div>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+
+				{/* Loading State */}
+				{isLoading && (
+					<Card className="border-0 shadow-md">
+						<CardContent className="py-16">
+							<div className="flex flex-col items-center justify-center gap-4">
+								<div className="relative">
+									<div className="h-16 w-16 rounded-full border-4 border-violet-100 animate-pulse" />
+									<Loader2 className="h-8 w-8 text-violet-600 animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+								</div>
+								<p className="text-slate-500 font-medium">Loading assets...</p>
+							</div>
+						</CardContent>
+					</Card>
+				)}
+
+				{/* Empty State */}
+				{!isLoading && assets.length === 0 && (
+					<Card className="border-0 shadow-md bg-gradient-to-br from-slate-50 to-white">
+						<CardContent className="py-16">
+							<div className="flex flex-col items-center text-center gap-4 max-w-sm mx-auto">
+								<div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center">
+									<Package className="h-10 w-10 text-violet-500" />
+								</div>
+								<div className="space-y-2">
+									<h3 className="text-xl font-semibold text-slate-900">No assets found</h3>
+									<p className="text-slate-500">
+										{searchTerm || selectedType !== 'all' || selectedStatus !== 'all'
+											? 'Try adjusting your search or filter criteria to find what you\'re looking for.'
+											: 'Get started by adding your first asset to the register.'}
+									</p>
+								</div>
+								{!searchTerm && selectedType === 'all' && selectedStatus === 'all' && (
+									<Button
+										onClick={() => {
+											setSelectedAsset(null)
+											setIsFormOpen(true)
+										}}
+										className="mt-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+									>
+										<Plus className="h-5 w-5 mr-2" />
+										Add Your First Asset
+									</Button>
+								)}
+							</div>
+						</CardContent>
+					</Card>
+				)}
+
+				{/* Grid View - All Screen Sizes */}
+				{!isLoading && assets.length > 0 && (viewMode === 'grid' || window.innerWidth < 640) && (
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+						{assets.map((asset) => {
+							const statusConfig = getStatusConfig(asset.status)
+							return (
+								<Card
+									key={asset.id}
+									className="group border-0 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden"
+								>
+									<CardContent className="p-0">
+										{/* Header */}
+										<div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-100">
+											<div className="flex items-start justify-between gap-3">
+												<div className="flex items-center gap-3">
+													<div className={cn('p-2.5 rounded-xl', getAssetTypeColor(asset.assetType))}>
+														{getAssetTypeIcon(asset.assetType, 'h-5 w-5')}
+													</div>
+													<div>
+														<h3 className="font-bold text-slate-900">{asset.assetTag}</h3>
+														<p className="text-xs text-slate-500">{asset.assetType}</p>
+													</div>
+												</div>
+												<Badge className={cn('border', statusConfig.bg, statusConfig.text, statusConfig.border)}>
+													{asset.status}
+												</Badge>
+											</div>
+										</div>
+
+										{/* Body */}
+										<div className="p-4 space-y-3">
+											<div className="flex items-center justify-between">
+												<span className="text-sm font-medium text-slate-900">{asset.make} {asset.model}</span>
+											</div>
+
+											<div className="grid grid-cols-2 gap-3 text-sm">
+												<div>
+													<p className="text-xs text-slate-400 uppercase tracking-wide">Serial</p>
+													<p className="font-mono text-xs text-slate-600 truncate">{asset.serialNumber}</p>
+												</div>
+												<div>
+													<p className="text-xs text-slate-400 uppercase tracking-wide">Location</p>
+													<p className="text-slate-600 truncate">{asset.location}</p>
+												</div>
+											</div>
+
+											{asset.assignedTo && (
+												<div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+													<div className="h-7 w-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center text-xs font-medium text-white">
+														{asset.assignedTo.charAt(0).toUpperCase()}
+													</div>
+													<span className="text-sm text-slate-600 truncate">{asset.assignedTo}</span>
+												</div>
+											)}
+										</div>
+
+										{/* Actions */}
+										<div className="px-4 pb-4 flex gap-2">
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => openEditForm(asset)}
+												className="flex-1 h-9 border-slate-200 hover:bg-violet-50 hover:text-violet-700 hover:border-violet-200 transition-colors"
+											>
+												<Pencil className="h-4 w-4 mr-1.5" />
+												Edit
+											</Button>
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => openDeleteDialog(asset)}
+												className="h-9 px-3 border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+											>
+												<Trash2 className="h-4 w-4" />
+											</Button>
+										</div>
+									</CardContent>
+								</Card>
+							)
+						})}
+					</div>
+				)}
+
+				{/* Table View - Large Screens */}
+				{!isLoading && assets.length > 0 && viewMode === 'table' && (
+					<Card className="hidden sm:block border-0 shadow-md overflow-hidden">
+						<div className="overflow-x-auto">
+							<table className="w-full">
+								<thead>
+									<tr className="bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-200">
+										<th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Asset</th>
+										<th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Make/Model</th>
+										<th className="hidden md:table-cell px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Serial</th>
+										<th className="hidden lg:table-cell px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Location</th>
+										<th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Assigned</th>
+										<th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+										<th className="px-4 py-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider w-[120px]">Actions</th>
+									</tr>
+								</thead>
+								<tbody className="divide-y divide-slate-100">
+									{assets.map((asset, index) => {
+										const statusConfig = getStatusConfig(asset.status)
+										return (
+											<tr
+												key={asset.id}
+												className="group hover:bg-slate-50/50 transition-colors"
+												style={{ animationDelay: `${index * 50}ms` }}
+											>
+												<td className="px-4 py-4">
+													<div className="flex items-center gap-3">
+														<div className={cn('p-2 rounded-lg', getAssetTypeColor(asset.assetType))}>
+															{getAssetTypeIcon(asset.assetType, 'h-4 w-4')}
+														</div>
+														<div>
+															<p className="font-semibold text-slate-900">{asset.assetTag}</p>
+															<p className="text-xs text-slate-500">{asset.assetType}</p>
+														</div>
+													</div>
+												</td>
+												<td className="px-4 py-4">
+													<p className="text-slate-900">{asset.make} {asset.model}</p>
+													<p className="text-xs text-slate-500 lg:hidden">{asset.serialNumber}</p>
+												</td>
+												<td className="hidden md:table-cell px-4 py-4">
+													<code className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600">{asset.serialNumber}</code>
+												</td>
+												<td className="hidden lg:table-cell px-4 py-4 text-slate-600">{asset.location}</td>
+												<td className="px-4 py-4">
+													{asset.assignedTo ? (
+														<div className="flex items-center gap-2">
+															<div className="h-7 w-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center text-xs font-medium text-white">
+																{asset.assignedTo.charAt(0).toUpperCase()}
+															</div>
+															<span className="text-sm text-slate-700 truncate max-w-[120px]">{asset.assignedTo}</span>
+														</div>
+													) : (
+														<span className="text-slate-400 text-sm">Unassigned</span>
+													)}
+												</td>
+												<td className="px-4 py-4">
+													<Badge className={cn('border font-medium', statusConfig.bg, statusConfig.text, statusConfig.border)}>
+														<statusConfig.icon className="h-3 w-3 mr-1" />
+														{asset.status}
+													</Badge>
+												</td>
+												<td className="px-4 py-4">
+													<div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+														<Button
+															variant="ghost"
+															size="sm"
+															onClick={() => openEditForm(asset)}
+															className="h-8 w-8 p-0 hover:bg-violet-100 hover:text-violet-700"
+														>
+															<Pencil className="h-4 w-4" />
+														</Button>
+														<Button
+															variant="ghost"
+															size="sm"
+															onClick={() => openDeleteDialog(asset)}
+															className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+														>
+															<Trash2 className="h-4 w-4" />
+														</Button>
+													</div>
+												</td>
+											</tr>
+										)
+									})}
+								</tbody>
+							</table>
+						</div>
+
+						{/* Pagination */}
+						{pagination.totalPages > 1 && (
+							<div className="px-4 py-4 border-t border-slate-100 bg-slate-50/50">
+								<div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+									<p className="text-sm text-slate-500">
+										Showing <span className="font-medium text-slate-700">{((pagination.currentPage - 1) * pagination.pageSize) + 1}</span> to{' '}
+										<span className="font-medium text-slate-700">{Math.min(pagination.currentPage * pagination.pageSize, pagination.totalCount)}</span> of{' '}
+										<span className="font-medium text-slate-700">{pagination.totalCount}</span> assets
+									</p>
+									<div className="flex items-center gap-2">
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+											disabled={!pagination.hasPrevious}
+											className="h-9 px-3"
+										>
+											<ChevronLeft className="h-4 w-4 mr-1" />
+											Previous
+										</Button>
+										<div className="hidden sm:flex items-center gap-1">
+											{Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+												const page = i + 1
+												return (
+													<Button
+														key={page}
+														variant={currentPage === page ? 'default' : 'outline'}
+														size="sm"
+														onClick={() => setCurrentPage(page)}
+														className={cn(
+															'h-9 w-9 p-0',
+															currentPage === page && 'bg-violet-600 hover:bg-violet-700'
+														)}
+													>
+														{page}
+													</Button>
+												)
+											})}
+										</div>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => setCurrentPage((prev) => Math.min(pagination.totalPages, prev + 1))}
+											disabled={!pagination.hasNext}
+											className="h-9 px-3"
+										>
+											Next
+											<ChevronRight className="h-4 w-4 ml-1" />
+										</Button>
+									</div>
+								</div>
+							</div>
+						)}
+					</Card>
+				)}
+
+				{/* Mobile Pagination */}
+				{!isLoading && assets.length > 0 && pagination.totalPages > 1 && (
+					<div className="sm:hidden flex flex-col items-center gap-3 py-4">
+						<p className="text-sm text-slate-500">
+							Page {currentPage} of {pagination.totalPages}
+						</p>
+						<div className="flex items-center gap-3">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+								disabled={!pagination.hasPrevious}
+								className="h-10 px-4"
+							>
+								<ChevronLeft className="h-4 w-4 mr-1" />
+								Previous
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setCurrentPage((prev) => Math.min(pagination.totalPages, prev + 1))}
+								disabled={!pagination.hasNext}
+								className="h-10 px-4"
+							>
+								Next
+								<ChevronRight className="h-4 w-4 ml-1" />
+							</Button>
+						</div>
+					</div>
+				)}
+			</div>
+
+			{/* Forms and Dialogs */}
+			<AssetForm
+				open={isFormOpen}
+				onClose={() => {
+					setIsFormOpen(false)
+					setSelectedAsset(null)
+				}}
+				onSubmit={selectedAsset ? handleEditAsset : handleAddAsset}
+				initialData={getFormInitialData()}
+				isLoading={createMutation.isPending || updateMutation.isPending}
+			/>
+
+			<AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+				<AlertDialogContent className="sm:max-w-md">
+					<AlertDialogHeader>
+						<div className="flex items-center gap-4">
+							<div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+								<Trash2 className="h-6 w-6 text-red-600" />
+							</div>
+							<div>
+								<AlertDialogTitle>Delete Asset</AlertDialogTitle>
+								<AlertDialogDescription className="mt-1">
+									This will permanently remove <span className="font-medium text-slate-700">{selectedAsset?.assetTag}</span> from the register.
+								</AlertDialogDescription>
+							</div>
+						</div>
+					</AlertDialogHeader>
+					<AlertDialogFooter className="mt-4">
+						<AlertDialogCancel disabled={deleteMutation.isPending} className="border-slate-200">
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={handleDeleteAsset}
+							disabled={deleteMutation.isPending}
+							className="bg-red-600 hover:bg-red-700 text-white"
+						>
+							{deleteMutation.isPending ? (
+								<>
+									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+									Deleting...
+								</>
+							) : (
+								'Delete Asset'
+							)}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+		</div>
+	)
 }
 
 export default AssetRegisterPage

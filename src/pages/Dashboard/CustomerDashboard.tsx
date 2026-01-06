@@ -448,7 +448,7 @@ const CustomerDashboard = ({ userRole }: CustomerDashboardProps) => {
   const metrics = siteData?.metrics?.[userRole] || [];
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <main className="min-h-screen bg-[#EFF4FF]">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-[90rem] py-4 sm:py-6 lg:py-8">
         <header className="mb-6 sm:mb-8">
           <DashboardGreeting className="mb-6" />

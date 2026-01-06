@@ -1,10 +1,23 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import type { Customer, CustomerPageId } from "@/types/customer"
 import { CUSTOMER_PAGES } from "@/config/customerPages"
 import { cn } from "@/lib/utils"
-import { FileText, ClipboardList, Shield, Star, Calendar, Wrench, BarChart, FileCheck, Building, ArrowLeft } from "lucide-react"
+import { 
+  FileText, 
+  ClipboardList, 
+  Shield, 
+  Star, 
+  BarChart, 
+  Building2, 
+  ArrowLeft,
+  ChevronRight,
+  Loader2,
+  FileBarChart,
+  AlertCircle
+} from "lucide-react"
 import { customerPageAccessCache } from "@/services/customerPageAccessCache"
 import type { CustomerPageAccessPage } from "@/api/customerPageAccess"
 
@@ -85,62 +98,99 @@ export function CustomerReportingSection({ customers, onNavigate }: CustomerRepo
   if (selectedCustomer) {
     return (
       <div className="space-y-6">
+        {/* Header with back button */}
         <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={handleBack} className="gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleBack} 
+            className="gap-2 bg-white hover:bg-gray-50"
+          >
             <ArrowLeft className="h-4 w-4" />
-            Back to Customers
+            Back
           </Button>
-          <h2 className="text-xl font-semibold">{selectedCustomer.companyName}</h2>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+              <Building2 className="h-5 w-5 text-indigo-600" />
+            </div>
+            <span className="text-lg font-semibold text-gray-900">{selectedCustomer.companyName}</span>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Available Reports</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pageState.isLoading && (
-                <div className="col-span-full text-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">Loading assigned pages...</p>
-                </div>
+        {/* Reports Card */}
+        <Card className="border-0 shadow-md bg-white overflow-hidden">
+          <CardHeader className="border-b bg-gradient-to-r from-gray-50 to-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileBarChart className="h-5 w-5 text-blue-600" />
+                <CardTitle className="text-base">Available Reports</CardTitle>
+              </div>
+              {!pageState.isLoading && !pageState.error && (
+                <Badge className="bg-emerald-100 text-emerald-700 border-0">
+                  {pageState.pages.length} reports
+                </Badge>
               )}
-
-              {!pageState.isLoading && pageState.error && (
-                <div className="col-span-full text-center py-8 text-destructive text-sm">
-                  {pageState.error}
-                </div>
-              )}
-
-              {!pageState.isLoading && !pageState.error && pageState.pages.map(page => {
-                const pageKey = resolvePageKey(page)
-                const Icon = pageKey ? (PAGE_ICONS[pageKey as keyof typeof PAGE_ICONS] || FileText) : FileText
-                return (
-                  <Button
-                    key={page.pageId}
-                    variant="outline"
-                    className={cn(
-                      "h-auto p-4 flex flex-col items-center text-center gap-2",
-                      "hover:bg-purple-50 hover:border-purple-200 transition-colors"
-                    )}
-                    onClick={() => onNavigate(String(selectedCustomer.id), (pageKey ?? page.pageId) as CustomerPageId)}
-                  >
-                    <Icon className="h-6 w-6 text-purple-600" />
-                    <div>
-                      <h3 className="font-medium">{page.title}</h3>
-                      <p className="text-sm text-gray-500 mt-1">{page.description}</p>
-                    </div>
-                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                      Assigned
-                    </span>
-                  </Button>
-                )
-              })}
             </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            {pageState.isLoading && (
+              <div className="text-center py-12">
+                <Loader2 className="h-10 w-10 text-blue-600 animate-spin mx-auto mb-4" />
+                <p className="text-gray-600">Loading assigned pages...</p>
+              </div>
+            )}
+
+            {!pageState.isLoading && pageState.error && (
+              <div className="text-center py-12">
+                <div className="h-16 w-16 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="h-8 w-8 text-red-600" />
+                </div>
+                <p className="text-red-600">{pageState.error}</p>
+              </div>
+            )}
+
+            {!pageState.isLoading && !pageState.error && pageState.pages.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pageState.pages.map(page => {
+                  const pageKey = resolvePageKey(page)
+                  const Icon = pageKey ? (PAGE_ICONS[pageKey as keyof typeof PAGE_ICONS] || FileText) : FileText
+                  return (
+                    <Card
+                      key={page.pageId}
+                      className="cursor-pointer border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 group"
+                      onClick={() => onNavigate(String(selectedCustomer.id), (pageKey ?? page.pageId) as CustomerPageId)}
+                    >
+                      <CardContent className="p-5">
+                        <div className="flex items-start gap-4">
+                          <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center group-hover:from-blue-200 group-hover:to-indigo-200 transition-colors flex-shrink-0">
+                            <Icon className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">
+                              {page.title}
+                            </h3>
+                            <p className="text-sm text-gray-500 line-clamp-2">{page.description}</p>
+                            <Badge className="mt-2 bg-emerald-100 text-emerald-700 border-0 text-xs">
+                              Assigned
+                            </Badge>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0 mt-1" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
 
             {!pageState.isLoading && !pageState.error && pageState.pages.length === 0 && (
-              <div className="text-center py-8 text-sm text-muted-foreground">
-                This customer has no assigned pages.
+              <div className="text-center py-12">
+                <div className="h-16 w-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                  <FileText className="h-8 w-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Assigned Pages</h3>
+                <p className="text-gray-500">
+                  This customer has no assigned pages.
+                </p>
               </div>
             )}
           </CardContent>
@@ -151,38 +201,72 @@ export function CustomerReportingSection({ customers, onNavigate }: CustomerRepo
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Customer Reporting</h2>
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+          <FileBarChart className="h-6 w-6 text-white" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Customer Reporting</h2>
+          <p className="text-gray-500 text-sm">Select a customer to view available reports</p>
+        </div>
       </div>
 
+      {/* Customer Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {customers.map(customer => {
-          // Get enabled pages count from pageAssignments if available, fallback to viewConfig
+          const reportCount = customer.pageAssignments 
+            ? Object.entries(customer.pageAssignments).filter(([_, assignment]) => (assignment as any).enabled).length
+            : customer.viewConfig?.enabledPages?.length || 0
+
           return (
-            <Button
+            <Card 
               key={customer.id}
-              variant="outline"
-              className={cn(
-                "h-auto p-4 flex flex-col items-center text-center gap-2",
-                "hover:bg-purple-50 hover:border-purple-200 transition-colors"
-              )}
+              className="cursor-pointer border border-gray-200 hover:border-indigo-300 hover:shadow-lg transition-all duration-200 group"
               onClick={() => handleCustomerSelect(customer)}
             >
-              <Building className="h-6 w-6 text-purple-600" />
-              <div>
-                <h3 className="font-medium">{customer.companyName}</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  {customer.address.town}, {customer.address.county}
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center group-hover:from-indigo-200 group-hover:to-purple-200 transition-colors">
+                    <Building2 className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  <Badge variant="outline" className="text-xs bg-gray-50">
+                    ID: {customer.id}
+                  </Badge>
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2 group-hover:text-indigo-600 transition-colors">
+                  {customer.companyName}
+                </h3>
+                <p className="text-sm text-gray-500 mb-4 line-clamp-1">
+                  {customer.address?.town}, {customer.address?.county}
                 </p>
-                <p className="text-xs text-purple-600 mt-1">
-                  {customer.pageAssignments ? Object.entries(customer.pageAssignments).filter(([_, assignment]) => (assignment as any).enabled).length
-                    : customer.viewConfig?.enabledPages?.length || 0} Reports Available
-                </p>
-              </div>
-            </Button>
+                <div className="flex items-center justify-between">
+                  <Badge className="bg-emerald-100 text-emerald-700 border-0">
+                    {reportCount} Reports
+                  </Badge>
+                  <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+                </div>
+              </CardContent>
+            </Card>
           )
         })}
       </div>
+
+      {customers.length === 0 && (
+        <Card className="border-0 shadow-md bg-white">
+          <CardContent className="py-16">
+            <div className="text-center">
+              <div className="h-20 w-20 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-5">
+                <Building2 className="h-10 w-10 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Customers Available</h3>
+              <p className="text-gray-500 max-w-sm mx-auto">
+                There are no customers available for reporting at this time.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
-} 
+}

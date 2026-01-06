@@ -624,7 +624,7 @@ const IncidentsReportPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#EFF4FF]">
       <div className="container mx-auto px-2 sm:px-4 lg:px-6 xl:px-8 py-2 sm:py-4 lg:py-6 max-w-[1600px]">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
@@ -702,7 +702,7 @@ const IncidentsReportPage: React.FC = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search incidents..."
-                  className="pl-10 pr-4 py-2 w-full text-sm bg-gray-50"
+                  className="pl-10 pr-4 py-2 w-full text-sm bg-[#EFF4FF]"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -880,7 +880,7 @@ const IncidentsReportPage: React.FC = () => {
                       selectedIncident.incidentType === "Vandalism" && "bg-orange-500",
                       selectedIncident.incidentType === "Customer Accident" && "bg-yellow-500",
                       selectedIncident.incidentType === "Suspicious Activity" && "bg-blue-500",
-                      selectedIncident.incidentType === "Other" && "bg-gray-500"
+                      selectedIncident.incidentType === "Other" && "bg-[#EFF4FF]0"
                     )}></span>
                     View Incident Details
                   </DialogTitle>
@@ -902,35 +902,35 @@ const IncidentsReportPage: React.FC = () => {
                     <div className="space-y-4">
                       <div>
                         <Label className="text-sm font-medium block mb-1">Customer Name</Label>
-                        <div className="h-9 px-3 py-1 border rounded-md bg-gray-50">
+                        <div className="h-9 px-3 py-1 border rounded-md bg-[#EFF4FF]">
                           <span className="text-sm">{selectedIncident.customer.name}</span>
                         </div>
                       </div>
                       
                       <div>
                         <Label className="text-sm font-medium block mb-1">Store Name</Label>
-                        <div className="h-9 px-3 py-1 border rounded-md bg-gray-50">
+                        <div className="h-9 px-3 py-1 border rounded-md bg-[#EFF4FF]">
                           <span className="text-sm">{selectedIncident.siteName}</span>
                         </div>
                       </div>
                       
                       <div>
                         <Label className="text-sm font-medium block mb-1">Officer Name</Label>
-                        <div className="h-9 px-3 py-1 border rounded-md bg-gray-50">
+                        <div className="h-9 px-3 py-1 border rounded-md bg-[#EFF4FF]">
                           <span className="text-sm">{selectedIncident.officer.name}</span>
                         </div>
                       </div>
                       
                       <div>
                         <Label className="text-sm font-medium block mb-1">Officer Role</Label>
-                        <div className="h-9 px-3 py-1 border rounded-md bg-gray-50">
+                        <div className="h-9 px-3 py-1 border rounded-md bg-[#EFF4FF]">
                           <span className="text-sm">{selectedIncident.officer.role}</span>
                         </div>
                       </div>
                       
                       <div>
                         <Label className="text-sm font-medium block mb-1">Duty Manager</Label>
-                        <div className="h-9 px-3 py-1 border rounded-md bg-gray-50">
+                        <div className="h-9 px-3 py-1 border rounded-md bg-[#EFF4FF]">
                           <span className="text-sm">{selectedIncident.dutyManager}</span>
                         </div>
                       </div>
@@ -949,14 +949,14 @@ const IncidentsReportPage: React.FC = () => {
                     <div className="space-y-4">
                       <div>
                         <Label className="text-sm font-medium block mb-1">Date of Incident</Label>
-                        <div className="h-9 px-3 py-1 border rounded-md bg-gray-50">
+                        <div className="h-9 px-3 py-1 border rounded-md bg-[#EFF4FF]">
                           <span className="text-sm">{format(selectedIncident.date, "PPP")}</span>
                         </div>
                       </div>
                       
                       <div>
                         <Label className="text-sm font-medium block mb-1">Time of Incident</Label>
-                        <div className="h-9 px-3 py-1 border rounded-md bg-gray-50">
+                        <div className="h-9 px-3 py-1 border rounded-md bg-[#EFF4FF]">
                           <span className="text-sm">
                             {selectedIncident.time?.hour?.padStart(2, '0')}:{selectedIncident.time?.minute?.padStart(2, '0')}
                           </span>
@@ -965,7 +965,7 @@ const IncidentsReportPage: React.FC = () => {
                       
                       <div>
                         <Label className="text-sm font-medium block mb-1">Incident Type</Label>
-                        <div className="h-9 px-3 py-1 border rounded-md bg-gray-50">
+                        <div className="h-9 px-3 py-1 border rounded-md bg-[#EFF4FF]">
                           <span className={cn(
                             "inline-flex items-center px-2 py-0.5 rounded text-sm font-medium",
                             selectedIncident.incidentType === "Theft" && "bg-red-100 text-red-800",
@@ -993,7 +993,7 @@ const IncidentsReportPage: React.FC = () => {
                     <div className="space-y-4">
                       <div>
                         <Label className="text-sm font-medium block mb-1">Incident Details</Label>
-                        <div className="min-h-[80px] p-3 border rounded-md bg-gray-50">
+                        <div className="min-h-[80px] p-3 border rounded-md bg-[#EFF4FF]">
                           <span className="text-sm">{selectedIncident.description}</span>
                         </div>
                       </div>
@@ -1001,7 +1001,7 @@ const IncidentsReportPage: React.FC = () => {
                       {selectedIncident.additionalComments && (
                         <div>
                           <Label className="text-sm font-medium block mb-1">Additional Comments</Label>
-                          <div className="min-h-[60px] p-3 border rounded-md bg-gray-50">
+                          <div className="min-h-[60px] p-3 border rounded-md bg-[#EFF4FF]">
                             <span className="text-sm">{selectedIncident.additionalComments}</span>
                           </div>
                         </div>
@@ -1257,7 +1257,7 @@ const IncidentsReportPage: React.FC = () => {
                         <h3 className="font-medium text-base">Stolen Items</h3>
                       </div>
                       
-                      <div className="bg-gray-50 rounded-lg overflow-hidden">
+                      <div className="bg-[#EFF4FF] rounded-lg overflow-hidden">
                         <div className="grid grid-cols-12 p-2 text-xs font-medium text-gray-500 bg-gray-100">
                           <div className="col-span-2">Category</div>
                           <div className="col-span-3">Product Name</div>
@@ -1276,7 +1276,7 @@ const IncidentsReportPage: React.FC = () => {
                             <div className="col-span-2 text-right text-gray-900 font-medium">£{item.total.toFixed(2)}</div>
                           </div>
                         ))}
-                        <div className="grid grid-cols-12 p-2 text-sm border-t border-gray-200 bg-gray-50">
+                        <div className="grid grid-cols-12 p-2 text-sm border-t border-gray-200 bg-[#EFF4FF]">
                           <div className="col-span-10 text-right font-medium">Total Value:</div>
                           <div className="col-span-2 text-right font-bold text-green-600">
                             £{selectedIncident.stolenItems.reduce((sum, item) => sum + item.total, 0).toFixed(2)}
@@ -1319,7 +1319,7 @@ const IncidentsReportPage: React.FC = () => {
             </DialogHeader>
             
             {selectedIncident && (
-              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <div className="bg-[#EFF4FF] p-4 rounded-lg mb-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span className={cn(
                     "inline-block w-2 h-2 rounded-full",
@@ -1327,7 +1327,7 @@ const IncidentsReportPage: React.FC = () => {
                     selectedIncident.incidentType === "Vandalism" && "bg-orange-500",
                     selectedIncident.incidentType === "Customer Accident" && "bg-yellow-500",
                     selectedIncident.incidentType === "Suspicious Activity" && "bg-blue-500",
-                    selectedIncident.incidentType === "Other" && "bg-gray-500"
+                    selectedIncident.incidentType === "Other" && "bg-[#EFF4FF]0"
                   )}></span>
                   <span className="text-sm font-medium">
                     {selectedIncident.incidentType} - {format(selectedIncident.date, "dd/MM/yyyy")}
@@ -1857,7 +1857,7 @@ const IncidentsReportPage: React.FC = () => {
                   </div>
 
                   {stolenItems.length > 0 && (
-                    <div className="bg-gray-50 rounded-lg overflow-hidden mt-4">
+                    <div className="bg-[#EFF4FF] rounded-lg overflow-hidden mt-4">
                       <div className="grid grid-cols-12 p-2 text-xs font-medium text-gray-500 bg-gray-100">
                         <div className="col-span-2">Category</div>
                         <div className="col-span-3">Product Name</div>
@@ -1888,7 +1888,7 @@ const IncidentsReportPage: React.FC = () => {
                           </div>
                         </div>
                       ))}
-                      <div className="grid grid-cols-12 p-2 text-sm border-t border-gray-200 bg-gray-50">
+                      <div className="grid grid-cols-12 p-2 text-sm border-t border-gray-200 bg-[#EFF4FF]">
                         <div className="col-span-10 text-right font-medium">Total Value:</div>
                         <div className="col-span-2 text-right font-bold text-green-600">
                           £{stolenItems.reduce((sum, item) => sum + item.total, 0).toFixed(2)}
@@ -2420,7 +2420,7 @@ const IncidentsReportPage: React.FC = () => {
                   </div>
 
                   {stolenItems.length > 0 && (
-                    <div className="bg-gray-50 rounded-lg overflow-hidden mt-4">
+                    <div className="bg-[#EFF4FF] rounded-lg overflow-hidden mt-4">
                       <div className="grid grid-cols-12 p-2 text-xs font-medium text-gray-500 bg-gray-100">
                         <div className="col-span-2">Category</div>
                         <div className="col-span-3">Product Name</div>
@@ -2451,7 +2451,7 @@ const IncidentsReportPage: React.FC = () => {
                           </div>
                         </div>
                       ))}
-                      <div className="grid grid-cols-12 p-2 text-sm border-t border-gray-200 bg-gray-50">
+                      <div className="grid grid-cols-12 p-2 text-sm border-t border-gray-200 bg-[#EFF4FF]">
                         <div className="col-span-10 text-right font-medium">Total Value:</div>
                         <div className="col-span-2 text-right font-bold text-green-600">
                           £{stolenItems.reduce((sum, item) => sum + item.total, 0).toFixed(2)}

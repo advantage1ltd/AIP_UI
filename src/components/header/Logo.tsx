@@ -9,11 +9,11 @@ interface LogoProps {
 
 export const Logo = ({ variant, className = "", containerClassName = "" }: LogoProps) => (
   <Link to="/" className="flex items-center">
-    <div className={`relative flex justify-center ${containerClassName}`}>
+    <div className={`relative flex items-center justify-center ${containerClassName}`}>
       <img 
         src="/AdvantageOne.svg" 
         alt="Advantage One"
-        className={`${LOGO_SIZES[variant]} w-auto ${className}`}
+        className={`${LOGO_SIZES[variant]} w-auto max-w-[240px] object-contain ${className}`}
       />
     </div>
   </Link>

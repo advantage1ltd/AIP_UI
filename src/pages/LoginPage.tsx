@@ -112,7 +112,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100/80 via-purple-50/80 to-pink-100/80">
+    <div className="min-h-screen flex items-center justify-center bg-[#EFF4FF]">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-2xl font-bold text-purple-700">

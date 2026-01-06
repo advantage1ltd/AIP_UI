@@ -57,9 +57,10 @@ interface PasswordFormProps {
   onClose: () => void
   onSubmit: (data: PasswordFormValues) => void
   initialData?: PasswordFormValues
+  isLoading?: boolean
 }
 
-export function PasswordForm({ open, onClose, onSubmit, initialData }: PasswordFormProps) {
+export function PasswordForm({ open, onClose, onSubmit, initialData, isLoading = false }: PasswordFormProps) {
   const form = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordFormSchema),
     defaultValues: initialData || {
@@ -121,7 +122,7 @@ export function PasswordForm({ open, onClose, onSubmit, initialData }: PasswordF
                 <FormItem>
                   <FormLabel>Title</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter title" {...field} />
+                    <Input placeholder="Enter title" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -134,7 +135,7 @@ export function PasswordForm({ open, onClose, onSubmit, initialData }: PasswordF
                 <FormItem>
                   <FormLabel>Username</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter username" {...field} />
+                    <Input placeholder="Enter username" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -153,6 +154,7 @@ export function PasswordForm({ open, onClose, onSubmit, initialData }: PasswordF
                         placeholder="Enter password" 
                         {...field} 
                         className="flex-grow"
+                        disabled={isLoading}
                       />
                     </FormControl>
                     <Button 
@@ -161,6 +163,7 @@ export function PasswordForm({ open, onClose, onSubmit, initialData }: PasswordF
                       onClick={handleGeneratePassword}
                       title="Generate Password"
                       className="h-9 bg-blue-600 hover:bg-blue-700 text-white text-xs whitespace-nowrap"
+                      disabled={isLoading}
                     >
                       Generate
                     </Button>
@@ -170,6 +173,7 @@ export function PasswordForm({ open, onClose, onSubmit, initialData }: PasswordF
                       onClick={togglePasswordVisibility}
                       title={isPasswordVisible ? "Hide Password" : "Show Password"}
                       className="h-9 text-xs whitespace-nowrap"
+                      disabled={isLoading}
                     >
                       {isPasswordVisible ? "Hide" : "Show"}
                     </Button>
@@ -185,7 +189,7 @@ export function PasswordForm({ open, onClose, onSubmit, initialData }: PasswordF
                 <FormItem>
                   <FormLabel>URL</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter URL (optional)" {...field} />
+                    <Input placeholder="Enter URL (optional)" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -198,18 +202,18 @@ export function PasswordForm({ open, onClose, onSubmit, initialData }: PasswordF
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Enter any additional notes" {...field} />
+                    <Textarea placeholder="Enter any additional notes" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
                 Cancel
               </Button>
-              <Button type="submit">
-                {initialData ? 'Update Password' : 'Add Password'}
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Saving...' : (initialData ? 'Update Password' : 'Add Password')}
               </Button>
             </DialogFooter>
           </form>

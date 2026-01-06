@@ -191,7 +191,7 @@ export default function Contacts() {
   const uniqueIndustries = new Set(filteredContacts.map(c => c.industry).filter(Boolean)).size;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#EFF4FF]">
       <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
         {/* Header with action buttons */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-border/40">

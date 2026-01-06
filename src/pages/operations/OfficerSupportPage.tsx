@@ -466,7 +466,7 @@ const OfficerSupportPage: React.FC = () => {
   }, [updates]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+    <div className="min-h-screen bg-[#EFF4FF] flex flex-col">
       <div className="container mx-auto px-2 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 py-2 sm:py-4 lg:py-6 xl:py-8 2xl:py-10 max-w-screen-2xl flex-grow">
         <div className="space-y-4 md:space-y-6 xl:space-y-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6 xl:mb-8">

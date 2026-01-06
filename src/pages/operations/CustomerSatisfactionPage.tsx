@@ -357,7 +357,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-[#EFF4FF]">
       <div className="container mx-auto max-w-[1280px] py-4 md:py-6 lg:py-8 px-2 md:px-4 lg:px-6">
         <PageHeader 
           pageId="customer-satisfaction"

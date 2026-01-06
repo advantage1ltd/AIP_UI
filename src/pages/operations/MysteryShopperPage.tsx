@@ -2,7 +2,6 @@ import * as React from "react";
 import { useState, useCallback, useMemo } from "react";
 import { format } from "date-fns";
 import { MoreHorizontal, Pencil, Trash2, PlusCircle } from "lucide-react";
-import { v4 as uuidv4 } from 'uuid';
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -178,35 +177,6 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
-
-// Sample data for testing
-const mockEvaluations = [
-  {
-    id: uuidv4(),
-    officerId: "OFF001",
-    officerName: "John Smith",
-    customerName: "Walmart Supercenter",
-    location: "New York City",
-    date: "2023-12-10",
-    time: "14:30",
-    mysteryShopperName: "Sarah Wilson",
-    scores: {
-      location: { score: 4, comments: "Good positioning" },
-      security: { score: 5, comments: "Very alert" },
-      presentation: { score: 6, comments: "Professional appearance" },
-      license: { score: 3, comments: "License visible" },
-      customer: { score: 4, comments: "Helpful approach" },
-      courtesy: { score: 5, comments: "Polite and courteous" },
-      knowledge: { score: 4, comments: "Good store knowledge" },
-      professionalism: { score: 5, comments: "Excellent service" }
-    },
-    totalScore: 36,
-    maxPossibleScore: 40,
-    percentage: "90.0%",
-    createdAt: "2023-12-10T14:30:00.000Z",
-    status: "submitted"
-  }
-];
 
 interface MysteryShopperPageProps {
   customerId?: string;
@@ -538,7 +508,7 @@ export default function MysteryShopperPage({ customerId, siteId }: MysteryShoppe
   }, [evaluations]);
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-100 overflow-x-hidden">
+    <div className="min-h-screen w-full bg-[#EFF4FF] overflow-x-hidden">
       <Toaster />
       <div className="container mx-auto py-2 xs:py-3 sm:py-4 lg:py-6 xl:py-8 2xl:py-10 px-1 xs:px-2 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 max-w-screen-2xl">
         {/* Header & Stats Section */}

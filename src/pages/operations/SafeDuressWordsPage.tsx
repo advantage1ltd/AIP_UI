@@ -606,7 +606,7 @@ const SafeDuressWordsPage: React.FC = () => {
 
   if (isLoading || !currentWords) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-[#EFF4FF] flex items-center justify-center">
         <div className="flex items-center gap-2">
           <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
           <span className="text-gray-600">Loading...</span>
@@ -616,7 +616,7 @@ const SafeDuressWordsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-[#EFF4FF]">
       <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6 max-w-[1280px]">
         {/* Header Section */}
         <PageHeader 

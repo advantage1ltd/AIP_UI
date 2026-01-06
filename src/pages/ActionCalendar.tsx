@@ -26,7 +26,7 @@ import {
   Plus, 
   CalendarDays, 
   ListTodo, 
-  CheckCircle, 
+  CheckCircle2, 
   Clock, 
   AlertCircle,
   ArrowUpCircle, 
@@ -38,6 +38,13 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Target,
+  TrendingUp,
+  Zap,
+  LayoutGrid,
+  List,
+  CalendarCheck,
+  Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { startOfWeek, endOfWeek, isSameWeek, isSameDay, isSameMonth, format, isToday } from "date-fns";
@@ -276,379 +283,397 @@ const ActionCalendar: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const completionRate = statistics.total > 0 ? Math.round((statistics.completed / statistics.total) * 100) : 0;
+
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-gray-50">
-        <header className="bg-white border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Action Calendar</h1>
-                <p className="text-sm text-gray-500 mt-1">{isAdmin ? "Plan, organize, and assign tasks efficiently" : "View your assigned tasks and their status"}</p>
-              </div>
+      <div className="min-h-screen bg-[#EFF4FF]">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <div className="relative">
+              <div className="h-20 w-20 rounded-full border-4 border-blue-100 animate-pulse" />
+              <Loader2 className="h-10 w-10 text-blue-600 animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
             </div>
+            <p className="mt-6 text-gray-600 font-medium">Loading your tasks...</p>
           </div>
-        </header>
-
-        <main className="flex-1 flex items-center justify-center p-6">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-500 mx-auto mb-4" />
-            <p className="text-sm text-gray-500">Loading tasks...</p>
-          </div>
-        </main>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Action Calendar</h1>
-              <p className="text-sm text-gray-500 mt-1">{isAdmin ? "Plan, organize, and assign tasks efficiently" : "View your assigned tasks and their status"}</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900">
-                  <Filter className="h-4 w-4" />
-                <span className="sr-only sm:not-sr-only">Filter</span>
-                </Button>
-
-                {isAdmin ? (
-                  <Dialog>
-                    <DialogTrigger asChild>
-                    <Button size="sm" className="gap-2 bg-[#111827] hover:bg-[#1f2937]">
-                        <Plus className="h-4 w-4" />
-                      <span className="hidden sm:inline">Create Task</span>
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Create New Task</DialogTitle>
-                      <DialogDescription>Fill in the details below to create a new task. All fields are required.</DialogDescription>
-          </DialogHeader>
-                      <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
-                    </DialogContent>
-                  </Dialog>
-                ) : (
-                <Button size="sm" variant="outline" className="gap-2 border-gray-200 text-gray-500 cursor-not-allowed" disabled>
-                    <Lock className="h-4 w-4" />
-                  <span className="hidden sm:inline">Create Task</span>
-                  </Button>
-                )}
+    <div className="min-h-screen bg-[#EFF4FF]">
+      <div className="container mx-auto px-4 py-6 max-w-7xl space-y-6">
+        
+        {/* Modern Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <CalendarCheck className="h-6 w-6 text-white" />
               </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Action Calendar</h1>
+                <p className="text-gray-500 text-sm">
+                  {isAdmin ? "Plan, organize, and assign tasks efficiently" : "View and manage your assigned tasks"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" className="gap-2 bg-white border-gray-200 text-gray-700 hover:bg-gray-50">
+              <Filter className="h-4 w-4" />
+              <span className="hidden sm:inline">Filter</span>
+            </Button>
+
+            {isAdmin ? (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md">
+                    <Plus className="h-4 w-4" />
+                    <span>Create Task</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[550px]">
+                  <DialogHeader>
+                    <DialogTitle>Create New Task</DialogTitle>
+                    <DialogDescription>Fill in the details below to create a new task.</DialogDescription>
+                  </DialogHeader>
+                  <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
+                </DialogContent>
+              </Dialog>
+            ) : (
+              <Button size="sm" variant="outline" className="gap-2 border-gray-200 text-gray-400 cursor-not-allowed" disabled>
+                <Lock className="h-4 w-4" />
+                <span className="hidden sm:inline">Create Task</span>
+              </Button>
+            )}
           </div>
         </div>
-      </header>
 
-      {/* Main content area */}
-      <main className="py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Stats */}
-          <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-6">
-            <Card className="border-0 shadow-sm bg-blue-600 text-white">
-              <CardContent className="p-3 sm:p-4 flex flex-col">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs sm:text-sm font-medium text-blue-100">Total Tasks</p>
-                  <ListTodo className="h-4 w-4 sm:h-5 sm:w-5 text-blue-100" />
+        {/* Statistics Cards - Colored Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total Tasks */}
+          <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white group hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+            <CardContent className="p-5 relative">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-100">Total Tasks</p>
+                  <p className="text-3xl font-bold mt-1">{statistics.total}</p>
+                  <p className="text-xs text-blue-200 mt-1">All time</p>
                 </div>
-                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{statistics.total}</p>
-                <p className="text-[10px] sm:text-xs text-blue-100 mt-0.5 sm:mt-1">All time</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-0 shadow-sm bg-green-600 text-white">
-              <CardContent className="p-3 sm:p-4 flex flex-col">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs sm:text-sm font-medium text-green-100">Completed</p>
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-100" />
-                </div>
-                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{statistics.completed}</p>
-                <p className="text-[10px] sm:text-xs text-green-100 mt-0.5 sm:mt-1">{statistics.total > 0 ? Math.round((statistics.completed / statistics.total) * 100) : 0}% of total</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-0 shadow-sm bg-amber-600 text-white">
-              <CardContent className="p-3 sm:p-4 flex flex-col">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs sm:text-sm font-medium text-amber-100">In Progress</p>
-                  <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-amber-100" />
-                </div>
-                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{statistics.inProgress}</p>
-                <p className="text-[10px] sm:text-xs text-amber-100 mt-0.5 sm:mt-1">{statistics.total > 0 ? Math.round((statistics.inProgress / statistics.total) * 100) : 0}% of total</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-0 shadow-sm bg-red-600 text-white">
-              <CardContent className="p-3 sm:p-4 flex flex-col">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs sm:text-sm font-medium text-red-100">Due Today</p>
-                  <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5 text-red-100" />
-                </div>
-                <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2">{statistics.dueToday}</p>
-                <p className="text-[10px] sm:text-xs text-red-100 font-medium mt-0.5 sm:mt-1">Urgent</p>
-              </CardContent>
-            </Card>
-          </section>
-
-          {/* Two column responsive layout: calendar + tasks */}
-          <section className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            {/* Calendar column */}
-            <div className="md:col-span-4 lg:col-span-3 order-2 md:order-1">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="h-5 w-5 text-gray-700" />
-                  <h2 className="text-sm font-medium text-gray-900">Calendar</h2>
-                </div>
-
-                <div className="flex items-center gap-2 text-gray-500">
-                  <p className="text-sm">{format(date, "MMMM yyyy")}</p>
+                <div className="h-12 w-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <Target className="h-6 w-6 text-white" />
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              <Card className="border-0 shadow-sm bg-white overflow-hidden">
-                <CardContent className="p-3 sm:p-4">
-                  {/* Centered calendar with responsive sizing */}
-                  <div className="w-full flex justify-center">
-                    <div className="w-full max-w-[360px] sm:max-w-[420px]">
-                      <div className="flex items-center justify-center mb-2">
-                        <button onClick={() => setDate(new Date(date.getFullYear(), date.getMonth() - 1, 1))} aria-label="Previous month" className="p-1">
-                          <ChevronLeft className="h-5 w-5 text-gray-700" />
-                        </button>
-
-                        <div className="flex-1 text-center font-medium">{format(date, "MMMM yyyy")}</div>
-
-                        <button onClick={() => setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1))} aria-label="Next month" className="p-1">
-                          <ChevronRight className="h-5 w-5 text-gray-700" />
-                        </button>
-                      </div>
-
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      onSelect={(d) => d && setDate(d)}
-                      className="w-full"
-                      showOutsideDays
-                      hideNavigation
-                    />
-
+          {/* Completed */}
+          <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white group hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+            <CardContent className="p-5 relative">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-emerald-100">Completed</p>
+                  <p className="text-3xl font-bold mt-1">{statistics.completed}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="h-1.5 w-14 bg-white/30 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-white rounded-full transition-all duration-500"
+                        style={{ width: `${completionRate}%` }}
+                      />
                     </div>
+                    <span className="text-xs font-semibold text-white">{completionRate}%</span>
+                  </div>
+                </div>
+                <div className="h-12 w-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* In Progress */}
+          <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white group hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+            <CardContent className="p-5 relative">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-amber-100">In Progress</p>
+                  <p className="text-3xl font-bold mt-1">{statistics.inProgress}</p>
+                  <p className="text-xs font-medium mt-1 flex items-center gap-1 text-amber-100">
+                    <TrendingUp className="h-3 w-3" />
+                    Active
+                  </p>
+                </div>
+                <div className="h-12 w-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Due Today */}
+          <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-red-500 to-rose-600 text-white group hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+            <CardContent className="p-5 relative">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-red-100">Due Today</p>
+                  <p className="text-3xl font-bold mt-1">{statistics.dueToday}</p>
+                  <p className="text-xs font-medium mt-1 flex items-center gap-1 text-red-100">
+                    <Zap className="h-3 w-3" />
+                    Urgent
+                  </p>
+                </div>
+                <div className="h-12 w-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <AlertCircle className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* Calendar Panel */}
+          <div className="lg:col-span-4 xl:col-span-3 order-2 lg:order-1">
+            <Card className="border-0 shadow-md bg-white overflow-hidden">
+              <CardHeader className="pb-3 border-b bg-gradient-to-r from-gray-50 to-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="h-5 w-5 text-blue-600" />
+                    <CardTitle className="text-base font-semibold text-gray-900">Calendar</CardTitle>
+                  </div>
+                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    {format(date, "MMM yyyy")}
+                  </Badge>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="p-4">
+                {/* Calendar Navigation */}
+                <div className="flex flex-col gap-3 mb-4">
+                  {/* Month Navigation */}
+                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                    <button 
+                      onClick={() => setDate(new Date(date.getFullYear(), date.getMonth() - 1, 1))} 
+                      className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white border border-gray-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-all shadow-sm text-sm font-medium text-gray-700"
+                      aria-label="Previous month"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      <span className="hidden sm:inline">Prev</span>
+                    </button>
+                    <span className="font-semibold text-gray-900 text-sm">{format(date, "MMMM yyyy")}</span>
+                    <button 
+                      onClick={() => setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1))} 
+                      className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white border border-gray-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-all shadow-sm text-sm font-medium text-gray-700"
+                      aria-label="Next month"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
                   </div>
                   
-                  <Separator className="my-3" />
-                  
-                  <div className="bg-gray-50 p-3 rounded-md">
-                    <h3 className="text-sm font-medium mb-3 text-gray-700">Priority Legend</h3>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between p-2 bg-white rounded border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-red-500" />
-                          <span className="text-sm text-gray-700">High Priority</span>
-                        </div>
-                        <Badge variant="outline" className="text-sm bg-white text-gray-700 border-gray-200">{statistics.highPriority}</Badge>
-                      </div>
-
-                      <div className="flex items-center justify-between p-2 bg-white rounded border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-amber-500" />
-                          <span className="text-sm text-gray-700">Medium Priority</span>
-                        </div>
-                        <Badge variant="outline" className="text-sm bg-white text-gray-700 border-gray-200">{tasks.filter((t) => t.priority === "medium").length}</Badge>
-                      </div>
-
-                      <div className="flex items-center justify-between p-2 bg-white rounded border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-green-500" />
-                          <span className="text-sm text-gray-700">Low Priority</span>
-                        </div>
-                        <Badge variant="outline" className="text-sm bg-white text-gray-700 border-gray-200">{tasks.filter((t) => t.priority === "low").length}</Badge>
-                      </div>
+                  {/* Today Button */}
+                  <button
+                    onClick={() => setDate(new Date())}
+                    className={cn(
+                      "w-full py-2 px-4 rounded-lg text-sm font-medium transition-all",
+                      isToday(date)
+                        ? "bg-blue-100 text-blue-700 border border-blue-200"
+                        : "bg-white border border-gray-200 text-gray-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 shadow-sm"
+                    )}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <CalendarIcon className="h-4 w-4" />
+                      <span>Go to Today</span>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Tasks column */}
-            <div className="md:col-span-8 lg:col-span-9 order-1 md:order-2">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <ListTodo className="h-5 w-5 text-gray-700" />
-                  <h2 className="text-sm font-medium text-gray-900">Tasks</h2>
+                  </button>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => d && setDate(d)}
+                  className="w-full"
+                  showOutsideDays
+                  hideNavigation
+                />
+
+                <Separator className="my-4" />
+
+                {/* Priority Legend */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    Priority Overview
+                  </h4>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2.5 bg-red-50 rounded-lg border border-red-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-red-200" />
+                        <span className="text-sm font-medium text-gray-700">High Priority</span>
+                      </div>
+                      <Badge className="bg-red-100 text-red-700 border-0 font-semibold">{statistics.highPriority}</Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 bg-amber-50 rounded-lg border border-amber-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-amber-200" />
+                        <span className="text-sm font-medium text-gray-700">Medium Priority</span>
+                      </div>
+                      <Badge className="bg-amber-100 text-amber-700 border-0 font-semibold">{tasks.filter((t) => t.priority === "medium").length}</Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 bg-emerald-50 rounded-lg border border-emerald-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200" />
+                        <span className="text-sm font-medium text-gray-700">Low Priority</span>
+                      </div>
+                      <Badge className="bg-emerald-100 text-emerald-700 border-0 font-semibold">{tasks.filter((t) => t.priority === "low").length}</Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Tasks Panel */}
+          <div className="lg:col-span-8 xl:col-span-9 order-1 lg:order-2">
+            <Card className="border-0 shadow-md bg-white overflow-hidden">
+              <CardHeader className="pb-0 border-b">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <ListTodo className="h-5 w-5 text-blue-600" />
+                    <CardTitle className="text-base font-semibold text-gray-900">Tasks</CardTitle>
+                  </div>
+                  
                   {isToday(date) && (
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100">
+                    <Badge className="bg-emerald-100 text-emerald-700 border-0">
+                      <span className="relative flex h-2 w-2 mr-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
                       Today
                     </Badge>
                   )}
-                  <Button variant="outline" size="sm" className="gap-2 border-gray-200 text-gray-700">Daily View</Button>
                 </div>
-              </div>
-              
-              <Card className="border-0 shadow-sm bg-white">
-                <CardHeader className="p-0">
-                  <Tabs defaultValue="day" className="w-full" onValueChange={setActiveTab}>
-                    <TabsList className="w-full grid grid-cols-3 h-10 bg-white border-b rounded-none p-0 text-xs sm:text-sm">
-                      <TabsTrigger value="day" className="min-w-0 px-2 sm:px-3">Day</TabsTrigger>
-                      <TabsTrigger value="week" className="min-w-0 px-2 sm:px-3">Week</TabsTrigger>
-                      <TabsTrigger value="month" className="min-w-0 px-2 sm:px-3">Month</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </CardHeader>
 
-                <CardContent className="p-0">
-                  <Tabs defaultValue="day" className="w-full" value={activeTab} onValueChange={setActiveTab}>
-                    <TabsContent value="day" className="m-0">
-                      <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-700">{format(date, "EEEE, MMMM d, yyyy")}</p>
-                        {isToday(date) && <Badge className="bg-green-500 text-white">Today</Badge>}
-                      </div>
+                <Tabs defaultValue="day" className="w-full" onValueChange={setActiveTab} value={activeTab}>
+                  <TabsList className="w-full grid grid-cols-3 h-11 bg-gray-100/80 p-1 rounded-lg">
+                    <TabsTrigger 
+                      value="day" 
+                      className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm font-medium"
+                    >
+                      Day
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="week"
+                      className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm font-medium"
+                    >
+                      Week
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="month"
+                      className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm font-medium"
+                    >
+                      Month
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </CardHeader>
 
-                      <div className="p-4">
-                        {tasks.filter((task) => isSameDay(new Date(task.date), date)).length > 0 ? (
-                          <TaskList 
-                            tasks={tasks.filter((task) => isSameDay(new Date(task.date), date))}
-                            onOpenProgress={handleOpenProgress}
-                            onUpdateTask={handleUpdateTask}
-                            onDeleteTask={handleDeleteTask}
-                            canManageTasks={canManageTasks}
-                            canUpdateStatus={canUpdateTaskStatus}
-                          />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="rounded-full bg-gray-100 p-4 mb-4">
-                              <ListTodo className="h-6 w-6 text-gray-400" />
-                            </div>
-                            <h3 className="text-lg font-medium mb-2 text-gray-900">No Tasks Scheduled</h3>
-                            <p className="text-sm text-gray-500 max-w-md">
-                              {isAdmin ? "No tasks are scheduled for this period. Create a new task to get started." : "No tasks have been assigned to you for this period."}
-                            </p>
+              <CardContent className="p-0">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <TabsContent value="day" className="m-0">
+                    <div className="px-5 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-800">{format(date, "EEEE, MMMM d, yyyy")}</p>
+                      <Badge variant="outline" className="bg-white text-gray-600 border-gray-200">
+                        {tasks.filter((task) => isSameDay(new Date(task.date), date)).length} tasks
+                      </Badge>
+                    </div>
 
-                            {isAdmin && (
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button className="mt-4 gap-2 bg-[#111827] hover:bg-[#1f2937]">
-                                    <Plus className="h-4 w-4" />
-                                    <span>Create Task</span>
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Create New Task</DialogTitle>
-                                    <DialogDescription>Fill in the details below to create a new task. All fields are required.</DialogDescription>
-                                  </DialogHeader>
-                                  <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
-                                </DialogContent>
-                              </Dialog>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
+                    <div className="p-5">
+                      {tasks.filter((task) => isSameDay(new Date(task.date), date)).length > 0 ? (
+                        <TaskList 
+                          tasks={tasks.filter((task) => isSameDay(new Date(task.date), date))}
+                          onOpenProgress={handleOpenProgress}
+                          onUpdateTask={handleUpdateTask}
+                          onDeleteTask={handleDeleteTask}
+                          canManageTasks={canManageTasks}
+                          canUpdateStatus={canUpdateTaskStatus}
+                        />
+                      ) : (
+                        <EmptyTaskState isAdmin={isAdmin} handleAddTask={handleAddTask} date={date} />
+                      )}
+                    </div>
+                  </TabsContent>
 
-                    <TabsContent value="week" className="m-0">
-                      <div className="px-3 sm:px-4 py-2 sm:py-3 bg-gray-50 border-b flex items-center justify-between">
-                        <p className="text-xs sm:text-sm font-medium text-gray-700">Week of {format(startOfWeek(date), "MMM d")} - {format(endOfWeek(date), "MMM d, yyyy")}</p>
-                        <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-50 text-blue-700 border-blue-100">{tasks.filter((task) => isSameWeek(new Date(task.date), date)).length} tasks</Badge>
-                      </div>
+                  <TabsContent value="week" className="m-0">
+                    <div className="px-5 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-800">
+                        Week of {format(startOfWeek(date), "MMM d")} - {format(endOfWeek(date), "MMM d, yyyy")}
+                      </p>
+                      <Badge variant="outline" className="bg-white text-gray-600 border-gray-200">
+                        {tasks.filter((task) => isSameWeek(new Date(task.date), date)).length} tasks
+                      </Badge>
+                    </div>
 
-                      <div className="p-4">
-                        {tasks.filter((task) => isSameWeek(new Date(task.date), date)).length > 0 ? (
-                          <TaskList 
-                            tasks={tasks.filter((task) => isSameWeek(new Date(task.date), date))}
-                            onOpenProgress={handleOpenProgress}
-                            onUpdateTask={handleUpdateTask}
-                            onDeleteTask={handleDeleteTask}
-                            canManageTasks={canManageTasks}
-                            canUpdateStatus={canUpdateTaskStatus}
-                          />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="rounded-full bg-gray-100 p-4 mb-4">
-                              <ListTodo className="h-6 w-6 text-gray-400" />
-                            </div>
-                            <h3 className="text-lg font-medium mb-2 text-gray-900">No Tasks Scheduled</h3>
-                            <p className="text-sm text-gray-500 max-w-md">{isAdmin ? "No tasks are scheduled for this period. Create a new task to get started." : "No tasks have been assigned to you for this period."}</p>
+                    <div className="p-5">
+                      {tasks.filter((task) => isSameWeek(new Date(task.date), date)).length > 0 ? (
+                        <TaskList 
+                          tasks={tasks.filter((task) => isSameWeek(new Date(task.date), date))}
+                          onOpenProgress={handleOpenProgress}
+                          onUpdateTask={handleUpdateTask}
+                          onDeleteTask={handleDeleteTask}
+                          canManageTasks={canManageTasks}
+                          canUpdateStatus={canUpdateTaskStatus}
+                        />
+                      ) : (
+                        <EmptyTaskState isAdmin={isAdmin} handleAddTask={handleAddTask} date={date} />
+                      )}
+                    </div>
+                  </TabsContent>
 
-                            {isAdmin && (
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button className="mt-4 gap-2 bg-[#111827] hover:bg-[#1f2937]">
-                                    <Plus className="h-4 w-4" />
-                                    <span>Create Task</span>
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Create New Task</DialogTitle>
-                                    <DialogDescription>Fill in the details below to create a new task. All fields are required.</DialogDescription>
-                                  </DialogHeader>
-                                  <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
-                                </DialogContent>
-                              </Dialog>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
+                  <TabsContent value="month" className="m-0">
+                    <div className="px-5 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-800">{format(date, "MMMM yyyy")}</p>
+                      <Badge variant="outline" className="bg-white text-gray-600 border-gray-200">
+                        {tasks.filter((task) => isSameMonth(new Date(task.date), date)).length} tasks
+                      </Badge>
+                    </div>
 
-                    <TabsContent value="month" className="m-0">
-                      <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-700">{format(date, "MMMM yyyy")}</p>
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100">{tasks.filter((task) => isSameMonth(new Date(task.date), date)).length} tasks</Badge>
-                      </div>
-
-                      <div className="p-4">
-                        {tasks.filter((task) => isSameMonth(new Date(task.date), date)).length > 0 ? (
-                          <TaskList 
-                            tasks={tasks.filter((task) => isSameMonth(new Date(task.date), date))}
-                            onOpenProgress={handleOpenProgress}
-                            onUpdateTask={handleUpdateTask}
-                            onDeleteTask={handleDeleteTask}
-                            canManageTasks={canManageTasks}
-                            canUpdateStatus={canUpdateTaskStatus}
-                          />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="rounded-full bg-gray-100 p-4 mb-4">
-                              <ListTodo className="h-6 w-6 text-gray-400" />
-                            </div>
-                            <h3 className="text-lg font-medium mb-2 text-gray-900">No Tasks Scheduled</h3>
-                            <p className="text-sm text-gray-500 max-w-md">{isAdmin ? "No tasks are scheduled for this period. Create a new task to get started." : "No tasks have been assigned to you for this period."}</p>
-
-                            {isAdmin && (
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button className="mt-4 gap-2 bg-[#111827] hover:bg-[#1f2937]">
-                                    <Plus className="h-4 w-4" />
-                                    <span>Create Task</span>
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Create New Task</DialogTitle>
-                                    <DialogDescription>Fill in the details below to create a new task. All fields are required.</DialogDescription>
-                                  </DialogHeader>
-                                  <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
-                                </DialogContent>
-                              </Dialog>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
-            </div>
-          </section>
+                    <div className="p-5">
+                      {tasks.filter((task) => isSameMonth(new Date(task.date), date)).length > 0 ? (
+                        <TaskList 
+                          tasks={tasks.filter((task) => isSameMonth(new Date(task.date), date))}
+                          onOpenProgress={handleOpenProgress}
+                          onUpdateTask={handleUpdateTask}
+                          onDeleteTask={handleDeleteTask}
+                          canManageTasks={canManageTasks}
+                          canUpdateStatus={canUpdateTaskStatus}
+                        />
+                      ) : (
+                        <EmptyTaskState isAdmin={isAdmin} handleAddTask={handleAddTask} date={date} />
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </main>
+      </div>
 
       <TaskProgressSheet
         open={isProgressSheetOpen}
@@ -665,5 +690,47 @@ const ActionCalendar: React.FC = () => {
     </div>
   );
 };
+
+// Empty Task State Component
+const EmptyTaskState = ({ 
+  isAdmin, 
+  handleAddTask, 
+  date 
+}: { 
+  isAdmin: boolean; 
+  handleAddTask: (task: Omit<Task, "id" | "status">) => void;
+  date: Date;
+}) => (
+  <div className="flex flex-col items-center justify-center py-16 text-center">
+    <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mb-5">
+      <CalendarDays className="h-10 w-10 text-gray-400" />
+    </div>
+    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Tasks Scheduled</h3>
+    <p className="text-sm text-gray-500 max-w-sm mb-6">
+      {isAdmin 
+        ? "No tasks are scheduled for this period. Create a new task to get started." 
+        : "No tasks have been assigned to you for this period."
+      }
+    </p>
+
+    {isAdmin && (
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md">
+            <Plus className="h-4 w-4" />
+            Create Task
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Create New Task</DialogTitle>
+            <DialogDescription>Fill in the details below to create a new task.</DialogDescription>
+          </DialogHeader>
+          <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
+        </DialogContent>
+      </Dialog>
+    )}
+  </div>
+);
 
 export default ActionCalendar;

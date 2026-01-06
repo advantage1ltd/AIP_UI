@@ -652,7 +652,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-[#EFF4FF] p-6">
       <div className="space-y-6">
         <DashboardGreeting />
         
@@ -911,7 +911,7 @@ const AdminDashboard = () => {
               <CardContent className="p-0">
                 <div className="divide-y">
                   {/* Activity 1 */}
-                  <div className="flex items-start gap-3 p-3 hover:bg-slate-50">
+                  <div className="flex items-start gap-3 p-3 hover:bg-[#EFF4FF]">
                     <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-rose-500 text-white">
                       <CheckCircle className="h-5 w-5" />
                     </div>
@@ -925,7 +925,7 @@ const AdminDashboard = () => {
                   </div>
 
                   {/* Activity 2 */}
-                  <div className="flex items-start gap-3 p-3 hover:bg-slate-50">
+                  <div className="flex items-start gap-3 p-3 hover:bg-[#EFF4FF]">
                     <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 text-white">
                       <Briefcase className="h-5 w-5" />
                     </div>
@@ -939,7 +939,7 @@ const AdminDashboard = () => {
                   </div>
 
                   {/* Activity 3 */}
-                  <div className="flex items-start gap-3 p-3 hover:bg-slate-50">
+                  <div className="flex items-start gap-3 p-3 hover:bg-[#EFF4FF]">
                     <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-cyan-500 text-white">
                       <FileText className="h-5 w-5" />
                     </div>
@@ -953,7 +953,7 @@ const AdminDashboard = () => {
                   </div>
 
                   {/* Activity 4 */}
-                  <div className="flex items-start gap-3 p-3 hover:bg-slate-50">
+                  <div className="flex items-start gap-3 p-3 hover:bg-[#EFF4FF]">
                     <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-amber-500 text-white">
                       <MapPin className="h-5 w-5" />
                     </div>
@@ -967,7 +967,7 @@ const AdminDashboard = () => {
                   </div>
 
                   {/* Activity 5 */}
-                  <div className="flex items-start gap-3 p-3 hover:bg-slate-50">
+                  <div className="flex items-start gap-3 p-3 hover:bg-[#EFF4FF]">
                     <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white">
                       <MessageSquare className="h-5 w-5" />
                     </div>

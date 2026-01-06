@@ -72,7 +72,7 @@ const Vetting = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 w-full overflow-x-hidden">
+    <div className="min-h-screen bg-[#EFF4FF] w-full overflow-x-hidden">
       <div className="container mx-auto px-3 py-3 sm:p-4 md:p-5 lg:p-6 space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6 max-w-full md:max-w-[95%] lg:max-w-7xl">
         {/* Header Card */}
         <Card className="shadow-sm border border-border/40">

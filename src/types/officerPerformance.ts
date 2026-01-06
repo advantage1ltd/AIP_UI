@@ -1,6 +1,6 @@
 import { PaginationInfo } from './api'
 
-export type OfficerPerformanceCategory = 'top-performers' | 'non-reporters'
+export type OfficerPerformanceCategory = 'top-performers' | 'needs-improvement' | 'non-reporters'
 export type OfficerPerformanceRecordLimit = 10 | 20 | 100
 
 export interface OfficerPerformanceParams {

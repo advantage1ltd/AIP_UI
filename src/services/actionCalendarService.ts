@@ -1,4 +1,4 @@
-import { BASE_API_URL } from '@/config/api';
+import { api } from '@/config/api';
 
 export interface ActionCalendarTask {
   actionCalendarId: number;
@@ -107,38 +107,7 @@ export interface ActionCalendarStatistics {
 }
 
 class ActionCalendarService {
-  private baseUrl = `${BASE_API_URL}/ActionCalendar`;
-
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const token = localStorage.getItem('authToken');
-    
-    const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    const response = await fetch(`${this.baseUrl}${endpoint}`, config);
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        localStorage.removeItem('authToken');
-        window.location.replace('/login');
-        throw new Error('Unauthorized');
-      }
-
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  }
+  private baseUrl = '/ActionCalendar';
 
   async getTasks(params?: {
     page?: number;
@@ -160,48 +129,45 @@ class ActionCalendarService {
     if (params?.toDate) searchParams.append('toDate', params.toDate);
 
     const queryString = searchParams.toString();
-    const endpoint = queryString ? `?${queryString}` : '';
+    const endpoint = queryString ? `${this.baseUrl}?${queryString}` : this.baseUrl;
 
-    return this.request<ActionCalendarsResponse>(endpoint);
+    const response = await api.get<ActionCalendarsResponse>(endpoint);
+    return response.data;
   }
 
   async getTask(id: number): Promise<ActionCalendarResponse> {
-    return this.request<ActionCalendarResponse>(`/${id}`);
+    const response = await api.get<ActionCalendarResponse>(`${this.baseUrl}/${id}`);
+    return response.data;
   }
 
   async createTask(task: CreateActionCalendarTask): Promise<ActionCalendarResponse> {
-    return this.request<ActionCalendarResponse>('', {
-      method: 'POST',
-      body: JSON.stringify(task),
-    });
+    const response = await api.post<ActionCalendarResponse>(this.baseUrl, task);
+    return response.data;
   }
 
   async updateTask(id: number, task: UpdateActionCalendarTask): Promise<ActionCalendarResponse> {
-    return this.request<ActionCalendarResponse>(`/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(task),
-    });
+    const response = await api.put<ActionCalendarResponse>(`${this.baseUrl}/${id}`, task);
+    return response.data;
   }
 
   async deleteTask(id: number): Promise<ActionCalendarResponse> {
-    return this.request<ActionCalendarResponse>(`/${id}`, {
-      method: 'DELETE',
-    });
+    const response = await api.delete<ActionCalendarResponse>(`${this.baseUrl}/${id}`);
+    return response.data;
   }
 
   async getStatistics(): Promise<ActionCalendarStatistics> {
-    return this.request<ActionCalendarStatistics>('/statistics');
+    const response = await api.get<ActionCalendarStatistics>(`${this.baseUrl}/statistics`);
+    return response.data;
   }
 
   async getStatusUpdates(taskId: number): Promise<ActionCalendarStatusUpdatesResponse> {
-    return this.request<ActionCalendarStatusUpdatesResponse>(`/${taskId}/status-updates`);
+    const response = await api.get<ActionCalendarStatusUpdatesResponse>(`${this.baseUrl}/${taskId}/status-updates`);
+    return response.data;
   }
 
   async createStatusUpdate(taskId: number, payload: CreateActionCalendarStatusUpdateRequest): Promise<ActionCalendarStatusUpdateResponse> {
-    return this.request<ActionCalendarStatusUpdateResponse>(`/${taskId}/status-updates`, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
+    const response = await api.post<ActionCalendarStatusUpdateResponse>(`${this.baseUrl}/${taskId}/status-updates`, payload);
+    return response.data;
   }
 
   // Helper method to convert frontend Task type to backend format

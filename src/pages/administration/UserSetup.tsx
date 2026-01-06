@@ -372,7 +372,7 @@ const UserSetup = () => {
   const officerUsers = displayUsers.filter(u => u.role === 'advantageoneofficer').length
 
   return (
-    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-indigo-100/80 via-purple-50/80 to-pink-100/80">
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#EFF4FF]">
       <div className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-4 md:py-6 lg:py-8 space-y-3 sm:space-y-4 md:space-y-6">
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 sm:gap-3 md:gap-4">

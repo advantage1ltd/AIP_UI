@@ -805,7 +805,7 @@ export default function CustomerCrimeIntelligence() {
 	}
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 overflow-x-hidden">
+		<div className="min-h-screen bg-[#EFF4FF] overflow-x-hidden">
 			<div className="container mx-auto py-3 sm:py-4 md:py-6 lg:py-8 px-3 sm:px-4 md:px-6 lg:px-8 space-y-3 sm:space-y-4 md:space-y-6 lg:space-y-8 max-w-full">
 				<div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
 					<div className="space-y-1.5 sm:space-y-2 flex-1 min-w-0 pr-0 md:pr-4">

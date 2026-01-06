@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Users, TrendingUp, AlertCircle, PoundSterling } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Users, AlertCircle, PoundSterling } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { DatePicker } from '@/components/ui/date-picker'
-import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -33,21 +32,13 @@ type StatCardProps = {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  'Excellent': 'bg-green-100 text-green-800',
-  'Good': 'bg-blue-100 text-blue-800',
+  'Top Performer': 'bg-green-100 text-green-800',
   'Needs Improvement': 'bg-yellow-100 text-yellow-800',
   'Non-Reporter': 'bg-red-100 text-red-800',
   default: 'bg-gray-100 text-gray-700',
 }
 
-const PROGRESS_COLORS = {
-  high: 'bg-green-500',
-  good: 'bg-blue-500',
-  medium: 'bg-yellow-500',
-  low: 'bg-red-500',
-} as const
-
-const CATEGORY_TABS: OfficerPerformanceCategory[] = ['top-performers', 'non-reporters']
+const CATEGORY_TABS: OfficerPerformanceCategory[] = ['top-performers', 'needs-improvement', 'non-reporters']
 const RECORD_LIMIT_OPTIONS: OfficerPerformanceRecordLimit[] = [10, 20, 100]
 const PAGE_SIZE = 10
 
@@ -57,27 +48,20 @@ const subtractMonths = (date: Date, months: number) => {
   return clone
 }
 
-const getProgressColor = (rate: number): string => {
-  if (rate >= 95) return PROGRESS_COLORS.high
-  if (rate >= 85) return PROGRESS_COLORS.good
-  if (rate >= 70) return PROGRESS_COLORS.medium
-  return PROGRESS_COLORS.low
-}
-
 const formatCurrency = (value: number) =>
   `£${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, icon, iconBgColor, iconColor }) => (
   <Card className={`${iconBgColor} hover:opacity-95 transition-all h-full`}>
-    <CardContent className="p-1.5 xs:p-2 sm:p-4 lg:p-6">
-      <div className="flex items-center justify-between gap-1.5 xs:gap-2 lg:gap-4">
+    <CardContent className="p-3 xs:p-4 sm:p-5 lg:p-6">
+      <div className="flex items-center justify-between gap-2 xs:gap-3 sm:gap-4">
         <div className="min-w-0 flex-1">
-          <p className="text-[9px] xs:text-xs sm:text-sm lg:text-base font-medium text-white/80 truncate">{title}</p>
-          <p className="text-sm xs:text-xl sm:text-2xl lg:text-3xl font-bold mt-0.5 lg:mt-1 text-white truncate">{value}</p>
-          <p className="text-[8px] xs:text-xs sm:text-sm lg:text-base text-white/70 mt-0.5 lg:mt-1 truncate">{subtitle}</p>
+          <p className="text-xs xs:text-sm sm:text-base font-medium text-white/80 truncate">{title}</p>
+          <p className="text-lg xs:text-2xl sm:text-3xl lg:text-4xl font-bold mt-1 xs:mt-1.5 sm:mt-2 text-white truncate">{value}</p>
+          <p className="text-[10px] xs:text-xs sm:text-sm text-white/70 mt-1 xs:mt-1.5 truncate">{subtitle}</p>
         </div>
-        <div className={`${iconColor} p-1 xs:p-2.5 sm:p-3 lg:p-4 rounded-full bg-white/10 flex-shrink-0`}>
-          {React.cloneElement(icon as React.ReactElement, { className: 'h-3 w-3 xs:h-5 xs:w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-white' })}
+        <div className={`${iconColor} p-2 xs:p-3 sm:p-4 rounded-full bg-white/10 flex-shrink-0`}>
+          {React.cloneElement(icon as React.ReactElement, { className: 'h-4 w-4 xs:h-6 xs:w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-white' })}
         </div>
       </div>
     </CardContent>
@@ -96,6 +80,7 @@ const OfficerPerformance = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [recordLimits, setRecordLimits] = useState<Record<OfficerPerformanceCategory, OfficerPerformanceRecordLimit>>({
     'top-performers': 10,
+    'needs-improvement': 10,
     'non-reporters': 10,
   })
   const [appliedFilters, setAppliedFilters] = useState<{
@@ -191,14 +176,6 @@ const OfficerPerformance = () => {
         iconBgColor: 'bg-emerald-600',
         iconColor: 'bg-emerald-500/20',
       },
-      {
-        title: 'Average Response',
-        value: `${stats.averageResponseRate}%`,
-        subtitle: 'Overall response rate',
-        icon: <TrendingUp />,
-        iconBgColor: 'bg-violet-600',
-        iconColor: 'bg-violet-500/20',
-      },
     ],
     [stats],
   )
@@ -257,7 +234,7 @@ const OfficerPerformance = () => {
     if (isLoading) {
       return (
         <tr>
-          <td colSpan={5} className="px-4 py-6 text-center text-xs sm:text-sm text-gray-500">
+          <td colSpan={4} className="px-4 py-6 text-center text-xs sm:text-sm text-gray-500">
             Loading officer performance...
           </td>
         </tr>
@@ -267,7 +244,7 @@ const OfficerPerformance = () => {
     if (!items.length) {
       return (
         <tr>
-          <td colSpan={5} className="px-4 py-6 text-center text-xs sm:text-sm text-gray-500">
+          <td colSpan={4} className="px-4 py-6 text-center text-xs sm:text-sm text-gray-500">
             No officers found for the selected filters.
           </td>
         </tr>
@@ -288,15 +265,6 @@ const OfficerPerformance = () => {
             {formatCurrency(officer.totalValueSaved)}
           </td>
           <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6">
-            <div className="flex items-center gap-1 xs:gap-2 lg:gap-3">
-              <Progress
-                value={officer.responseRate}
-                className={`h-1 xs:h-1.5 sm:h-2 lg:h-2.5 w-6 xs:w-16 sm:w-24 lg:w-32 ${getProgressColor(officer.responseRate)}`}
-              />
-              <span className="text-[9px] xs:text-xs sm:text-sm lg:text-base">{officer.responseRate}%</span>
-            </div>
-          </td>
-          <td className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6">
             <Badge className={`${statusClass} text-[8px] xs:text-xs sm:text-sm lg:text-base px-1 py-0.5 xs:px-2 lg:px-3`}>
               {officer.status}
             </Badge>
@@ -313,12 +281,12 @@ const OfficerPerformance = () => {
           <div>
             <h1 className="text-base xs:text-xl sm:text-2xl lg:text-3xl font-bold">Officer Performance</h1>
             <p className="text-[9px] xs:text-xs sm:text-sm lg:text-base text-gray-500 mt-0.5 lg:mt-1">
-              Monitor top performers and non-reporters across customers
+              Monitor top performers and officers needing improvement across customers
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-1 xs:gap-3 sm:gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 xs:gap-3 sm:gap-4 lg:gap-6">
           {statCards.map((card, index) => (
             <StatCard key={card.title} {...card} />
           ))}
@@ -398,7 +366,11 @@ const OfficerPerformance = () => {
                   value={tab}
                   className="flex-1 xs:flex-none text-[9px] xs:text-xs sm:text-sm lg:text-base h-6 xs:h-7 sm:h-8 lg:h-9 capitalize"
                 >
-                  {tab === 'top-performers' ? 'Top Performers' : 'Non-Reporters'}
+                  {tab === 'top-performers' 
+                    ? 'Top Performers' 
+                    : tab === 'needs-improvement' 
+                    ? 'Needs Improvement' 
+                    : 'Non-Reporters'}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -440,7 +412,7 @@ const OfficerPerformance = () => {
                         <table className="w-full text-left">
                           <thead className="bg-gray-50">
                             <tr className="border-b">
-                              {['Officer', 'Incidents', 'Value Saved', 'Response Rate', 'Status'].map((header) => (
+                              {['Officer', 'Incidents', 'Value Saved', 'Status'].map((header) => (
                                 <th
                                   key={header}
                                   className="px-1 py-1.5 xs:px-3 xs:py-3 sm:px-4 lg:px-6 text-[9px] xs:text-xs lg:text-sm whitespace-nowrap"

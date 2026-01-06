@@ -723,7 +723,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-100 overflow-x-hidden">
+    <div className="min-h-screen w-full bg-[#EFF4FF] overflow-x-hidden">
       <div className="container mx-auto py-2 xs:py-3 sm:py-4 lg:py-6 xl:py-8 2xl:py-10 px-1 xs:px-2 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 max-w-screen-2xl">
         <div className="flex flex-col space-y-2 sm:space-y-4 lg:space-y-6 xl:space-y-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 xl:gap-6">

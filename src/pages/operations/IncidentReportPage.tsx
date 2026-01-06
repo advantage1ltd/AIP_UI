@@ -505,7 +505,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen w-full bg-[#EFF4FF]">
       <Toaster />
       <div className="container mx-auto py-4 sm:py-6 lg:py-8 xl:py-10 2xl:py-12 px-2 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 max-w-screen-2xl">
         {/* Header Section */}

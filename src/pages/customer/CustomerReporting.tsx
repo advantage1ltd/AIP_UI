@@ -1,14 +1,26 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Card } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Customer } from "@/types/customer"
 import useAuth from "@/hooks/useAuth"
-import { RefreshCw } from "lucide-react"
+import { 
+  RefreshCw, 
+  FileBarChart, 
+  Building2, 
+  ChevronRight, 
+  Loader2, 
+  Users, 
+  FileText,
+  AlertCircle,
+  Layers
+} from "lucide-react"
 import { customerService } from "@/services/customerService"
 import { customerPageAccessCache } from "@/services/customerPageAccessCache"
 import type { CustomerPageAccessPage } from "@/api/customerPageAccess"
+import { cn } from "@/lib/utils"
 
 export default function CustomerReporting() {
   const navigate = useNavigate()
@@ -49,20 +61,11 @@ export default function CustomerReporting() {
             const isAssigned = !isNaN(customerId) && assignedIdsAsNumbers.includes(customerId)
             return isAssigned
           })
-          
-          console.log('🔄 [CustomerReporting] Filtered customers for officer:', {
-            assignedCustomerIds: assignedCustomerIds,
-            assignedIdsAsNumbers: assignedIdsAsNumbers,
-            filteredCount: customerData.length,
-            filteredCustomerIds: customerData.map((c: any) => c.id)
-          })
         }
         
         setCustomers(customerData)
-        console.log('✅ [CustomerReporting] Loaded customers from store:', customerData.length)
-        
       } catch (error) {
-        console.error('❌ [CustomerReporting] Error loading customers from store:', error)
+        console.error('Error loading customers:', error)
         setCustomers([])
       } finally {
         setLoading(false)
@@ -75,7 +78,6 @@ export default function CustomerReporting() {
   // Listen for customer data updates to refresh data automatically
   useEffect(() => {
     const handleCustomerDataUpdate = (event: CustomEvent) => {
-      console.log('🔄 [CustomerReporting] Received customer data update:', event.detail)
       refreshData()
     }
 
@@ -118,15 +120,9 @@ export default function CustomerReporting() {
           error: null,
           pages: assignedPages
         })
-
-        console.log('🔍 [CustomerReporting] Loaded assigned pages for customer:', {
-          customerId,
-          assignedCount: assignedPages.length
-        })
       } catch (error) {
         if (!isActive) return
         const message = error instanceof Error ? error.message : 'Failed to load customer pages'
-        console.error('❌ [CustomerReporting] Error loading pages:', error)
         setPageState({
           isLoading: false,
           error: message,
@@ -148,106 +144,212 @@ export default function CustomerReporting() {
     }
   }
 
+  const selectedCustomerData = customers.find(c => c.id.toString() === selectedCustomer)
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+      <div className="min-h-screen bg-[#EFF4FF]">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <div className="relative">
+              <div className="h-20 w-20 rounded-full border-4 border-blue-100 animate-pulse" />
+              <Loader2 className="h-10 w-10 text-blue-600 animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+            </div>
+            <p className="mt-6 text-gray-600 font-medium">Loading customer data...</p>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (!loading && customers.length === 0) {
     return (
-      <div className="container mx-auto p-4">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-bold">Customer Reporting</h1>
-          <Card className="p-6 text-center">
-            <p className="text-muted-foreground">
-              No customers are currently assigned to you.
-              Please contact your administrator to get access to customer reports.
+      <div className="min-h-screen bg-[#EFF4FF]">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <div className="h-20 w-20 rounded-2xl bg-gray-100 flex items-center justify-center mb-5">
+              <Users className="h-10 w-10 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Customers Assigned</h3>
+            <p className="text-gray-500 max-w-md text-center mb-6">
+              No customers are currently assigned to you. Please contact your administrator to get access to customer reports.
             </p>
-          </Card>
+            <Button onClick={refreshData} variant="outline" className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-bold">Customer Reporting</h1>
-          <p className="text-muted-foreground">
-            Select a customer to view their reports and metrics
-          </p>
+    <div className="min-h-screen bg-[#EFF4FF]">
+      <div className="container mx-auto px-4 py-6 max-w-7xl space-y-6">
+        
+        {/* Modern Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <FileBarChart className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Customer Reporting</h1>
+                <p className="text-gray-500 text-sm">
+                  Select a customer to view their reports and metrics
+                </p>
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            onClick={refreshData}
+            disabled={loading}
+            className="gap-2 bg-white hover:bg-gray-50"
+          >
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            Refresh
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={refreshData}
-          disabled={loading}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
 
-      <div className="w-full max-w-md">
-        <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select a customer" />
-          </SelectTrigger>
-          <SelectContent>
-            {customers.map(customer => (
-              <SelectItem key={customer.id} value={customer.id.toString()}>
-                {customer.companyName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {selectedCustomer && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {pageState.isLoading && (
-            <div className="col-span-full flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+        {/* Customer Selector Card */}
+        <Card className="border-0 shadow-md bg-white overflow-hidden">
+          <CardHeader className="border-b bg-gradient-to-r from-gray-50 to-white py-4">
+            <div className="flex items-center gap-3">
+              <Building2 className="h-5 w-5 text-blue-600" />
+              <CardTitle className="text-base">Select Customer</CardTitle>
+              <Badge className="bg-blue-100 text-blue-700 border-0">
+                {customers.length} available
+              </Badge>
             </div>
-          )}
-
-          {!pageState.isLoading && pageState.error && (
-            <div className="col-span-full text-center text-destructive text-sm">
-              {pageState.error}
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="max-w-md">
+              <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                <SelectTrigger className="h-12 bg-gray-50 border-gray-200">
+                  <SelectValue placeholder="Choose a customer to view reports..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map(customer => (
+                    <SelectItem key={customer.id} value={customer.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-gray-400" />
+                        {customer.companyName}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
+          </CardContent>
+        </Card>
 
-          {!pageState.isLoading && !pageState.error && pageState.pages.map(page => (
-            <Card
-              key={page.pageId}
-              className="p-4 cursor-pointer hover:bg-accent transition-colors"
-              onClick={() => handlePageSelect(page)}
-            >
-              <h3 className="font-semibold mb-2">{page.title}</h3>
-              <p className="text-sm text-muted-foreground">{page.description}</p>
-              {page.category && (
-                <span className="inline-block mt-2 text-xs bg-muted px-2 py-1 rounded">
-                  {page.category}
-                </span>
+        {/* Selected Customer Info & Pages */}
+        {selectedCustomer && (
+          <Card className="border-0 shadow-md bg-white overflow-hidden">
+            <CardHeader className="border-b bg-gradient-to-r from-gray-50 to-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Layers className="h-5 w-5 text-indigo-600" />
+                  <div>
+                    <CardTitle className="text-base">Available Reports</CardTitle>
+                    {selectedCustomerData && (
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        for {selectedCustomerData.companyName}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {!pageState.isLoading && !pageState.error && (
+                  <Badge className="bg-emerald-100 text-emerald-700 border-0">
+                    {pageState.pages.length} reports
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {pageState.isLoading && (
+                <div className="text-center py-12">
+                  <Loader2 className="h-10 w-10 text-blue-600 animate-spin mx-auto mb-4" />
+                  <p className="text-gray-600">Loading available reports...</p>
+                </div>
               )}
-            </Card>
-          ))}
-        </div>
-      )}
 
-      {selectedCustomer && !pageState.isLoading && !pageState.error && pageState.pages.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">
-            No pages have been configured for this customer.
-            Please contact your administrator to set up page access.
-          </p>
-        </div>
-      )}
+              {!pageState.isLoading && pageState.error && (
+                <div className="text-center py-12">
+                  <div className="h-16 w-16 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-4">
+                    <AlertCircle className="h-8 w-8 text-red-600" />
+                  </div>
+                  <p className="text-red-600">{pageState.error}</p>
+                </div>
+              )}
+
+              {!pageState.isLoading && !pageState.error && pageState.pages.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pageState.pages.map(page => (
+                    <Card
+                      key={page.pageId}
+                      className="cursor-pointer border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 group"
+                      onClick={() => handlePageSelect(page)}
+                    >
+                      <CardContent className="p-5">
+                        <div className="flex items-start gap-4">
+                          <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center group-hover:from-blue-200 group-hover:to-indigo-200 transition-colors flex-shrink-0">
+                            <FileText className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">
+                              {page.title}
+                            </h3>
+                            <p className="text-sm text-gray-500 line-clamp-2">{page.description}</p>
+                            {page.category && (
+                              <Badge variant="outline" className="mt-2 text-xs bg-gray-50">
+                                {page.category}
+                              </Badge>
+                            )}
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0 mt-1" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {!pageState.isLoading && !pageState.error && pageState.pages.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="h-16 w-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                    <FileText className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Reports Configured</h3>
+                  <p className="text-gray-500 max-w-sm mx-auto">
+                    No pages have been configured for this customer. Please contact your administrator to set up page access.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Empty State when no customer selected */}
+        {!selectedCustomer && (
+          <Card className="border-0 shadow-md bg-white">
+            <CardContent className="py-16">
+              <div className="text-center">
+                <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center mx-auto mb-5">
+                  <Building2 className="h-10 w-10 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Select a Customer</h3>
+                <p className="text-gray-500 max-w-sm mx-auto">
+                  Choose a customer from the dropdown above to view their available reports and metrics.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
-} 
+}

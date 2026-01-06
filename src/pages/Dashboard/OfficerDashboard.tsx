@@ -282,7 +282,7 @@ export default function OfficerDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-[#EFF4FF] p-4">
         <Card className="w-full max-w-md mx-auto">
           <CardHeader>
             <CardTitle className="text-red-600 text-base sm:text-lg">Error Loading Dashboard</CardTitle>
@@ -303,7 +303,7 @@ export default function OfficerDashboard() {
 
   if (isLoading || !dashboardData || !incidentsData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#EFF4FF]">
         <div className="text-center space-y-3">
           <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-b-2 border-blue-600 mx-auto"></div>
           <p className="text-gray-600 text-sm">Loading dashboard...</p>
@@ -313,7 +313,7 @@ export default function OfficerDashboard() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <main className="min-h-screen bg-[#EFF4FF]">
       <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
         <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
           {/* Header Section */}

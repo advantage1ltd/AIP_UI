@@ -215,6 +215,25 @@ export const MYSTERY_SHOPPER_ENDPOINTS = {
   EVALUATIONS: '/mystery-shopper/evaluations'
 } as const
 
+// Contract Renewal endpoints
+export const CONTRACT_RENEWAL_ENDPOINTS = {
+  LIST: '/contract-renewal',
+  DETAIL: (id: number) => `/contract-renewal/${id}`,
+  CREATE: '/contract-renewal',
+  UPDATE: (id: number) => `/contract-renewal/${id}`,
+  DELETE: (id: number) => `/contract-renewal/${id}`,
+} as const
+
+// Asset Register endpoints
+export const ASSET_REGISTER_ENDPOINTS = {
+  LIST: '/asset-register',
+  DETAIL: (id: number) => `/asset-register/${id}`,
+  CREATE: '/asset-register',
+  UPDATE: (id: number) => `/asset-register/${id}`,
+  DELETE: (id: number) => `/asset-register/${id}`,
+  CHECK_TAG: '/asset-register/check-tag',
+} as const
+
 // API Headers
 export const API_HEADERS = {
   'Content-Type': 'application/json',

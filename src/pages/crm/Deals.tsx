@@ -129,7 +129,7 @@ export default function Deals() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#EFF4FF]">
       <div className="container ml-0 mr-2 md:ml-0 mr-[-20px] md:ml-0 lg:mx-auto px-2 md:px-4 lg:px-6 py-3 md:py-4 lg:py-6 max-w-full md:max-w-[95%] lg:max-w-7xl">
         <div className="space-y-3 md:space-y-4 lg:space-y-6">
           {/* Header with action buttons */}
