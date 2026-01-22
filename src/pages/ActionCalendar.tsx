@@ -93,6 +93,50 @@ const mapStatusUpdate = (update: ActionCalendarStatusUpdate): TaskStatusUpdate =
   updatedByName: update.updatedByUserName,
 });
 
+const buildTaskStatistics = (taskList: Task[]) => {
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  return taskList.reduce(
+    (acc, task) => {
+      acc.total += 1;
+      if (task.status === "completed") acc.completed += 1;
+      if (task.status === "in-progress") acc.inProgress += 1;
+      if (task.status === "pending") acc.pending += 1;
+      if (task.status === "blocked") acc.blocked += 1;
+      if (task.priority === "high") acc.highPriority += 1;
+      if (isToday(task.date)) acc.dueToday += 1;
+      if (task.date < todayStart && task.status !== "completed") acc.overdue += 1;
+      return acc;
+    },
+    {
+      total: 0,
+      completed: 0,
+      inProgress: 0,
+      pending: 0,
+      blocked: 0,
+      highPriority: 0,
+      dueToday: 0,
+      overdue: 0,
+    }
+  );
+};
+
+const hasRecentMatchingUpdate = (
+  updates: TaskStatusUpdate[],
+  payload: { status: Task["status"]; comment?: string }
+) => {
+  const now = Date.now();
+  return updates.some(update => {
+    const isRecent = now - update.updateDate.getTime() < 2 * 60 * 1000;
+    if (!isRecent) return false;
+    const commentMatches = payload.comment
+      ? (update.comment || "").trim() === payload.comment.trim()
+      : true;
+    return update.status === payload.status && commentMatches;
+  });
+};
+
 const ActionCalendar: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -131,10 +175,15 @@ const ActionCalendar: React.FC = () => {
   const loadTasks = async () => {
     try {
       setLoading(true);
-      const response = await actionCalendarService.getTasks();
+      const response = await actionCalendarService.getTasks(
+        !isAdmin && currentUserId ? { assignee: currentUserId } : undefined
+      );
       if (response.success) {
         const convertedTasks = response.data.map((task: any) => actionCalendarService.convertToFrontendFormat(task));
         setTasks(convertedTasks);
+        if (!isAdmin) {
+          setStatistics(buildTaskStatistics(convertedTasks));
+        }
       } else {
         toast({ title: "Error", description: response.message || "Failed to load tasks", variant: "destructive" });
       }
@@ -148,6 +197,7 @@ const ActionCalendar: React.FC = () => {
 
   const loadStatistics = async () => {
     try {
+      if (!isAdmin) return;
       const stats = await actionCalendarService.getStatistics();
       setStatistics(stats);
     } catch (error) {
@@ -186,17 +236,37 @@ const ActionCalendar: React.FC = () => {
     try {
       setStatusUpdatesError((p) => ({ ...p, [taskId]: null }));
       const response = await actionCalendarService.createStatusUpdate(parseInt(taskId), payload);
-      if (response.success) {
+      if (response.success || response.data) {
         const mappedUpdate = mapStatusUpdate(response.data);
         setStatusUpdates((p) => ({ ...p, [taskId]: [mappedUpdate, ...(p[taskId] || [])] }));
         await loadTasks();
-        await loadStatistics();
+        if (isAdmin) await loadStatistics();
+        setIsProgressSheetOpen(false);
+        setActiveTask(null);
         toast({ title: "Progress Updated", description: "Task progress has been shared with the task creator and assignee." });
-      } else {
-        throw new Error(response.message || "Failed to submit status update");
+        return;
       }
+      throw new Error(response.message || "Failed to submit status update");
     } catch (error) {
       console.error("Error updating task progress:", error);
+      try {
+        const fallback = await actionCalendarService.getStatusUpdates(parseInt(taskId));
+        if (fallback.success) {
+          const mappedUpdates = fallback.data.map(mapStatusUpdate);
+          setStatusUpdates((p) => ({ ...p, [taskId]: mappedUpdates }));
+          if (hasRecentMatchingUpdate(mappedUpdates, payload)) {
+            await loadTasks();
+            if (isAdmin) await loadStatistics();
+            setIsProgressSheetOpen(false);
+            setActiveTask(null);
+            toast({ title: "Progress Updated", description: "Task progress was saved. The latest status has been refreshed." });
+            return;
+          }
+        }
+      } catch (fallbackError) {
+        console.error("Error verifying task progress update:", fallbackError);
+      }
+
       setStatusUpdatesError((p) => ({ ...p, [taskId]: "Unable to submit update. Please try again." }));
       toast({ title: "Error", description: "Failed to submit task progress.", variant: "destructive" });
     }
@@ -222,7 +292,7 @@ const ActionCalendar: React.FC = () => {
       if (response.success) {
         const convertedTask = actionCalendarService.convertToFrontendFormat(response.data);
         setTasks((t) => [...t, convertedTask]);
-        await loadStatistics();
+        if (isAdmin) await loadStatistics();
         toast({ title: "Task Added", description: "Your task has been successfully created." });
       } else {
         toast({ title: "Error", description: response.message || "Failed to create task", variant: "destructive" });
@@ -246,7 +316,7 @@ const ActionCalendar: React.FC = () => {
       if (response.success) {
         const updated = actionCalendarService.convertToFrontendFormat(response.data);
         setTasks((t) => t.map((x) => (x.id === taskId ? updated : x)));
-        await loadStatistics();
+        if (isAdmin) await loadStatistics();
         toast({ title: "Task Updated", description: "Task has been successfully updated." });
       } else {
         toast({ title: "Error", description: response.message || "Failed to update task", variant: "destructive" });
@@ -266,7 +336,7 @@ const ActionCalendar: React.FC = () => {
       const response = await actionCalendarService.deleteTask(parseInt(taskId));
       if (response.success) {
         setTasks((t) => t.filter((task) => task.id !== taskId));
-        await loadStatistics();
+        if (isAdmin) await loadStatistics();
         toast({ title: "Task Deleted", description: "Task has been successfully deleted." });
       } else {
         toast({ title: "Error", description: response.message || "Failed to delete task", variant: "destructive" });
@@ -279,9 +349,9 @@ const ActionCalendar: React.FC = () => {
 
   useEffect(() => {
     loadTasks();
-    loadStatistics();
+    if (isAdmin) loadStatistics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAdmin, currentUserId]);
 
   const completionRate = statistics.total > 0 ? Math.round((statistics.completed / statistics.total) * 100) : 0;
 

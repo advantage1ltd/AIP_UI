@@ -4,6 +4,15 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
+// Work around malformed global keys (e.g. trailing spaces) in some globals versions
+const sanitizedBrowserGlobals = Object.entries(globals.browser).reduce((acc, [key, value]) => {
+  const normalizedKey = key.trim();
+  if (!(normalizedKey in acc)) {
+    acc[normalizedKey] = value;
+  }
+  return acc;
+}, {});
+
 export default tseslint.config(
   { ignores: ["dist"] },
   {
@@ -11,7 +20,7 @@ export default tseslint.config(
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      globals: sanitizedBrowserGlobals,
     },
     plugins: {
       "react-hooks": reactHooks,
@@ -19,11 +28,9 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      "react-refresh/only-export-components": [
-        "warn",
-        { allowConstantExport: true },
-      ],
+      "react-refresh/only-export-components": "off",
       "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
     },
   }
 );

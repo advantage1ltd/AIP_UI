@@ -1,1294 +1,1461 @@
-import { useState } from "react"
-import { useDispatch, useSelector } from "react-redux"
-import { RootState } from "@/store/store"
-import { 
-  addQuiz, 
-  updateQuiz, 
-  deleteQuiz, 
-  addQuestion,
-  updateQuestion,
-  deleteQuestion,
-  Quiz,
-  Question,
-  QuestionType,
-  QuizResult as BaseQuizResult,
-} from "@/store/features/quizSlice"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useEffect, useMemo, useState } from 'react'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { 
-  BookOpen, 
-  CheckCircle, 
-  Clock, 
-  AlertTriangle, 
-  Search, 
-  Plus,
-  FileText,
-  Edit2,
-  Eye,
-  Trash2,
-  CheckSquare,
-  Type,
-  AlignLeft,
-  List,
-  Calendar,
-  Timer
-} from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Progress } from "@/components/ui/progress"
+	AlertTriangle,
+	AlignLeft,
+	BookOpen,
+	CheckCircle,
+	CheckSquare,
+	Clock,
+	Edit2,
+	Eye,
+	FileText,
+	List,
+	Plus,
+	Search,
+	Timer,
+	Trash2,
+	Type,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
+import { toast } from '@/components/ui/use-toast'
+import { recruitmentTestService } from '@/services/recruitmentTestService'
+import type {
+	RecruitmentAdminOption,
+	RecruitmentAdminQuestion,
+	RecruitmentAdminTest,
+	RecruitmentAttemptDetail,
+	RecruitmentAttemptSummary,
+	RecruitmentQuestionType,
+	RecruitmentTestSummary,
+} from '@/types/recruitment-tests'
 
-// Extended QuizResult interface to include additional properties used in the UI
-interface QuizResult extends BaseQuizResult {
-  officerRank?: string;
-  officerDepartment?: string;
-  correctAnswers?: number;
-  totalQuestions?: number;
-  feedback?: string;
+type TestStatus = 'draft' | 'active' | 'scheduled' | 'completed'
+interface BulkQuestionDraft {
+	id: string
+	text: string
+	type: RecruitmentQuestionType
+	points: number
+	correctAnswerText: string
+	options: RecruitmentAdminOption[]
+}
+
+const normalizeStatus = (value: string | null | undefined) => String(value ?? '').trim().toLowerCase()
+
+const makeId = () => {
+	if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+	return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+const createDefaultOptions = (): RecruitmentAdminOption[] => ([
+	{ optionId: null, text: '', sortOrder: 1, isCorrect: false },
+	{ optionId: null, text: '', sortOrder: 2, isCorrect: false },
+])
+
+const createBulkDraft = (): BulkQuestionDraft => ({
+	id: makeId(),
+	text: '',
+	type: 'multiple-choice',
+	points: 1,
+	correctAnswerText: '',
+	options: createDefaultOptions(),
+})
+
+const normalizeBulkOptions = (options: RecruitmentAdminOption[]) => options
+	.map(option => ({ ...option, text: option.text.trim() }))
+	.filter(option => option.text !== '')
+	.map((option, index) => ({ ...option, sortOrder: index + 1 }))
+
+const applyBulkTypeDefaults = (draft: BulkQuestionDraft, nextType: RecruitmentQuestionType): BulkQuestionDraft => {
+	const normalizedType = normalizeStatus(nextType) as RecruitmentQuestionType
+	const isChoice = normalizedType === 'multiple-choice' || normalizedType === 'multiple-answer'
+	const isTrueFalse = normalizedType === 'true-false'
+	const isText = normalizedType === 'text' || normalizedType === 'essay'
+
+	const options = isChoice
+		? (draft.options.length >= 2 ? draft.options : createDefaultOptions())
+		: []
+
+	const sanitizedOptions = options.map((option, index) => ({ ...option, sortOrder: index + 1 }))
+	const correctAnswerText = isTrueFalse ? (draft.correctAnswerText || 'true') : isText ? draft.correctAnswerText : ''
+
+	if (normalizedType === 'multiple-choice') {
+		const firstCorrect = sanitizedOptions.findIndex(option => option.isCorrect)
+		const normalizedOptions = sanitizedOptions.map((option, index) => ({
+			...option,
+			isCorrect: index === firstCorrect && firstCorrect !== -1,
+		}))
+		return { ...draft, type: normalizedType, options: normalizedOptions, correctAnswerText }
+	}
+
+	return { ...draft, type: normalizedType, options: sanitizedOptions, correctAnswerText }
 }
 
 const CBT = () => {
-  // Redux
-  const dispatch = useDispatch()
-  const { quizzes, results } = useSelector((state: RootState) => state.quiz)
-  
-  // State
-  const [activeTab, setActiveTab] = useState<string>("tests")
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null)
-  const [editMode, setEditMode] = useState(false)
-  const [questionDialogOpen, setQuestionDialogOpen] = useState(false)
-  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
-  const [resultDetailsOpen, setResultDetailsOpen] = useState(false)
-  const [currentResult, setCurrentResult] = useState<QuizResult | null>(null)
-  
-  // Filtered quizzes based on search and filter
-  const filteredQuizzes = quizzes.filter(quiz => {
-    const matchesSearch = quiz.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || quiz.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
+	const [activeTab, setActiveTab] = useState<'tests' | 'results'>('tests')
+	const [searchTerm, setSearchTerm] = useState('')
+	const [filterStatus, setFilterStatus] = useState<'all' | TestStatus>('all')
 
-  // Handler for creating a new test
-  const handleCreateTest = (data: Partial<Quiz>) => {
-    if (editMode && currentQuiz) {
-      // Update existing quiz
-      const updatedQuiz = { ...currentQuiz, ...data };
-      dispatch(updateQuiz(updatedQuiz));
-    } else {
-      // Create new quiz
-      const newQuiz: Quiz = {
-        id: Date.now().toString(),
-        title: data.title || 'Untitled Test',
-        description: data.description,
-        duration: data.duration || 30,
-        totalPoints: data.totalPoints || 100,
-        questions: [],
-        dateCreated: new Date(),
-        createdBy: 'Admin User',
-        status: 'draft'
-      };
-      dispatch(addQuiz(newQuiz));
-    }
-    setCreateDialogOpen(false);
-    setCurrentQuiz(null);
-    setEditMode(false);
-  };
+	const [testsLoading, setTestsLoading] = useState(false)
+	const [testsError, setTestsError] = useState<string | null>(null)
+	const [tests, setTests] = useState<RecruitmentTestSummary[]>([])
 
-  // Handler for editing a test
-  const handleEditTest = (quiz: Quiz) => {
-    setCurrentQuiz(quiz);
-    setEditMode(true);
-    setCreateDialogOpen(true);
-  };
+	const [attemptsLoading, setAttemptsLoading] = useState(false)
+	const [attemptsError, setAttemptsError] = useState<string | null>(null)
+	const [attempts, setAttempts] = useState<RecruitmentAttemptSummary[]>([])
 
-  // Handler for deleting a test
-  const handleDeleteTest = (quizId: string) => {
-    dispatch(deleteQuiz(quizId));
-  };
+	const [createDialogOpen, setCreateDialogOpen] = useState(false)
+	const [editMode, setEditMode] = useState(false)
 
-  // Handler for creating a question
-  const handleCreateQuestion = (data: Partial<Question>) => {
-    if (!currentQuiz) return;
+	const [currentTest, setCurrentTest] = useState<RecruitmentAdminTest | null>(null)
+	const [currentTestHasAttempts, setCurrentTestHasAttempts] = useState(false)
+	const [testSaving, setTestSaving] = useState(false)
 
-    const question: Question = {
-      id: editMode && currentQuestion ? currentQuestion.id : Date.now().toString(),
-      type: data.type || 'multiple-choice',
-      text: data.text || '',
-      options: data.options || [],
-      correctAnswer: data.correctAnswer,
-      points: data.points || 1
-    };
+	const [questionDialogOpen, setQuestionDialogOpen] = useState(false)
+	const [currentQuestion, setCurrentQuestion] = useState<RecruitmentAdminQuestion | null>(null)
+	const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
+	const [bulkQuestions, setBulkQuestions] = useState<BulkQuestionDraft[]>([createBulkDraft()])
 
-    if (editMode && currentQuestion) {
-      // Update existing question
-      dispatch(updateQuestion({ quizId: currentQuiz.id, question }));
-      
-      // Update current quiz in local state to reflect changes
-      const updatedQuestions = currentQuiz.questions.map(q => 
-        q.id === question.id ? question : q
-      );
-      setCurrentQuiz({ ...currentQuiz, questions: updatedQuestions });
-    } else {
-      // Add new question
-      dispatch(addQuestion({ quizId: currentQuiz.id, question }));
-      
-      // Update current quiz in local state to reflect changes
-      setCurrentQuiz({ 
-        ...currentQuiz, 
-        questions: [...currentQuiz.questions, question]
-      });
-    }
-    
-    setQuestionDialogOpen(false);
-    setCurrentQuestion(null);
-    setEditMode(false);
-  };
+	const [resultDetailsOpen, setResultDetailsOpen] = useState(false)
+	const [currentResult, setCurrentResult] = useState<RecruitmentAttemptDetail | null>(null)
+	const [resultLoading, setResultLoading] = useState(false)
 
-  // Stats data with colors
-  const stats = [
-    {
-      title: 'Total Tests',
-      value: quizzes.length,
-      icon: BookOpen,
-      color: 'bg-indigo-700',
-      iconBg: 'bg-indigo-600/40'
-    },
-    {
-      title: 'Completed',
-      value: quizzes.filter(q => q.status === 'completed').length,
-      icon: CheckCircle,
-      color: 'bg-emerald-700',
-      iconBg: 'bg-emerald-600/40'
-    },
-    {
-      title: 'Active',
-      value: quizzes.filter(q => q.status === 'active').length,
-      icon: Clock,
-      color: 'bg-amber-600',
-      iconBg: 'bg-amber-500/40'
-    },
-    {
-      title: 'Pass Rate',
-      value: `${Math.round((results.filter(r => r.status === 'passed').length / Math.max(results.length, 1)) * 100)}%`,
-      icon: AlertTriangle,
-      color: 'bg-rose-700',
-      iconBg: 'bg-rose-600/40'
-    }
-  ]
+	const [resultsFilterTestId, setResultsFilterTestId] = useState<string>('all')
+	const [resultsDateFrom, setResultsDateFrom] = useState<string>('')
+	const [resultsDateTo, setResultsDateTo] = useState<string>('')
 
-  // Function to get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-emerald-100 text-emerald-800';
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-800';
-      case 'draft':
-        return 'bg-gray-100 text-gray-800';
-      case 'completed':
-        return 'bg-amber-100 text-amber-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+	const loadTests = async () => {
+		setTestsLoading(true)
+		setTestsError(null)
+		try {
+			const data = await recruitmentTestService.getAdminTests()
+			setTests(data)
+		} catch (err) {
+			console.error('❌ [CBT] Failed to load tests:', err)
+			const message = err instanceof Error ? err.message : 'Failed to load tests'
+			setTestsError(message)
+			toast({ title: 'Failed to load tests', description: message, variant: 'destructive' })
+		} finally {
+			setTestsLoading(false)
+		}
+	}
 
-  // Function to format date
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric'
-    }).format(date);
-  };
+	const loadAttempts = async () => {
+		setAttemptsLoading(true)
+		setAttemptsError(null)
+		try {
+			const data = await recruitmentTestService.getAdminAttempts(resultsFilterTestId === 'all' ? undefined : resultsFilterTestId)
+			setAttempts(data)
+		} catch (err) {
+			console.error('❌ [CBT] Failed to load attempts:', err)
+			const message = err instanceof Error ? err.message : 'Failed to load attempts'
+			setAttemptsError(message)
+			toast({ title: 'Failed to load attempts', description: message, variant: 'destructive' })
+		} finally {
+			setAttemptsLoading(false)
+		}
+	}
 
-  // Component for creating/editing a question
-  const QuestionForm = () => {
-    const [questionType, setQuestionType] = useState<QuestionType>(currentQuestion?.type || 'multiple-choice');
-    const [questionText, setQuestionText] = useState(currentQuestion?.text || '');
-    const [questionPoints, setQuestionPoints] = useState(currentQuestion?.points || 1);
-    const [options, setOptions] = useState<string[]>(currentQuestion?.options || ['', '', '', '']);
-    const [correctAnswer, setCorrectAnswer] = useState<string | string[]>(currentQuestion?.correctAnswer || '');
+	useEffect(() => {
+		void loadTests()
+	}, [])
 
-    const addOption = () => {
-      setOptions([...options, '']);
-    };
+	useEffect(() => {
+		void loadAttempts()
+	}, [resultsFilterTestId])
 
-    const updateOption = (index: number, value: string) => {
-      const newOptions = [...options];
-      newOptions[index] = value;
-      setOptions(newOptions);
-    };
+	const filteredTests = useMemo(() => {
+		const term = searchTerm.trim().toLowerCase()
+		return tests.filter(t => {
+			const matchesSearch = term === '' || t.title.toLowerCase().includes(term) || (t.description ?? '').toLowerCase().includes(term)
+			const matchesStatus = filterStatus === 'all' || normalizeStatus(t.status) === filterStatus
+			return matchesSearch && matchesStatus
+		})
+	}, [filterStatus, searchTerm, tests])
 
-    const removeOption = (index: number) => {
-      if (options.length <= 2) return;
-      setOptions(options.filter((_, i) => i !== index));
-      
-      // Reset correct answer if it was the removed option
-      if (Array.isArray(correctAnswer)) {
-        setCorrectAnswer(correctAnswer.filter(ans => ans !== index.toString()));
-      } else if (correctAnswer === index.toString()) {
-        setCorrectAnswer('');
-      }
-    };
+	const stats = useMemo(() => {
+		const total = tests.length
+		const active = tests.filter(t => normalizeStatus(t.status) === 'active').length
+		const completed = tests.filter(t => normalizeStatus(t.status) === 'completed').length
+		const passRate = attempts.length > 0
+			? `${Math.round((attempts.filter(a => normalizeStatus(a.status) === 'passed').length / attempts.length) * 100)}%`
+			: '0%'
 
-    // Handle multiple answer selection (for multiple-answer type questions)
-    const handleMultipleAnswerChange = (index: string, checked: boolean) => {
-      if (!Array.isArray(correctAnswer)) {
-        // Convert to array if it's not already
-        setCorrectAnswer(checked ? [index] : []);
-      } else {
-        if (checked) {
-          // Add to selected answers
-          setCorrectAnswer([...correctAnswer, index]);
-        } else {
-          // Remove from selected answers
-          setCorrectAnswer(correctAnswer.filter(i => i !== index));
-        }
-      }
-    };
+		return [
+			{ title: 'Total Tests', value: total, icon: BookOpen, accent: 'text-indigo-600', ring: 'bg-indigo-50' },
+			{ title: 'Completed', value: completed, icon: CheckCircle, accent: 'text-emerald-600', ring: 'bg-emerald-50' },
+			{ title: 'Active', value: active, icon: Clock, accent: 'text-amber-600', ring: 'bg-amber-50' },
+			{ title: 'Pass Rate', value: passRate, icon: AlertTriangle, accent: 'text-rose-600', ring: 'bg-rose-50' },
+		]
+	}, [attempts, tests])
 
-    const handleSubmit = () => {
-      handleCreateQuestion({
-        type: questionType,
-        text: questionText,
-        options: options.filter(o => o.trim() !== ''),
-        correctAnswer,
-        points: questionPoints
-      });
-    };
+	const getStatusColor = (status: string) => {
+		switch (normalizeStatus(status)) {
+			case 'active':
+				return 'bg-emerald-100 text-emerald-800'
+			case 'scheduled':
+				return 'bg-blue-100 text-blue-800'
+			case 'draft':
+				return 'bg-gray-100 text-gray-800'
+			case 'completed':
+				return 'bg-amber-100 text-amber-800'
+			default:
+				return 'bg-gray-100 text-gray-800'
+		}
+	}
 
-    return (
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="questionType">Question Type</Label>
-          <Select value={questionType} onValueChange={(value) => {
-            setQuestionType(value as QuestionType);
-            // Reset correctAnswer when changing type
-            if (value === 'multiple-answer') {
-              setCorrectAnswer([]);
-            } else if (value === 'true-false') {
-              setCorrectAnswer('');
-            } else if (value === 'multiple-choice') {
-              setCorrectAnswer('');
-            }
-          }}>
-            <SelectTrigger id="questionType" className="w-full">
-              <SelectValue placeholder="Select question type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="multiple-choice">
-                <div className="flex items-center gap-2">
-                  <CheckSquare className="h-4 w-4" />
-                  <span>Multiple Choice (Single Answer)</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="multiple-answer">
-                <div className="flex items-center gap-2">
-                  <List className="h-4 w-4" />
-                  <span>Multiple Choice (Multiple Answers)</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="true-false">
-                <div className="flex items-center gap-2">
-                  <CheckSquare className="h-4 w-4" />
-                  <span>True/False</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="text">
-                <div className="flex items-center gap-2">
-                  <Type className="h-4 w-4" />
-                  <span>Short Answer</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="essay">
-                <div className="flex items-center gap-2">
-                  <AlignLeft className="h-4 w-4" />
-                  <span>Essay/Long Answer</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div>
-          <Label htmlFor="questionText">Question Text</Label>
-          <Textarea 
-            id="questionText" 
-            placeholder="Enter your question here" 
-            value={questionText}
-            onChange={(e) => setQuestionText(e.target.value)}
-            className="min-h-[100px]"
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="points">Points</Label>
-          <Input 
-            id="points" 
-            type="number" 
-            min="1" 
-            value={questionPoints}
-            onChange={(e) => setQuestionPoints(parseInt(e.target.value))}
-          />
-        </div>
-        
-        {questionType === 'multiple-choice' && (
-          <div className="space-y-3">
-            <Label>Answer Options</Label>
-            {options.map((option, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <Checkbox 
-                  id={`option-${index}`} 
-                  checked={correctAnswer === index.toString()} 
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setCorrectAnswer(index.toString());
-                    } else {
-                      setCorrectAnswer('');
-                    }
-                  }}
-                />
-                <Input 
-                  value={option} 
-                  onChange={(e) => updateOption(index, e.target.value)} 
-                  placeholder={`Option ${index + 1}`}
-                  className="flex-1"
-                />
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => removeOption(index)}
-                  disabled={options.length <= 2}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-            <Button type="button" variant="outline" size="sm" onClick={addOption}>
-              Add Option
-            </Button>
-          </div>
-        )}
-        
-        {questionType === 'multiple-answer' && (
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <Label>Answer Options (Select All Correct Answers)</Label>
-              <Badge variant="outline" className="text-xs">
-                Multiple Answers Allowed
-              </Badge>
-            </div>
-            {options.map((option, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <Checkbox 
-                  id={`option-${index}`}
-                  checked={Array.isArray(correctAnswer) && correctAnswer.includes(index.toString())}
-                  onCheckedChange={(checked) => handleMultipleAnswerChange(index.toString(), !!checked)}
-                />
-                <Input 
-                  value={option} 
-                  onChange={(e) => updateOption(index, e.target.value)} 
-                  placeholder={`Option ${index + 1}`}
-                  className="flex-1"
-                />
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => removeOption(index)}
-                  disabled={options.length <= 2}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-            <Button type="button" variant="outline" size="sm" onClick={addOption}>
-              Add Option
-            </Button>
-          </div>
-        )}
-        
-        {questionType === 'true-false' && (
-          <div className="space-y-3">
-            <Label>Correct Answer</Label>
-            <RadioGroup 
-              value={correctAnswer as string} 
-              onValueChange={setCorrectAnswer}
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="true" id="true" />
-                <Label htmlFor="true">True</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="false" id="false" />
-                <Label htmlFor="false">False</Label>
-              </div>
-            </RadioGroup>
-          </div>
-        )}
-        
-        <div className="flex justify-end gap-2 pt-4">
-          <Button variant="outline" onClick={() => setQuestionDialogOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit}>
-            {editMode ? 'Update Question' : 'Add Question'}
-          </Button>
-        </div>
-      </div>
-    );
-  };
+	const formatDate = (value?: string | null) => {
+		if (!value) return '—'
+		const date = new Date(value)
+		if (Number.isNaN(date.getTime())) return '—'
+		return new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).format(date)
+	}
 
-  // Test Builder component
-  const TestBuilder = () => {
-    if (!currentQuiz) return null;
-    
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold">{currentQuiz.title}</h2>
-            <p className="text-sm text-muted-foreground">{currentQuiz.description}</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setQuestionDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Question
-            </Button>
-          </div>
-        </div>
-        
-        <div className="flex justify-between items-center text-sm">
-          <div className="space-x-4">
-            <Badge variant="outline" className="flex gap-1 items-center">
-              <Clock className="h-4 w-4" />
-              Duration: {currentQuiz.duration} minutes
-            </Badge>
-            <Badge variant="outline" className="flex gap-1 items-center">
-              <FileText className="h-4 w-4" />
-              Total Points: {currentQuiz.totalPoints}
-            </Badge>
-          </div>
-          <Badge className={getStatusColor(currentQuiz.status)}>
-            {currentQuiz.status.charAt(0).toUpperCase() + currentQuiz.status.slice(1)}
-          </Badge>
-        </div>
-        
-        <div className="border rounded-md">
-          {currentQuiz.questions.length > 0 ? (
-            <div className="divide-y">
-              {currentQuiz.questions.map((question, index) => (
-                <div key={question.id} className="p-4 hover:bg-[#EFF4FF]">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="bg-slate-200 text-slate-700 rounded-full h-6 w-6 flex items-center justify-center text-xs font-medium">
-                          {index + 1}
-                        </span>
-                        <h3 className="font-medium">{question.text}</h3>
-                      </div>
-                      <div className="mt-2 pl-8">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Badge variant="outline" className="text-xs">
-                            {question.type === 'multiple-choice' ? 'Multiple Choice' : 
-                             question.type === 'true-false' ? 'True/False' :
-                             question.type === 'text' ? 'Short Answer' : 'Essay'}
-                          </Badge>
-                          <span>{question.points} {question.points === 1 ? 'point' : 'points'}</span>
-                        </div>
-                        
-                        {question.type === 'multiple-choice' && question.options && (
-                          <ul className="mt-2 space-y-1 text-sm">
-                            {question.options.map((option, optIndex) => (
-                              <li key={optIndex} className={cn(
-                                "pl-2",
-                                question.correctAnswer === optIndex.toString() && "font-medium text-emerald-600"
-                              )}>
-                                {option} {question.correctAnswer === optIndex.toString() && "(Correct)"}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        
-                        {question.type === 'multiple-answer' && question.options && (
-                          <ul className="mt-2 space-y-1 text-sm">
-                            {question.options.map((option, optIndex) => (
-                              <li key={optIndex} className={cn(
-                                "pl-2",
-                                Array.isArray(question.correctAnswer) && 
-                                question.correctAnswer.includes(optIndex.toString()) && 
-                                "font-medium text-emerald-600"
-                              )}>
-                                {option} {Array.isArray(question.correctAnswer) && 
-                                         question.correctAnswer.includes(optIndex.toString()) && 
-                                         "(Correct)"}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        
-                        {question.type === 'true-false' && (
-                          <div className="mt-2 text-sm">
-                            Correct Answer: <span className="font-medium">
-                              {question.correctAnswer === 'true' ? 'True' : 'False'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => {
-                        setCurrentQuestion(question);
-                        setEditMode(true);
-                        setQuestionDialogOpen(true);
-                      }}>
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => {
-                        dispatch(deleteQuestion({ quizId: currentQuiz.id, questionId: question.id }));
-                        
-                        // Update current quiz in local state to reflect changes
-                        const updatedQuestions = currentQuiz.questions.filter(q => q.id !== question.id);
-                        setCurrentQuiz({ ...currentQuiz, questions: updatedQuestions });
-                      }}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-8 text-center">
-              <div className="mx-auto bg-slate-100 rounded-full w-12 h-12 flex items-center justify-center mb-4">
-                <FileText className="h-6 w-6 text-slate-500" />
-              </div>
-              <h3 className="text-lg font-medium">No Questions Yet</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Start by adding your first question to this test.
-              </p>
-              <Button 
-                className="mt-4" 
-                variant="outline" 
-                onClick={() => setQuestionDialogOpen(true)}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Question
-              </Button>
-            </div>
-          )}
-        </div>
-        
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setCurrentQuiz(null)}>
-            Back to Tests
-          </Button>
-          <Button onClick={() => {
-            const updatedQuiz = { ...currentQuiz, status: 'active' as const };
-            dispatch(updateQuiz(updatedQuiz));
-            setCurrentQuiz(null);
-          }} disabled={currentQuiz.questions.length === 0}>
-            Publish Test
-          </Button>
-        </div>
-      </div>
-    );
-  };
+	const parseDateInput = (value: string, endOfDay = false) => {
+		if (!value) return null
+		const date = new Date(value)
+		if (Number.isNaN(date.getTime())) return null
+		if (endOfDay) date.setHours(23, 59, 59, 999)
+		return date
+	}
 
-  // Results Tab content
-  const ResultsTab = () => {
-    const [selectedQuizId, setSelectedQuizId] = useState<string>('all')
-    
-    // Filtered results based on selected quiz
-    const filteredResults = selectedQuizId === 'all' 
-      ? results 
-      : results.filter(result => result.quizId === selectedQuizId)
-      
-    // Handler for viewing result details
-    const handleViewResultDetails = (result: QuizResult) => {
-      setCurrentResult(result)
-      setResultDetailsOpen(true)
-    }
-    
-    return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-lg font-semibold">Test Results</h2>
-          <div>
-            <Select value={selectedQuizId} onValueChange={setSelectedQuizId}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by test" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Tests</SelectItem>
-                {quizzes.map(quiz => (
-                  <SelectItem key={quiz.id} value={quiz.id}>{quiz.title}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100 text-slate-600">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">Officer</th>
-                  <th className="px-4 py-3 text-left font-medium">Test</th>
-                  <th className="px-4 py-3 text-left font-medium">Date</th>
-                  <th className="px-4 py-3 text-left font-medium">Score</th>
-                  <th className="px-4 py-3 text-left font-medium">Status</th>
-                  <th className="px-4 py-3 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredResults.length > 0 ? (
-                  filteredResults.map(result => (
-                    <tr key={result.id} className="hover:bg-[#EFF4FF]">
-                      <td className="px-4 py-3">{result.officerName}</td>
-                      <td className="px-4 py-3">{result.quizTitle}</td>
-                      <td className="px-4 py-3">{formatDate(result.endTime)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span>{result.score}/{result.totalPoints}</span>
-                          <span className="text-xs text-muted-foreground">
-                            ({result.percentageScore.toFixed(1)}%)
-                          </span>
-                        </div>
-                        <Progress 
-                          value={result.percentageScore} 
-                          className="h-1.5 w-24" 
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge className={
-                          result.status === 'passed' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }>
-                          {result.status === 'passed' ? 'Passed' : 'Failed'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleViewResultDetails(result)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Details
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                      No results found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
-  return (
-    <div className="min-h-screen bg-[#EFF4FF] w-full overflow-x-hidden">
-      <div className="container mx-auto px-3 py-3 sm:p-4 md:p-5 lg:p-6 space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6 max-w-full md:max-w-[95%] lg:max-w-7xl">
-        {/* Header Card */}
-        <Card className="shadow-sm border border-border/40">
-          <CardHeader className="pb-3 sm:pb-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
-              <div>
-                <CardTitle className="text-xl sm:text-2xl font-bold text-primary">CBT Assessment</CardTitle>
-                <CardDescription className="mt-1 text-xs sm:text-sm">Manage and monitor candidate assessment tests</CardDescription>
-              </div>
-              <Button 
-                className="w-full sm:w-auto h-9 text-xs sm:text-sm"
-                onClick={() => {
-                  setCurrentQuiz(null);
-                  setEditMode(false);
-                  setCreateDialogOpen(true);
-                }}
-              >
-                <Plus className="h-5 w-5 mr-1 sm:mr-2" />
-                <span className="sm:hidden">Add Test</span>
-                <span className="hidden sm:inline">Create New Test</span>
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
+	const filteredAttempts = useMemo(() => {
+		const from = parseDateInput(resultsDateFrom)
+		const to = parseDateInput(resultsDateTo, true)
+		return attempts.filter(attempt => {
+			if (resultsFilterTestId !== 'all' && attempt.testId !== resultsFilterTestId) return false
+			if (!attempt.completedAt) return false
+			const completedAt = new Date(attempt.completedAt)
+			if (Number.isNaN(completedAt.getTime())) return false
+			if (from && completedAt < from) return false
+			if (to && completedAt > to) return false
+			return true
+		})
+	}, [attempts, resultsDateFrom, resultsDateTo, resultsFilterTestId])
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-          {stats.map((stat) => (
-            <Card 
-              key={stat.title} 
-              className={cn(
-                "text-white hover:shadow-lg transition-shadow rounded-lg",
-                stat.color 
-              )}
-            >
-              <CardContent className="pt-3 pb-2 px-3 md:pt-4 md:pb-3 md:px-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs md:text-sm font-medium text-white/80">{stat.title}</p>
-                    <p className="text-lg md:text-xl lg:text-2xl font-bold mt-0 md:mt-1">{stat.value}</p>
-                  </div>
-                  <div className={cn("p-2 rounded-full", stat.iconBg)}>
-                    <stat.icon className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+	const handleExportResultsCsv = () => {
+		if (filteredAttempts.length === 0) return
+		const headers = [
+			'AttemptId',
+			'OfficerName',
+			'OfficerId',
+			'TestTitle',
+			'TestId',
+			'Score',
+			'TotalPoints',
+			'PercentageScore',
+			'Status',
+			'CompletedAt',
+		]
 
-        {/* Main Content */}
-        <Card className="border border-border/40 shadow-sm">
-          <CardContent className="p-4 sm:p-6">
-            {currentQuiz ? (
-              <TestBuilder />
-            ) : (
-              <>
-                <Tabs defaultValue="tests" value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="mb-4">
-                    <TabsTrigger value="tests">Tests</TabsTrigger>
-                    <TabsTrigger value="results">Results</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="tests" className="space-y-4">
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
-                      <div className="relative flex-grow">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                        <Input
-                          type="text"
-                          placeholder="Search tests..."
-                          className="pl-9 h-9 sm:h-10 w-full"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                      </div>
-                      <Select value={filterStatus} onValueChange={setFilterStatus}>
-                        <SelectTrigger className="h-9 sm:h-10 w-full sm:w-[180px]">
-                          <SelectValue placeholder="Filter by status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Statuses</SelectItem>
-                          <SelectItem value="draft">Draft</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="scheduled">Scheduled</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      {filteredQuizzes.length > 0 ? (
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {filteredQuizzes.map((quiz) => (
-                            <Card key={quiz.id} className="hover:shadow-md transition-all">
-                              <CardContent className="p-4">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <h3 className="font-semibold text-base">{quiz.title}</h3>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      {quiz.description || 'No description'}
-                                    </p>
-                                  </div>
-                                  <Badge className={getStatusColor(quiz.status)}>
-                                    {quiz.status.charAt(0).toUpperCase() + quiz.status.slice(1)}
-                                  </Badge>
-                                </div>
-                                
-                                <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-                                  <div className="flex items-center gap-1">
-                                    <Timer className="h-3.5 w-3.5" />
-                                    <span>{quiz.duration} min</span>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <FileText className="h-3.5 w-3.5" />
-                                    <span>{quiz.questions.length} questions</span>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <AlertTriangle className="h-3.5 w-3.5" />
-                                    <span>{quiz.totalPoints} points</span>
-                                  </div>
-                                </div>
-                                
-                                {quiz.scheduledDate && (
-                                  <div className="mt-2 flex items-center gap-1 text-xs">
-                                    <Calendar className="h-3.5 w-3.5 text-blue-500" />
-                                    <span>Scheduled: {formatDate(quiz.scheduledDate)}</span>
-                                  </div>
-                                )}
-                                
-                                <div className="mt-3 pt-3 border-t border-border/20 flex justify-between">
-                                  <span className="text-xs text-muted-foreground">
-                                    Created: {formatDate(quiz.dateCreated)}
-                                  </span>
-                                  <div className="flex gap-1">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-8 w-8 p-0" 
-                                      onClick={() => setCurrentQuiz(quiz)}
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-8 w-8 p-0"
-                                      onClick={() => handleEditTest(quiz)}
-                                    >
-                                      <Edit2 className="h-4 w-4" />
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-8 w-8 p-0"
-                                      onClick={() => handleDeleteTest(quiz.id)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-12">
-                          <div className="mx-auto bg-slate-100 rounded-full w-12 h-12 flex items-center justify-center mb-4">
-                            <FileText className="h-6 w-6 text-slate-500" />
-                          </div>
-                          <h3 className="text-lg font-medium">No Tests Found</h3>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {searchTerm || filterStatus !== 'all' 
-                              ? 'Try adjusting your search or filters' 
-                              : 'Create your first test to get started'}
-                          </p>
-                          {!searchTerm && filterStatus === 'all' && (
-                            <Button 
-                              className="mt-4" 
-                              onClick={() => {
-                                setCurrentQuiz(null);
-                                setEditMode(false);
-                                setCreateDialogOpen(true);
-                              }}
-                            >
-                              <Plus className="h-4 w-4 mr-1" />
-                              Create Test
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="results">
-                    <ResultsTab />
-                  </TabsContent>
-                </Tabs>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+		const rows = filteredAttempts.map(attempt => ([
+			attempt.attemptId,
+			attempt.officerName,
+			attempt.officerId,
+			attempt.testTitle,
+			attempt.testId,
+			attempt.score,
+			attempt.totalPoints,
+			attempt.percentageScore,
+			attempt.status,
+			attempt.completedAt ?? '',
+		]).map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
 
-      {/* Create/Edit Test Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{editMode ? 'Edit Test' : 'Create New Test'}</DialogTitle>
-            <DialogDescription>
-              {editMode 
-                ? 'Update the details for this test' 
-                : 'Define the basic details for your new assessment test'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <form id="create-test-form" className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="title">Test Title</Label>
-              <Input 
-                id="title" 
-                name="title"
-                placeholder="Enter test title" 
-                defaultValue={currentQuiz?.title || ''} 
-                required
-              />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="description">Description (Optional)</Label>
-              <Textarea 
-                id="description" 
-                name="description"
-                placeholder="Briefly describe the purpose of this test" 
-                defaultValue={currentQuiz?.description || ''} 
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="duration">Duration (minutes)</Label>
-                <Input 
-                  id="duration" 
-                  name="duration"
-                  type="number" 
-                  min="1" 
-                  defaultValue={currentQuiz?.duration || 30}
-                  required 
-                />
-              </div>
-              
-              <div className="grid gap-2">
-                <Label htmlFor="points">Total Points</Label>
-                <Input 
-                  id="points" 
-                  name="points"
-                  type="number" 
-                  min="1" 
-                  defaultValue={currentQuiz?.totalPoints || 100} 
-                  required
-                />
-              </div>
-            </div>
-          </form>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => {
-              const form = document.getElementById('create-test-form') as HTMLFormElement;
-              if (form) {
-                const formData = new FormData(form);
-                
-                handleCreateTest({
-                  title: formData.get('title') as string,
-                  description: formData.get('description') as string,
-                  duration: parseInt(formData.get('duration') as string) || 30,
-                  totalPoints: parseInt(formData.get('points') as string) || 100
-                });
-              }
-            }}>
-              {editMode ? 'Update Test' : 'Create Test'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+		const csv = [headers.join(','), ...rows].join('\n')
+		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+		const url = URL.createObjectURL(blob)
+		const anchor = document.createElement('a')
+		const fromLabel = resultsDateFrom || 'all'
+		const toLabel = resultsDateTo || 'all'
+		anchor.href = url
+		anchor.download = `cbt-results-${fromLabel}_to_${toLabel}.csv`
+		anchor.click()
+		URL.revokeObjectURL(url)
+	}
 
-      {/* Question Dialog */}
-      <Dialog open={questionDialogOpen} onOpenChange={setQuestionDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{editMode ? 'Edit Question' : 'Add Question'}</DialogTitle>
-            <DialogDescription>
-              {editMode 
-                ? 'Update the details for this question' 
-                : 'Create a new question for your test'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <QuestionForm />
-        </DialogContent>
-      </Dialog>
-      
-      {/* Result Details Dialog */}
-      <Dialog open={resultDetailsOpen} onOpenChange={setResultDetailsOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Test Result Details</DialogTitle>
-            <DialogDescription>
-              Detailed view of the officer's test performance
-            </DialogDescription>
-          </DialogHeader>
-          
-          {currentResult && (
-            <div className="space-y-6">
-              {/* Officer & Test Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Officer Information</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <dl className="space-y-2 text-sm">
-                      <div>
-                        <dt className="text-muted-foreground">Name:</dt>
-                        <dd className="font-medium">{currentResult.officerName}</dd>
-                      </div>
-                      {currentResult.officerRank && (
-                        <div>
-                          <dt className="text-muted-foreground">Rank:</dt>
-                          <dd>{currentResult.officerRank}</dd>
-                        </div>
-                      )}
-                      {currentResult.officerDepartment && (
-                        <div>
-                          <dt className="text-muted-foreground">Department:</dt>
-                          <dd>{currentResult.officerDepartment}</dd>
-                        </div>
-                      )}
-                    </dl>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Test Information</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <dl className="space-y-2 text-sm">
-                      <div>
-                        <dt className="text-muted-foreground">Test Name:</dt>
-                        <dd className="font-medium">{currentResult.quizTitle}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Date Taken:</dt>
-                        <dd>{formatDate(currentResult.endTime)}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Duration:</dt>
-                        <dd>{Math.round((currentResult.endTime.getTime() - currentResult.startTime.getTime()) / 60000)} minutes</dd>
-                      </div>
-                    </dl>
-                  </CardContent>
-                </Card>
-              </div>
+	const openCreateDialog = () => {
+		setEditMode(false)
+		setCurrentTest({
+			testId: '',
+			title: '',
+			description: '',
+			durationMinutes: 30,
+			totalPoints: 100,
+			passThresholdPercentage: 80,
+			status: 'draft',
+			scheduledDate: null,
+			questions: [],
+		})
+		setCreateDialogOpen(true)
+	}
 
-              {/* Test Stats */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Test Performance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="border rounded-lg p-4 flex flex-col items-center justify-center">
-                      <div className="text-3xl font-bold">{currentResult.score}</div>
-                      <div className="text-sm text-muted-foreground">Points Scored</div>
-                      <div className="text-xs">Out of {currentResult.totalPoints}</div>
-                    </div>
-                    <div className="border rounded-lg p-4 flex flex-col items-center justify-center">
-                      <div className="text-3xl font-bold">{currentResult.percentageScore.toFixed(1)}%</div>
-                      <div className="text-sm text-muted-foreground">Percentage</div>
-                      <div className="text-xs">
-                        <Badge className={
-                          currentResult.status === 'passed' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }>
-                          {currentResult.status === 'passed' ? 'PASSED' : 'FAILED'}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="border rounded-lg p-4 flex flex-col items-center justify-center">
-                      <div className="text-3xl font-bold">{currentResult.correctAnswers || 
-                        currentResult.answers?.filter(a => a.correct).length || 0}</div>
-                      <div className="text-sm text-muted-foreground">Correct Answers</div>
-                      <div className="text-xs">Out of {currentResult.totalQuestions || 
-                        currentResult.answers?.length || 0} questions</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+	const openEditDialog = async (testId: string) => {
+		setEditMode(true)
+		setTestSaving(true)
+		try {
+			const test = await recruitmentTestService.getAdminTestById(testId)
+			setCurrentTest({ ...test, passThresholdPercentage: test.passThresholdPercentage ?? 80 })
+			const testAttempts = await recruitmentTestService.getAdminAttempts(testId)
+			setCurrentTestHasAttempts(testAttempts.length > 0)
+			setCreateDialogOpen(true)
+		} catch (err) {
+			console.error('❌ [CBT] Failed to load test:', err)
+			const message = err instanceof Error ? err.message : 'Failed to load test'
+			toast({ title: 'Failed to load test', description: message, variant: 'destructive' })
+		} finally {
+			setTestSaving(false)
+		}
+	}
 
-              {/* Answer Details */}
-              {currentResult.answers && currentResult.answers.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Answer Details</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {currentResult.answers.map((answer, index) => {
-                        // Find corresponding question if available
-                        const question = quizzes.find(q => q.id === currentResult.quizId)?.questions.find(q => q.id === answer.questionId);
-                        const isCorrect = answer.correct === true;
-                        
-                        return (
-                          <div key={answer.questionId} className={cn(
-                            "border rounded-lg p-4",
-                            isCorrect ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"
-                          )}>
-                            <div className="flex justify-between items-start">
-                              <div className="flex gap-2 items-start">
-                                <div className={cn(
-                                  "rounded-full h-6 w-6 flex items-center justify-center text-xs font-medium",
-                                  isCorrect ? "bg-emerald-200 text-emerald-800" : "bg-red-200 text-red-800"
-                                )}>
-                                  {index + 1}
-                                </div>
-                                <div>
-                                  <h4 className="font-medium text-sm">{question?.text || `Question ${index + 1}`}</h4>
-                                  
-                                  {question?.type === 'multiple-choice' && (
-                                    <div className="mt-2 pl-1 space-y-1">
-                                      {question.options.map((option, optIndex) => (
-                                        <div key={optIndex} className={cn(
-                                          "text-sm flex items-start gap-2",
-                                          answer.answer === optIndex.toString() && "font-medium",
-                                          question.correctAnswer === optIndex.toString() && "text-emerald-700",
-                                          answer.answer === optIndex.toString() && answer.answer !== question.correctAnswer && "text-red-700"
-                                        )}>
-                                          <div className={cn(
-                                            "h-4 w-4 mt-0.5 rounded-full flex items-center justify-center",
-                                            answer.answer === optIndex.toString() && (
-                                              answer.answer === question.correctAnswer 
-                                                ? "bg-emerald-500 text-white"
-                                                : "bg-red-500 text-white"
-                                            ),
-                                            question.correctAnswer === optIndex.toString() && answer.answer !== optIndex.toString() && "border-2 border-emerald-500"
-                                          )}>
-                                            {answer.answer === optIndex.toString() && (
-                                              <CheckSquare className="h-3 w-3" />
-                                            )}
-                                          </div>
-                                          <span>{option}</span>
-                                          {question.correctAnswer === optIndex.toString() && answer.answer !== optIndex.toString() && (
-                                            <span className="text-xs text-emerald-600 ml-1">(Correct Answer)</span>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  
-                                  {question?.type === 'true-false' && (
-                                    <div className="mt-2 pl-1 space-y-1">
-                                      <div className={cn(
-                                        "text-sm flex items-center gap-2",
-                                        answer.answer === 'true' && "font-medium",
-                                        question.correctAnswer === 'true' && "text-emerald-700",
-                                        answer.answer === 'true' && question.correctAnswer !== 'true' && "text-red-700"
-                                      )}>
-                                        <div className={cn(
-                                          "h-4 w-4 rounded-full flex items-center justify-center",
-                                          answer.answer === 'true' && (
-                                            question.correctAnswer === 'true' 
-                                              ? "bg-emerald-500 text-white" 
-                                              : "bg-red-500 text-white"
-                                          ),
-                                          question.correctAnswer === 'true' && answer.answer !== 'true' && "border-2 border-emerald-500"
-                                        )}>
-                                          {answer.answer === 'true' && <CheckSquare className="h-3 w-3" />}
-                                        </div>
-                                        <span>True</span>
-                                      </div>
-                                      <div className={cn(
-                                        "text-sm flex items-center gap-2",
-                                        answer.answer === 'false' && "font-medium",
-                                        question.correctAnswer === 'false' && "text-emerald-700",
-                                        answer.answer === 'false' && question.correctAnswer !== 'false' && "text-red-700"
-                                      )}>
-                                        <div className={cn(
-                                          "h-4 w-4 rounded-full flex items-center justify-center",
-                                          answer.answer === 'false' && (
-                                            question.correctAnswer === 'false' 
-                                              ? "bg-emerald-500 text-white" 
-                                              : "bg-red-500 text-white"
-                                          ),
-                                          question.correctAnswer === 'false' && answer.answer !== 'false' && "border-2 border-emerald-500"
-                                        )}>
-                                          {answer.answer === 'false' && <CheckSquare className="h-3 w-3" />}
-                                        </div>
-                                        <span>False</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                  
-                                  {(question?.type === 'text' || question?.type === 'essay') && (
-                                    <div className="mt-2 pl-1">
-                                      <div className="text-sm">
-                                        <div className="font-medium">Officer's Answer:</div>
-                                        <div className="mt-1 p-2 border bg-white rounded">{answer.answer}</div>
-                                      </div>
-                                      {question.correctAnswer && (
-                                        <div className="text-sm mt-2">
-                                          <div className="font-medium text-emerald-700">Correct Answer:</div>
-                                          <div className="mt-1 p-2 border border-emerald-200 bg-emerald-50 rounded">{question.correctAnswer}</div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              <Badge className={isCorrect ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}>
-                                {isCorrect ? "Correct" : "Incorrect"}
-                              </Badge>
-                            </div>
-                            
-                            {question && (
-                              <div className="text-xs text-muted-foreground mt-3 flex items-center justify-end">
-                                <div>Points: {isCorrect ? question.points : 0}/{question.points}</div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              {/* Comments & Feedback */}
-              {currentResult.feedback && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Feedback & Comments</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="p-3 bg-[#EFF4FF] rounded border text-sm">
-                      {currentResult.feedback}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setResultDetailsOpen(false)}>
-                  Close
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
+	const saveTest = async (test: RecruitmentAdminTest) => {
+		setTestSaving(true)
+		try {
+			const payload: RecruitmentAdminTest = {
+				...test,
+				title: test.title.trim(),
+				status: (normalizeStatus(test.status) as TestStatus) || 'draft',
+				passThresholdPercentage: Math.min(100, Math.max(0, test.passThresholdPercentage)),
+				questions: test.questions.map(q => ({
+					...q,
+					questionId: q.questionId || makeId(),
+					type: normalizeStatus(q.type),
+					text: q.text,
+					options: q.options.map((o, idx) => ({
+						...o,
+						sortOrder: o.sortOrder ?? (idx + 1),
+						optionId: o.optionId ?? null,
+					})),
+				})),
+			}
+
+			const saved = editMode && payload.testId
+				? await recruitmentTestService.updateAdminTest(payload.testId, payload)
+				: await recruitmentTestService.createAdminTest(payload)
+
+			setCurrentTest(saved)
+			setCreateDialogOpen(false)
+			toast({ title: 'Saved', description: 'Test saved successfully' })
+			await loadTests()
+		} catch (err) {
+			console.error('❌ [CBT] Failed to save test:', err)
+			const message = err instanceof Error ? err.message : 'Failed to save test'
+			toast({ title: 'Save failed', description: message, variant: 'destructive' })
+		} finally {
+			setTestSaving(false)
+		}
+	}
+
+	const deleteTest = async (testId: string) => {
+		try {
+			await recruitmentTestService.deleteAdminTest(testId)
+			toast({ title: 'Deleted', description: 'Test deleted successfully' })
+			await loadTests()
+		} catch (err) {
+			console.error('❌ [CBT] Failed to delete test:', err)
+			const message = err instanceof Error ? err.message : 'Failed to delete test'
+			toast({ title: 'Delete failed', description: message, variant: 'destructive' })
+		}
+	}
+
+	const upsertQuestion = async (question: RecruitmentAdminQuestion) => {
+		if (!currentTest) return
+		if (currentTestHasAttempts) {
+			toast({ title: 'Locked', description: 'This test already has attempts; questions are locked.', variant: 'destructive' })
+			return
+		}
+
+		const isEdit = Boolean(currentQuestion)
+		const normalized: RecruitmentAdminQuestion = {
+			...question,
+			questionId: question.questionId || makeId(),
+			type: normalizeStatus(question.type) as RecruitmentQuestionType,
+			sortOrder: question.sortOrder || (currentTest.questions.length + 1),
+			options: question.options.map((o, idx) => ({
+				...o,
+				sortOrder: o.sortOrder || (idx + 1),
+				optionId: o.optionId ?? null,
+			})),
+		}
+
+		const nextQuestions = isEdit
+			? currentTest.questions.map(q => (q.questionId === normalized.questionId ? normalized : q))
+			: [...currentTest.questions, normalized]
+
+		const nextTest: RecruitmentAdminTest = { ...currentTest, questions: nextQuestions }
+		setCurrentTest(nextTest)
+		setQuestionDialogOpen(false)
+		setCurrentQuestion(null)
+
+		await saveTest(nextTest)
+	}
+
+	const removeQuestion = async (questionId: string) => {
+		if (!currentTest) return
+		if (currentTestHasAttempts) {
+			toast({ title: 'Locked', description: 'This test already has attempts; questions are locked.', variant: 'destructive' })
+			return
+		}
+
+		const nextTest: RecruitmentAdminTest = {
+			...currentTest,
+			questions: currentTest.questions.filter(q => q.questionId !== questionId),
+		}
+		setCurrentTest(nextTest)
+		await saveTest(nextTest)
+	}
+
+	const handleAddBulkQuestionRow = () => {
+		setBulkQuestions(prev => [...prev, createBulkDraft()])
+	}
+
+	const handleRemoveBulkQuestionRow = (id: string) => {
+		setBulkQuestions(prev => prev.filter(q => q.id !== id))
+	}
+
+	const handleBulkQuestionChange = (id: string, patch: Partial<BulkQuestionDraft>) => {
+		setBulkQuestions(prev => prev.map(q => (q.id === id ? { ...q, ...patch } : q)))
+	}
+
+	const handleBulkQuestionTypeChange = (id: string, type: RecruitmentQuestionType) => {
+		setBulkQuestions(prev => prev.map(q => (q.id === id ? applyBulkTypeDefaults(q, type) : q)))
+	}
+
+	const handleBulkOptionChange = (questionId: string, optionIndex: number, patch: Partial<RecruitmentAdminOption>) => {
+		setBulkQuestions(prev => prev.map(question => {
+			if (question.id !== questionId) return question
+			const nextOptions = question.options.map((option, index) => (
+				index === optionIndex ? { ...option, ...patch } : option
+			))
+			return { ...question, options: nextOptions }
+		}))
+	}
+
+	const handleAddBulkOption = (questionId: string) => {
+		setBulkQuestions(prev => prev.map(question => {
+			if (question.id !== questionId) return question
+			const nextOptions = [
+				...question.options,
+				{ optionId: null, text: '', sortOrder: question.options.length + 1, isCorrect: false },
+			]
+			return { ...question, options: nextOptions }
+		}))
+	}
+
+	const handleRemoveBulkOption = (questionId: string, optionIndex: number) => {
+		setBulkQuestions(prev => prev.map(question => {
+			if (question.id !== questionId) return question
+			if (question.options.length <= 2) return question
+			const nextOptions = question.options
+				.filter((_, index) => index !== optionIndex)
+				.map((option, index) => ({ ...option, sortOrder: index + 1 }))
+			return { ...question, options: nextOptions }
+		}))
+	}
+
+	const handleBulkOptionCorrectSingle = (questionId: string, optionIndex: number, checked: boolean) => {
+		setBulkQuestions(prev => prev.map(question => {
+			if (question.id !== questionId) return question
+			const nextOptions = question.options.map((option, index) => ({
+				...option,
+				isCorrect: index === optionIndex ? checked : false,
+			}))
+			return { ...question, options: nextOptions }
+		}))
+	}
+
+	const handleBulkOptionCorrectMulti = (questionId: string, optionIndex: number, checked: boolean) => {
+		setBulkQuestions(prev => prev.map(question => {
+			if (question.id !== questionId) return question
+			const nextOptions = question.options.map((option, index) => (
+				index === optionIndex ? { ...option, isCorrect: checked } : option
+			))
+			return { ...question, options: nextOptions }
+		}))
+	}
+
+	const saveBulkQuestions = async () => {
+		if (!currentTest) return
+		if (currentTestHasAttempts) {
+			toast({ title: 'Locked', description: 'This test already has attempts; questions are locked.', variant: 'destructive' })
+			return
+		}
+
+		const errors: string[] = []
+
+		const defaults = bulkQuestions
+			.map((draft, index) => {
+				const text = draft.text.trim()
+				const normalizedType = normalizeStatus(draft.type) as RecruitmentQuestionType
+				const isChoice = normalizedType === 'multiple-choice' || normalizedType === 'multiple-answer'
+				const isText = normalizedType === 'text' || normalizedType === 'essay'
+				const hasAnyContent = text !== ''
+					|| draft.options.some(option => option.text.trim() !== '')
+					|| draft.correctAnswerText.trim() !== ''
+
+				if (!text) {
+					if (hasAnyContent) {
+						errors.push(`Question ${index + 1}: add question text.`)
+					}
+					return null
+				}
+
+				const normalizedOptions = isChoice ? normalizeBulkOptions(draft.options) : []
+				if (isChoice) {
+					if (normalizedOptions.length < 2) {
+						errors.push(`Question ${index + 1}: add at least two options.`)
+					}
+					const correctCount = normalizedOptions.filter(option => option.isCorrect).length
+					if (normalizedType === 'multiple-choice' && correctCount !== 1) {
+						errors.push(`Question ${index + 1}: select exactly one correct option.`)
+					}
+					if (normalizedType === 'multiple-answer' && correctCount < 1) {
+						errors.push(`Question ${index + 1}: select at least one correct option.`)
+					}
+				}
+
+				const correctAnswerText = normalizedType === 'true-false'
+					? (draft.correctAnswerText === 'false' ? 'false' : 'true')
+					: isText
+						? (draft.correctAnswerText.trim() || null)
+						: null
+
+				return {
+					questionId: makeId(),
+					type: normalizedType,
+					text,
+					points: Math.max(1, draft.points),
+					sortOrder: currentTest.questions.length + index + 1,
+					correctAnswerText,
+					options: normalizedOptions,
+				} as RecruitmentAdminQuestion
+			})
+			.filter(Boolean) as RecruitmentAdminQuestion[]
+
+		if (errors.length > 0) {
+			const errorMessage = errors.length > 3
+				? `${errors.slice(0, 3).join(' ')} (+${errors.length - 3} more)`
+				: errors.join(' ')
+			toast({ title: 'Fix bulk questions', description: errorMessage, variant: 'destructive' })
+			return
+		}
+
+		if (defaults.length === 0) {
+			toast({ title: 'Nothing to save', description: 'Add at least one question before saving.', variant: 'destructive' })
+			return
+		}
+
+		const nextTest: RecruitmentAdminTest = {
+			...currentTest,
+			questions: [...currentTest.questions, ...defaults],
+		}
+		setCurrentTest(nextTest)
+		setBulkDialogOpen(false)
+		setBulkQuestions([createBulkDraft()])
+		await saveTest(nextTest)
+	}
+
+	const openResultDetails = async (attemptId: number) => {
+		setResultDetailsOpen(true)
+		setResultLoading(true)
+		setCurrentResult(null)
+		try {
+			const detail = await recruitmentTestService.getAdminAttemptById(attemptId)
+			setCurrentResult(detail)
+		} catch (err) {
+			console.error('❌ [CBT] Failed to load attempt details:', err)
+			const message = err instanceof Error ? err.message : 'Failed to load attempt details'
+			toast({ title: 'Failed to load details', description: message, variant: 'destructive' })
+		} finally {
+			setResultLoading(false)
+		}
+	}
+	return (
+		<div className="min-h-screen bg-slate-50 w-full overflow-x-hidden">
+			<div className="container mx-auto px-3 py-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-5 lg:space-y-6 max-w-full md:max-w-[96%] lg:max-w-7xl">
+				<div className="rounded-2xl border border-slate-200/70 bg-white/90 shadow-sm backdrop-blur">
+					<div className="flex flex-col gap-4 p-4 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+						<div className="space-y-2">
+							<Badge variant="outline" className="border-slate-200/80 text-xs uppercase tracking-wide text-slate-500">CBT administration</Badge>
+							<div>
+								<h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">Assessment Test Console</h1>
+								<p className="text-sm text-slate-500">Create, schedule, and monitor CBT assessments in one place.</p>
+							</div>
+						</div>
+						<div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto">
+							<Button className="h-10 w-full sm:w-auto" onClick={openCreateDialog}>
+								<Plus className="h-4 w-4 mr-2" />
+								Create New Test
+							</Button>
+						</div>
+					</div>
+				</div>
+
+				<div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+					{stats.map((stat) => (
+						<Card key={stat.title} className="border-slate-200/70 bg-white/90 shadow-sm">
+							<CardContent className="p-4">
+								<div className="flex items-center justify-between">
+									<div>
+										<p className="text-xs font-medium uppercase tracking-wide text-slate-400">{stat.title}</p>
+										<p className="text-2xl font-semibold text-slate-900">{stat.value}</p>
+									</div>
+									<div className={cn('flex h-10 w-10 items-center justify-center rounded-full', stat.ring)}>
+										<stat.icon className={cn('h-5 w-5', stat.accent)} />
+									</div>
+								</div>
+							</CardContent>
+						</Card>
+					))}
+				</div>
+
+				<Card className="border-slate-200/70 bg-white/90 shadow-sm">
+					<CardContent className="p-4 sm:p-6">
+						<Tabs defaultValue="tests" value={activeTab} onValueChange={(v) => setActiveTab(v as 'tests' | 'results')}>
+							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+								<TabsList className="rounded-full bg-slate-100 p-1">
+								<TabsTrigger value="tests">Tests</TabsTrigger>
+								<TabsTrigger value="results">Results</TabsTrigger>
+								</TabsList>
+								<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+									<div className="relative w-full sm:w-[260px]">
+										<Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+										<Input
+											type="text"
+											placeholder="Search tests..."
+											className="h-10 pl-8"
+											value={searchTerm}
+											onChange={(e) => setSearchTerm(e.target.value)}
+										/>
+									</div>
+									<Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as 'all' | TestStatus)}>
+										<SelectTrigger className="h-10 w-full sm:w-[180px]">
+											<SelectValue placeholder="Filter by status" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="all">All Statuses</SelectItem>
+											<SelectItem value="draft">Draft</SelectItem>
+											<SelectItem value="active">Active</SelectItem>
+											<SelectItem value="scheduled">Scheduled</SelectItem>
+											<SelectItem value="completed">Completed</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+							</div>
+
+							<TabsContent value="tests" className="space-y-4 pt-4">
+								{testsLoading ? (
+									<div className="text-center py-12 text-sm text-slate-500">Loading tests…</div>
+								) : testsError ? (
+									<div className="text-center py-12 text-sm text-slate-500">{testsError}</div>
+								) : filteredTests.length > 0 ? (
+									<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+										{filteredTests.map((t) => (
+											<Card key={t.testId} className="border-slate-200/70 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+												<CardContent className="p-4">
+													<div className="flex items-start justify-between gap-3">
+														<div className="space-y-1">
+															<h3 className="text-base font-semibold text-slate-900">{t.title}</h3>
+															<p className="text-xs text-slate-500">{t.description || 'No description provided.'}</p>
+														</div>
+														<Badge className={getStatusColor(t.status)}>{t.status.charAt(0).toUpperCase() + t.status.slice(1)}</Badge>
+													</div>
+
+													<div className="mt-4 grid gap-2 text-xs text-slate-500">
+														<div className="flex items-center gap-2">
+															<Timer className="h-4 w-4" />
+															<span>{t.durationMinutes} min duration</span>
+														</div>
+														<div className="flex items-center gap-2">
+															<FileText className="h-4 w-4" />
+															<span>{t.questionCount} questions</span>
+														</div>
+														<div className="flex items-center gap-2">
+															<AlertTriangle className="h-4 w-4" />
+															<span>{t.totalPoints} total points</span>
+														</div>
+														{t.scheduledDate && (
+															<div className="flex items-center gap-2 text-slate-400">
+																<span>Scheduled {formatDate(t.scheduledDate)}</span>
+															</div>
+														)}
+													</div>
+
+													<div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+														<Button variant="ghost" size="sm" className="px-0 text-slate-500" onClick={() => openEditDialog(t.testId)}>
+															<Eye className="mr-2 h-4 w-4" />
+															View
+														</Button>
+														<div className="flex gap-1">
+															<Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => openEditDialog(t.testId)} aria-label="Edit test">
+																<Edit2 className="h-4 w-4" />
+															</Button>
+															<Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => void deleteTest(t.testId)} aria-label="Delete test">
+																<Trash2 className="h-4 w-4" />
+															</Button>
+														</div>
+													</div>
+												</CardContent>
+											</Card>
+										))}
+									</div>
+								) : (
+									<div className="text-center py-12">
+										<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+											<FileText className="h-6 w-6 text-slate-500" />
+										</div>
+										<h3 className="mt-3 text-lg font-medium text-slate-900">No tests yet</h3>
+										<p className="text-sm text-slate-500">
+											{searchTerm || filterStatus !== 'all' ? 'Try adjusting your search or filters.' : 'Create your first CBT assessment to get started.'}
+										</p>
+									</div>
+								)}
+							</TabsContent>
+
+							<TabsContent value="results" className="space-y-4 pt-4">
+								<div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+									<div className="space-y-2">
+										<div className="text-sm text-slate-500">Completed attempts</div>
+										<div className="grid gap-2 sm:grid-cols-3">
+											<div className="grid gap-1">
+												<Label htmlFor="results-from">From</Label>
+												<Input
+													id="results-from"
+													type="date"
+													value={resultsDateFrom}
+													onChange={(e) => setResultsDateFrom(e.target.value)}
+												/>
+											</div>
+											<div className="grid gap-1">
+												<Label htmlFor="results-to">To</Label>
+												<Input
+													id="results-to"
+													type="date"
+													value={resultsDateTo}
+													onChange={(e) => setResultsDateTo(e.target.value)}
+												/>
+											</div>
+											<div className="grid gap-1">
+												<Label>Test</Label>
+												<Select value={resultsFilterTestId} onValueChange={setResultsFilterTestId}>
+													<SelectTrigger className="h-10 w-full">
+														<SelectValue placeholder="Filter by test" />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value="all">All Tests</SelectItem>
+														{tests.map(t => (
+															<SelectItem key={t.testId} value={t.testId}>{t.title}</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
+											</div>
+										</div>
+									</div>
+									<Button
+										variant="outline"
+										onClick={handleExportResultsCsv}
+										disabled={filteredAttempts.length === 0}
+									>
+										Export CSV
+									</Button>
+								</div>
+
+								{attemptsLoading ? (
+									<div className="text-center py-12 text-sm text-slate-500">Loading attempts…</div>
+								) : attemptsError ? (
+									<div className="text-center py-12 text-sm text-slate-500">{attemptsError}</div>
+								) : (
+									<div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white">
+										<div className="overflow-x-auto">
+											<table className="w-full text-sm">
+												<thead className="bg-slate-50 text-slate-500 sticky top-0">
+													<tr>
+														<th className="px-4 py-3 text-left font-medium">Officer</th>
+														<th className="px-4 py-3 text-left font-medium">Test</th>
+														<th className="px-4 py-3 text-left font-medium">Date</th>
+														<th className="px-4 py-3 text-left font-medium">Score</th>
+														<th className="px-4 py-3 text-left font-medium">Status</th>
+														<th className="px-4 py-3 text-right font-medium">Actions</th>
+													</tr>
+												</thead>
+												<tbody className="divide-y">
+													{filteredAttempts.length > 0 ? (
+														filteredAttempts.map(a => (
+															<tr key={a.attemptId} className="hover:bg-slate-50">
+																<td className="px-4 py-3">{a.officerName}</td>
+																<td className="px-4 py-3">{a.testTitle}</td>
+																<td className="px-4 py-3">{a.completedAt ? formatDate(a.completedAt) : '—'}</td>
+																<td className="px-4 py-3">
+																	<div className="flex items-center gap-2">
+																		<span>{a.score}/{a.totalPoints}</span>
+																		<span className="text-xs text-slate-400">({a.percentageScore.toFixed(1)}%)</span>
+																	</div>
+																	<Progress value={a.percentageScore} className="h-1.5 w-24" />
+																</td>
+																<td className="px-4 py-3">
+																	<Badge className={normalizeStatus(a.status) === 'passed' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}>
+																		{normalizeStatus(a.status) === 'passed' ? 'Passed' : 'Failed'}
+																	</Badge>
+																</td>
+																<td className="px-4 py-3 text-right">
+																	<Button variant="ghost" size="sm" onClick={() => void openResultDetails(a.attemptId)}>
+																		<Eye className="mr-2 h-4 w-4" />
+																		View Details
+																	</Button>
+																</td>
+															</tr>
+														))
+													) : (
+														<tr>
+															<td colSpan={6} className="px-4 py-8 text-center text-slate-500">No attempts found</td>
+														</tr>
+													)}
+												</tbody>
+											</table>
+										</div>
+									</div>
+								)}
+							</TabsContent>
+						</Tabs>
+					</CardContent>
+				</Card>
+			</div>
+
+			<Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+				<DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>{editMode ? 'Edit Test' : 'Create New Test'}</DialogTitle>
+						<DialogDescription>
+							{editMode ? 'Update the details and questions for this test' : 'Define the basic details and questions for your new assessment test'}
+						</DialogDescription>
+						{editMode && currentTestHasAttempts && (
+							<p className="text-xs text-amber-700">
+								This test already has attempts. **Questions are locked** (you can still update title/duration/status).
+							</p>
+						)}
+					</DialogHeader>
+
+					{currentTest && (
+						<div className="space-y-6">
+							<div className="grid gap-4">
+								<div className="grid gap-2">
+									<Label htmlFor="title">Test Title</Label>
+									<Input
+										id="title"
+										placeholder="Enter test title"
+										value={currentTest.title}
+										onChange={(e) => setCurrentTest({ ...currentTest, title: e.target.value })}
+									/>
+								</div>
+								<div className="grid gap-2">
+									<Label htmlFor="description">Description (Optional)</Label>
+									<Textarea
+										id="description"
+										placeholder="Briefly describe the purpose of this test"
+										value={currentTest.description ?? ''}
+										onChange={(e) => setCurrentTest({ ...currentTest, description: e.target.value })}
+									/>
+								</div>
+							<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+									<div className="grid gap-2">
+										<Label htmlFor="duration">Duration (minutes)</Label>
+										<Input
+											id="duration"
+											type="number"
+											min="1"
+											value={currentTest.durationMinutes}
+											onChange={(e) => setCurrentTest({ ...currentTest, durationMinutes: Math.max(1, Number(e.target.value || 1)) })}
+										/>
+									</div>
+									<div className="grid gap-2">
+										<Label htmlFor="points">Total Points</Label>
+										<Input
+											id="points"
+											type="number"
+											min="1"
+											value={currentTest.totalPoints}
+											onChange={(e) => setCurrentTest({ ...currentTest, totalPoints: Math.max(1, Number(e.target.value || 1)) })}
+										/>
+									</div>
+								<div className="grid gap-2">
+									<Label htmlFor="pass-threshold">Pass Threshold (%)</Label>
+									<Input
+										id="pass-threshold"
+										type="number"
+										min="1"
+										max="100"
+										value={currentTest.passThresholdPercentage}
+										onChange={(e) => setCurrentTest({
+											...currentTest,
+											passThresholdPercentage: Math.min(100, Math.max(1, Number(e.target.value || 1)))
+										})}
+									/>
+								</div>
+								</div>
+								<div className="grid grid-cols-2 gap-4">
+									<div className="grid gap-2">
+										<Label>Status</Label>
+										<Select value={normalizeStatus(currentTest.status)} onValueChange={(v) => setCurrentTest({ ...currentTest, status: v })}>
+											<SelectTrigger>
+												<SelectValue placeholder="Select status" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="draft">Draft</SelectItem>
+												<SelectItem value="active">Active</SelectItem>
+												<SelectItem value="scheduled">Scheduled</SelectItem>
+												<SelectItem value="completed">Completed</SelectItem>
+											</SelectContent>
+										</Select>
+									</div>
+									<div className="grid gap-2">
+										<Label>Scheduled Date (optional)</Label>
+										<Input
+											type="date"
+											value={currentTest.scheduledDate ? String(currentTest.scheduledDate).slice(0, 10) : ''}
+											onChange={(e) => setCurrentTest({ ...currentTest, scheduledDate: e.target.value ? e.target.value : null })}
+										/>
+									</div>
+								</div>
+							</div>
+
+							<div className="border rounded-md">
+								<div className="p-4 flex flex-col gap-3 border-b sm:flex-row sm:items-center sm:justify-between">
+									<div>
+										<div className="font-medium">Questions</div>
+										<div className="text-xs text-muted-foreground">{currentTest.questions.length} total</div>
+									</div>
+									<div className="flex flex-col gap-2 sm:flex-row">
+										<Button
+											variant="outline"
+											size="sm"
+											disabled={currentTestHasAttempts}
+											onClick={() => {
+												setBulkQuestions([createBulkDraft()])
+												setBulkDialogOpen(true)
+											}}
+										>
+											<Plus className="h-4 w-4 mr-1" />
+											Bulk Add
+										</Button>
+										<Button
+											variant="default"
+											size="sm"
+											disabled={currentTestHasAttempts}
+											onClick={() => {
+												setCurrentQuestion(null)
+												setQuestionDialogOpen(true)
+											}}
+										>
+											<Plus className="h-4 w-4 mr-1" />
+											Add Question
+										</Button>
+									</div>
+								</div>
+
+								{currentTest.questions.length === 0 ? (
+									<div className="p-8 text-center text-sm text-muted-foreground">No questions yet.</div>
+								) : (
+									<div className="divide-y">
+										{currentTest.questions
+											.slice()
+											.sort((a, b) => a.sortOrder - b.sortOrder)
+											.map((q, idx) => (
+												<div key={q.questionId} className="p-4 hover:bg-[#EFF4FF]">
+													<div className="flex justify-between items-start">
+														<div className="space-y-2">
+															<div className="flex items-center gap-2">
+																<span className="bg-slate-200 text-slate-700 rounded-full h-6 w-6 flex items-center justify-center text-xs font-medium">
+																	{idx + 1}
+																</span>
+																<div className="font-medium">{q.text}</div>
+															</div>
+															<div className="pl-8 flex items-center gap-2 text-xs text-muted-foreground">
+																<Badge variant="outline" className="text-xs">{q.type}</Badge>
+																<span>{q.points} {q.points === 1 ? 'point' : 'points'}</span>
+															</div>
+														</div>
+													<div className="flex flex-wrap gap-2">
+														<Button
+															variant="outline"
+															size="sm"
+															disabled={currentTestHasAttempts}
+															onClick={() => {
+																setCurrentQuestion(q)
+																setQuestionDialogOpen(true)
+															}}
+														>
+															<Edit2 className="h-4 w-4 mr-1" />
+															Edit
+														</Button>
+														<Button
+															variant="outline"
+															size="sm"
+															disabled={currentTestHasAttempts}
+															onClick={() => void removeQuestion(q.questionId)}
+														>
+															<Trash2 className="h-4 w-4 mr-1" />
+															Delete
+														</Button>
+													</div>
+													</div>
+												</div>
+											))}
+									</div>
+								)}
+							</div>
+						</div>
+					)}
+
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={testSaving}>Cancel</Button>
+						<Button onClick={() => currentTest && void saveTest(currentTest)} disabled={testSaving || !currentTest?.title.trim()}>
+							{testSaving ? 'Saving…' : editMode ? 'Update Test' : 'Create Test'}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={questionDialogOpen} onOpenChange={setQuestionDialogOpen}>
+				<DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>{currentQuestion ? 'Edit Question' : 'Add Question'}</DialogTitle>
+						<DialogDescription>Create a question for your test.</DialogDescription>
+					</DialogHeader>
+
+					<QuestionEditor
+						key={currentQuestion?.questionId || 'new'}
+						initial={currentQuestion}
+						onSubmit={(q) => void upsertQuestion(q)}
+						disabled={currentTestHasAttempts}
+					/>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+				<DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Bulk Add Questions</DialogTitle>
+						<DialogDescription>Add multiple questions quickly. You can edit options after saving.</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-4">
+						{bulkQuestions.map((question, index) => (
+							<div key={question.id} className="rounded-lg border border-slate-200/70 p-4 space-y-3">
+								<div className="flex items-center justify-between">
+									<div className="text-sm font-medium">Question {index + 1}</div>
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() => handleRemoveBulkQuestionRow(question.id)}
+										disabled={bulkQuestions.length === 1}
+									>
+										Remove
+									</Button>
+								</div>
+								<div className="grid gap-3 sm:grid-cols-3">
+									<div className="grid gap-2 sm:col-span-2">
+										<Label htmlFor={`bulk-text-${question.id}`}>Question Text</Label>
+										<Textarea
+											id={`bulk-text-${question.id}`}
+											value={question.text}
+											onChange={(e) => handleBulkQuestionChange(question.id, { text: e.target.value })}
+											placeholder="Enter question text"
+											className="min-h-[90px]"
+										/>
+									</div>
+									<div className="grid gap-2">
+										<Label htmlFor={`bulk-points-${question.id}`}>Points</Label>
+										<Input
+											id={`bulk-points-${question.id}`}
+											type="number"
+											min="1"
+											value={question.points}
+											onChange={(e) => handleBulkQuestionChange(question.id, { points: Math.max(1, Number(e.target.value || 1)) })}
+										/>
+										<div className="grid gap-2">
+											<Label htmlFor={`bulk-type-${question.id}`}>Type</Label>
+											<Select
+												value={question.type}
+											onValueChange={(value) => handleBulkQuestionTypeChange(question.id, value as RecruitmentQuestionType)}
+											>
+												<SelectTrigger id={`bulk-type-${question.id}`}>
+													<SelectValue placeholder="Select type" />
+												</SelectTrigger>
+												<SelectContent>
+													<SelectItem value="multiple-choice">Multiple Choice</SelectItem>
+													<SelectItem value="multiple-answer">Multiple Answer</SelectItem>
+													<SelectItem value="true-false">True / False</SelectItem>
+													<SelectItem value="text">Short Answer</SelectItem>
+													<SelectItem value="essay">Essay</SelectItem>
+												</SelectContent>
+											</Select>
+										</div>
+									</div>
+								</div>
+							{(question.type === 'multiple-choice' || question.type === 'multiple-answer') && (
+								<div className="space-y-3">
+									<Label>Answer Options</Label>
+									{question.options.map((option, optionIndex) => (
+										<div key={`${question.id}-option-${optionIndex}`} className="flex items-center gap-2">
+											{question.type === 'multiple-choice' ? (
+												<Checkbox
+													checked={option.isCorrect}
+													onCheckedChange={(checked) => handleBulkOptionCorrectSingle(question.id, optionIndex, Boolean(checked))}
+												/>
+											) : (
+												<Checkbox
+													checked={option.isCorrect}
+													onCheckedChange={(checked) => handleBulkOptionCorrectMulti(question.id, optionIndex, Boolean(checked))}
+												/>
+											)}
+											<Input
+												value={option.text}
+												onChange={(e) => handleBulkOptionChange(question.id, optionIndex, { text: e.target.value })}
+												placeholder={`Option ${optionIndex + 1}`}
+												className="flex-1"
+											/>
+											<Button
+												type="button"
+												variant="ghost"
+												size="icon"
+												onClick={() => handleRemoveBulkOption(question.id, optionIndex)}
+												disabled={question.options.length <= 2}
+											>
+												<Trash2 className="h-4 w-4" />
+											</Button>
+										</div>
+									))}
+									<Button type="button" variant="outline" size="sm" onClick={() => handleAddBulkOption(question.id)}>
+										Add Option
+									</Button>
+								</div>
+							)}
+							{question.type === 'true-false' && (
+								<div className="space-y-3">
+									<Label>Correct Answer</Label>
+									<RadioGroup
+										value={question.correctAnswerText || 'true'}
+										onValueChange={(value) => handleBulkQuestionChange(question.id, { correctAnswerText: value })}
+									>
+										<div className="flex items-center space-x-2">
+											<RadioGroupItem value="true" id={`bulk-true-${question.id}`} />
+											<Label htmlFor={`bulk-true-${question.id}`}>True</Label>
+										</div>
+										<div className="flex items-center space-x-2">
+											<RadioGroupItem value="false" id={`bulk-false-${question.id}`} />
+											<Label htmlFor={`bulk-false-${question.id}`}>False</Label>
+										</div>
+									</RadioGroup>
+								</div>
+							)}
+							{(question.type === 'text' || question.type === 'essay') && (
+								<div className="space-y-2">
+									<Label>Expected Answer (optional)</Label>
+									<Textarea
+										value={question.correctAnswerText}
+										onChange={(e) => handleBulkQuestionChange(question.id, { correctAnswerText: e.target.value })}
+										placeholder="Optional model answer / marking guide"
+									/>
+								</div>
+							)}
+							</div>
+						))}
+						<Button variant="outline" onClick={handleAddBulkQuestionRow}>
+							<Plus className="h-4 w-4 mr-1" />
+							Add Another Question
+						</Button>
+					</div>
+					<DialogFooter className="gap-2 sm:gap-0">
+						<Button variant="outline" onClick={() => setBulkDialogOpen(false)}>Cancel</Button>
+						<Button onClick={() => void saveBulkQuestions()} disabled={currentTestHasAttempts}>
+							Save Questions
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={resultDetailsOpen} onOpenChange={setResultDetailsOpen}>
+				<DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Attempt Details</DialogTitle>
+						<DialogDescription>Detailed view of an officer's attempt</DialogDescription>
+					</DialogHeader>
+
+					{resultLoading ? (
+						<div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
+					) : currentResult ? (
+						<div className="space-y-6">
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<Card>
+									<CardHeader className="pb-2">
+										<CardTitle className="text-base">Officer</CardTitle>
+									</CardHeader>
+									<CardContent className="text-sm space-y-1">
+										<div><span className="text-muted-foreground">Name:</span> <span className="font-medium">{currentResult.officerName}</span></div>
+										<div><span className="text-muted-foreground">UserId:</span> {currentResult.officerId}</div>
+									</CardContent>
+								</Card>
+								<Card>
+									<CardHeader className="pb-2">
+										<CardTitle className="text-base">Test</CardTitle>
+									</CardHeader>
+									<CardContent className="text-sm space-y-1">
+										<div><span className="text-muted-foreground">Title:</span> <span className="font-medium">{currentResult.testTitle}</span></div>
+										<div><span className="text-muted-foreground">Completed:</span> {currentResult.completedAt ? formatDate(currentResult.completedAt) : '—'}</div>
+									</CardContent>
+								</Card>
+							</div>
+
+							<Card>
+								<CardHeader className="pb-2">
+									<CardTitle className="text-base">Performance</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+										<div className="border rounded-lg p-4 flex flex-col items-center justify-center">
+											<div className="text-3xl font-bold">{currentResult.score}</div>
+											<div className="text-sm text-muted-foreground">Points Scored</div>
+											<div className="text-xs">Out of {currentResult.totalPoints}</div>
+										</div>
+										<div className="border rounded-lg p-4 flex flex-col items-center justify-center">
+											<div className="text-3xl font-bold">{currentResult.percentageScore.toFixed(1)}%</div>
+											<div className="text-sm text-muted-foreground">Percentage</div>
+											<div className="text-xs">
+												<Badge className={normalizeStatus(currentResult.status) === 'passed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+													{normalizeStatus(currentResult.status) === 'passed' ? 'PASSED' : 'FAILED'}
+												</Badge>
+											</div>
+										</div>
+										<div className="border rounded-lg p-4 flex flex-col items-center justify-center">
+											<div className="text-3xl font-bold">{currentResult.answers.filter(a => a.isCorrect).length}</div>
+											<div className="text-sm text-muted-foreground">Correct Answers</div>
+											<div className="text-xs">Out of {currentResult.answers.length}</div>
+										</div>
+									</div>
+								</CardContent>
+							</Card>
+						</div>
+					) : (
+						<div className="py-10 text-center text-sm text-muted-foreground">No data.</div>
+					)}
+
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setResultDetailsOpen(false)}>Close</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</div>
+	)
 }
 
 export default CBT
+
+type QuestionEditorProps = {
+	initial: RecruitmentAdminQuestion | null
+	onSubmit: (q: RecruitmentAdminQuestion) => void
+	disabled?: boolean
+}
+
+const QuestionEditor = ({ initial, onSubmit, disabled }: QuestionEditorProps) => {
+	const [questionType, setQuestionType] = useState<string>(initial?.type || 'multiple-choice')
+	const [questionText, setQuestionText] = useState(initial?.text || '')
+	const [questionPoints, setQuestionPoints] = useState<number>(initial?.points || 1)
+	const [correctAnswerText, setCorrectAnswerText] = useState<string>(initial?.correctAnswerText ?? '')
+
+	const [options, setOptions] = useState<RecruitmentAdminOption[]>(
+		initial?.options?.length
+			? initial.options
+			: [
+				{ optionId: null, text: '', sortOrder: 1, isCorrect: false },
+				{ optionId: null, text: '', sortOrder: 2, isCorrect: false },
+			]
+	)
+
+	const normalizedType = normalizeStatus(questionType) as RecruitmentQuestionType
+
+	useEffect(() => {
+		// Reset correct answer fields when changing type
+		if (normalizedType === 'multiple-choice' || normalizedType === 'multiple-answer') {
+			setCorrectAnswerText('')
+		}
+		if (normalizedType === 'true-false') {
+			setCorrectAnswerText(correctAnswerText || 'true')
+		}
+	}, [questionType])
+
+	const addOption = () => setOptions(prev => [...prev, { optionId: null, text: '', sortOrder: prev.length + 1, isCorrect: false }])
+	const removeOption = (index: number) => {
+		if (options.length <= 2) return
+		setOptions(prev => prev.filter((_, i) => i !== index).map((o, idx) => ({ ...o, sortOrder: idx + 1 })))
+	}
+
+	const updateOption = (index: number, patch: Partial<RecruitmentAdminOption>) => {
+		setOptions(prev => prev.map((o, i) => (i === index ? { ...o, ...patch } : o)))
+	}
+
+	const setSingleCorrect = (index: number, checked: boolean) => {
+		setOptions(prev => prev.map((o, i) => ({ ...o, isCorrect: i === index ? checked : false })))
+	}
+
+	const toggleMultiCorrect = (index: number, checked: boolean) => {
+		setOptions(prev => prev.map((o, i) => (i === index ? { ...o, isCorrect: checked } : o)))
+	}
+
+	const canSubmit = questionText.trim() !== '' && questionPoints > 0
+
+	return (
+		<div className="space-y-4">
+			<div>
+				<Label htmlFor="questionType">Question Type</Label>
+				<Select value={questionType} onValueChange={setQuestionType} disabled={disabled}>
+					<SelectTrigger id="questionType" className="w-full">
+						<SelectValue placeholder="Select question type" />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="multiple-choice">
+							<div className="flex items-center gap-2">
+								<CheckSquare className="h-4 w-4" />
+								<span>Multiple Choice (Single Answer)</span>
+							</div>
+						</SelectItem>
+						<SelectItem value="multiple-answer">
+							<div className="flex items-center gap-2">
+								<List className="h-4 w-4" />
+								<span>Multiple Choice (Multiple Answers)</span>
+							</div>
+						</SelectItem>
+						<SelectItem value="true-false">
+							<div className="flex items-center gap-2">
+								<CheckSquare className="h-4 w-4" />
+								<span>True/False</span>
+							</div>
+						</SelectItem>
+						<SelectItem value="text">
+							<div className="flex items-center gap-2">
+								<Type className="h-4 w-4" />
+								<span>Short Answer</span>
+							</div>
+						</SelectItem>
+						<SelectItem value="essay">
+							<div className="flex items-center gap-2">
+								<AlignLeft className="h-4 w-4" />
+								<span>Essay/Long Answer</span>
+							</div>
+						</SelectItem>
+					</SelectContent>
+				</Select>
+			</div>
+
+			<div>
+				<Label htmlFor="questionText">Question Text</Label>
+				<Textarea
+					id="questionText"
+					placeholder="Enter your question here"
+					value={questionText}
+					onChange={(e) => setQuestionText(e.target.value)}
+					className="min-h-[100px]"
+					disabled={disabled}
+				/>
+			</div>
+
+			<div>
+				<Label htmlFor="points">Points</Label>
+				<Input
+					id="points"
+					type="number"
+					min="1"
+					value={questionPoints}
+					onChange={(e) => setQuestionPoints(Math.max(1, Number(e.target.value || 1)))}
+					disabled={disabled}
+				/>
+			</div>
+
+			{(normalizedType === 'multiple-choice' || normalizedType === 'multiple-answer') && (
+				<div className="space-y-3">
+					<Label>Answer Options</Label>
+					{options.map((opt, index) => (
+						<div key={index} className="flex items-center gap-2">
+							{normalizedType === 'multiple-choice' ? (
+								<Checkbox
+									checked={opt.isCorrect}
+									onCheckedChange={(checked) => setSingleCorrect(index, Boolean(checked))}
+									disabled={disabled}
+								/>
+							) : (
+								<Checkbox
+									checked={opt.isCorrect}
+									onCheckedChange={(checked) => toggleMultiCorrect(index, Boolean(checked))}
+									disabled={disabled}
+								/>
+							)}
+							<Input
+								value={opt.text}
+								onChange={(e) => updateOption(index, { text: e.target.value })}
+								placeholder={`Option ${index + 1}`}
+								className="flex-1"
+								disabled={disabled}
+							/>
+							<Button type="button" variant="ghost" size="icon" onClick={() => removeOption(index)} disabled={disabled || options.length <= 2}>
+								<Trash2 className="h-4 w-4" />
+							</Button>
+						</div>
+					))}
+					<Button type="button" variant="outline" size="sm" onClick={addOption} disabled={disabled}>
+						Add Option
+					</Button>
+				</div>
+			)}
+
+			{normalizedType === 'true-false' && (
+				<div className="space-y-3">
+					<Label>Correct Answer</Label>
+					<RadioGroup value={correctAnswerText} onValueChange={setCorrectAnswerText} disabled={disabled}>
+						<div className="flex items-center space-x-2">
+							<RadioGroupItem value="true" id="true" />
+							<Label htmlFor="true">True</Label>
+						</div>
+						<div className="flex items-center space-x-2">
+							<RadioGroupItem value="false" id="false" />
+							<Label htmlFor="false">False</Label>
+						</div>
+					</RadioGroup>
+				</div>
+			)}
+
+			{(normalizedType === 'text' || normalizedType === 'essay') && (
+				<div className="space-y-2">
+					<Label>Expected Answer (optional)</Label>
+					<Textarea
+						value={correctAnswerText}
+						onChange={(e) => setCorrectAnswerText(e.target.value)}
+						placeholder="Optional model answer / marking guide"
+						disabled={disabled}
+					/>
+				</div>
+			)}
+
+			<div className="flex justify-end gap-2 pt-4">
+				<Button variant="outline" onClick={() => onSubmit({
+					questionId: initial?.questionId || '',
+					type: questionType,
+					text: questionText,
+					points: questionPoints,
+					sortOrder: initial?.sortOrder || 1,
+					correctAnswerText: correctAnswerText || null,
+					options: options.map((o, idx) => ({ ...o, sortOrder: idx + 1 })),
+				})} disabled={disabled || !canSubmit}>
+					{initial ? 'Update Question' : 'Add Question'}
+				</Button>
+			</div>
+		</div>
+	)
+}

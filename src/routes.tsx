@@ -3,6 +3,7 @@ import { createBrowserRouter, Outlet, useNavigate, useLocation } from 'react-rou
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Layout } from '@/components/layout/Layout';
 import LoginPage from '@/pages/LoginPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import Index from '@/pages/Index';
 import CustomerReportingPage from '@/pages/management/CustomerReportingPage';
 import CustomerDetailPage from '@/pages/customer/CustomerDetailPage';
@@ -32,6 +33,17 @@ const PathNormalizer = () => {
 			}
 		}
 	}, [location.pathname, location.search, location.hash, navigate]);
+
+	return null;
+};
+
+const ScrollToTop = () => {
+	const location = useLocation();
+
+	useEffect(() => {
+		const scrollTarget = document.scrollingElement ?? document.documentElement;
+		scrollTarget.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+	}, [location.pathname, location.search]);
 
 	return null;
 };
@@ -128,7 +140,7 @@ import Profile from '@/pages/Profile';
 // Import CRM pages
 import CRMDashboard from '@/pages/crm/CRMDashboard';
 import Contacts from '@/pages/crm/Contacts';
-import Leads from '@/pages/crm/Leads';
+import CRMContacts from '@/pages/crm/CRMContacts';
 import Deals from '@/pages/crm/Deals';
 import Pipeline from '@/pages/crm/Pipeline';
 import Tasks from '@/pages/crm/Tasks';
@@ -142,6 +154,7 @@ import AssetRegisterPage from '@/pages/compliance/AssetRegisterPage';
 import Vetting from '@/pages/recruitment/Vetting';
 import CBT from '@/pages/recruitment/CBT';
 import TakeTest from '@/pages/recruitment/TakeTest';
+import TestSession from '@/pages/recruitment/TestSession';
 
 // Import customer pages with lazy loading
 const DailyActivityReportPage = lazy(() => import('./pages/customer/CustomerDailyActivityReport'));
@@ -164,6 +177,7 @@ const router = createBrowserRouter([
     element: (
       <PageAccessProvider>
         <PathNormalizer />
+        <ScrollToTop />
         <NavigationTracker />
         <CustomerSelectionUrlSync />
         <Outlet />
@@ -173,6 +187,10 @@ const router = createBrowserRouter([
       {
         path: 'login',
         element: <LoginPage />,
+      },
+      {
+        path: 'reset-password',
+        element: <ResetPasswordPage />,
       },
       {
         path: 'test/barcode',
@@ -505,10 +523,18 @@ const router = createBrowserRouter([
             ),
           },
           {
+            path: 'crm/contacts',
+            element: (
+              <ProtectedRoute>
+                <CRMContacts />
+              </ProtectedRoute>
+            ),
+          },
+          {
             path: 'crm/leads',
             element: (
               <ProtectedRoute>
-                <Leads />
+                <CRMContacts />
               </ProtectedRoute>
             ),
           },
@@ -591,6 +617,14 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute>
                 <TakeTest />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'recruitment/test-session/:testId',
+            element: (
+              <ProtectedRoute enforcePageAccess={false} accessPath="/recruitment/test-session">
+                <TestSession />
               </ProtectedRoute>
             ),
           },

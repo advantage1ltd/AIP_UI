@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { CustomerWithRelations, CustomerPage } from '@/types/customer';
 import { CUSTOMER_PAGES } from '@/config/customerPages';
 import { BASE_API_URL, api } from '@/config/api';
-import { ApiResponse } from '@/types/api';
+import { BackendApiResponse, getApiData } from '@/types/backend-api';
 import { User } from '@/types/user';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -130,6 +130,26 @@ const buildCustomerKey = (customer: CustomerWithRelations, index: number): strin
   return `customer-index-${index}`;
 };
 
+type AuthUserPayload = User & {
+	AssignedCustomerIds?: Array<number | string>
+	assignedCustomerIds?: Array<number | string>
+}
+
+const normalizeAssignedCustomerIds = (value?: Array<number | string> | null): number[] | null => {
+	if (!value) return null
+	const normalized = value
+		.map(id => Number(id))
+		.filter(id => Number.isFinite(id))
+	return normalized
+}
+
+const areCustomerIdsEqual = (left: number[], right: number[]): boolean => {
+	if (left.length !== right.length) return false
+	const leftSorted = [...left].sort((a, b) => a - b)
+	const rightSorted = [...right].sort((a, b) => a - b)
+	return leftSorted.every((value, index) => value === rightSorted[index])
+}
+
 // Step indicator component
 const StepIndicator = ({ 
   step, 
@@ -202,62 +222,67 @@ export default function CustomerReportingPage(): React.JSX.Element {
   
   const { user } = useAuth();
   const navigate = useNavigate();
+  const assignedCustomerIdsKey = useMemo(() => {
+    if (!user?.assignedCustomerIds || user.assignedCustomerIds.length === 0) return '';
+    return [...user.assignedCustomerIds].sort((a, b) => a - b).join('|');
+  }, [user?.assignedCustomerIds]);
 
   const fetchCustomerReportingData = async () => {
     try {
-      if (!user) return;
-      
+      if (!user) {
+        setCustomers([]);
+        setError(null);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
 
       let customerData = await customerService.getAllCustomers();
-      
+
       if (user.role === 'advantageoneofficer') {
-        let assignedCustomerIds = user.assignedCustomerIds || [];
-        
+        let assignedCustomerIds = normalizeAssignedCustomerIds(user.assignedCustomerIds) ?? [];
+
         try {
-          const response = await api.get<ApiResponse<User>>('/Auth/me');
-          const userData = response.data;
-          
-          if (userData && response.data) {
-            const latestAssignedIds = (userData as any)?.AssignedCustomerIds || (userData as any)?.assignedCustomerIds || [];
-            const currentIds = assignedCustomerIds || [];
-            const idsChanged = JSON.stringify(latestAssignedIds.sort()) !== JSON.stringify(currentIds.sort());
-            
-            if (idsChanged || currentIds.length === 0) {
-              const updatedUser = {
-                ...user,
-                assignedCustomerIds: latestAssignedIds
-              };
-              window.dispatchEvent(new CustomEvent('user-assignments-updated', { detail: updatedUser }));
-            }
-            
+          const response = await api.get<BackendApiResponse<AuthUserPayload>>('/Auth/me');
+          const userData = getApiData(response.data);
+          const latestAssignedIds = normalizeAssignedCustomerIds(
+            userData?.assignedCustomerIds ?? userData?.AssignedCustomerIds
+          );
+
+          if (latestAssignedIds && !areCustomerIdsEqual(latestAssignedIds, assignedCustomerIds)) {
+            const updatedUser: User = {
+              ...user,
+              assignedCustomerIds: latestAssignedIds
+            };
+            window.dispatchEvent(new CustomEvent<User>('user-assignments-updated', { detail: updatedUser }));
             assignedCustomerIds = latestAssignedIds;
           }
         } catch (error) {
           console.warn('Failed to fetch from /Auth/me, using cached assignments:', error);
         }
-        
-        const assignedIdsAsNumbers = assignedCustomerIds.map(id => Number(id)).filter(id => !isNaN(id));
-        
-        customerData = customerData.filter((customer: any) => {
+
+        const assignedIdsAsNumbers = assignedCustomerIds.filter(id => Number.isFinite(id));
+
+        customerData = customerData.filter(customer => {
           const customerId = resolveNumericCustomerId(customer);
           return customerId !== null && assignedIdsAsNumbers.includes(customerId);
         });
-        
+
         if (customerData.length === 0 && assignedIdsAsNumbers.length > 0) {
           try {
             const allCustomers = await customerService.getAllCustomers();
-            customerData = allCustomers.filter((customer: any) => {
-              const customerId = Number(customer.customerId || customer.id);
-              return !isNaN(customerId) && assignedIdsAsNumbers.includes(customerId);
+            customerData = allCustomers.filter(customer => {
+              const customerId = resolveNumericCustomerId(customer);
+              return customerId !== null && assignedIdsAsNumbers.includes(customerId);
             });
           } catch (error) {
             console.error('Failed to fetch from API:', error);
           }
         }
       }
-      
+
       setCustomers(customerData);
       await preloadAssignedCounts(customerData);
       
@@ -320,19 +345,19 @@ export default function CustomerReportingPage(): React.JSX.Element {
 
   useEffect(() => {
     fetchCustomerReportingData();
-  }, [user, user?.assignedCustomerIds]);
+  }, [user?.id, user?.role, assignedCustomerIdsKey]);
 
   useEffect(() => {
-    const handleUserAssignmentUpdate = (event: CustomEvent) => {
+    const handleUserAssignmentUpdate = () => {
       fetchCustomerReportingData();
     };
 
-    window.addEventListener('user-customer-assignment-updated', handleUserAssignmentUpdate as EventListener);
+    window.addEventListener('user-assignments-updated', handleUserAssignmentUpdate as EventListener);
     
     return () => {
-      window.removeEventListener('user-customer-assignment-updated', handleUserAssignmentUpdate as EventListener);
+      window.removeEventListener('user-assignments-updated', handleUserAssignmentUpdate as EventListener);
     };
-  }, [user]);
+  }, [user?.id, user?.role]);
 
   const getIcon = (iconName: string | undefined) => {
     if (!iconName) return FileText;
@@ -630,18 +655,23 @@ export default function CustomerReportingPage(): React.JSX.Element {
                     <p className="text-gray-500 mb-6 max-w-sm mx-auto">
                       {searchTerm ? 'Try adjusting your search criteria.' : 'No customers are available for reporting.'}
                     </p>
-                    {user?.role === 'AdvantageOneOfficer' && (
+                    {user?.role === 'advantageoneofficer' && (
                       <Button
                         onClick={async () => {
                           try {
-                            const response = await api.get<ApiResponse<User>>(`/User/${user.id}`)
-                            const userData = response.data
-                            const updatedUser = {
-                              ...user,
-                              assignedCustomerIds: (userData as any)?.AssignedCustomerIds || (userData as any)?.assignedCustomerIds || []
+                            const response = await api.get<BackendApiResponse<AuthUserPayload>>(`/User/${user.id}`)
+                            const userData = getApiData(response.data)
+                            const latestAssignedIds = normalizeAssignedCustomerIds(
+                              userData?.assignedCustomerIds ?? userData?.AssignedCustomerIds
+                            )
+                            if (latestAssignedIds) {
+                              const updatedUser: User = {
+                                ...user,
+                                assignedCustomerIds: latestAssignedIds
+                              }
+                              window.dispatchEvent(new CustomEvent<User>('user-assignments-updated', { detail: updatedUser }))
                             }
-                            window.dispatchEvent(new CustomEvent('user-assignments-updated', { detail: updatedUser }))
-                            window.location.reload()
+                            fetchCustomerReportingData()
                           } catch (error) {
                             console.error('Failed to refresh user data:', error)
                           }

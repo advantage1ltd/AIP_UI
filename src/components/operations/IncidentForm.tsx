@@ -1,4 +1,4 @@
-import { useState, useCallback, memo, useEffect } from "react"
+import { useState, useCallback, memo, useEffect, useRef } from "react"
 import { Incident, IncidentType, IncidentInvolved, StolenItem, RepeatOffenderMatch } from "@/types/incidents"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,7 +45,7 @@ import { customerService } from "@/services/customerService"
 import { siteService } from "@/services/siteService"
 import { lookupTableService } from "@/services/lookupTableService"
 import type { Customer } from "@/types/customer"
-import type { Site } from "@/types/site"
+import type { Site } from "@/types/customer"
 import type { LookupTableItem } from "@/services/lookupTableService"
 
 const formSchema = z.object({
@@ -100,12 +100,27 @@ const formSchema = z.object({
   policeID: z.string().optional(),
   crimeRefNumber: z.string().optional(),
   arrestSaveComment: z.string().optional(),
+  offenderDetailsVerified: z.boolean().default(false),
+  verificationMethod: z.string().optional(),
+  verificationEvidenceImage: z.string().optional(),
+}).superRefine((values, context) => {
+  if (values.offenderDetailsVerified && !values.verificationMethod) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Verification method is required when details are verified.',
+      path: ['verificationMethod'],
+    })
+  }
 })
 
 const incidentTypes: IncidentType[] = [
   IncidentType.ARREST,
   IncidentType.DETER,
   IncidentType.THEFT,
+  IncidentType.VIOLENT_BEHAVIOUR,
+  IncidentType.ABUSIVE_BEHAVIOUR,
+  IncidentType.COLLEAGUE_ASSAULT,
+  IncidentType.COLLEAGUE_ABUSE,
   IncidentType.CRIMINAL_DAMAGE,
   IncidentType.CREDIT_CARD_FRAUD,
   IncidentType.SUSPICIOUS_BEHAVIOUR,
@@ -113,6 +128,24 @@ const incidentTypes: IncidentType[] = [
   IncidentType.ANTI_SOCIAL,
   IncidentType.OTHERS
 ]
+
+const verificationMethods = [
+  'Drivers licence',
+  'Police',
+  'ID card',
+  'Others'
+] as const
+
+const formatDateSafe = (value: string | Date | undefined, pattern: string, fallback = 'N/A') => {
+  if (!value) {
+    return fallback
+  }
+  const dateValue = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(dateValue.getTime())) {
+    return fallback
+  }
+  return format(dateValue, pattern)
+}
 
 const incidentInvolved: IncidentInvolved[] = [
   IncidentInvolved.SELF_SCAN_TILLS,
@@ -189,6 +222,13 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   } | null>(null)
   const [offenderSearchError, setOffenderSearchError] = useState<string | null>(null)
   const [offenderMarksPreview, setOffenderMarksPreview] = useState<string>(initialData?.offenderMarks || '')
+  const [verificationEvidencePreview, setVerificationEvidencePreview] = useState<string>(initialData?.verificationEvidenceImage || '')
+  const [zoomedEvidenceImage, setZoomedEvidenceImage] = useState<string | null>(null)
+  const [verificationFileName, setVerificationFileName] = useState<string>('')
+  const [isProcessingVerificationImage, setIsProcessingVerificationImage] = useState(false)
+  const [isCameraActive, setIsCameraActive] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const cameraStreamRef = useRef<MediaStream | null>(null)
   
   // State for dynamic customers and sites
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -203,6 +243,10 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   // State for manual barcode entry
   const [manualBarcode, setManualBarcode] = useState('')
   const [isProcessingBarcode, setIsProcessingBarcode] = useState(false)
+  const didPrefillSiteRef = useRef(false)
+  const previousCustomerIdRef = useRef<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   const searchOffender = async (name: string, dob?: Date, marks?: string) => {
     setIsSearchingOffender(true);
@@ -238,7 +282,19 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         form.setValue('offenderAddress', topMatch.offenderAddress)
       }
       if (topMatch.gender) {
-        form.setValue('gender', topMatch.gender)
+        const normalizedGender = topMatch.gender.toLowerCase().trim()
+        const genderMap: Record<string, 'Male' | 'Female' | 'N/A or N/K'> = {
+          male: 'Male',
+          female: 'Female',
+          'n/a or n/k': 'N/A or N/K',
+          'n/a': 'N/A or N/K',
+          'n/k': 'N/A or N/K',
+          'unknown': 'N/A or N/K'
+        }
+        const mappedGender = genderMap[normalizedGender]
+        if (mappedGender) {
+          form.setValue('gender', mappedGender)
+        }
       }
       if (topMatch.offenderDOB) {
         form.setValue('offenderDOB', new Date(topMatch.offenderDOB))
@@ -304,6 +360,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       offenderDOB: initialData?.offenderDOB ? new Date(initialData.offenderDOB) : undefined,
       offenderPlaceOfBirth: initialData?.offenderPlaceOfBirth || "",
       offenderMarks: initialData?.offenderMarks || "",
+      offenderDetailsVerified: initialData?.offenderDetailsVerified || false,
+      verificationMethod: initialData?.verificationMethod || "",
+      verificationEvidenceImage: initialData?.verificationEvidenceImage || "",
       policeID: initialData?.policeID || "",
       crimeRefNumber: initialData?.crimeRefNumber || "",
       arrestSaveComment: initialData?.arrestSaveComment || "",
@@ -314,6 +373,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   const customerId = form.watch('customerId')
   const selectedCustomer = customers.find(c => c.id.toString() === customerId)
   const offenderMarksValue = form.watch('offenderMarks')
+  const offenderDetailsVerified = form.watch('offenderDetailsVerified')
   
   // Fetch customers on mount
   useEffect(() => {
@@ -361,6 +421,10 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         form.setValue('siteName', '')
         return
       }
+
+      if (previousCustomerIdRef.current && previousCustomerIdRef.current !== customerId) {
+        didPrefillSiteRef.current = false
+      }
       
       setIsLoadingSites(true)
       try {
@@ -369,14 +433,27 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         if (response.success) {
           setSites(response.data)
           console.log('✅ [IncidentForm] Loaded sites for customer:', response.data.length)
-          // Reset site selection when customer changes
-          form.setValue('siteId', '')
-          form.setValue('siteName', '')
+          if (initialData?.siteId && !didPrefillSiteRef.current) {
+            const matchById = response.data.find(site => site.siteID?.toString() === initialData.siteId)
+            const matchByName = response.data.find(site =>
+              site.locationName?.toLowerCase().trim() === (initialData.siteName || '').toLowerCase().trim()
+            )
+            const matchedSite = matchById || matchByName
+
+            form.setValue('siteId', matchedSite?.siteID?.toString() || initialData.siteId)
+            form.setValue('siteName', matchedSite?.locationName || initialData.siteName || '')
+            didPrefillSiteRef.current = true
+          } else if (!initialData) {
+            // Reset site selection when customer changes for new incidents
+            form.setValue('siteId', '')
+            form.setValue('siteName', '')
+          }
         }
       } catch (error) {
         console.error('❌ [IncidentForm] Failed to load sites:', error)
         setSites([])
       } finally {
+        previousCustomerIdRef.current = customerId
         setIsLoadingSites(false)
       }
     }
@@ -437,6 +514,71 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
     }
   }
 
+  const stopCamera = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach(track => track.stop())
+      cameraStreamRef.current = null
+    }
+    setIsCameraActive(false)
+  }
+
+  const startCamera = () => {
+    setCameraError(null)
+    setIsCameraActive(true)
+  }
+
+  const captureVerificationImage = () => {
+    if (!videoRef.current || !canvasRef.current) {
+      return
+    }
+
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    const context = canvas.getContext('2d')
+    if (!context) {
+      return
+    }
+
+    // Set canvas dimensions (limit max size for GDPR-compliant storage)
+    const maxWidth = 1920
+    const maxHeight = 1080
+    let width = video.videoWidth
+    let height = video.videoHeight
+
+    // Scale down if image is too large to reduce base64 size
+    if (width > maxWidth || height > maxHeight) {
+      const ratio = Math.min(maxWidth / width, maxHeight / height)
+      width = Math.floor(width * ratio)
+      height = Math.floor(height * ratio)
+    }
+
+    canvas.width = width
+    canvas.height = height
+    context.drawImage(video, 0, 0, width, height)
+
+    // Convert to base64 JPEG with quality compression (GDPR compliant - stored in-app)
+    // Quality 0.75 provides good balance between size and quality
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.75)
+    
+    // Validate size (warn if too large, but still allow)
+    const base64Size = dataUrl.length
+    if (base64Size > 500000) { // ~500KB base64 = ~375KB image
+      console.warn(`Image size is ${Math.round(base64Size / 1024)}KB. Consider retaking with better lighting.`)
+    }
+
+    form.setValue('verificationEvidenceImage', dataUrl, { shouldValidate: true })
+    setVerificationEvidencePreview(dataUrl)
+    setVerificationFileName('captured-image.jpg')
+    stopCamera()
+  }
+
+  const handleRetakeVerificationImage = () => {
+    setVerificationEvidencePreview('')
+    setVerificationFileName('')
+    form.setValue('verificationEvidenceImage', '')
+    setCameraError(null)
+  }
+
   // Pre-fill customer, site, and officer info for new incidents
   useEffect(() => {
     if (!initialData && customers.length > 0) {
@@ -488,6 +630,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
       setStolenItems(initialData.stolenItems || [])
       setIncidentType(initialData.incidentType || '')
       setArrestSaveComment(initialData.arrestSaveComment || '')
+      setVerificationEvidencePreview(initialData.verificationEvidenceImage || '')
       
       // Reset form with the new initial data - fix date handling
       const formData = {
@@ -529,6 +672,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         offenderDOB: initialData.offenderDOB ? new Date(initialData.offenderDOB) : undefined,
         offenderPlaceOfBirth: initialData.offenderPlaceOfBirth || "",
         offenderMarks: initialData.offenderMarks || "",
+        offenderDetailsVerified: initialData.offenderDetailsVerified || false,
+        verificationMethod: initialData.verificationMethod || "",
+        verificationEvidenceImage: initialData.verificationEvidenceImage || "",
         policeID: initialData.policeID || "",
         crimeRefNumber: initialData.crimeRefNumber || "",
         arrestSaveComment: initialData.arrestSaveComment || "",
@@ -552,6 +698,11 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         }
         if (formData.offenderDOB) {
           form.setValue('offenderDOB', formData.offenderDOB)
+        }
+        if (formData.verificationEvidenceImage) {
+          setVerificationEvidencePreview(formData.verificationEvidenceImage)
+        } else {
+          setVerificationEvidencePreview('')
         }
       }, 100)
     }
@@ -588,6 +739,58 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
   React.useEffect(() => {
     setOffenderMarksPreview(offenderMarksValue || '')
   }, [offenderMarksValue])
+
+  React.useEffect(() => {
+    if (!offenderDetailsVerified) {
+      form.setValue('verificationMethod', '')
+      form.setValue('verificationEvidenceImage', '')
+      setVerificationEvidencePreview('')
+      setVerificationFileName('')
+      stopCamera()
+    }
+  }, [offenderDetailsVerified, form])
+
+  useEffect(() => {
+    const attachCameraStream = async () => {
+      if (!isCameraActive) {
+        return
+      }
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError('Camera access is not supported in this browser or context.')
+        setIsCameraActive(false)
+        return
+      }
+
+      setIsProcessingVerificationImage(true)
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' },
+          audio: false
+        })
+        cameraStreamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play()
+        }
+      } catch (error) {
+        console.error('Error accessing camera:', error)
+        setCameraError('Unable to access camera. Please check permissions or HTTPS.')
+        setIsCameraActive(false)
+      } finally {
+        setIsProcessingVerificationImage(false)
+      }
+    }
+
+    attachCameraStream()
+  }, [isCameraActive])
+
+  useEffect(() => {
+    return () => {
+      stopCamera()
+    }
+  }, [])
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -664,6 +867,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         offenderDOB: values.offenderDOB,
         offenderPlaceOfBirth: values.offenderPlaceOfBirth,
         offenderMarks: values.offenderMarks,
+        offenderDetailsVerified: values.offenderDetailsVerified,
+        verificationMethod: values.verificationMethod,
+        verificationEvidenceImage: values.verificationEvidenceImage,
         policeID: values.policeID,
         crimeRefNumber: values.crimeRefNumber || '',
         // Additional fields
@@ -772,8 +978,36 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="bg-gradient-to-br from-gray-50 to-gray-100/50 min-h-full">
-        <div className="w-full max-w-[98%] mx-auto px-4 py-4">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 min-h-screen">
+        {zoomedEvidenceImage && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Verification evidence preview"
+            onClick={() => setZoomedEvidenceImage(null)}
+          >
+            <div
+              className="relative max-h-[90vh] w-full max-w-3xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="absolute -top-3 -right-3 rounded-full bg-white px-2 py-1 text-xs font-semibold text-gray-700 shadow"
+                onClick={() => setZoomedEvidenceImage(null)}
+                aria-label="Close preview"
+              >
+                Close
+              </button>
+              <img
+                src={zoomedEvidenceImage}
+                alt="Verification evidence enlarged view"
+                className="max-h-[90vh] w-full rounded-lg bg-white object-contain"
+              />
+            </div>
+          </div>
+        )}
+        <div className="w-full max-w-none px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
           {/* Header */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <div className="flex items-center gap-4">
@@ -1197,7 +1431,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <FormField
                   control={form.control}
                   name="policeInvolvement"
@@ -1275,16 +1509,16 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="offenderName"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="lg:col-span-2">
                         <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Offender Name</FormLabel>
                         <div className="space-y-2">
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <FormControl>
                               <Input className="h-12 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm" {...field} placeholder="Enter offender name" />
                             </FormControl>
@@ -1341,7 +1575,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                                     <div>
                                       <p className="text-sm font-semibold text-gray-800">{match.offenderName}</p>
                                       <p className="text-xs text-gray-600">
-                                        {match.offenderDOB ? `DOB: ${format(new Date(match.offenderDOB), 'dd MMM yyyy')}` : 'DOB: N/A'}
+                                        DOB: {formatDateSafe(match.offenderDOB, 'dd MMM yyyy')}
                                       </p>
                                       {match.offenderMarks && (
                                         <p className="text-xs text-gray-600 mt-1">
@@ -1372,6 +1606,20 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                                           form.setValue('offenderMarks', match.offenderMarks)
                                           setOffenderMarksPreview(match.offenderMarks)
                                         }
+                                        const verificationSource = match.recentIncidents.find((incident) =>
+                                          incident.offenderDetailsVerified !== undefined ||
+                                          Boolean(incident.verificationMethod) ||
+                                          Boolean(incident.verificationEvidenceImage)
+                                        )
+                                        if (verificationSource) {
+                                          const isVerified = verificationSource.offenderDetailsVerified
+                                            ?? Boolean(verificationSource.verificationMethod || verificationSource.verificationEvidenceImage)
+                                          form.setValue('offenderDetailsVerified', isVerified, { shouldValidate: true })
+                                          form.setValue('verificationMethod', verificationSource.verificationMethod || '', { shouldValidate: true })
+                                          form.setValue('verificationEvidenceImage', verificationSource.verificationEvidenceImage || '', { shouldValidate: true })
+                                          setVerificationEvidencePreview(verificationSource.verificationEvidenceImage || '')
+                                          setVerificationFileName(verificationSource.verificationEvidenceImage ? 'history-evidence.jpg' : '')
+                                        }
                                         setOffenderVerified(true)
                                       }}
                                       aria-label={`Use offender details for ${match.offenderName}`}
@@ -1382,8 +1630,30 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                                   <div className="mt-2 space-y-1">
                                     {match.recentIncidents.map((incident) => (
                                       <div key={incident.incidentId} className="text-xs text-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-t border-dashed pt-1 first:border-none first:pt-0">
-                                        <span>{format(new Date(incident.dateOfIncident), 'dd MMM yyyy')} - {incident.siteName}</span>
+                                        <span>{formatDateSafe(incident.dateOfIncident, 'dd MMM yyyy')} - {incident.siteName}</span>
                                         <span className="text-gray-500">{incident.incidentType}</span>
+												{(incident.offenderDetailsVerified !== undefined || incident.verificationMethod || incident.verificationEvidenceImage) && (
+													<div className="text-[11px] text-gray-600 flex flex-wrap gap-x-2 gap-y-1 sm:basis-full">
+														{incident.offenderDetailsVerified !== undefined && (
+															<span>Verified: {incident.offenderDetailsVerified ? 'Yes' : 'No'}</span>
+														)}
+														{incident.verificationMethod && (
+															<span>Method: {incident.verificationMethod}</span>
+														)}
+														{incident.verificationEvidenceImage && (
+															<span className="text-gray-500">Evidence attached</span>
+														)}
+													</div>
+												)}
+												{incident.verificationEvidenceImage && (
+													<img
+														src={incident.verificationEvidenceImage}
+														alt={`Verification evidence for ${match.offenderName}`}
+														className="mt-1 max-h-20 w-full max-w-[160px] cursor-zoom-in rounded-md border border-gray-200 object-contain sm:basis-full"
+														loading="lazy"
+														onClick={() => setZoomedEvidenceImage(incident.verificationEvidenceImage || null)}
+													/>
+												)}
                                       </div>
                                     ))}
                                   </div>
@@ -1402,7 +1672,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     control={form.control}
                     name="gender"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="lg:col-span-1">
                         <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Gender</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
@@ -1421,6 +1691,9 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     )}
                   />
 
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="offenderDOB"
@@ -1549,6 +1822,166 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
                     )}
                   />
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="offenderDetailsVerified"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Details Verified?</FormLabel>
+                      <div className="flex flex-wrap items-center gap-4">
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="radio"
+                            checked={field.value === true}
+                            onChange={() => field.onChange(true)}
+                            className="h-4 w-4"
+                          />
+                          Yes
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="radio"
+                            checked={field.value === false}
+                            onChange={() => field.onChange(false)}
+                            className="h-4 w-4"
+                          />
+                          No
+                        </label>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+              {offenderDetailsVerified && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 rounded-xl border border-gray-200 bg-gray-50 p-3 sm:p-4">
+                  <FormField
+                    control={form.control}
+                    name="verificationMethod"
+                    render={({ field }) => (
+                      <FormItem className="lg:col-span-1">
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Verification Method *</FormLabel>
+                        <Select
+                          value={field.value || ''}
+                          onValueChange={field.onChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-11 border-2 border-gray-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm">
+                              <SelectValue placeholder="Select verification method" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {verificationMethods.map((method) => (
+                              <SelectItem key={method} value={method}>
+                                {method}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="verificationEvidenceImage"
+                    render={() => (
+                      <FormItem className="lg:col-span-2">
+                        <FormLabel className="text-sm font-semibold text-gray-700 mb-2">Verification Evidence</FormLabel>
+                        <FormControl>
+                          <div className="space-y-3">
+                            {verificationEvidencePreview ? (
+                              <div className="space-y-3">
+                                <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                  <img
+                                    src={verificationEvidencePreview}
+                                    alt="Verification evidence preview"
+                                    className="max-h-56 w-full cursor-zoom-in rounded-md object-contain"
+                                    onClick={() => setZoomedEvidenceImage(verificationEvidencePreview)}
+                                  />
+                                  {verificationFileName && (
+                                    <p className="mt-2 text-xs text-gray-500">{verificationFileName}</p>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={startCamera}
+                                    className="h-9 text-xs sm:text-sm"
+                                  >
+                                    Capture New Image
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleRetakeVerificationImage}
+                                    className="h-9 text-xs sm:text-sm"
+                                  >
+                                    Remove Image
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                {isCameraActive ? (
+                                  <div className="space-y-3">
+                                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                      <div className="mx-auto w-full max-w-sm sm:max-w-lg">
+                                        <video ref={videoRef} className="w-full rounded-md" playsInline muted />
+                                      </div>
+                                      <canvas ref={canvasRef} className="hidden" />
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={captureVerificationImage}
+                                        className="h-9 text-xs sm:text-sm"
+                                      >
+                                        Capture Image
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={stopCamera}
+                                        className="h-9 text-xs sm:text-sm"
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={startCamera}
+                                    className="h-9 text-xs sm:text-sm"
+                                    disabled={isProcessingVerificationImage}
+                                  >
+                                    {isProcessingVerificationImage ? 'Starting Camera...' : 'Capture Image'}
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                            {cameraError && (
+                              <p className="text-xs text-red-600">{cameraError}</p>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
                 <div className="space-y-3 sm:space-y-4 pt-4 border-t">
                   <FormField

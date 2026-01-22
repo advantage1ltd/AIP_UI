@@ -21,11 +21,13 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { useState, useEffect } from "react"
+import type { AxiosError } from "axios"
 import { Employee } from "@/types/employee"
 import { UserRole } from "@/types/user"
 import { lookupTableService, LookupTableItem } from "@/services/lookupTableService"
 import { employeeService, EmployeeRegistrationRequest } from "@/services/employeeService"
 import { mapToBackendUpdateRequest } from "@/utils/employeeMapper"
+import { compressImageFileToDataUrl, validateImageFile } from "@/utils/image"
 import { Upload, User, FileText, Shield, MapPin, Briefcase, CreditCard, Camera, Calendar, Mail } from "lucide-react"
 
 const formSchema = z.object({
@@ -235,95 +237,34 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
   const aipAccessLevel = form.watch('aipAccessLevel')
   const requiresSIA = aipAccessLevel?.toLowerCase() === 'advantageoneofficer' || aipAccessLevel?.toLowerCase() === 'advantageonehoofficer'
 
-  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB')
-        event.target.value = '' // Clear the input
-        return
-      }
+    if (!file) return
 
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        alert('Please select a valid image file (JPEG, PNG, GIF)')
-        event.target.value = '' // Clear the input
-        return
-      }
+    const validation = validateImageFile(file)
+    if (!validation.ok) {
+      alert(validation.message)
+      event.target.value = "" // Clear the input
+      return
+    }
 
-      // Show loading state
-      setPhotoPreview('loading...')
+    // Show loading state
+    setPhotoPreview("loading...")
 
-              const reader = new FileReader()
-        reader.onloadend = () => {
-          // Create a canvas to resize and compress the image
-          const img = new Image()
-          img.onload = () => {
-            try {
-              const canvas = document.createElement('canvas')
-              const ctx = canvas.getContext('2d')
-              
-              if (!ctx) {
-                throw new Error('Could not get canvas context')
-              }
-              
-              // Set canvas size for optimal display (256x256 for good quality)
-              const maxSize = 256
-              let { width, height } = img
-              
-              // Calculate new dimensions maintaining aspect ratio
-              if (width > height) {
-                if (width > maxSize) {
-                  height = (height * maxSize) / width
-                  width = maxSize
-                }
-              } else {
-                if (height > maxSize) {
-                  width = (width * maxSize) / height
-                  height = maxSize
-                }
-              }
-              
-              canvas.width = width
-              canvas.height = height
-              
-              // Draw and compress the image
-              ctx.drawImage(img, 0, 0, width, height)
-              
-              // Convert to base64 with better quality
-              const compressedImage = canvas.toDataURL('image/jpeg', 0.8)
-              
-              setPhotoPreview(compressedImage)
-              form.setValue('photoFile', compressedImage)
-              form.setValue('photoTaken', true)
-            } catch (error) {
-              console.error('Error processing image:', error)
-              alert('Error processing image. Please try again.')
-              setPhotoPreview(null)
-              form.setValue('photoFile', '')
-              form.setValue('photoTaken', false)
-            }
-          }
-          img.onerror = () => {
-            console.error('Error loading image')
-            alert('Error loading image. Please try again.')
-            setPhotoPreview(null)
-            form.setValue('photoFile', '')
-            form.setValue('photoTaken', false)
-          }
-          img.src = reader.result as string
-        }
-        reader.onerror = () => {
-          console.error('Error reading file')
-          alert('Error reading file. Please try again.')
-          setPhotoPreview(null)
-          form.setValue('photoFile', '')
-          form.setValue('photoTaken', false)
-        }
-        reader.readAsDataURL(file)
-     }
-   }
+    try {
+      const compressedImage = await compressImageFileToDataUrl(file)
+      setPhotoPreview(compressedImage)
+      form.setValue("photoFile", compressedImage)
+      form.setValue("photoTaken", true)
+    } catch (error) {
+      console.error("Error processing image:", error)
+      alert("Error processing image. Please try again.")
+      setPhotoPreview(null)
+      form.setValue("photoFile", "")
+      form.setValue("photoTaken", false)
+      event.target.value = "" // Clear the input
+    }
+  }
 
      // Load lookup data and employee data on component mount
   useEffect(() => {
@@ -442,7 +383,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
     }
 
     loadData()
-  }, [initialData?.id])
+  }, [initialData?.id, form])
 
   // Reset form when initialData changes to null (when switching from edit to create mode)
   useEffect(() => {
@@ -571,9 +512,10 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
         errorMessage = error.message
       } else if (typeof error === 'object' && error !== null) {
         // Handle Axios error response
-        const axiosError = error as any
-        if (axiosError.response?.data?.message) {
-          errorMessage = axiosError.response.data.message
+        const axiosError = error as AxiosError<{ message?: string; Message?: string }>
+        const responseMessage = axiosError.response?.data?.message ?? axiosError.response?.data?.Message
+        if (responseMessage) {
+          errorMessage = responseMessage
         } else if (axiosError.message) {
           errorMessage = axiosError.message
         }

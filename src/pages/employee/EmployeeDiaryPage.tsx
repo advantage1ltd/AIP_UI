@@ -1,799 +1,824 @@
-import React, { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
-import { Plus, Search, FileText, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { cn } from '@/lib/utils';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/components/ui/card";
-import { toast } from '@/components/ui/use-toast';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { useEffect, useMemo, useState } from 'react'
+import { AlertCircle, Briefcase, CalendarDays, CreditCard, FileText, HardHat, Loader2, RefreshCw, ShieldAlert, Sparkles, User } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Alert } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
+import { toast } from '@/components/ui/use-toast'
+import { useAuth } from '@/contexts/AuthContext'
+import { employeeService } from '@/services/employeeService'
+import { employeeDiaryService } from '@/services/employeeDiaryService'
+import type { Employee } from '@/types/employee'
+import type { EmployeeDiary } from '@/types/employeeDiary'
 
-// Use imported components with renamed imports
-import { ActivityTimeline } from '@/components/employee/ActivityTimeline';
-import { ActivityForm } from '@/components/employee/ActivityForm';
-import { SyncStatus } from '@/components/employee/SyncStatus';
-import { employeeActivityService } from '@/services/employeeActivityService';
-import { ACTIVITY_CATEGORIES, ACTIVITY_SOURCES, AUTO_SYNC_INTERVAL, ITEMS_PER_PAGE } from '@/config/activityConfig';
-import type { ActivityCategory, ActivitySource, ActivityStatus, ActivitySyncStatus, EmployeeActivity, Employee } from '@/types/employee';
+type UserWithLegacyEmployeeId = { employeeId?: number; EmployeeId?: number | string; role?: string }
 
-// Constants and Types - In a real implementation, these would be moved to separate files
-const CATEGORY_COLORS: Record<ActivityCategory, string> = {
-  employment: 'bg-blue-100 text-blue-800',
-  training: 'bg-green-100 text-green-800',
-  leave: 'bg-purple-100 text-purple-800',
-  incidents: 'bg-red-100 text-red-800',
-  documents: 'bg-yellow-100 text-yellow-800',
-  performance: 'bg-orange-100 text-orange-800',
-  equipment: 'bg-indigo-100 text-indigo-800',
-  certifications: 'bg-pink-100 text-pink-800',
-};
+const normalizeStatus = (value: string | null | undefined) => String(value ?? '').trim().toLowerCase()
+const isPendingStatus = (value: string | null | undefined) => normalizeStatus(value) === 'pending'
 
-// Form schema
-const formSchema = z.object({
-  employeeId: z.string().min(1, 'Employee is required'),
-  employeeName: z.string().min(1, 'Employee name is required'),
-  activityDate: z.date(),
-  activityCategory: z.enum(['employment', 'training', 'leave', 'incidents', 'documents', 'performance', 'equipment', 'certifications'] as const),
-  activityType: z.string().min(1, 'Type is required'),
-  description: z.string().min(1, 'Description is required'),
-  status: z.enum(['pending', 'in_progress', 'completed', 'cancelled', 'on_hold'] as const),
-  source: z.enum(['manual', 'hr_system', 'training_system', 'leave_system', 'performance_system', 'document_system', 'equipment_system', 'certification_system'] as const),
-  sourceReference: z.string().optional(),
-  attachments: z.array(z.string()).default([]),
-  notes: z.string().optional(),
-  relatedDocuments: z.array(z.string()).default([]),
-  nextReviewDate: z.date().optional(),
-  actionRequired: z.boolean().default(false),
-  actionDeadline: z.date().optional(),
-  recordedBy: z.string().min(1, 'Recorder is required'),
-});
-
-type FormData = z.infer<typeof formSchema>;
-
-// State interface
-interface State {
-  isDialogOpen: boolean;
-  searchQuery: string;
-  currentPage: number;
-  editingEntry: EmployeeActivity | null;
-  activeTab: ActivityCategory | 'all';
-  selectedEmployee: string | null;
-  activities: EmployeeActivity[];
-  syncStatus: Record<ActivitySource, ActivitySyncStatus>;
-  isSyncing: boolean;
-  errorLog: Array<{ message: string; timestamp: Date; data?: any }>;
-  isLoading: boolean;
-  employees: Employee[];
-  isLoadingEmployees: boolean;
+const getStatusBadgeVariant = (status: string | null | undefined): 'default' | 'secondary' | 'destructive' => {
+	const s = normalizeStatus(status)
+	if (s === 'pending') return 'destructive'
+	if (s === 'approved' || s === 'completed' || s === 'fulfilled') return 'default'
+	return 'secondary'
 }
 
-// Action types
-type Action =
-  | { type: 'SET_DIALOG_OPEN'; payload: boolean }
-  | { type: 'SET_SEARCH_QUERY'; payload: string }
-  | { type: 'SET_CURRENT_PAGE'; payload: number }
-  | { type: 'SET_EDITING_ENTRY'; payload: EmployeeActivity | null }
-  | { type: 'SET_ACTIVE_TAB'; payload: ActivityCategory | 'all' }
-  | { type: 'SET_SELECTED_EMPLOYEE'; payload: string | null }
-  | { type: 'SET_ACTIVITIES'; payload: EmployeeActivity[] }
-  | { type: 'ADD_ACTIVITY'; payload: EmployeeActivity }
-  | { type: 'UPDATE_ACTIVITY'; payload: EmployeeActivity }
-  | { type: 'DELETE_ACTIVITY'; payload: string }
-  | { type: 'SET_SYNC_STATUS'; payload: Record<ActivitySource, ActivitySyncStatus> }
-  | { type: 'UPDATE_SYNC_STATUS'; payload: { source: ActivitySource; status: ActivitySyncStatus } }
-  | { type: 'SET_SYNCING'; payload: boolean }
-  | { type: 'LOG_ERROR'; payload: { message: string; data?: any } }
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_EMPLOYEES'; payload: Employee[] }
-  | { type: 'SET_LOADING_EMPLOYEES'; payload: boolean };
-
-const initialSyncStatus: Record<ActivitySource, ActivitySyncStatus> = {
-  manual: { source: 'manual', status: 'inactive', lastSynced: null },
-  hr_system: { source: 'hr_system', status: 'inactive', lastSynced: null },
-  training_system: { source: 'training_system', status: 'inactive', lastSynced: null },
-  leave_system: { source: 'leave_system', status: 'inactive', lastSynced: null },
-  performance_system: { source: 'performance_system', status: 'inactive', lastSynced: null },
-  document_system: { source: 'document_system', status: 'inactive', lastSynced: null },
-  equipment_system: { source: 'equipment_system', status: 'inactive', lastSynced: null },
-  certification_system: { source: 'certification_system', status: 'inactive', lastSynced: null },
-};
-
-const initialState: State = {
-  isDialogOpen: false,
-  searchQuery: '',
-  currentPage: 1,
-  editingEntry: null,
-  activeTab: 'all',
-  selectedEmployee: null,
-  activities: [],
-  syncStatus: initialSyncStatus,
-  isSyncing: false,
-  errorLog: [],
-  isLoading: false,
-  employees: [],
-  isLoadingEmployees: false,
-};
-
-// Reducer function defined outside component
-function reducer(state: State, action: Action): State {
-  switch (action.type) {
-    case 'SET_DIALOG_OPEN':
-      return { ...state, isDialogOpen: action.payload };
-    case 'SET_SEARCH_QUERY':
-      return { ...state, searchQuery: action.payload, currentPage: 1 };
-    case 'SET_CURRENT_PAGE':
-      return { ...state, currentPage: action.payload };
-    case 'SET_EDITING_ENTRY':
-      return { ...state, editingEntry: action.payload };
-    case 'SET_ACTIVE_TAB':
-      return { ...state, activeTab: action.payload, currentPage: 1 };
-    case 'SET_SELECTED_EMPLOYEE':
-      return { ...state, selectedEmployee: action.payload, currentPage: 1 };
-    case 'SET_ACTIVITIES':
-      return { ...state, activities: action.payload };
-    case 'ADD_ACTIVITY':
-      return { ...state, activities: [action.payload, ...state.activities] };
-    case 'UPDATE_ACTIVITY':
-      return {
-        ...state,
-        activities: state.activities.map(activity =>
-          activity.id === action.payload.id ? action.payload : activity
-        ),
-      };
-    case 'DELETE_ACTIVITY':
-      return {
-        ...state,
-        activities: state.activities.filter(activity => activity.id !== action.payload),
-      };
-    case 'SET_SYNC_STATUS':
-      return { ...state, syncStatus: action.payload };
-    case 'UPDATE_SYNC_STATUS':
-      return {
-        ...state,
-        syncStatus: {
-          ...state.syncStatus,
-          [action.payload.source]: action.payload.status,
-        },
-      };
-    case 'SET_SYNCING':
-      return { ...state, isSyncing: action.payload };
-    case 'LOG_ERROR':
-      return {
-        ...state,
-        errorLog: [
-          ...state.errorLog,
-          { message: action.payload.message, timestamp: new Date(), data: action.payload.data },
-        ],
-      };
-    case 'SET_LOADING':
-      return { ...state, isLoading: action.payload };
-    case 'SET_EMPLOYEES':
-      return { ...state, employees: action.payload };
-    case 'SET_LOADING_EMPLOYEES':
-      return { ...state, isLoadingEmployees: action.payload };
-    default:
-      return state;
-  }
+const formatDate = (value?: string | null) => {
+	if (!value) return '—'
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return '—'
+	return new Intl.DateTimeFormat('en-GB', { year: 'numeric', month: 'short', day: '2-digit' }).format(date)
 }
 
-const EmployeeDiaryPage: React.FC = () => {
-  // State management
-  const [state, dispatch] = useReducer(reducer, initialState);
-  
-  // Fetch employees data
-  const fetchEmployees = useCallback(async () => {
-    try {
-      dispatch({ type: 'SET_LOADING_EMPLOYEES', payload: true });
-      
-      // Replace with your actual API endpoint
-      const response = await fetch('/api/employees');
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch employees: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      dispatch({ type: 'SET_EMPLOYEES', payload: data });
-    } catch (error) {
-      dispatch({
-        type: 'LOG_ERROR',
-        payload: { message: 'Error fetching employees', data: error },
-      });
-      toast({
-        title: "Error",
-        description: "Failed to load employee data.",
-        variant: "destructive",
-      });
-    } finally {
-      dispatch({ type: 'SET_LOADING_EMPLOYEES', payload: false });
-    }
-  }, []);
+const formatMoney = (value?: number | null) => {
+	if (value === null || value === undefined) return '—'
+	return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value)
+}
 
-  // Initialize data on component mount
-  useEffect(() => {
-    fetchEmployees();
-    checkSyncStatus();
-    fetchActivities();
-    dispatch({ type: 'SET_ACTIVE_TAB', payload: 'all' });
-  }, []);
-  
-  // Filter activities based on search, employee selection, and active tab
-  const filteredActivities = useMemo(() => {
-    const searchLower = state.searchQuery.toLowerCase();
-    
-    return state.activities.filter((activity) => {
-      // Handle search filtering
-      const matchesSearch = 
-        activity.employeeName.toLowerCase().includes(searchLower) ||
-        activity.activityType.toLowerCase().includes(searchLower) ||
-        activity.description.toLowerCase().includes(searchLower);
+const getEmployeeLabel = (employee: Employee) => {
+	const name = employee.fullName || `${employee.firstName} ${employee.surname}`.trim()
+	return `${name} • ${employee.employeeNumber}`
+}
 
-      // Handle employee filtering
-      if (state.selectedEmployee && state.selectedEmployee !== 'all') {
-        if (activity.employeeId !== state.selectedEmployee) return false;
-      }
-      
-      // Handle tab filtering
-      if (state.activeTab === 'all') {
-        return matchesSearch;
-      }
-      
-      return matchesSearch && activity.activityCategory === state.activeTab;
-    });
-  }, [state.activities, state.searchQuery, state.selectedEmployee, state.activeTab]);
+const EmployeeDiaryPage = () => {
+	const { user } = useAuth()
+	const isAdmin = user?.role === 'administrator'
+	const linkedEmployeeId = useMemo<number | null>(() => {
+		if (!user) return null
+		const legacy = user as unknown as UserWithLegacyEmployeeId
+		const raw = legacy.employeeId ?? legacy.EmployeeId
+		if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+		if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) return Number(raw)
+		return null
+	}, [user])
 
-  // Form handling
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      employeeId: '',
-      employeeName: '',
-      activityCategory: 'employment',
-      activityType: '',
-      description: '',
-      status: 'pending',
-      source: 'manual',
-      sourceReference: '',
-      attachments: [],
-      notes: '',
-      relatedDocuments: [],
-      actionRequired: false,
-      recordedBy: 'System User',
-      activityDate: new Date(),
-    },
-  });
+	const [employees, setEmployees] = useState<Employee[]>([])
+	const [employeesLoading, setEmployeesLoading] = useState(false)
+	const [employeesError, setEmployeesError] = useState<string | null>(null)
 
-  // Data fetching
-  const fetchActivities = useCallback(async () => {
-    try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      const activities = await employeeActivityService.fetchEmployeeActivities(
-        state.selectedEmployee || undefined
-      );
-      dispatch({ type: 'SET_ACTIVITIES', payload: activities });
-    } catch (error) {
-      dispatch({
-        type: 'LOG_ERROR',
-        payload: { message: 'Error fetching activities', data: error },
-      });
-      toast({
-        title: "Error",
-        description: "Failed to fetch activities.",
-        variant: "destructive",
-      });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
-  }, [state.selectedEmployee]);
+	const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null)
 
-  const checkSyncStatus = useCallback(async () => {
-    try {
-      const sources = await employeeActivityService.fetchActivitySources();
-      dispatch({ type: 'SET_SYNC_STATUS', payload: sources });
-    } catch (error) {
-      dispatch({
-        type: 'LOG_ERROR',
-        payload: { message: 'Error checking sync status', data: error },
-      });
-    }
-  }, []);
+	const [diary, setDiary] = useState<EmployeeDiary | null>(null)
+	const [diaryLoading, setDiaryLoading] = useState(false)
+	const [diaryError, setDiaryError] = useState<string | null>(null)
 
-  // Event handlers
-  const handleSync = useCallback(async (source: ActivitySource) => {
-    if (state.isSyncing) return;
-    
-    try {
-      dispatch({ type: 'SET_SYNCING', payload: true });
-      await employeeActivityService.syncActivitiesFromSource(source);
-      await fetchActivities();
-      toast({
-        title: "Sync Complete",
-        description: `Successfully synced activities from ${ACTIVITY_SOURCES[source].label}`,
-      });
-    } catch (error) {
-      dispatch({
-        type: 'LOG_ERROR',
-        payload: { message: `Error syncing from ${source}`, data: error },
-      });
-      toast({
-        title: "Sync Error",
-        description: `Failed to sync activities from ${ACTIVITY_SOURCES[source].label}`,
-        variant: "destructive",
-      });
-    } finally {
-      dispatch({ type: 'SET_SYNCING', payload: false });
-    }
-  }, [fetchActivities, state.isSyncing]);
+	useEffect(() => {
+		let isMounted = true
+		const loadEmployees = async () => {
+			setEmployeesLoading(true)
+			setEmployeesError(null)
+			try {
+				if (!isAdmin) {
+					if (!linkedEmployeeId) {
+						if (!isMounted) return
+						setEmployees([])
+						setEmployeesError('Your account is not linked to an employee record.')
+						return
+					}
 
-  const handleSubmit = useCallback(async (values: FormData) => {
-    try {
-      const commonData = {
-        employeeId: values.employeeId,
-        employeeName: values.employeeName,
-        activityDate: values.activityDate,
-        activityCategory: values.activityCategory as ActivityCategory,
-        activityType: values.activityType,
-        description: values.description,
-        status: values.status as ActivityStatus,
-        source: values.source as ActivitySource,
-        attachments: values.attachments || [],
-        notes: values.notes,
-        relatedDocuments: values.relatedDocuments || [],
-        nextReviewDate: values.nextReviewDate,
-        actionRequired: values.actionRequired,
-        actionDeadline: values.actionDeadline,
-        recordedBy: values.recordedBy,
-      };
+					const employee = await employeeService.getEmployeeByIdAsFrontendInterface(linkedEmployeeId)
+					if (!isMounted) return
+					setEmployees([employee])
+					setSelectedEmployeeId(employee.id)
+					return
+				}
 
-      if (state.editingEntry) {
-        const updated = await employeeActivityService.updateActivity(
-          state.editingEntry.id,
-          commonData
-        );
-        dispatch({ type: 'UPDATE_ACTIVITY', payload: updated });
-        toast({
-          title: "Activity Updated",
-          description: "Employee activity record has been updated.",
-        });
-      } else {
-        const created = await employeeActivityService.createActivity(commonData);
-        dispatch({ type: 'ADD_ACTIVITY', payload: created });
-        toast({
-          title: "Activity Added",
-          description: "New employee activity has been recorded.",
-        });
-      }
+				const result = await employeeService.getEmployeesAsFrontendInterface({ page: 1, pageSize: 200 })
+				if (!isMounted) return
+				setEmployees(result.employees)
+			} catch (err) {
+				console.error('❌ [EmployeeDiary] Failed to load employees:', err)
+				if (!isMounted) return
+				setEmployeesError(err instanceof Error ? err.message : 'Failed to load employees')
+			} finally {
+				if (!isMounted) return
+				setEmployeesLoading(false)
+			}
+		}
 
-      dispatch({ type: 'SET_DIALOG_OPEN', payload: false });
-      dispatch({ type: 'SET_EDITING_ENTRY', payload: null });
-      form.reset();
-    } catch (error) {
-      dispatch({
-        type: 'LOG_ERROR',
-        payload: { message: 'Error in handleSubmit', data: error },
-      });
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save the activity.",
-        variant: "destructive",
-      });
-    }
-  }, [state.editingEntry, form]);
+		loadEmployees()
+		return () => {
+			isMounted = false
+		}
+	}, [isAdmin, linkedEmployeeId])
 
-  const handleEdit = useCallback((activity: EmployeeActivity) => {
-    dispatch({ type: 'SET_EDITING_ENTRY', payload: activity });
-    form.reset({
-      ...activity,
-      activityCategory: activity.activityCategory as ActivityCategory,
-      status: activity.status as ActivityStatus,
-    });
-    dispatch({ type: 'SET_DIALOG_OPEN', payload: true });
-  }, [form]);
+	useEffect(() => {
+		if (!selectedEmployeeId) {
+			setDiary(null)
+			setDiaryError(null)
+			return
+		}
 
-  const handleDelete = useCallback(async (id: string) => {
-    try {
-      if (window.confirm('Are you sure you want to delete this activity record?')) {
-        await employeeActivityService.deleteActivity(id);
-        dispatch({ type: 'DELETE_ACTIVITY', payload: id });
-        toast({
-          title: "Activity Deleted",
-          description: "The activity record has been permanently deleted.",
-        });
-      }
-    } catch (error) {
-      dispatch({
-        type: 'LOG_ERROR',
-        payload: { message: 'Error in handleDelete', data: error },
-      });
-      toast({
-        title: "Error",
-        description: "Failed to delete the activity.",
-        variant: "destructive",
-      });
-    }
-  }, []);
+		let isMounted = true
+		const loadDiary = async () => {
+			setDiaryLoading(true)
+			setDiaryError(null)
+			try {
+				const result = await employeeDiaryService.getEmployeeDiary(selectedEmployeeId)
+				if (!isMounted) return
+				setDiary(result)
+			} catch (err) {
+				console.error('❌ [EmployeeDiary] Failed to load diary:', err)
+				if (!isMounted) return
+				const message = err instanceof Error ? err.message : 'Failed to load employee diary'
+				setDiaryError(message)
+				toast({ title: 'Failed to load diary', description: message, variant: 'destructive' })
+			} finally {
+				if (!isMounted) return
+				setDiaryLoading(false)
+			}
+		}
 
-  const handleToggleSourceStatus = useCallback((source: ActivitySource) => {
-    const currentStatus = state.syncStatus[source];
-    const newStatus: ActivitySyncStatus = {
-      ...currentStatus,
-      status: currentStatus.status === 'active' ? 'inactive' : 'active',
-      lastSynced: currentStatus.status === 'inactive' ? currentStatus.lastSynced : new Date()
-    };
-    
-    dispatch({ 
-      type: 'UPDATE_SYNC_STATUS', 
-      payload: { 
-        source, 
-        status: newStatus 
-      } 
-    });
-    
-    toast({
-      title: `${ACTIVITY_SOURCES[source].label} Sync ${newStatus.status === 'active' ? 'Activated' : 'Deactivated'}`,
-      description: `Synchronization for ${ACTIVITY_SOURCES[source].label} is now ${newStatus.status}.`,
-    });
-  }, [state.syncStatus]);
+		loadDiary()
+		return () => {
+			isMounted = false
+		}
+	}, [selectedEmployeeId])
 
-  // Auto-sync effect
-  useEffect(() => {
-    const syncSources = async () => {
-      if (state.isSyncing) return;
-      
-      for (const [source, config] of Object.entries(ACTIVITY_SOURCES)) {
-        if (config.syncInterval > 0 && state.syncStatus[source as ActivitySource]?.status === 'active') {
-          await handleSync(source as ActivitySource);
-        }
-      }
-    };
+	const selectedEmployee = useMemo(() => {
+		if (!selectedEmployeeId) return null
+		return employees.find(e => e.id === selectedEmployeeId) || null
+	}, [employees, selectedEmployeeId])
 
-    const interval = setInterval(syncSources, AUTO_SYNC_INTERVAL);
-    return () => clearInterval(interval);
-  }, [state.syncStatus, handleSync, state.isSyncing]);
+	const pending = useMemo(() => {
+		if (!diary) {
+			return {
+				holiday: [] as EmployeeDiary['holidays'],
+				expenses: [] as EmployeeDiary['expenses'],
+				equipmentRequests: [] as EmployeeDiary['equipment']['requests'],
+			}
+		}
 
-  // Sort and paginate activities
-  const sortedActivities = useMemo(() => 
-    [...filteredActivities].sort((a, b) => 
-      b.activityDate.getTime() - a.activityDate.getTime()
-    )
-  , [filteredActivities]);
+		return {
+			holiday: diary.holidays.filter(h => isPendingStatus(h.status)),
+			expenses: diary.expenses.filter(e => isPendingStatus(e.status)),
+			equipmentRequests: diary.equipment.requests.filter(r => isPendingStatus(r.status)),
+		}
+	}, [diary])
 
-  const totalPages = Math.ceil(sortedActivities.length / ITEMS_PER_PAGE);
-  
-  const paginatedActivities = useMemo(() => 
-    sortedActivities.slice(
-      (state.currentPage - 1) * ITEMS_PER_PAGE,
-      state.currentPage * ITEMS_PER_PAGE
-    )
-  , [sortedActivities, state.currentPage]);
+	const pendingTotal = pending.holiday.length + pending.expenses.length + pending.equipmentRequests.length
 
-  const handleTabChange = useCallback((value: string) => {
-    dispatch({ 
-      type: 'SET_ACTIVE_TAB', 
-      payload: value === 'all' ? 'all' : value as ActivityCategory
-    });
-  }, []);
+	return (
+		<div className="h-full bg-gradient-to-b from-muted/30 to-background">
+			<div className="border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+				<div className="px-4 md:px-6 py-4">
+					<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+						<div className="space-y-1">
+							<Breadcrumb>
+								<BreadcrumbList>
+									<BreadcrumbItem>Employee</BreadcrumbItem>
+									<BreadcrumbSeparator />
+									<BreadcrumbItem>
+										<BreadcrumbPage>Diary</BreadcrumbPage>
+									</BreadcrumbItem>
+								</BreadcrumbList>
+							</Breadcrumb>
+							<div className="flex items-center gap-2">
+								<h1 className="text-xl md:text-2xl font-semibold tracking-tight">Employee Diary</h1>
+								<Badge variant="secondary" className="hidden sm:inline-flex">Aggregated</Badge>
+							</div>
+							<p className="text-sm text-muted-foreground">
+								A unified view of holidays, incidents, expenses, licenses, equipment and training.
+							</p>
+						</div>
 
-  const handleEmployeeChange = useCallback((value: string) => {
-    dispatch({ type: 'SET_SELECTED_EMPLOYEE', payload: value || null });
-    fetchActivities();
-  }, [fetchActivities]);
+						<div className="flex items-center gap-2">
+							<Button
+								variant="outline"
+								onClick={() => selectedEmployeeId && setSelectedEmployeeId(selectedEmployeeId)}
+								disabled={!selectedEmployeeId || diaryLoading}
+								aria-label="Refresh employee diary"
+							>
+								{diaryLoading ? (
+									<>
+										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										Refreshing…
+									</>
+								) : (
+									<>
+										<RefreshCw className="mr-2 h-4 w-4" />
+										Refresh
+									</>
+								)}
+							</Button>
+						</div>
+					</div>
+				</div>
+			</div>
 
-  const handleDialogChange = useCallback((open: boolean) => {
-    dispatch({ type: 'SET_DIALOG_OPEN', payload: open });
-  }, []);
+			<div className="p-4 md:p-6 space-y-6">
+				<Card className="overflow-hidden border-border/60 bg-card/70 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+					<CardHeader className="border-b bg-muted/20">
+						<CardTitle className="flex items-center gap-2">
+							<User className="h-5 w-5 text-muted-foreground" />
+							Select employee
+						</CardTitle>
+						<CardDescription>Admins can switch employees; officers only see their own diary.</CardDescription>
+					</CardHeader>
+					<CardContent className="p-4 md:p-6">
+						<div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+							<div className="w-full md:max-w-lg space-y-2">
+								{employeesLoading ? (
+									<div className="space-y-2">
+										<Skeleton className="h-10 w-full" />
+										<Skeleton className="h-4 w-2/3" />
+									</div>
+								) : (
+									<>
+										<Select
+											value={selectedEmployeeId ? String(selectedEmployeeId) : ''}
+											onValueChange={(value) => setSelectedEmployeeId(value ? Number(value) : null)}
+											disabled={!isAdmin}
+										>
+											<SelectTrigger className={cn('w-full', !isAdmin && 'opacity-100')}>
+												<SelectValue placeholder={isAdmin ? 'Select an employee' : 'Your employee diary'} />
+											</SelectTrigger>
+											<SelectContent>
+												{employees.map(employee => (
+													<SelectItem key={employee.id} value={String(employee.id)}>
+														{getEmployeeLabel(employee)}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+										{employeesError && (
+											<p className="text-sm text-red-600">{employeesError}</p>
+										)}
+									</>
+								)}
+							</div>
 
-  const handlePageChange = useCallback((page: number) => {
-    dispatch({ type: 'SET_CURRENT_PAGE', payload: page });
-  }, []);
+							{selectedEmployeeId && (
+								<div className="flex items-center gap-2 text-sm text-muted-foreground">
+									<Sparkles className="h-4 w-4" />
+									<span>Tip: check the Pending tab for approvals</span>
+								</div>
+							)}
+						</div>
+					</CardContent>
+				</Card>
 
-  // Render empty state component
-  const renderEmptyState = useCallback(() => (
-    <div className="text-center py-12">
-      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-4">
-        <FileText className="h-6 w-6 text-muted-foreground" />
-      </div>
-      <h3 className="text-lg font-medium">No activities found</h3>
-      <p className="text-muted-foreground mt-2">
-        Start by adding a new activity record or sync from available sources.
-      </p>
-    </div>
-  ), []);
+				{!selectedEmployeeId && (
+					<Card>
+						<CardContent className="p-6 text-sm text-muted-foreground">
+							Select an employee to view diary details.
+						</CardContent>
+					</Card>
+				)}
 
-  // Loading state component
-  const renderLoadingState = useCallback(() => (
-    <div className="flex items-center justify-center py-16">
-      <div className="flex flex-col items-center space-y-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Loading activities...</p>
-      </div>
-    </div>
-  ), []);
+				{selectedEmployeeId && diaryLoading && (
+					<Card className="border-border/60">
+						<CardContent className="p-4 md:p-6 space-y-4">
+							<div className="flex items-center gap-2">
+								<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+								<p className="text-sm text-muted-foreground">Loading diary…</p>
+							</div>
+							<div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+								{Array.from({ length: 6 }).map((_, i) => (
+									<Skeleton key={i} className="h-20 w-full" />
+								))}
+							</div>
+							<Skeleton className="h-28 w-full" />
+							<Skeleton className="h-10 w-80" />
+							<Skeleton className="h-64 w-full" />
+						</CardContent>
+					</Card>
+				)}
 
-  // Error state for employee loading
-  const renderEmployeeLoadingError = useCallback(() => (
-    <Card className="shadow-sm border-red-200">
-      <CardHeader className="text-center border-b text-red-600">
-        <CardTitle>Failed to Load Employees</CardTitle>
-        <CardDescription className="text-red-500">
-          We couldn't load the employee data. Please try refreshing the page.
-        </CardDescription>
-      </CardHeader>
-      <CardFooter className="flex justify-center pt-4">
-        <Button 
-          variant="outline"
-          onClick={fetchEmployees}
-          className="border-red-300 text-red-600 hover:bg-red-50"
-        >
-          Retry Loading Employees
-        </Button>
-      </CardFooter>
-    </Card>
-  ), [fetchEmployees]);
+				{selectedEmployeeId && diaryError && !diaryLoading && (
+					<Alert variant="destructive" className="py-3">
+						<div className="flex items-start gap-2">
+							<AlertCircle className="h-4 w-4 mt-0.5" />
+							<div>
+								<p className="text-sm font-medium">Unable to load employee diary</p>
+								<p className="text-sm">{diaryError}</p>
+							</div>
+						</div>
+					</Alert>
+				)}
 
-  return (
-    <div className="container mx-auto px-4 py-6 max-w-[1400px]">
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-[#324053]">Employee Activity Diary</h1>
-          <p className="text-muted-foreground mt-1">
-            Comprehensive record of all employee-related activities and interactions
-          </p>
-        </div>
-      </div>
+				{diary && (
+					<>
+						{pendingTotal > 0 && (
+							<Card className="border-amber-200">
+								<CardHeader>
+									<CardTitle className="text-base">Pending approvals</CardTitle>
+									<CardDescription>
+										You have <span className="font-medium text-foreground">{pendingTotal}</span> pending item(s) across holidays, expenses, and equipment requests.
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="text-sm">
+									<div className="flex flex-wrap gap-2">
+										{pending.holiday.length > 0 && (
+											<Badge variant="secondary">Holidays: {pending.holiday.length}</Badge>
+										)}
+										{pending.expenses.length > 0 && (
+											<Badge variant="secondary">Expenses: {pending.expenses.length}</Badge>
+										)}
+										{pending.equipmentRequests.length > 0 && (
+											<Badge variant="secondary">Equipment: {pending.equipmentRequests.length}</Badge>
+										)}
+									</div>
+								</CardContent>
+							</Card>
+						)}
 
-      <div className="grid grid-cols-1 gap-6">
-        {/* Controls Card */}
-        <Card className="shadow-sm border-gray-200">
-          <CardHeader className="p-4 lg:p-6 border-b">
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full md:w-auto">
-                {state.isLoadingEmployees ? (
-                  <div className="w-full sm:w-[240px] h-10 flex items-center justify-center">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    <span className="text-sm text-muted-foreground">Loading...</span>
-                  </div>
-                ) : state.employees.length === 0 ? (
-                  <Button
-                    variant="outline"
-                    onClick={fetchEmployees}
-                    className="w-full sm:w-[240px]"
-                  >
-                    Retry Loading Employees
-                  </Button>
-                ) : (
-                  <Select
-                    value={state.selectedEmployee || undefined}
-                    onValueChange={handleEmployeeChange}
-                  >
-                    <SelectTrigger className="w-full sm:w-[240px]">
-                      <SelectValue placeholder="Select Employee" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Employees</SelectItem>
-                      {state.employees.map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id}>
-                          {employee.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <Dialog 
-                  open={state.isDialogOpen} 
-                  onOpenChange={handleDialogChange}
-                >
-                  <DialogTrigger asChild>
-                    <Button className="bg-blue-900 text-white hover:bg-blue-800 w-full sm:w-auto">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Activity
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[600px] w-[95vw] max-w-full">
-                    <DialogHeader>
-                      <DialogTitle>
-                        {state.editingEntry ? 'Edit Activity Record' : 'Add New Activity Record'}
-                      </DialogTitle>
-                      <DialogDescription>
-                        {state.editingEntry 
-                          ? 'Update the activity record details below.' 
-                          : 'Record a new employee activity or interaction.'}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <ActivityForm
-                      form={form}
-                      onSubmit={handleSubmit}
-                      onCancel={() => handleDialogChange(false)}
-                      isEditing={!!state.editingEntry}
-                      employees={state.employees}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </div>
-              
-              <div className="relative w-full md:w-[300px]">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search activities..."
-                  className="pl-8 w-full"
-                  value={state.searchQuery}
-                  onChange={(e) => dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value })}
-                />
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
+						<div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+							<Card className="border-white/10 bg-gradient-to-br from-blue-950 to-blue-900 text-white shadow-sm">
+								<CardContent className="p-4">
+									<div className="flex items-center justify-between">
+										<div>
+											<p className="text-xs text-white/70">Holidays</p>
+											<p className="text-lg font-semibold text-white">{diary.stats.holidayCount}</p>
+										</div>
+										<CalendarDays className="h-5 w-5 text-white/90" />
+									</div>
+								</CardContent>
+							</Card>
+							<Card className="border-white/10 bg-gradient-to-br from-rose-950 to-rose-900 text-white shadow-sm">
+								<CardContent className="p-4">
+									<div className="flex items-center justify-between">
+										<div>
+											<p className="text-xs text-white/70">Incidents</p>
+											<p className="text-lg font-semibold text-white">{diary.stats.incidentCount}</p>
+										</div>
+										<ShieldAlert className="h-5 w-5 text-white/90" />
+									</div>
+								</CardContent>
+							</Card>
+							<Card className="border-white/10 bg-gradient-to-br from-emerald-950 to-emerald-900 text-white shadow-sm">
+								<CardContent className="p-4">
+									<div className="flex items-center justify-between">
+										<div>
+											<p className="text-xs text-white/70">Expenses</p>
+											<p className="text-lg font-semibold text-white">{diary.stats.expenseCount}</p>
+										</div>
+										<CreditCard className="h-5 w-5 text-white/90" />
+									</div>
+								</CardContent>
+							</Card>
+							<Card className="border-white/10 bg-gradient-to-br from-amber-950 to-amber-900 text-white shadow-sm">
+								<CardContent className="p-4">
+									<div className="flex items-center justify-between">
+										<div>
+											<p className="text-xs text-white/70">Equipment requests</p>
+											<p className="text-lg font-semibold text-white">{diary.stats.equipmentRequestCount}</p>
+										</div>
+										<HardHat className="h-5 w-5 text-white/90" />
+									</div>
+								</CardContent>
+							</Card>
+							<Card className="border-white/10 bg-gradient-to-br from-indigo-950 to-indigo-900 text-white shadow-sm">
+								<CardContent className="p-4">
+									<div className="flex items-center justify-between">
+										<div>
+											<p className="text-xs text-white/70">Equipment issued</p>
+											<p className="text-lg font-semibold text-white">{diary.stats.equipmentIssuedCount}</p>
+										</div>
+										<Briefcase className="h-5 w-5 text-white/90" />
+									</div>
+								</CardContent>
+							</Card>
+							<Card className="border-white/10 bg-gradient-to-br from-slate-950 to-slate-900 text-white shadow-sm">
+								<CardContent className="p-4">
+									<div className="flex items-center justify-between">
+										<div>
+											<p className="text-xs text-white/70">Training tests</p>
+											<p className="text-lg font-semibold text-white">{diary.stats.trainingTestCount}</p>
+										</div>
+										<FileText className="h-5 w-5 text-white/90" />
+									</div>
+								</CardContent>
+							</Card>
+						</div>
 
-        {/* Content Card */}
-        <Card className="shadow-sm border-gray-200">
-          <CardContent className="p-4 lg:p-6">
-            <Tabs 
-              defaultValue="all"
-              value={state.activeTab}
-              onValueChange={handleTabChange}
-              className="w-full"
-            >
-              <div className="flex justify-between items-center mb-6 overflow-x-auto pb-2">
-                <TabsList className="h-auto p-1 bg-muted/50 overflow-x-auto flex-nowrap min-w-[320px]">
-                  <TabsTrigger 
-                    value="all" 
-                    className={`flex items-center gap-2 px-3 py-2 flex-shrink-0 ${state.activeTab === 'all' ? 'bg-blue-100 text-blue-800' : ''}`}
-                  >
-                    <FileText className="h-4 w-4" />
-                    <span>All</span>
-                  </TabsTrigger>
-                  
-                  {ACTIVITY_CATEGORIES.map((category) => {
-                    const Icon = category.icon;
-                    const isActive = state.activeTab === category.id;
-                    const categories = state.activities
-                      .filter(a => a.activityCategory === category.id)
-                      .length;
-                    
-                    return (
-                      <TabsTrigger
-                        key={category.id}
-                        value={category.id}
-                        className={`flex items-center gap-2 px-3 py-2 flex-shrink-0 ${isActive ? CATEGORY_COLORS[category.id] : ''}`}
-                      >
-                        <Icon className="h-4 w-4" />
-                        <span className="hidden sm:inline">{category.label}</span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white' : 'bg-gray-200'}`}>
-                          {categories}
-                        </span>
-                      </TabsTrigger>
-                    );
-                  })}
-                </TabsList>
-              </div>
+						<Card>
+							<CardHeader>
+								<CardTitle>{diary.employee.fullName || selectedEmployee?.fullName || getEmployeeLabel(selectedEmployee || employees[0])}</CardTitle>
+								<CardDescription>
+									{diary.employee.position} • {diary.employee.employeeStatus} • {diary.employee.employeeNumber}
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="text-sm text-muted-foreground">
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+									<div><span className="font-medium text-foreground">Email:</span> {diary.employee.email || '—'}</div>
+									<div><span className="font-medium text-foreground">Phone:</span> {diary.employee.contactNumber || '—'}</div>
+									<div><span className="font-medium text-foreground">Region:</span> {diary.employee.region || '—'}</div>
+								</div>
+							</CardContent>
+						</Card>
 
-              {/* Show loading state */}
-              {state.isLoading && renderLoadingState()}
+						<Tabs defaultValue={pendingTotal > 0 ? 'pending' : 'holidays'} className="w-full">
+							<TabsList className="flex flex-wrap h-auto">
+								<TabsTrigger value="pending">
+									Pending
+									{pendingTotal > 0 && (
+										<span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-medium text-amber-800">
+											{pendingTotal}
+										</span>
+									)}
+								</TabsTrigger>
+								<TabsTrigger value="holidays">Holidays</TabsTrigger>
+								<TabsTrigger value="incidents">Incidents</TabsTrigger>
+								<TabsTrigger value="expenses">Expenses</TabsTrigger>
+								<TabsTrigger value="license">License</TabsTrigger>
+								<TabsTrigger value="equipment">Equipment</TabsTrigger>
+								<TabsTrigger value="training">Training</TabsTrigger>
+							</TabsList>
 
-              {/* Show content when not loading */}
-              {!state.isLoading && (
-                <>
-                  {state.activeTab === 'all' && (
-                    <TabsContent value="all" className="mt-4 md:mt-6 space-y-4 md:space-y-6">
-                      {filteredActivities.length === 0 ? (
-                        renderEmptyState()
-                      ) : (
-                        paginatedActivities.map((activity) => (
-                          <ActivityTimeline
-                            key={activity.id}
-                            activity={activity}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                          />
-                        ))
-                      )}
-                    </TabsContent>
-                  )}
+							<TabsContent value="pending" className="mt-4">
+								<div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+									<Card>
+										<CardHeader>
+											<CardTitle className="text-base">Pending holidays</CardTitle>
+											<CardDescription>Status = Pending</CardDescription>
+										</CardHeader>
+										<CardContent>
+											{pending.holiday.length === 0 ? (
+												<p className="text-sm text-muted-foreground">No pending holidays.</p>
+											) : (
+												<ul className="space-y-2">
+													{pending.holiday.slice(0, 10).map(h => (
+														<li key={h.id} className="text-sm">
+															<div className="flex items-center justify-between">
+																<span>{formatDate(h.startDate)} – {formatDate(h.endDate)}</span>
+																<Badge variant="secondary">Pending</Badge>
+															</div>
+															<div className="text-xs text-muted-foreground">{h.totalDays} day(s)</div>
+														</li>
+													))}
+												</ul>
+											)}
+										</CardContent>
+									</Card>
 
-                  {ACTIVITY_CATEGORIES.map((category) => (
-                    state.activeTab === category.id && (
-                      <TabsContent key={category.id} value={category.id} className="mt-4 md:mt-6 space-y-4 md:space-y-6">
-                        {filteredActivities.length === 0 ? (
-                          <div className="text-center py-6 md:py-8">
-                            <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-muted mb-3 md:mb-4">
-                              {React.createElement(category.icon, { className: "h-5 w-5 md:h-6 md:w-6 text-muted-foreground" })}
-                            </div>
-                            <h3 className="text-base md:text-lg font-medium">No {category.label} Activities</h3>
-                            <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-                              No activities found in this category. Try another category or add a new activity.
-                            </p>
-                            <Button 
-                              className="mt-4 bg-blue-900 text-white hover:bg-blue-800"
-                              onClick={() => {
-                                // Pre-select the current category when adding a new activity
-                                form.setValue('activityCategory', category.id as ActivityCategory);
-                                dispatch({ type: 'SET_DIALOG_OPEN', payload: true });
-                              }}
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add {category.label} Activity
-                            </Button>
-                          </div>
-                        ) : (
-                          paginatedActivities.map((activity) => (
-                            <ActivityTimeline
-                              key={activity.id}
-                              activity={activity}
-                              onEdit={handleEdit}
-                              onDelete={handleDelete}
-                            />
-                          ))
-                        )}
-                      </TabsContent>
-                    )
-                  ))}
-                </>
-              )}
-            </Tabs>
+									<Card>
+										<CardHeader>
+											<CardTitle className="text-base">Pending expenses</CardTitle>
+											<CardDescription>Status = Pending</CardDescription>
+										</CardHeader>
+										<CardContent>
+											{pending.expenses.length === 0 ? (
+												<p className="text-sm text-muted-foreground">No pending expenses.</p>
+											) : (
+												<ul className="space-y-2">
+													{pending.expenses.slice(0, 10).map(e => (
+														<li key={e.id} className="text-sm">
+															<div className="flex items-center justify-between">
+																<span>{formatDate(e.weekStartDate)} – {formatDate(e.weekEndDate)}</span>
+																<Badge variant="secondary">Pending</Badge>
+															</div>
+															<div className="text-xs text-muted-foreground">Total: {formatMoney(e.weekTotal)}</div>
+														</li>
+													))}
+												</ul>
+											)}
+										</CardContent>
+									</Card>
 
-            {/* Pagination - only show when not loading and we have activities */}
-            {!state.isLoading && filteredActivities.length > 0 && (
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 border-t pt-4">
-                <div className="text-xs sm:text-sm text-muted-foreground order-2 sm:order-1">
-                  Showing {((state.currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(state.currentPage * ITEMS_PER_PAGE, sortedActivities.length)} of {sortedActivities.length} activities
-                </div>
-                <div className="flex space-x-2 order-1 sm:order-2 w-full sm:w-auto justify-center sm:justify-start">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(Math.max(1, state.currentPage - 1))}
-                    disabled={state.currentPage === 1}
-                    className="h-8 px-3"
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(Math.min(totalPages, state.currentPage + 1))}
-                    disabled={state.currentPage === totalPages}
-                    className="h-8 px-3"
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-};
+									<Card>
+										<CardHeader>
+											<CardTitle className="text-base">Pending equipment</CardTitle>
+											<CardDescription>Status = Pending</CardDescription>
+										</CardHeader>
+										<CardContent>
+											{pending.equipmentRequests.length === 0 ? (
+												<p className="text-sm text-muted-foreground">No pending equipment requests.</p>
+											) : (
+												<ul className="space-y-2">
+													{pending.equipmentRequests.slice(0, 10).map(r => (
+														<li key={r.id} className="text-sm">
+															<div className="flex items-center justify-between">
+																<span>{r.equipmentType}{r.size ? ` (${r.size})` : ''}</span>
+																<Badge variant="secondary">Pending</Badge>
+															</div>
+															<div className="text-xs text-muted-foreground">Qty {r.quantity} • {formatDate(r.createdAt)}</div>
+														</li>
+													))}
+												</ul>
+											)}
+										</CardContent>
+									</Card>
+								</div>
+							</TabsContent>
 
-export default EmployeeDiaryPage;
+							<TabsContent value="holidays" className="mt-4">
+								<Card>
+									<CardHeader>
+										<CardTitle>Booked holidays</CardTitle>
+										<CardDescription>Holiday requests from the HolidayRequest table.</CardDescription>
+									</CardHeader>
+									<CardContent>
+										{diary.holidays.length === 0 ? (
+											<p className="text-sm text-muted-foreground">No holiday requests found.</p>
+										) : (
+											<div className="overflow-x-auto">
+												<Table>
+													<TableHeader className="border-b">
+														<TableRow>
+															<TableHead>Dates</TableHead>
+															<TableHead>Days</TableHead>
+															<TableHead>Status</TableHead>
+															<TableHead>Requested</TableHead>
+															<TableHead>Return</TableHead>
+														</TableRow>
+													</TableHeader>
+													<TableBody>
+														{diary.holidays.map(h => (
+															<TableRow key={h.id}>
+																<TableCell className="font-medium">{formatDate(h.startDate)} – {formatDate(h.endDate)}</TableCell>
+																<TableCell>{h.totalDays}</TableCell>
+																<TableCell>
+																	<Badge variant={getStatusBadgeVariant(h.status)}>{h.status}</Badge>
+																</TableCell>
+																<TableCell>{formatDate(h.dateOfRequest)}</TableCell>
+																<TableCell>{formatDate(h.returnToWorkDate)}</TableCell>
+															</TableRow>
+														))}
+													</TableBody>
+												</Table>
+											</div>
+										)}
+									</CardContent>
+								</Card>
+							</TabsContent>
+
+							<TabsContent value="incidents" className="mt-4">
+								<Card>
+									<CardHeader>
+										<CardTitle>Incident reporting</CardTitle>
+										<CardDescription>Incidents created by the linked user or matching officer name.</CardDescription>
+									</CardHeader>
+									<CardContent>
+										{diary.incidents.length === 0 ? (
+											<p className="text-sm text-muted-foreground">No incidents found.</p>
+										) : (
+											<div className="overflow-x-auto">
+												<Table>
+													<TableHeader className="border-b">
+														<TableRow>
+															<TableHead>Date</TableHead>
+															<TableHead>Store/Site</TableHead>
+															<TableHead>Customer</TableHead>
+															<TableHead>Type</TableHead>
+															<TableHead>Value recovered</TableHead>
+														</TableRow>
+													</TableHeader>
+													<TableBody>
+														{diary.incidents.map(i => (
+															<TableRow key={i.incidentId}>
+																<TableCell className="font-medium">{formatDate(i.dateOfIncident)}</TableCell>
+																<TableCell>{i.siteName}</TableCell>
+																<TableCell>{i.customerName || '—'}</TableCell>
+																<TableCell>{i.incidentType}</TableCell>
+																<TableCell>{formatMoney(i.valueRecovered ?? i.totalValueRecovered ?? null)}</TableCell>
+															</TableRow>
+														))}
+													</TableBody>
+												</Table>
+											</div>
+										)}
+									</CardContent>
+								</Card>
+							</TabsContent>
+
+							<TabsContent value="expenses" className="mt-4">
+								<Card>
+									<CardHeader>
+										<CardTitle>Expenses</CardTitle>
+										<CardDescription>Officer expense claims linked via the user ID.</CardDescription>
+									</CardHeader>
+									<CardContent>
+										{diary.expenses.length === 0 ? (
+											<p className="text-sm text-muted-foreground">No expense claims found.</p>
+										) : (
+											<div className="overflow-x-auto">
+												<Table>
+													<TableHeader className="border-b">
+														<TableRow>
+															<TableHead>Week</TableHead>
+															<TableHead>Status</TableHead>
+															<TableHead>Total</TableHead>
+															<TableHead>Approved</TableHead>
+														</TableRow>
+													</TableHeader>
+													<TableBody>
+														{diary.expenses.map(c => (
+															<TableRow key={c.id}>
+																<TableCell className="font-medium">{formatDate(c.weekStartDate)} – {formatDate(c.weekEndDate)}</TableCell>
+																<TableCell><Badge variant={getStatusBadgeVariant(c.status)}>{c.status}</Badge></TableCell>
+																<TableCell>{formatMoney(c.weekTotal)}</TableCell>
+																<TableCell>{c.approvedAt ? `${formatDate(c.approvedAt)} (${c.approvedByName || '—'})` : '—'}</TableCell>
+															</TableRow>
+														))}
+													</TableBody>
+												</Table>
+											</div>
+										)}
+									</CardContent>
+								</Card>
+							</TabsContent>
+
+							<TabsContent value="license" className="mt-4">
+								<Card>
+									<CardHeader>
+										<CardTitle>License</CardTitle>
+										<CardDescription>License info extracted from the Employee table.</CardDescription>
+									</CardHeader>
+									<CardContent className="space-y-4">
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+											<Card>
+												<CardHeader>
+													<CardTitle className="text-base">SIA license</CardTitle>
+												</CardHeader>
+												<CardContent className="text-sm">
+													<div className="flex items-center justify-between">
+														<span className="text-muted-foreground">Type</span>
+														<span className="font-medium">{diary.license.siaLicenceType || '—'}</span>
+													</div>
+													<div className="flex items-center justify-between mt-2">
+														<span className="text-muted-foreground">Expiry</span>
+														<div className="flex items-center gap-2">
+															<span className="font-medium">{formatDate(diary.license.siaLicenceExpiry)}</span>
+															{diary.license.isSiaLicenceExpired ? (
+																<Badge variant="destructive">Expired</Badge>
+															) : diary.license.isSiaLicenceExpiringSoon ? (
+																<Badge variant="secondary">Expiring soon</Badge>
+															) : (
+																<Badge variant="secondary">Valid</Badge>
+															)}
+														</div>
+													</div>
+												</CardContent>
+											</Card>
+
+											<Card>
+												<CardHeader>
+													<CardTitle className="text-base">Driving license</CardTitle>
+												</CardHeader>
+												<CardContent className="text-sm">
+													<div className="flex items-center justify-between">
+														<span className="text-muted-foreground">Type</span>
+														<span className="font-medium">{diary.license.drivingLicenceType || '—'}</span>
+													</div>
+													<div className="flex items-center justify-between mt-2">
+														<span className="text-muted-foreground">Last checked</span>
+														<span className="font-medium">{formatDate(diary.license.dateDLChecked)}</span>
+													</div>
+													<div className="flex items-center justify-between mt-2">
+														<span className="text-muted-foreground">Copy taken</span>
+														<span className="font-medium">{diary.license.drivingLicenceCopyTaken ? 'Yes' : 'No'}</span>
+													</div>
+												</CardContent>
+											</Card>
+										</div>
+									</CardContent>
+								</Card>
+							</TabsContent>
+
+							<TabsContent value="equipment" className="mt-4">
+								<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+									<Card>
+										<CardHeader>
+											<CardTitle>Equipment requests</CardTitle>
+											<CardDescription>Requests from the Uniform &amp; Equipment Request table.</CardDescription>
+										</CardHeader>
+										<CardContent>
+											{diary.equipment.requests.length === 0 ? (
+												<p className="text-sm text-muted-foreground">No requests found.</p>
+											) : (
+												<div className="overflow-x-auto">
+													<Table>
+														<TableHeader className="border-b">
+															<TableRow>
+																<TableHead>Item</TableHead>
+																<TableHead>Qty</TableHead>
+																<TableHead>Priority</TableHead>
+																<TableHead>Status</TableHead>
+																<TableHead>Requested</TableHead>
+															</TableRow>
+														</TableHeader>
+														<TableBody>
+															{diary.equipment.requests.map(r => (
+																<TableRow key={r.id}>
+																	<TableCell className="font-medium">{r.equipmentType}{r.size ? ` (${r.size})` : ''}</TableCell>
+																	<TableCell>{r.quantity}</TableCell>
+																	<TableCell><Badge variant="secondary">{r.priority}</Badge></TableCell>
+																	<TableCell><Badge variant={getStatusBadgeVariant(r.status)}>{r.status}</Badge></TableCell>
+																	<TableCell>{formatDate(r.createdAt)}</TableCell>
+																</TableRow>
+															))}
+														</TableBody>
+													</Table>
+												</div>
+											)}
+										</CardContent>
+									</Card>
+
+									<Card>
+										<CardHeader>
+											<CardTitle>Equipment issued</CardTitle>
+											<CardDescription>Issued items from the Uniform &amp; Equipment Issued table.</CardDescription>
+										</CardHeader>
+										<CardContent>
+											{diary.equipment.issued.length === 0 ? (
+												<p className="text-sm text-muted-foreground">No issued items found.</p>
+											) : (
+												<div className="overflow-x-auto">
+													<Table>
+														<TableHeader className="border-b">
+															<TableRow>
+																<TableHead>Item</TableHead>
+																<TableHead>Qty</TableHead>
+																<TableHead>Condition</TableHead>
+																<TableHead>Issued</TableHead>
+																<TableHead>Returned</TableHead>
+															</TableRow>
+														</TableHeader>
+														<TableBody>
+															{diary.equipment.issued.map(i => (
+																<TableRow key={i.id}>
+																	<TableCell className="font-medium">{i.equipmentType}{i.size ? ` (${i.size})` : ''}</TableCell>
+																	<TableCell>{i.quantity}</TableCell>
+																	<TableCell><Badge variant="secondary">{i.condition}</Badge></TableCell>
+																	<TableCell>{formatDate(i.dateIssued)}</TableCell>
+																	<TableCell>{formatDate(i.dateReturned)}</TableCell>
+																</TableRow>
+															))}
+														</TableBody>
+													</Table>
+												</div>
+											)}
+										</CardContent>
+									</Card>
+								</div>
+							</TabsContent>
+
+							<TabsContent value="training" className="mt-4">
+								<div className="space-y-4">
+									<Card>
+										<CardHeader>
+											<CardTitle>Training &amp; induction</CardTitle>
+											<CardDescription>Training fields and test attempts.</CardDescription>
+										</CardHeader>
+										<CardContent className="text-sm">
+											<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+												<div><span className="font-medium text-foreground">Induction booked:</span> {formatDate(diary.training.inductionAndTrainingBooked)}</div>
+												<div><span className="font-medium text-foreground">Full rotas issued:</span> {formatDate(diary.training.fullRotasIssued)}</div>
+												<div><span className="font-medium text-foreground">Trainer:</span> {diary.training.trainer || '—'}</div>
+												<div><span className="font-medium text-foreground">Location:</span> {diary.training.location || '—'}</div>
+											</div>
+										</CardContent>
+									</Card>
+
+									<Card>
+										<CardHeader>
+											<CardTitle>Tests</CardTitle>
+											<CardDescription>Attempts from the Take Test table.</CardDescription>
+										</CardHeader>
+										<CardContent>
+											{diary.training.tests.length === 0 ? (
+												<p className="text-sm text-muted-foreground">No test attempts found.</p>
+											) : (
+												<div className="overflow-x-auto">
+													<Table>
+														<TableHeader className="border-b">
+															<TableRow>
+																<TableHead>Test</TableHead>
+																<TableHead>Completed</TableHead>
+																<TableHead>Score</TableHead>
+																<TableHead>Status</TableHead>
+															</TableRow>
+														</TableHeader>
+														<TableBody>
+															{diary.training.tests.map(t => (
+																<TableRow key={t.id}>
+																	<TableCell className="font-medium">{t.testTitle}</TableCell>
+																	<TableCell>{formatDate(t.completedAt)}</TableCell>
+																	<TableCell>{Math.round(t.percentageScore)}%</TableCell>
+																	<TableCell><Badge variant={getStatusBadgeVariant(t.status)}>{t.status}</Badge></TableCell>
+																</TableRow>
+															))}
+														</TableBody>
+													</Table>
+												</div>
+											)}
+										</CardContent>
+									</Card>
+								</div>
+							</TabsContent>
+						</Tabs>
+					</>
+				)}
+			</div>
+		</div>
+	)
+}
+
+export default EmployeeDiaryPage

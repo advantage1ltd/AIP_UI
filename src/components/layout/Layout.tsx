@@ -5,7 +5,6 @@ import { Footer } from '../Footer'
 import { ThemeToggle } from '../theme-toggle'
 import { SidebarNavigation } from '@/components/dashboard/SidebarNavigation'
 import { Logo } from './Logo'
-import { CreateReportButton } from './CreateReportButton'
 import { UserMenu } from './UserMenu'
 import { SearchBar } from './SearchBar'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -41,11 +40,6 @@ export const Layout = ({ children }: LayoutProps) => {
             <Logo />
           </div>
 
-          {/* Create Button */}
-          <div className="flex justify-center pt-14 pb-6">
-            <CreateReportButton />
-          </div>
-
           {/* Navigation */}
           <div className="flex-1 overflow-y-auto">
             <nav className="grid gap-1 p-2">
@@ -73,11 +67,6 @@ export const Layout = ({ children }: LayoutProps) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-            </div>
-
-            {/* Create Button */}
-            <div className="flex justify-center pt-14 pb-6">
-              <CreateReportButton />
             </div>
 
             {/* Navigation */}

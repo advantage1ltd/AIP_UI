@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { Loader2 } from "lucide-react"
 import { Plus, Search, Filter, PoundSterling, AlertTriangle, CheckCircle } from "lucide-react"
 import { DealsTable } from "@/components/crm/DealsTable"
 import { DealDialog } from "@/components/crm/DealDialog"
@@ -22,7 +23,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/components/ui/use-toast"
-import { Deal, DUMMY_DEALS, PIPELINE_STAGES } from "@/data/pipeline"
+import { Deal, PIPELINE_STAGES } from "@/data/pipeline"
+import { dealService } from "@/services/dealService"
 import {
   Card,
   CardContent,
@@ -33,7 +35,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 
 export default function Deals() {
-  const [deals, setDeals] = useState<Deal[]>(DUMMY_DEALS)
+  const [deals, setDeals] = useState<Deal[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [stageFilter, setStageFilter] = useState<string>("all")
   const [priorityFilter, setPriorityFilter] = useState<string>("all")
@@ -61,58 +64,79 @@ export default function Deals() {
     .filter(deal => deal.stage === "closed")
     .reduce((sum, deal) => sum + deal.value, 0)
 
-  const handleCreateDeal = (data: Partial<Deal>) => {
-    const newDeal: Deal = {
-      id: `d${deals.length + 1}`,
-      title: data.title!,
-      value: data.value!,
-      company: data.company!,
-      contact: data.contact!,
-      email: data.email!,
-      stage: data.stage!,
-      priority: data.priority!,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+  const handleCreateDeal = async (data: Partial<Deal>) => {
+    try {
+      const newDeal = await dealService.create(data)
+      if (newDeal) {
+        // Reload all deals to ensure we have the latest data
+        const allDeals = await dealService.getAll(1, 1000)
+        setDeals(allDeals)
+        setIsDialogOpen(false)
+        toast({
+          title: "Deal Created",
+          description: "New deal has been created successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error creating deal:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to create deal. Please try again.',
+        variant: 'destructive'
+      })
     }
-
-    setDeals(prev => [...prev, newDeal])
-    setIsDialogOpen(false)
-    toast({
-      title: "Deal Created",
-      description: "New deal has been created successfully",
-    })
   }
 
-  const handleUpdateDeal = (data: Partial<Deal>) => {
+  const handleUpdateDeal = async (data: Partial<Deal>) => {
     if (!selectedDeal) return
 
-    setDeals(prev => prev.map(deal => 
-      deal.id === selectedDeal.id 
-        ? { 
-            ...deal, 
-            ...data, 
-            updatedAt: new Date().toISOString() 
-          }
-        : deal
-    ))
-    setIsDialogOpen(false)
-    setSelectedDeal(undefined)
-    toast({
-      title: "Deal Updated",
-      description: "Deal has been updated successfully",
-    })
+    try {
+      const updatedDeal = await dealService.update(selectedDeal.id, data)
+      if (updatedDeal) {
+        // Reload all deals to ensure we have the latest data
+        const allDeals = await dealService.getAll(1, 1000)
+        setDeals(allDeals)
+        setIsDialogOpen(false)
+        setSelectedDeal(undefined)
+        toast({
+          title: "Deal Updated",
+          description: "Deal has been updated successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error updating deal:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to update deal. Please try again.',
+        variant: 'destructive'
+      })
+    }
   }
 
-  const handleDeleteDeal = () => {
+  const handleDeleteDeal = async () => {
     if (!dealToDelete) return
 
-    setDeals(prev => prev.filter(deal => deal.id !== dealToDelete.id))
-    setDealToDelete(undefined)
-    toast({
-      title: "Deal Deleted",
-      description: "Deal has been deleted successfully",
-      variant: "destructive",
-    })
+    try {
+      const success = await dealService.delete(dealToDelete.id)
+      if (success) {
+        // Reload all deals to ensure we have the latest data
+        const allDeals = await dealService.getAll(1, 1000)
+        setDeals(allDeals)
+        setDealToDelete(undefined)
+        toast({
+          title: "Deal Deleted",
+          description: "Deal has been deleted successfully",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting deal:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to delete deal. Please try again.',
+        variant: 'destructive'
+      })
+    }
   }
 
   const handleViewDeal = (deal: Deal) => {
@@ -265,9 +289,18 @@ export default function Deals() {
             {searchTerm && <> matching "{searchTerm}"</>}
           </div>
 
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground">Loading deals...</span>
+            </div>
+          )}
+
           {/* Deals Table */}
-          <div className="bg-white rounded-lg border border-border/40 shadow-sm overflow-hidden">
-            {filteredDeals.length > 0 ? (
+          {!isLoading && (
+            <div className="bg-white rounded-lg border border-border/40 shadow-sm overflow-hidden">
+              {filteredDeals.length > 0 ? (
               <DealsTable 
                 data={filteredDeals}
                 onEdit={(deal) => {
@@ -300,7 +333,8 @@ export default function Deals() {
                 </Button>
               </div>
             )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Deal Dialog */}

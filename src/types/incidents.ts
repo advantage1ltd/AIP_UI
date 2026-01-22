@@ -10,6 +10,8 @@ export enum IncidentType {
   CREDIT_CARD_FRAUD = 'Credit Card Fraud',
   VIOLENT_BEHAVIOUR = 'Violent Behaviour',
   ABUSIVE_BEHAVIOUR = 'Abusive Behaviour',
+  COLLEAGUE_ASSAULT = 'Colleague Assault',
+  COLLEAGUE_ABUSE = 'Colleague Abuse',
   SHOPLIFTING = 'Shoplifting',
   CUSTOMER_COMPLAINT = 'Customer Complaint',
   SUSPICIOUS_BEHAVIOUR = 'Suspicious Behaviour',
@@ -127,6 +129,9 @@ export interface Incident {
   offenderPlaceOfBirth?: string;
   offenderMarks?: string;
   offenderAddress?: OffenderAddress;
+  offenderDetailsVerified?: boolean;
+  verificationMethod?: string;
+  verificationEvidenceImage?: string;
 
   // Special fields
   arrestSaveComment?: string;
@@ -144,6 +149,9 @@ export interface RepeatOffenderIncidentSummary {
   incidentType: string;
   description?: string;
   offenderMarks?: string;
+  offenderDetailsVerified?: boolean;
+  verificationMethod?: string;
+  verificationEvidenceImage?: string;
 }
 
 export interface RepeatOffenderMatch {

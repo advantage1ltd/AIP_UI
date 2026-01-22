@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios'
 import { api, EMPLOYEE_ENDPOINTS, ApiResponse, handleApiError } from '@/config/api'
 import { Employee } from '@/types/employee'
 import { mapToBackendRequest, mapFromBackendResponse, mapFromBackendResponseArray, mapFromListResponseArray, mapToBackendUpdateRequest } from '@/utils/employeeMapper'
@@ -151,17 +152,15 @@ class EmployeeService {
       console.log('✅ [EmployeeService] API response received:', response.data)
       console.log('📥 [EmployeeService] Response data:', response.data.data)
       return response.data.data
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('❌ [EmployeeService] Registration failed:', error)
-      console.error('❌ [EmployeeService] Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        response: (error as any)?.response?.data,
-        status: (error as any)?.response?.status,
-        error: error
-      })
-      console.error('❌ [EmployeeService] Backend error response:', JSON.stringify((error as any)?.response?.data, null, 2))
-      console.error('❌ [EmployeeService] Backend error message:', (error as any)?.response?.data?.message)
-      console.error('❌ [EmployeeService] Backend error errors:', (error as any)?.response?.data?.errors)
+      if (isAxiosError(error)) {
+        console.error('❌ [EmployeeService] Axios error details:', {
+          message: error.message,
+          status: error.response?.status,
+          responseData: error.response?.data,
+        })
+      }
       throw new Error(handleApiError(error))
     }
   }
@@ -198,7 +197,7 @@ class EmployeeService {
     status?: 'active' | 'inactive'
     position?: string
     region?: string
-  }): Promise<{ employees: any[]; total: number; page: number; pageSize: number }> {
+  }): Promise<{ employees: EmployeeDetailResponse[]; total: number; page: number; pageSize: number }> {
     try {
       const response = await api.get<ApiResponse<{
         items: EmployeeDetailResponse[]
@@ -323,21 +322,13 @@ class EmployeeService {
   }
 
   /**
-   * Upload employee photo
+   * Update employee photo (base64 data URL)
    */
-  async uploadEmployeePhoto(id: number, photoFile: File): Promise<{ photoUrl: string }> {
+  async updateEmployeePhoto(id: number, photoFile: string): Promise<EmployeeDetailResponse> {
     try {
-      const formData = new FormData()
-      formData.append('photo', photoFile)
-
-      const response = await api.post<ApiResponse<{ photoUrl: string }>>(
+      const response = await api.put<ApiResponse<EmployeeDetailResponse>>(
         `${EMPLOYEE_ENDPOINTS.DETAIL(id.toString())}/photo`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        }
+        { photoFile }
       )
       return response.data.data
     } catch (error) {

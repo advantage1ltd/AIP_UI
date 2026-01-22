@@ -26,13 +26,7 @@ api.interceptors.request.use(
         baseURL: config.baseURL
       })
     }
-    
-    // Skip authentication for test endpoints
-    if (config.url?.includes('/test')) {
-      console.log('🔓 [API Interceptor] Skipping authentication for test endpoint')
-      return config
-    }
-    
+        
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
       if (import.meta.env.DEV) {
@@ -95,22 +89,27 @@ api.interceptors.response.use(
       // Don't redirect if already on login page
       const isSettingsEndpoint = url.includes('/PageAccess/settings') || url.includes('/pageaccess/settings')
       const isLoginPage = window.location.pathname.includes('/login')
+
+      // Only auto-logout for auth endpoints (e.g. /Auth/me, /Auth/refresh)
+      const isAuthEndpoint = url.toLowerCase().includes('/auth/')
       
       if (import.meta.env.DEV) {
         console.warn('⚠️ [API Interceptor] Unauthorized access detected', {
           url,
           isSettingsEndpoint,
-          isLoginPage
+          isLoginPage,
+          isAuthEndpoint
         })
       }
       
       // Only redirect to login if:
-      // 1. Not the settings endpoint (which allows anonymous access)
-      // 2. Not already on the login page
-      // 3. Has an auth token (meaning user was authenticated but token expired)
+      // 1. Auth-related endpoint (token really invalid)
+      // 2. Not the settings endpoint (which allows anonymous access)
+      // 3. Not already on the login page
+      // 4. Has an auth token (meaning user was authenticated but token expired)
       const hasToken = sessionStore.getToken()
-      if (!isSettingsEndpoint && !isLoginPage && hasToken) {
-        console.warn('⚠️ [API Interceptor] Redirecting to login due to expired/invalid token')
+      if (isAuthEndpoint && !isSettingsEndpoint && !isLoginPage && hasToken) {
+        console.warn('⚠️ [API Interceptor] Redirecting to login due to expired/invalid token on auth endpoint')
         sessionStore.clearAll()
         window.location.href = '/login'
       }

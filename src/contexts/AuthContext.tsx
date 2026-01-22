@@ -1,17 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { isAxiosError } from 'axios';
 import { User } from '@/types/user';
 import { api } from '@/config/api';
 import { sessionStore } from '@/state/sessionStore';
 import { ApiResponse } from '@/types/api';
-
-// Backend ApiResponseDto structure (capital case)
-interface BackendApiResponse<T> {
-	Success: boolean;
-	Message: string;
-	Data: T;
-	Errors?: string[];
-	Timestamp?: string;
-}
+import type { BackendApiResponse } from '@/types/backend-api';
+import { getApiData, getApiErrors, getApiMessage, getApiSuccess } from '@/types/backend-api';
 
 type LoginResponsePayload = {
 	AccessToken: string;
@@ -57,19 +51,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       const response = await api.get<BackendApiResponse<User>>('/Auth/me');
-      // Backend returns ApiResponseDto with capital Data property
       const apiResponse = response.data;
-      if (apiResponse.Success && apiResponse.Data) {
-        setUser(apiResponse.Data);
-        sessionStore.setUser(apiResponse.Data);
+      const currentUser = getApiData(apiResponse);
+      if (getApiSuccess(apiResponse) && currentUser) {
+        setUser(currentUser);
+        sessionStore.setUser(currentUser);
         setError(null);
       } else {
-        throw new Error(apiResponse.Message || 'Failed to fetch user data');
+        throw new Error(getApiMessage(apiResponse) || 'Failed to fetch user data');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Only clear token if it's a 401 (unauthorized) - token is invalid
       // For other errors (network, 500, etc.), keep the cached user
-      const isUnauthorized = err?.response?.status === 401;
+      const isUnauthorized = isAxiosError(err) && err.response?.status === 401;
       
       if (isUnauthorized) {
         console.error('Failed to fetch current user - unauthorized:', err);
@@ -114,28 +108,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       let response;
       try {
-        response = await api.post<any>('/Auth/login', {
+        response = await api.post<BackendApiResponse<LoginResponsePayload>>('/Auth/login', {
           email: username,
           password
         });
-      } catch (axiosError: any) {
-        // Axios throws errors for non-2xx responses, but we might have error data
-        const errorResponse = axiosError?.response;
-        if (errorResponse?.data) {
-          // Backend returns error in ApiResponseDto format
-          const errorData = errorResponse.data;
-          const errorMessage = errorData?.Message ?? errorData?.message ?? 'Invalid email or password';
-          
-          console.error('❌ [AuthContext] Login failed (HTTP error):', {
-            status: errorResponse.status,
-            message: errorMessage,
-            errorData
-          });
-          
+      } catch (axiosError: unknown) {
+        if (isAxiosError(axiosError)) {
+          const errorData = axiosError.response?.data as BackendApiResponse<unknown> | undefined;
+          const errorMessage = getApiMessage(errorData) || 'Invalid email or password';
           setError(errorMessage);
           throw new Error(errorMessage);
         }
-        // Re-throw if we can't extract error message
         throw axiosError;
       }
 
@@ -197,7 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       return user;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If error is already an Error with a message, use it
       if (err instanceof Error && err.message && !err.message.includes('Invalid response from server')) {
         const errorMessage = err.message;
@@ -207,9 +190,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       // Otherwise, try to extract error message from response
-      const errorMessage = err?.response?.data?.Message 
-        ?? err?.response?.data?.message 
-        ?? err?.message 
+      const axiosError = isAxiosError(err) ? err : null;
+      const errorData = axiosError?.response?.data as BackendApiResponse<unknown> | undefined;
+      const errorMessage = getApiErrors(errorData)[0]
+        ?? getApiMessage(errorData)
+        ?? (err instanceof Error ? err.message : undefined)
         ?? 'An error occurred during login';
       
       setError(errorMessage);

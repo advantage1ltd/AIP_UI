@@ -9,7 +9,7 @@
  * - Crime Linking Panel
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
 	Card,
@@ -72,10 +72,13 @@ const DataAnalyticsHub = () => {
 		const loadFilters = async () => {
 			setLoadingFilters(true)
 			try {
+				console.log('🔄 Loading regions and sites for analytics...')
 				const [regionsData, sitesData] = await Promise.all([
 					customerDashboardService.getRegions(),
 					customerDashboardService.getSites(),
 				])
+				console.log('✅ Loaded regions:', regionsData.length)
+				console.log('✅ Loaded sites:', sitesData.length)
 				setRegions(regionsData)
 				setSites(sitesData)
 			} catch (err) {
@@ -105,8 +108,8 @@ const DataAnalyticsHub = () => {
 		})
 	}, [sites, selectedRegionId])
 
-	// Load analytics data
-	const loadData = async () => {
+	// Load analytics data - wrapped in useCallback to prevent infinite loops
+	const loadData = useCallback(async () => {
 		setLoading(true)
 		setError(null)
 
@@ -122,6 +125,8 @@ const DataAnalyticsHub = () => {
 				name: region.name,
 			}))
 
+			console.log('📊 Loading analytics with stores:', storeOptions.length, 'and regions:', regionOptions.length)
+
 			const params = {
 				startDate: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined,
 				endDate: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
@@ -133,6 +138,7 @@ const DataAnalyticsHub = () => {
 			}
 
 			const analyticsData = await analyticsService.getAnalyticsHub(params)
+			console.log('✅ Analytics data loaded, storeDrilldown count:', Object.keys(analyticsData.crimeTrends.storeDrilldown).length)
 			setData(analyticsData)
 		} catch (err) {
 			console.error('Failed to load analytics data:', err)
@@ -145,11 +151,17 @@ const DataAnalyticsHub = () => {
 		} finally {
 			setLoading(false)
 		}
-	}
+	}, [sites, regions, dateRange, selectedRegionId, selectedStoreId, selectedCustomerId, toast])
 
 	useEffect(() => {
-		loadData()
-	}, [dateRange, selectedRegionId, selectedStoreId, selectedCustomerId])
+		// Only load data if sites and regions are available
+		if (sites.length > 0 && regions.length > 0) {
+			console.log('🔄 Triggering analytics reload with', sites.length, 'sites and', regions.length, 'regions')
+			loadData()
+		} else {
+			console.log('⏳ Waiting for sites and regions to load... (sites:', sites.length, ', regions:', regions.length, ')')
+		}
+	}, [loadData, sites.length, regions.length])
 
 	// Reset store selection when region changes
 	useEffect(() => {
@@ -184,17 +196,17 @@ const DataAnalyticsHub = () => {
 
 	if (error && !data) {
 		return (
-			<div className="container mx-auto p-6">
+			<div className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
 				<Card>
-					<CardHeader>
-						<CardTitle>Data Analytics Hub</CardTitle>
-						<CardDescription>Error loading analytics data</CardDescription>
+					<CardHeader className="p-4 sm:p-6">
+						<CardTitle className="text-lg sm:text-xl">Data Analytics Hub</CardTitle>
+						<CardDescription className="text-xs sm:text-sm">Error loading analytics data</CardDescription>
 					</CardHeader>
-					<CardContent>
-						<div className="flex flex-col items-center justify-center py-12 space-y-4">
-							<AlertCircle className="h-12 w-12 text-red-500" />
-							<p className="text-red-600">{error}</p>
-							<Button onClick={handleRefresh}>
+					<CardContent className="p-4 sm:p-6">
+						<div className="flex flex-col items-center justify-center py-8 sm:py-12 space-y-4">
+							<AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-red-500" />
+							<p className="text-sm sm:text-base text-red-600 text-center">{error}</p>
+							<Button onClick={handleRefresh} className="text-sm">
 								<RefreshCw className="h-4 w-4 mr-2" />
 								Retry
 							</Button>
@@ -207,50 +219,55 @@ const DataAnalyticsHub = () => {
 
 	return (
 		<ErrorBoundary>
-			<div className="container mx-auto p-4 sm:p-6 space-y-8">
+			<div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50">
+				<div className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 space-y-4 sm:space-y-6 md:space-y-8 max-w-screen-2xl">
 				{/* Header */}
-				<Card>
-					<CardHeader>
-						<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-							<div>
-								<CardTitle className="flex items-center gap-2 text-2xl">
-									<BarChart3 className="h-6 w-6" />
+				<Card className="overflow-hidden">
+					<CardHeader className="p-4 sm:p-6 overflow-x-hidden">
+						<div className="flex flex-col gap-4 w-full">
+							<div className="min-w-0">
+								<CardTitle className="flex items-center gap-2 text-lg sm:text-xl md:text-2xl">
+									<BarChart3 className="h-5 w-5 sm:h-6 sm:w-6" />
 									Data Analytics Hub
 								</CardTitle>
-								<CardDescription className="mt-2">
+								<CardDescription className="mt-1 sm:mt-2 text-xs sm:text-sm">
 									Comprehensive crime analytics and intelligence dashboard
 									{(selectedRegionId !== 'all' || selectedStoreId !== 'all') && (
 										<span className="block mt-1 text-xs text-blue-600">
-											Filters active: {selectedRegionId !== 'all' && 'Region • '}
+											Filters: {selectedRegionId !== 'all' && 'Region • '}
 											{selectedStoreId !== 'all' && 'Store'}
 										</span>
 									)}
 								</CardDescription>
 							</div>
-							<div className="flex flex-col gap-3">
-								<div className="flex flex-col sm:flex-row gap-2">
+							
+							{/* Filters Section */}
+							<div className="flex flex-col gap-3 w-full min-w-0">
+								{/* Date Range Picker */}
+								<div className="w-full min-w-0">
 									<Popover>
 										<PopoverTrigger asChild>
 											<Button
 												variant="outline"
 												className={cn(
-													'w-full sm:w-auto justify-start text-left font-normal',
+													'w-full justify-start text-left font-normal text-xs sm:text-sm min-w-0',
 													!dateRange && 'text-muted-foreground'
 												)}
 											>
-												<CalendarIcon className="h-4 w-4 mr-2" />
-												{dateRange?.from ? (
-													dateRange.to ? (
-														<>
-															{format(dateRange.from, 'LLL dd, y')} -{' '}
-															{format(dateRange.to, 'LLL dd, y')}
-														</>
+												<CalendarIcon className="h-4 w-4 mr-2 flex-shrink-0" />
+												<span className="truncate block">
+													{dateRange?.from ? (
+														dateRange.to ? (
+															<>
+																{format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yy')}
+															</>
+														) : (
+															format(dateRange.from, 'MMM dd, yy')
+														)
 													) : (
-														format(dateRange.from, 'LLL dd, y')
-													)
-												) : (
-													'Pick a date range'
-												)}
+														'Pick a date range'
+													)}
+												</span>
 											</Button>
 										</PopoverTrigger>
 										<PopoverContent className="w-auto p-0" align="start">
@@ -262,60 +279,77 @@ const DataAnalyticsHub = () => {
 											/>
 										</PopoverContent>
 									</Popover>
-									<Select
-										value={selectedRegionId}
-										onValueChange={setSelectedRegionId}
-										disabled={loadingFilters}
-									>
-										<SelectTrigger className="w-full sm:w-48">
-											<Building2 className="h-4 w-4 mr-2" />
-											<SelectValue placeholder="All Regions" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="all">All Regions</SelectItem>
-											{regions.map((region) => (
-												<SelectItem key={region.id} value={String(region.id)}>
-													{region.name}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-									<Select
-										value={selectedStoreId}
-										onValueChange={setSelectedStoreId}
-										disabled={loadingFilters || filteredSites.length === 0}
-									>
-										<SelectTrigger className="w-full sm:w-48">
-											<MapPin className="h-4 w-4 mr-2" />
-											<SelectValue placeholder="All Stores" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="all">All Stores</SelectItem>
-											{filteredSites.map((site) => {
-												const siteId = (site as any).siteID || (site as any).id
-												const siteName = (site as any).locationName || (site as any).name || `Store ${siteId}`
-												return (
-													<SelectItem key={siteId} value={String(siteId)}>
-														{siteName}
-													</SelectItem>
-												)
-											})}
-										</SelectContent>
-									</Select>
 								</div>
-								<div className="flex gap-2">
+
+								{/* Region and Store Filters */}
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 w-full">
+									<div className="min-w-0">
+										<Select
+											value={selectedRegionId}
+											onValueChange={setSelectedRegionId}
+											disabled={loadingFilters}
+										>
+											<SelectTrigger className="w-full text-xs sm:text-sm">
+												<Building2 className="h-4 w-4 mr-2 flex-shrink-0" />
+												<SelectValue placeholder="All Regions" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="all">All Regions</SelectItem>
+												{regions.map((region) => (
+													<SelectItem key={region.id} value={String(region.id)}>
+														{region.name}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+									<div className="min-w-0">
+										<Select
+											value={selectedStoreId}
+											onValueChange={setSelectedStoreId}
+											disabled={loadingFilters || filteredSites.length === 0}
+										>
+											<SelectTrigger className="w-full text-xs sm:text-sm">
+												<MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+												<SelectValue placeholder="All Stores" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="all">All Stores</SelectItem>
+												{filteredSites.map((site) => {
+													const siteId = (site as any).siteID || (site as any).id
+													const siteName = (site as any).locationName || (site as any).name || `Store ${siteId}`
+													return (
+														<SelectItem key={siteId} value={String(siteId)}>
+															{siteName}
+														</SelectItem>
+													)
+												})}
+											</SelectContent>
+										</Select>
+									</div>
+								</div>
+
+								{/* Action Buttons */}
+								<div className="flex flex-wrap gap-2 w-full">
 									<Button
 										variant="outline"
 										onClick={handleRefresh}
 										disabled={loading}
+										size="sm"
+										className="flex-1 sm:flex-none text-xs sm:text-sm"
 									>
 										<RefreshCw
-											className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`}
+											className={`h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 ${loading ? 'animate-spin' : ''}`}
 										/>
 										Refresh
 									</Button>
-									<Button variant="outline" onClick={handleExport}>
-										<Download className="h-4 w-4 mr-2" />
+									<Button 
+										variant="outline" 
+										onClick={handleExport}
+										size="sm"
+										className="flex-1 sm:flex-none text-xs sm:text-sm"
+									>
+										<Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
 										Export
 									</Button>
 									{(selectedRegionId !== 'all' || selectedStoreId !== 'all') && (
@@ -325,60 +359,62 @@ const DataAnalyticsHub = () => {
 												setSelectedRegionId('all')
 												setSelectedStoreId('all')
 											}}
+											size="sm"
+											className="w-full sm:w-auto text-xs sm:text-sm"
 										>
-											<Filter className="h-4 w-4 mr-2" />
+											<Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
 											Clear Filters
 										</Button>
 									)}
 								</div>
 							</div>
+
+							{data && (
+								<div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 w-full">
+									<div className="text-center sm:text-left min-w-0">
+										<div className="text-xs sm:text-sm text-gray-500 truncate">Date Range</div>
+										<div className="text-xs sm:text-sm font-medium truncate">
+											{format(new Date(data.metadata.dateRange.start), 'MMM dd')} - {format(new Date(data.metadata.dateRange.end), 'MMM dd, yy')}
+										</div>
+									</div>
+									<div className="text-center sm:text-left min-w-0">
+										<div className="text-xs sm:text-sm text-gray-500 truncate">Total Incidents</div>
+										<div className="text-xs sm:text-sm font-medium truncate">
+											{data.crimeTrends.totalIncidents.toLocaleString()}
+										</div>
+									</div>
+									<div className="text-center sm:text-left min-w-0">
+										<div className="text-xs sm:text-sm text-gray-500 truncate">Value Lost</div>
+										<div className="text-xs sm:text-sm font-medium truncate">
+											£{data.hotProducts.totalValueLost.toLocaleString('en-GB', {
+												minimumFractionDigits: 0,
+												maximumFractionDigits: 0,
+											})}
+										</div>
+									</div>
+									<div className="text-center sm:text-left min-w-0">
+										<div className="text-xs sm:text-sm text-gray-500 truncate">Offenders Tracked</div>
+										<div className="text-xs sm:text-sm font-medium truncate">
+											{data.repeatOffenders.totalOffenders}
+										</div>
+									</div>
+								</div>
+							)}
 						</div>
-						{data && (
-							<div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
-								<div className="text-center sm:text-left">
-									<div className="text-sm text-gray-500">Date Range</div>
-									<div className="text-sm font-medium">
-										{format(new Date(data.metadata.dateRange.start), 'MMM dd')} -{' '}
-										{format(new Date(data.metadata.dateRange.end), 'MMM dd, yyyy')}
-									</div>
-								</div>
-								<div className="text-center sm:text-left">
-									<div className="text-sm text-gray-500">Total Incidents</div>
-									<div className="text-sm font-medium">
-										{data.crimeTrends.totalIncidents.toLocaleString()}
-									</div>
-								</div>
-								<div className="text-center sm:text-left">
-									<div className="text-sm text-gray-500">Value Lost</div>
-									<div className="text-sm font-medium">
-										£{data.hotProducts.totalValueLost.toLocaleString('en-GB', {
-											minimumFractionDigits: 0,
-											maximumFractionDigits: 0,
-										})}
-									</div>
-								</div>
-								<div className="text-center sm:text-left">
-									<div className="text-sm text-gray-500">Offenders Tracked</div>
-									<div className="text-sm font-medium">
-										{data.repeatOffenders.totalOffenders}
-									</div>
-								</div>
-							</div>
-						)}
 					</CardHeader>
 				</Card>
 
 				{/* Loading State */}
 				{loading && !data && (
-					<div className="space-y-6">
+					<div className="space-y-4 sm:space-y-6">
 						{Array.from({ length: 5 }).map((_, i) => (
 							<Card key={i}>
-								<CardHeader>
-									<Skeleton className="h-6 w-48" />
-									<Skeleton className="h-4 w-64 mt-2" />
+								<CardHeader className="p-4 sm:p-6">
+									<Skeleton className="h-5 sm:h-6 w-32 sm:w-48" />
+									<Skeleton className="h-3 sm:h-4 w-48 sm:w-64 mt-2" />
 								</CardHeader>
-								<CardContent>
-									<Skeleton className="h-96 w-full" />
+								<CardContent className="p-4 sm:p-6 pt-0">
+									<Skeleton className="h-64 sm:h-80 md:h-96 w-full" />
 								</CardContent>
 							</Card>
 						))}
@@ -387,32 +423,34 @@ const DataAnalyticsHub = () => {
 
 				{/* Analytics Modules - single focused view at a time */}
 				{data && (
-					<Card>
-						<CardHeader className="pb-4">
-							<CardTitle className="text-base">
+					<Card className="overflow-hidden">
+						<CardHeader className="p-4 sm:p-6 pb-3 sm:pb-4">
+							<CardTitle className="text-sm sm:text-base">
 								Select an analytics view to focus on a single insight at a time
 							</CardTitle>
-							<CardDescription>
+							<CardDescription className="text-xs sm:text-sm">
 								All views respect the date range, region and store filters from the header above.
 							</CardDescription>
 						</CardHeader>
-						<CardContent>
+						<CardContent className="p-4 sm:p-6 pt-0 overflow-x-hidden">
 							<Tabs defaultValue="crime-trends" className="w-full">
-								<TabsList className="w-full grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 mb-4">
-									<TabsTrigger value="crime-trends">Crime Trends</TabsTrigger>
-									<TabsTrigger value="deployment">Resource Deployment</TabsTrigger>
-									<TabsTrigger value="hot-products">Hot Products &amp; Heatmaps</TabsTrigger>
-									<TabsTrigger value="repeat-offenders">Repeat Offenders</TabsTrigger>
-									<TabsTrigger value="crime-linking">Crime Linking Panel</TabsTrigger>
-								</TabsList>
+								<div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+									<TabsList className="w-full h-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1 sm:gap-0 mb-4 p-1 min-w-max sm:min-w-0">
+										<TabsTrigger value="crime-trends" className="text-xs sm:text-sm py-2 whitespace-nowrap">Crime Trends</TabsTrigger>
+										<TabsTrigger value="deployment" className="text-xs sm:text-sm py-2 whitespace-nowrap">Deployment</TabsTrigger>
+										<TabsTrigger value="hot-products" className="text-xs sm:text-sm py-2 whitespace-nowrap">Hot Products</TabsTrigger>
+										<TabsTrigger value="repeat-offenders" className="text-xs sm:text-sm py-2 whitespace-nowrap">Offenders</TabsTrigger>
+										<TabsTrigger value="crime-linking" className="text-xs sm:text-sm py-2 whitespace-nowrap">Crime Linking</TabsTrigger>
+									</TabsList>
+								</div>
 
-								<TabsContent value="crime-trends" className="mt-4">
+								<TabsContent value="crime-trends" className="mt-3 sm:mt-4 overflow-x-hidden">
 									<ErrorBoundary>
 										<CrimeTrendExplorer data={data.crimeTrends} loading={loading} />
 									</ErrorBoundary>
 								</TabsContent>
 
-								<TabsContent value="deployment" className="mt-4">
+								<TabsContent value="deployment" className="mt-3 sm:mt-4 overflow-x-hidden">
 									<ErrorBoundary>
 										<ResourceDeploymentEngine
 											data={data.deploymentRecommendations}
@@ -421,13 +459,13 @@ const DataAnalyticsHub = () => {
 									</ErrorBoundary>
 								</TabsContent>
 
-								<TabsContent value="hot-products" className="mt-4">
+								<TabsContent value="hot-products" className="mt-3 sm:mt-4 overflow-x-hidden">
 									<ErrorBoundary>
 										<HotProductsDashboard data={data.hotProducts} loading={loading} />
 									</ErrorBoundary>
 								</TabsContent>
 
-								<TabsContent value="repeat-offenders" className="mt-4">
+								<TabsContent value="repeat-offenders" className="mt-3 sm:mt-4 overflow-x-hidden">
 									<ErrorBoundary>
 										<RepeatOffenderAnalysis
 											data={data.repeatOffenders}
@@ -436,7 +474,7 @@ const DataAnalyticsHub = () => {
 									</ErrorBoundary>
 								</TabsContent>
 
-								<TabsContent value="crime-linking" className="mt-4">
+								<TabsContent value="crime-linking" className="mt-3 sm:mt-4 overflow-x-hidden">
 									<ErrorBoundary>
 										<CrimeLinkingPanel data={data.crimeLinking} loading={loading} />
 									</ErrorBoundary>
@@ -448,26 +486,29 @@ const DataAnalyticsHub = () => {
 
 				{/* Error State (partial data) */}
 				{error && data && (
-					<Card className="border-yellow-200 bg-yellow-50">
-						<CardContent className="p-4">
-							<div className="flex items-center gap-2 text-yellow-800">
-								<AlertCircle className="h-4 w-4" />
-								<span className="text-sm">
-									Some data may be outdated. Error: {error}
-								</span>
+					<Card className="border-yellow-200 bg-yellow-50 overflow-hidden">
+						<CardContent className="p-3 sm:p-4">
+							<div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-yellow-800">
+								<div className="flex items-center gap-2 flex-1 min-w-0">
+									<AlertCircle className="h-4 w-4 flex-shrink-0" />
+									<span className="text-xs sm:text-sm break-words">
+										Some data may be outdated. Error: {error}
+									</span>
+								</div>
 								<Button
 									variant="ghost"
 									size="sm"
 									onClick={handleRefresh}
-									className="ml-auto"
+									className="w-full sm:w-auto text-xs sm:text-sm flex-shrink-0"
 								>
-									<RefreshCw className="h-4 w-4 mr-2" />
+									<RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
 									Retry
 								</Button>
 							</div>
 						</CardContent>
 					</Card>
 				)}
+				</div>
 			</div>
 		</ErrorBoundary>
 	)

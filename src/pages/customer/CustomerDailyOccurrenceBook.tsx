@@ -3,12 +3,23 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger
+} from "@/components/ui/sheet"
+// NOTE: We intentionally use inline action buttons in tables
+// because dropdown menus can be clipped inside overflow containers.
+import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, BookOpen, Plus, Search, Calendar, Clock, User, MapPin, Eye, Edit, Trash2 } from "lucide-react"
+import { ArrowLeft, BookOpen, Plus, Search, Calendar, Clock, User, MapPin, Eye, Edit, Trash2, SlidersHorizontal, Loader2 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { findCustomerById } from "@/hooks/useAvailableCustomers"
 import { useToast } from "@/hooks/use-toast"
@@ -85,14 +96,19 @@ export default function CustomerDailyOccurrenceBook() {
   // Filter states
   const [filters, setFilters] = useState<DailyOccurrenceBookFilters>({})
   const [searchTerm, setSearchTerm] = useState('')
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const hasActiveFilters = Boolean(
-    filters.storeNumber ||
-    filters.storeName ||
-    filters.officerName ||
-    (filters.code && filters.code.length) ||
+    searchTerm ||
     filters.dateFrom ||
     filters.dateTo
   )
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (searchTerm) count += 1
+    if (filters.dateFrom) count += 1
+    if (filters.dateTo) count += 1
+    return count
+  }, [filters, searchTerm])
   
   // Form state for creating/editing occurrences
   const [formData, setFormData] = useState<OccurrenceFormState>(getDefaultFormState())
@@ -261,10 +277,6 @@ export default function CustomerDailyOccurrenceBook() {
         ...(selectedSiteId && selectedSiteId !== ALL_SITES_OPTION && { siteId: selectedSiteId }),
         ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
         ...(filters.dateTo && { dateTo: filters.dateTo }),
-        ...(filters.storeNumber && { storeNumber: filters.storeNumber }),
-        ...(filters.storeName && { storeName: filters.storeName }),
-        ...(filters.officerName && { officerName: filters.officerName }),
-        ...(filters.code?.length && { code: filters.code.join(',') }),
         ...(searchTerm && { search: searchTerm })
       })
 
@@ -574,85 +586,261 @@ export default function CustomerDailyOccurrenceBook() {
     </div>
   )
 
+  const renderFiltersPanel = (options?: { includeSearch?: boolean }) => {
+    const includeSearch = options?.includeSearch ?? true
+
+    return (
+      <div className="space-y-4">
+        {includeSearch && (
+          <>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Search</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search occurrences..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <Separator />
+          </>
+        )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label htmlFor="date-from" className="text-xs uppercase tracking-wide text-muted-foreground">Date from</Label>
+          <Input
+            id="date-from"
+            type="date"
+            value={filters.dateFrom ?? ''}
+            onChange={(event) => setFilters({ ...filters, dateFrom: event.target.value || undefined })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="date-to" className="text-xs uppercase tracking-wide text-muted-foreground">Date to</Label>
+          <Input
+            id="date-to"
+            type="date"
+            value={filters.dateTo ?? ''}
+            onChange={(event) => setFilters({ ...filters, dateTo: event.target.value || undefined })}
+          />
+        </div>
+      </div>
+
+      {activeFilterCount > 0 && (
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+          <div className="text-sm text-muted-foreground">
+            Active filters: <span className="font-medium text-foreground">{activeFilterCount}</span>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setFilters({})
+              setSearchTerm('')
+            }}
+          >
+            Clear filters
+          </Button>
+        </div>
+      )}
+      </div>
+    )
+  }
+
   if (loading && !customer) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-[#EFF4FF] flex items-center justify-center p-6">
+        <Card className="w-full max-w-md border border-border/40 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <div>
+                <p className="font-medium">Loading Daily Occurrence Book…</p>
+                <p className="text-sm text-muted-foreground">Fetching customer and entries.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   if (error || !customer) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="rounded-lg bg-red-50 p-4 text-red-800">
-          {error || 'Customer not found'}
-        </div>
+      <div className="min-h-screen bg-[#EFF4FF] flex items-center justify-center p-6">
+        <Card className="w-full max-w-md border border-border/40 shadow-sm">
+          <CardContent className="p-6 space-y-3">
+            <div className="space-y-1">
+              <p className="font-semibold text-destructive">Unable to load Daily Occurrence Book</p>
+              <p className="text-sm text-muted-foreground">{error || 'Customer not found'}</p>
+            </div>
+            <Button variant="outline" onClick={() => navigate('/management/customer-reporting')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Customer Reporting
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-          <Button 
-            variant="outline" 
-            onClick={() => navigate('/management/customer-reporting')}
-            className="w-full sm:w-auto"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Back to Customer Reporting</span>
-            <span className="sm:hidden">Back</span>
-          </Button>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-              <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
-              <span className="truncate">Daily Occurrence Book (DOB)</span>
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground truncate">
-              {customer.name} {selectedSiteId === ALL_SITES_OPTION ? ' - All Sites' : (selectedSiteName ? `- ${selectedSiteName}` : '')}
-            </p>
+    <div className="min-h-screen bg-[#EFF4FF]">
+      <div className="container mx-auto p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6 max-w-7xl">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-30 -mx-3 sm:-mx-4 md:-mx-6 px-3 sm:px-4 md:px-6 py-3 bg-[#EFF4FF]/80 backdrop-blur supports-[backdrop-filter]:bg-[#EFF4FF]/60 border-b border-border/40">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/management/customer-reporting')}
+                className="shrink-0"
+              >
+                <ArrowLeft className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Back</span>
+              </Button>
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-primary/10 p-2">
+                    <BookOpen className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight truncate">
+                      Daily Occurrence Book
+                    </h1>
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                      {customer.name}
+                      {selectedSiteId === ALL_SITES_OPTION
+                        ? ' • All Sites'
+                        : selectedSiteName
+                          ? ` • ${selectedSiteName}`
+                          : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              {/* Mobile filters */}
+              <div className="sm:hidden">
+                <Sheet open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between">
+                      <span className="flex items-center gap-2">
+                        <SlidersHorizontal className="h-4 w-4" />
+                        Filters
+                      </span>
+                      {activeFilterCount > 0 && (
+                        <Badge variant="secondary" className="bg-muted text-foreground">
+                          {activeFilterCount}
+                        </Badge>
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-full sm:max-w-md">
+                    <SheetHeader>
+                      <SheetTitle>Filters</SheetTitle>
+                    </SheetHeader>
+                    <div className="mt-6">
+                      {renderFiltersPanel()}
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </div>
+
+              <Button
+                onClick={() => setCreateDialogOpen(true)}
+                disabled={!selectedSiteId || selectedSiteId === ALL_SITES_OPTION}
+                className="w-full sm:w-auto"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add occurrence
+              </Button>
+            </div>
           </div>
         </div>
-        
-        <Button 
-          onClick={() => setCreateDialogOpen(true)} 
-          disabled={!selectedSiteId || selectedSiteId === ALL_SITES_OPTION}
-          className="w-full sm:w-auto"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          <span className="hidden sm:inline">Add Occurrence</span>
-          <span className="sm:hidden">Add</span>
-        </Button>
-      </div>
 
       {/* Site Selection */}
       {sites.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Site Selection
+        <Card className="border border-border/40 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              Site
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <Select value={selectedSiteId} onValueChange={setSelectedSiteId}>
-              <SelectTrigger className="w-full md:w-[300px]">
-                <SelectValue placeholder="Select a site to view occurrences" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_SITES_OPTION}>
-                  All Sites
-                </SelectItem>
-                {sites.map((site, index) => (
-                  <SelectItem key={site.siteID || site.id || `site-${index}`} value={String(site.siteID || site.id || '')}>
-                    {site.locationName}
+          <CardContent className="pt-0">
+            {/* Desktop: site + search side-by-side */}
+            <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Site</Label>
+                <Select value={selectedSiteId} onValueChange={setSelectedSiteId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a site to view occurrences" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_SITES_OPTION}>
+                      All Sites
+                    </SelectItem>
+                    {sites.map((site, index) => (
+                      <SelectItem key={site.siteID || site.id || `site-${index}`} value={String(site.siteID || site.id || '')}>
+                        {site.locationName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search occurrences..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile: keep site dropdown simple (filters live in drawer) */}
+            <div className="sm:hidden">
+              <Select value={selectedSiteId} onValueChange={setSelectedSiteId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a site to view occurrences" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_SITES_OPTION}>
+                    All Sites
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  {sites.map((site, index) => (
+                    <SelectItem key={site.siteID || site.id || `site-${index}`} value={String(site.siteID || site.id || '')}>
+                      {site.locationName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedSiteId === ALL_SITES_OPTION ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Select a specific site to add a new occurrence.
+              </p>
+            ) : null}
+
+            {/* Filters (desktop) - moved here to free space for records */}
+            <div className="hidden sm:block mt-5">
+              {renderFiltersPanel({ includeSearch: false })}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -660,158 +848,79 @@ export default function CustomerDailyOccurrenceBook() {
       <>
           {/* Stats Cards */}
           {stats && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <Card className="border-0 shadow-md bg-gradient-to-br from-blue-600 to-blue-700">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Total Entries</p>
-                      <p className="text-2xl font-bold">{stats.totalEntries}</p>
+                      <p className="text-xs text-blue-100">Total entries</p>
+                      <p className="text-2xl font-bold text-white">{stats.totalEntries}</p>
                     </div>
-                    <BookOpen className="h-8 w-8 text-blue-500" />
+                    <div className="rounded-full bg-white/20 p-2">
+                      <BookOpen className="h-5 w-5 text-white" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-              
-              <Card>
+
+              <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-600 to-emerald-700">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Entries This Week</p>
-                      <p className="text-2xl font-bold">{stats.entriesThisWeek}</p>
+                      <p className="text-xs text-emerald-100">This week</p>
+                      <p className="text-2xl font-bold text-white">{stats.entriesThisWeek}</p>
                     </div>
-                    <Calendar className="h-8 w-8 text-emerald-500" />
+                    <div className="rounded-full bg-white/20 p-2">
+                      <Calendar className="h-5 w-5 text-white" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-              
-              <Card>
+
+              <Card className="border-0 shadow-md bg-gradient-to-br from-amber-600 to-amber-700">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Entries This Month</p>
-                      <p className="text-2xl font-bold">{stats.entriesThisMonth}</p>
+                      <p className="text-xs text-amber-100">This month</p>
+                      <p className="text-2xl font-bold text-white">{stats.entriesThisMonth}</p>
                     </div>
-                    <Clock className="h-8 w-8 text-yellow-500" />
+                    <div className="rounded-full bg-white/20 p-2">
+                      <Clock className="h-5 w-5 text-white" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-              
-              <Card>
+
+              <Card className="border-0 shadow-md bg-gradient-to-br from-slate-700 to-slate-800">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Active Stores</p>
-                      <p className="text-2xl font-bold">{Object.keys(stats.byStore ?? {}).length}</p>
+                      <p className="text-xs text-slate-200">Active stores</p>
+                      <p className="text-2xl font-bold text-white">{Object.keys(stats.byStore ?? {}).length}</p>
                     </div>
-                    <MapPin className="h-8 w-8 text-sky-500" />
+                    <div className="rounded-full bg-white/20 p-2">
+                      <MapPin className="h-5 w-5 text-white" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
           )}
 
-          {stats && Object.keys(stats.byCode ?? {}).length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Incident Codes</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {Object.entries(stats.byCode).map(([code, count]) => (
-                  <div key={code} className="rounded-lg border p-3">
-                    <p className="text-sm text-muted-foreground">{getCodeMeta(code)}</p>
-                    <p className="text-lg font-semibold">{code} · {count}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Search and Filters */}
-          <Card>
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex flex-col gap-3 sm:gap-4">
-                <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search occurrences..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 w-full"
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                  <Input
-                    placeholder="Store number"
-                    value={filters.storeNumber ?? ''}
-                    onChange={(event) => setFilters({ ...filters, storeNumber: event.target.value || undefined })}
-                  />
-                  <Input
-                    placeholder="Store name"
-                    value={filters.storeName ?? ''}
-                    onChange={(event) => setFilters({ ...filters, storeName: event.target.value || undefined })}
-                  />
-                  <Input
-                    placeholder="Officer name"
-                    value={filters.officerName ?? ''}
-                    onChange={(event) => setFilters({ ...filters, officerName: event.target.value || undefined })}
-                  />
-                  <Select
-                    value={filters.code?.[0] ?? 'all'}
-                    onValueChange={(value) =>
-                      setFilters({ ...filters, code: value === 'all' ? undefined : [value as DailyOccurrenceCode] })
-                    }
-                  >
-                    <SelectTrigger className="w-full capitalize">
-                      <SelectValue placeholder="Code" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All codes</SelectItem>
-                      {DOB_CODES.map((code) => (
-                        <SelectItem key={code.value} value={code.value}>
-                          {code.value} — {code.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="date-from" className="text-xs uppercase tracking-wide text-muted-foreground">Date from</Label>
-                    <Input
-                      id="date-from"
-                      type="date"
-                      value={filters.dateFrom ?? ''}
-                      onChange={(event) => setFilters({ ...filters, dateFrom: event.target.value || undefined })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="date-to" className="text-xs uppercase tracking-wide text-muted-foreground">Date to</Label>
-                    <Input
-                      id="date-to"
-                      type="date"
-                      value={filters.dateTo ?? ''}
-                      onChange={(event) => setFilters({ ...filters, dateTo: event.target.value || undefined })}
-                    />
-                  </div>
+          {/* Occurrences */}
+          <Card className="border border-border/40 shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <CardTitle className="text-base">Occurrence Records</CardTitle>
+                <div className="text-sm text-muted-foreground">
+                  {loading ? 'Loading…' : `${occurrences.length} record${occurrences.length === 1 ? '' : 's'}`}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Occurrences Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Occurrence Records</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               {loading ? (
                 <div className="flex justify-center py-8">
-                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : occurrences.length === 0 ? (
                 <div className="text-center py-8">
@@ -837,12 +946,12 @@ export default function CustomerDailyOccurrenceBook() {
                           <TableHead>Code</TableHead>
                           <TableHead>Crime Report Sent to HO</TableHead>
                           <TableHead>Details</TableHead>
-                          <TableHead>Actions</TableHead>
+                          <TableHead className="text-right w-[168px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {occurrences.map((occurrence) => (
-                          <TableRow key={occurrence.id}>
+                          <TableRow key={occurrence.id} className="hover:bg-muted/40">
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -869,38 +978,52 @@ export default function CustomerDailyOccurrenceBook() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="text-sm font-semibold">
-                                {occurrence.code} — {getCodeMeta(occurrence.code)}
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-background font-semibold">
+                                  {occurrence.code}
+                                </Badge>
+                                <span className="text-sm">{getCodeMeta(occurrence.code)}</span>
                               </div>
                             </TableCell>
                             <TableCell>
                               {occurrence.crimeReportCompletedDate ? (
-                                <div className="text-sm">
-                                  <div>{new Date(occurrence.crimeReportCompletedDate).toLocaleDateString()}</div>
-                                  <div className="text-muted-foreground">{occurrence.crimeReportCompletedTime}</div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                                    Sent
+                                  </Badge>
+                                  <div className="text-sm">
+                                    <div className="font-medium">{new Date(occurrence.crimeReportCompletedDate).toLocaleDateString()}</div>
+                                    <div className="text-muted-foreground">{occurrence.crimeReportCompletedTime}</div>
+                                  </div>
                                 </div>
                               ) : (
-                                <span className="text-muted-foreground">Pending</span>
+                                <Badge variant="outline" className="text-muted-foreground">
+                                  Pending
+                                </Badge>
                               )}
                             </TableCell>
                             <TableCell className="max-w-[220px]">
                               <p className="text-sm text-muted-foreground line-clamp-2">{occurrence.details}</p>
                             </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
+                            <TableCell className="text-right w-[168px]">
+                              <div className="flex justify-end gap-1">
                                 <Button
                                   variant="ghost"
-                                  size="sm"
+                                  size="icon"
+                                  aria-label="View occurrence"
+                                  className="h-11 w-11"
                                   onClick={() => {
                                     setSelectedOccurrence(occurrence)
                                     setViewDialogOpen(true)
                                   }}
                                 >
-                                  <Eye className="h-4 w-4" />
+                                  <Eye className="h-5 w-5" />
                                 </Button>
                                 <Button
                                   variant="ghost"
-                                  size="sm"
+                                  size="icon"
+                                  aria-label="Edit occurrence"
+                                  className="h-11 w-11"
                                   onClick={() => {
                                     setSelectedOccurrence(occurrence)
                                     setFormData({
@@ -921,14 +1044,16 @@ export default function CustomerDailyOccurrenceBook() {
                                     setEditDialogOpen(true)
                                   }}
                                 >
-                                  <Edit className="h-4 w-4" />
+                                  <Edit className="h-5 w-5" />
                                 </Button>
                                 <Button
                                   variant="ghost"
-                                  size="sm"
+                                  size="icon"
+                                  aria-label="Delete occurrence"
+                                  className="h-11 w-11 text-destructive hover:text-destructive"
                                   onClick={() => handleDelete(occurrence)}
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <Trash2 className="h-5 w-5" />
                                 </Button>
                               </div>
                             </TableCell>
@@ -951,49 +1076,69 @@ export default function CustomerDailyOccurrenceBook() {
                                 <span>{new Date(occurrence.date).toLocaleDateString()} {occurrence.time}</span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedOccurrence(occurrence)
-                                  setViewDialogOpen(true)
-                                }}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedOccurrence(occurrence)
-                                  setFormData({
-                                    id: occurrence.id,
-                                    customerId: occurrence.customerId,
-                                    siteId: occurrence.siteId,
-                                    storeName: occurrence.storeName ?? '',
-                                    storeNumber: occurrence.storeNumber ?? '',
-                                    date: occurrence.date,
-                                    time: occurrence.time,
-                                    officerName: occurrence.officerName,
-                                    code: occurrence.code,
-                                    crimeReportCompletedDate: occurrence.crimeReportCompletedDate,
-                                    crimeReportCompletedTime: occurrence.crimeReportCompletedTime,
-                                    details: occurrence.details,
-                                    signature: occurrence.signature
-                                  })
-                                  setEditDialogOpen(true)
-                                }}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(occurrence)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <Badge variant="outline" className="bg-background font-semibold">
+                                {occurrence.code}
+                              </Badge>
+                              {occurrence.crimeReportCompletedDate ? (
+                                <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                                  Sent
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-muted-foreground">
+                                  Pending
+                                </Badge>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="View occurrence"
+                                  className="h-11 w-11"
+                                  onClick={() => {
+                                    setSelectedOccurrence(occurrence)
+                                    setViewDialogOpen(true)
+                                  }}
+                                >
+                                  <Eye className="h-5 w-5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Edit occurrence"
+                                  className="h-11 w-11"
+                                  onClick={() => {
+                                    setSelectedOccurrence(occurrence)
+                                    setFormData({
+                                      id: occurrence.id,
+                                      customerId: occurrence.customerId,
+                                      siteId: occurrence.siteId,
+                                      storeName: occurrence.storeName ?? '',
+                                      storeNumber: occurrence.storeNumber ?? '',
+                                      date: occurrence.date,
+                                      time: occurrence.time,
+                                      officerName: occurrence.officerName,
+                                      code: occurrence.code,
+                                      crimeReportCompletedDate: occurrence.crimeReportCompletedDate,
+                                      crimeReportCompletedTime: occurrence.crimeReportCompletedTime,
+                                      details: occurrence.details,
+                                      signature: occurrence.signature
+                                    })
+                                    setEditDialogOpen(true)
+                                  }}
+                                >
+                                  <Edit className="h-5 w-5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Delete occurrence"
+                                  className="h-11 w-11 text-destructive hover:text-destructive"
+                                  onClick={() => handleDelete(occurrence)}
+                                >
+                                  <Trash2 className="h-5 w-5" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
 
@@ -1007,8 +1152,7 @@ export default function CustomerDailyOccurrenceBook() {
                               <span>Store #{occurrence.storeNumber ?? 'N/A'}</span>
                             </div>
                             <div className="flex items-center gap-2 text-muted-foreground">
-                              <span className="font-semibold">{occurrence.code}</span>
-                              <span>{getCodeMeta(occurrence.code)}</span>
+                              <span className="font-semibold">{getCodeMeta(occurrence.code)}</span>
                             </div>
                             <p className="text-muted-foreground">{occurrence.details}</p>
                           </div>
@@ -1180,6 +1324,7 @@ export default function CustomerDailyOccurrenceBook() {
           )}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   )
 }

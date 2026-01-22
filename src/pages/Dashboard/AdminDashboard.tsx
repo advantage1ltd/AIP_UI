@@ -37,7 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { TaskCard } from '@/components/dashboard/TaskCard'
 import { IncidentTable } from '@/components/dashboard/IncidentTable'
 import { OfficerPerformance } from '@/components/dashboard/OfficerPerformance'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
@@ -47,6 +46,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePageAccess } from "@/contexts/PageAccessContext"
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
+import { actionCalendarService } from '@/services/actionCalendarService'
+import { customerService } from '@/services/customerService'
+import { employeeService } from '@/services/employeeService'
+import { assetRegisterService } from '@/services/assetRegisterService'
+import { customerSatisfactionService } from '@/services/customerSatisfactionService'
+import { siteVisitService } from '@/services/siteVisitService'
+import { holidayRequestService } from '@/services/holidayRequestService'
+import { api } from '@/config/api'
+import { extractApiResponseData } from '@/utils/apiResponseHelper'
 
 // Lazy load the dashboard components
 const OfficerDashboard = React.lazy(() => import('@/pages/Dashboard/OfficerDashboard'))
@@ -331,12 +339,6 @@ const equipmentData = [
   { name: 'Other', value: 75, color: '#8b5cf6' }      // violet-500
 ];
 
-const customers = [
-  { id: 'customer1', name: 'Central England COOP' },
-  { id: 'customer2', name: 'Heart of England' },
-  { id: 'customer3', name: 'Midcounties COOP' }
-] as const;
-
 const notifications = [
   {
     id: '1',
@@ -439,6 +441,168 @@ const officerStats = [
   }
 ] as const;
 
+type MetricCard = {
+	title: string
+	value: string
+	change: string
+	trend: 'up' | 'down'
+	icon: React.ElementType
+	color: 'green' | 'yellow' | 'red' | 'blue'
+}
+
+type ChartPoint = {
+	date?: string
+	week?: string
+	month?: string
+	year?: string
+	uniformOfficers: number
+	storeDetectives: number
+}
+
+type EquipmentSlice = {
+	name: string
+	value: number
+	color: string
+}
+
+type RecentActivity = {
+	id: string
+	title: string
+	subtitle: string
+	timeLabel: string
+	status: 'pending' | 'in-progress' | 'completed' | 'blocked'
+	priority: 'low' | 'medium' | 'high'
+}
+
+const formatCurrencyShort = (value: number) => {
+	const absValue = Math.abs(value)
+	if (absValue >= 1_000_000) return `£${(value / 1_000_000).toFixed(1)}M`
+	if (absValue >= 1_000) return `£${(value / 1_000).toFixed(0)}K`
+	return `£${value.toFixed(0)}`
+}
+
+const getIncidentDate = (incident: any) => {
+	const dateValue = incident.DateOfIncident || incident.dateOfIncident || incident.Date || incident.date || incident.incidentDate
+	const parsed = dateValue ? new Date(dateValue) : null
+	return parsed && !Number.isNaN(parsed.getTime()) ? parsed : null
+}
+
+const getOfficerBucket = (incident: any) => {
+	const roleValue = String(incident.officerRole || incident.OfficerRole || incident.officerType || incident.OfficerType || '')
+		.toLowerCase()
+	if (roleValue.includes('detective')) return 'storeDetectives'
+	return 'uniformOfficers'
+}
+
+const parseActivityDate = (value?: string | Date | null) => {
+	if (!value) return null
+	const date = value instanceof Date ? value : new Date(value)
+	return Number.isNaN(date.getTime()) ? null : date
+}
+
+const buildIncidentTimeSeries = (incidents: any[]) => {
+	const now = new Date()
+	const daily: ChartPoint[] = []
+	const weekly: ChartPoint[] = []
+	const monthly: ChartPoint[] = []
+	const yearly: ChartPoint[] = []
+	const dailyIndexByDate = new Map<string, number>()
+
+	for (let i = 6; i >= 0; i -= 1) {
+		const date = new Date(now)
+		date.setDate(now.getDate() - i)
+		const dateKey = date.toISOString().split('T')[0]
+		const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+		dailyIndexByDate.set(dateKey, daily.length)
+		daily.push({ date: label, uniformOfficers: 0, storeDetectives: 0 })
+	}
+
+	for (let i = 3; i >= 0; i -= 1) {
+		weekly.push({ week: `Week ${4 - i}`, uniformOfficers: 0, storeDetectives: 0 })
+	}
+
+	for (let i = 11; i >= 0; i -= 1) {
+		const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+		const label = date.toLocaleDateString('en-US', { month: 'short' })
+		monthly.push({ month: label, uniformOfficers: 0, storeDetectives: 0 })
+	}
+
+	for (let i = 4; i >= 0; i -= 1) {
+		const year = now.getFullYear() - i
+		yearly.push({ year: String(year), uniformOfficers: 0, storeDetectives: 0 })
+	}
+
+	incidents.forEach((incident) => {
+		const incidentDate = getIncidentDate(incident)
+		if (!incidentDate) return
+		const bucket = getOfficerBucket(incident)
+
+		const dailyKey = incidentDate.toISOString().split('T')[0]
+		const dailyIndex = dailyIndexByDate.get(dailyKey)
+		if (dailyIndex !== undefined) {
+			daily[dailyIndex][bucket] += 1
+		}
+
+		const weeksAgo = Math.floor((now.getTime() - incidentDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
+		if (weeksAgo >= 0 && weeksAgo < 4) {
+			const weeklyPoint = weekly[3 - weeksAgo]
+			if (weeklyPoint) weeklyPoint[bucket] += 1
+		}
+
+		const monthLabel = incidentDate.toLocaleDateString('en-US', { month: 'short' })
+		const monthlyPoint = monthly.find(point => point.month === monthLabel)
+		if (monthlyPoint) monthlyPoint[bucket] += 1
+
+		const yearlyPoint = yearly.find(point => point.year === String(incidentDate.getFullYear()))
+		if (yearlyPoint) yearlyPoint[bucket] += 1
+	})
+
+	return { daily, weekly, monthly, yearly }
+}
+
+const filterIncidentsByPeriod = (incidents: Array<{ date: string }>, period: 'Daily' | 'Weekly' | 'Monthly' | 'Yearly') => {
+	const now = new Date()
+	const start = new Date(now)
+	if (period === 'Daily') {
+		start.setDate(now.getDate() - 6)
+	} else if (period === 'Weekly') {
+		start.setDate(now.getDate() - 27)
+	} else if (period === 'Monthly') {
+		start.setMonth(now.getMonth() - 11)
+		start.setDate(1)
+	} else {
+		start.setFullYear(now.getFullYear() - 4)
+		start.setMonth(0, 1)
+	}
+
+	return incidents.filter(incident => {
+		if (!incident.date) return false
+		const date = new Date(incident.date)
+		if (Number.isNaN(date.getTime())) return false
+		return date >= start
+	})
+}
+
+const formatDateRangeLabel = (period: 'Daily' | 'Weekly' | 'Monthly' | 'Yearly') => {
+	const now = new Date()
+	const start = new Date(now)
+	if (period === 'Daily') {
+		start.setDate(now.getDate() - 6)
+	} else if (period === 'Weekly') {
+		start.setDate(now.getDate() - 27)
+	} else if (period === 'Monthly') {
+		start.setMonth(now.getMonth() - 11)
+		start.setDate(1)
+	} else {
+		start.setFullYear(now.getFullYear() - 4, 0, 1)
+	}
+
+	const formatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit' })
+	const startLabel = formatter.format(start)
+	const endLabel = formatter.format(now)
+	return `${startLabel} - ${endLabel}`
+}
+
 const TestComponents = () => {
   return (
     <div className="space-y-6 p-4 border border-gray-200 rounded-md my-4">
@@ -536,50 +700,358 @@ const AdminDashboard = () => {
     )
   }
 
-  const [selectedCustomer, setSelectedCustomer] = React.useState<string>(customers[2].id);
-  const customer = customerData[selectedCustomer as keyof typeof customerData];
-  const [activePeriod, setActivePeriod] = React.useState<'Daily' | 'Weekly' | 'Monthly' | 'Yearly'>('Monthly');
+  const [customersOptions, setCustomersOptions] = React.useState<Array<{ id: string; name: string }>>([])
+  const [selectedCustomer, setSelectedCustomer] = React.useState<string>('all')
+  const [activePeriod, setActivePeriod] = React.useState<'Daily' | 'Weekly' | 'Monthly' | 'Yearly'>('Monthly')
 
-  // Log customer selection and data
+  const [metrics, setMetrics] = React.useState<MetricCard[]>([])
+  const [incidentReports, setIncidentReports] = React.useState<Array<{
+    id: string
+    customerName: string
+    store?: string
+    siteName?: string
+    officerName: string
+    date: string
+    amount: number
+    incidentType: string
+  }>>([])
+  const [equipmentData, setEquipmentData] = React.useState<EquipmentSlice[]>([])
+  const [recentActivities, setRecentActivities] = React.useState<RecentActivity[]>([])
+  const [chartSeries, setChartSeries] = React.useState<{ daily: ChartPoint[]; weekly: ChartPoint[]; monthly: ChartPoint[]; yearly: ChartPoint[] }>({
+    daily: [],
+    weekly: [],
+    monthly: [],
+    yearly: []
+  })
+  const [dashboardLoading, setDashboardLoading] = React.useState(false)
+  const [dashboardError, setDashboardError] = React.useState<string | null>(null)
+
   React.useEffect(() => {
-    console.log('Selected customer:', selectedCustomer);
-    console.log('Customer data:', customer);
-    console.log('Incident reports:', customer.incidentReports);
-  }, [selectedCustomer, customer]);
+    let isMounted = true
 
-  // Get the appropriate data based on selected time period
-  const getChartData = () => {
-    switch (activePeriod) {
-      case 'Daily':
-        return customer.dailyIncidents;
-      case 'Weekly':
-        return customer.weeklyIncidents;
-      case 'Monthly':
-        return customer.monthlyIncidents;
-      case 'Yearly':
-        return customer.yearlyIncidents;
-      default:
-        return customer.monthlyIncidents;
+    const loadCustomers = async () => {
+      try {
+        const customers = await customerService.getAvailableCustomers()
+        if (!isMounted) return
+        const normalized = customers.map(c => ({ id: c.id.toString(), name: c.name }))
+        setCustomersOptions(normalized)
+        if (normalized.length > 0 && selectedCustomer === 'all') {
+          setSelectedCustomer(normalized[0].id)
+        }
+      } catch (error) {
+        console.error('❌ [AdminDashboard] Failed to load customers:', error)
+      }
     }
-  };
 
-  // Get x-axis key based on active period
-  const getDataKey = () => {
-    switch (activePeriod) {
-      case 'Daily': return 'date';
-      case 'Weekly': return 'week';
-      case 'Monthly': return 'month';
-      case 'Yearly': return 'year';
-      default: return 'month';
+    void loadCustomers()
+    return () => {
+      isMounted = false
     }
-  };
+  }, [])
 
-  // Get current chart data
-  const chartData = getChartData();
-  const dataKey = getDataKey();
+  React.useEffect(() => {
+    let isMounted = true
 
-  // Derive data for component
-  const { metrics, incidentReports } = customer;
+    const loadDashboardData = async () => {
+      setDashboardLoading(true)
+      setDashboardError(null)
+      try {
+        const customerFilter = selectedCustomer && selectedCustomer !== 'all' ? `&customerId=${selectedCustomer}` : ''
+        const incidentHeaders = selectedCustomer && selectedCustomer !== 'all'
+          ? { 'X-Customer-Id': selectedCustomer }
+          : undefined
+        const incidentsResponse = await api.get(
+          `/incidents?page=1&pageSize=1000${customerFilter}`,
+          incidentHeaders ? { headers: incidentHeaders } : undefined
+        )
+        const incidentsRaw = extractApiResponseData<any>(incidentsResponse.data)
+
+        const normalizedIncidents = incidentsRaw.map((inc: any) => ({
+          id: inc.Id?.toString() || inc.id?.toString() || crypto.randomUUID(),
+          customerName: inc.CustomerName || inc.customerName || '—',
+          store: inc.SiteName || inc.siteName || inc.store || '',
+          siteName: inc.SiteName || inc.siteName || '',
+          officerName: inc.OfficerName || inc.officerName || '—',
+          date: inc.DateOfIncident || inc.dateOfIncident || inc.Date || inc.date || inc.incidentDate || '',
+          amount: inc.TotalValueRecovered || inc.totalValueRecovered || inc.Amount || inc.amount || inc.value || 0,
+          incidentType: inc.IncidentType || inc.incidentType || inc.type || '—',
+          officerRole: inc.OfficerRole || inc.officerRole || inc.officerType || inc.OfficerType || ''
+        }))
+
+        const sortedIncidents = normalizedIncidents
+          .filter(inc => inc.date)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+        const chartBuckets = buildIncidentTimeSeries(normalizedIncidents)
+
+        const incidentStats = sortedIncidents.reduce((acc, inc) => {
+          const amount = typeof inc.amount === 'number' ? inc.amount : 0
+          acc.totalValue += amount
+          const incidentDate = inc.date ? new Date(inc.date) : null
+          if (incidentDate && incidentDate.getFullYear() === new Date().getFullYear()) {
+            acc.totalValueYtd += amount
+          }
+          return acc
+        }, { totalValue: 0, totalValueYtd: 0 })
+
+        const today = new Date()
+        const todayCount = sortedIncidents.filter(inc => {
+          if (!inc.date) return false
+          const date = new Date(inc.date)
+          return date.toDateString() === today.toDateString()
+        }).length
+
+        const yesterday = new Date()
+        yesterday.setDate(today.getDate() - 1)
+        const yesterdayCount = sortedIncidents.filter(inc => {
+          if (!inc.date) return false
+          const date = new Date(inc.date)
+          return date.toDateString() === yesterday.toDateString()
+        }).length
+
+        const last30Days = sortedIncidents.filter(inc => {
+          if (!inc.date) return false
+          const date = new Date(inc.date)
+          return date >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        })
+        const prev30Days = sortedIncidents.filter(inc => {
+          if (!inc.date) return false
+          const date = new Date(inc.date)
+          return date < new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) && date >= new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
+        })
+        const last30Value = last30Days.reduce((sum, inc) => sum + (inc.amount || 0), 0)
+        const prev30Value = prev30Days.reduce((sum, inc) => sum + (inc.amount || 0), 0)
+        const valueDelta = prev30Value === 0 ? 0 : ((last30Value - prev30Value) / prev30Value) * 100
+
+        const employeeStats = await employeeService.getEmployeeStatistics()
+
+        const surveysResponse = await customerSatisfactionService.getSurveys(1, 200, selectedCustomer && selectedCustomer !== 'all'
+          ? { search: '', customerId: selectedCustomer, regionId: '', siteId: '' }
+          : { search: '', customerId: '', regionId: '', siteId: '' })
+        const surveys = surveysResponse.data || []
+        const averageRating = surveys.length > 0
+          ? surveys.reduce((sum, survey) => {
+            const ratings = Object.values(survey.ratings || {})
+            const avg = ratings.length > 0 ? ratings.reduce((acc, val) => acc + Number(val || 0), 0) / ratings.length : 0
+            return sum + avg
+          }, 0) / surveys.length
+          : 0
+
+        const currentMonth = new Date()
+        const previousMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)
+        const currentMonthRatings = surveys.filter(s => new Date(s.date).getMonth() === currentMonth.getMonth())
+        const previousMonthRatings = surveys.filter(s => new Date(s.date).getMonth() === previousMonth.getMonth())
+        const currentMonthAvg = currentMonthRatings.length > 0
+          ? currentMonthRatings.reduce((sum, survey) => {
+            const ratings = Object.values(survey.ratings || {})
+            const avg = ratings.length > 0 ? ratings.reduce((acc, val) => acc + Number(val || 0), 0) / ratings.length : 0
+            return sum + avg
+          }, 0) / currentMonthRatings.length
+          : averageRating
+        const previousMonthAvg = previousMonthRatings.length > 0
+          ? previousMonthRatings.reduce((sum, survey) => {
+            const ratings = Object.values(survey.ratings || {})
+            const avg = ratings.length > 0 ? ratings.reduce((acc, val) => acc + Number(val || 0), 0) / ratings.length : 0
+            return sum + avg
+          }, 0) / previousMonthRatings.length
+          : averageRating
+        const ratingScale = surveys.some(survey =>
+          Object.values(survey.ratings || {}).some(value => Number(value || 0) > 5)
+        ) ? 10 : 5
+        const averageRatingScaled = averageRating
+        const currentMonthAvgScaled = currentMonthAvg
+        const previousMonthAvgScaled = previousMonthAvg
+        const satisfactionDelta = Number.isFinite(currentMonthAvgScaled - previousMonthAvgScaled)
+          ? currentMonthAvgScaled - previousMonthAvgScaled
+          : 0
+
+        const assetsResponse = await assetRegisterService.getAssets({ page: 1, pageSize: 1000 })
+        const categoryTotals = assetsResponse.items.reduce<Record<string, number>>((acc, item) => {
+          const key = item.assetType || 'Other'
+          acc[key] = (acc[key] || 0) + 1
+          return acc
+        }, {})
+        const palette = ['#0ea5e9', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6']
+        const mappedEquipment = Object.entries(categoryTotals)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([name, value], index) => ({
+            name,
+            value,
+            color: palette[index % palette.length]
+          }))
+
+        const [tasksResponse, siteVisitResponse, holidayResponse] = await Promise.all([
+          actionCalendarService.getTasks({ page: 1, pageSize: 6 }),
+          selectedCustomer && selectedCustomer !== 'all'
+            ? siteVisitService.getSiteVisits({ page: 1, pageSize: 6, customerId: selectedCustomer })
+            : Promise.resolve({ data: [] as any[] }),
+          holidayRequestService.getHolidayRequests({ page: 1, limit: 6 })
+        ])
+
+        const tasks = tasksResponse.data || []
+        const siteVisits = siteVisitResponse.data || []
+        const holidayRequests = holidayResponse.data || []
+
+        const combinedActivities: Array<{ date: Date; activity: RecentActivity }> = []
+
+        tasks.forEach(task => {
+          const date = parseActivityDate(task.dateCreated || task.dateModified || task.dueDate)
+          if (!date) return
+          combinedActivities.push({
+            date,
+            activity: {
+              id: `task-${task.actionCalendarId}`,
+              title: task.taskTitle,
+              subtitle: task.assignedUserName || task.assignTo,
+              timeLabel: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date',
+              status: task.taskStatus,
+              priority: task.priorityLevel
+            }
+          })
+        })
+
+        sortedIncidents.slice(0, 10).forEach(incident => {
+          const date = parseActivityDate(incident.date)
+          if (!date) return
+          combinedActivities.push({
+            date,
+            activity: {
+              id: `incident-${incident.id}`,
+              title: 'Incident Report',
+              subtitle: `${incident.customerName} · ${incident.store || incident.siteName || '—'} · ${incident.incidentType || 'Incident'}`,
+              timeLabel: new Date(incident.date).toLocaleDateString(),
+              status: 'completed',
+              priority: 'medium'
+            }
+          })
+        })
+
+        siteVisits.forEach(visit => {
+          const date = parseActivityDate(visit.date || visit.createdAt)
+          if (!date) return
+          combinedActivities.push({
+            date,
+            activity: {
+              id: `site-visit-${visit.id || visit.siteVisitId}`,
+              title: 'Site Visit',
+              subtitle: `${visit.customerName || visit.customer} · ${visit.locationName || visit.location}`,
+              timeLabel: date.toLocaleDateString(),
+              status: visit.status === 'Completed' ? 'completed' : 'in-progress',
+              priority: 'medium'
+            }
+          })
+        })
+
+        surveys.slice(0, 10).forEach((survey) => {
+          const date = parseActivityDate(survey.date || survey.createdAt)
+          if (!date) return
+          combinedActivities.push({
+            date,
+            activity: {
+              id: `survey-${survey.id}`,
+              title: 'Satisfaction Survey',
+              subtitle: `${survey.customer} · ${survey.siteName}`,
+              timeLabel: date.toLocaleDateString(),
+              status: 'completed',
+              priority: 'low'
+            }
+          })
+        })
+
+        holidayRequests.forEach(request => {
+          const date = parseActivityDate(request.dateOfRequest)
+          if (!date) return
+          const status = request.status === 'approved'
+            ? 'completed'
+            : request.status === 'denied'
+              ? 'blocked'
+              : 'in-progress'
+          combinedActivities.push({
+            date,
+            activity: {
+              id: `holiday-${request.id}`,
+              title: 'Holiday Booking',
+              subtitle: `${request.officerName} · ${request.totalDays} days`,
+              timeLabel: date.toLocaleDateString(),
+              status,
+              priority: request.status === 'pending' ? 'high' : 'medium'
+            }
+          })
+        })
+
+        const activities = combinedActivities
+          .sort((a, b) => b.date.getTime() - a.date.getTime())
+          .slice(0, 8)
+          .map(entry => entry.activity)
+
+        if (!isMounted) return
+        const filteredIncidents = filterIncidentsByPeriod(sortedIncidents, activePeriod)
+        setIncidentReports(filteredIncidents)
+        setChartSeries(chartBuckets)
+        setEquipmentData(mappedEquipment)
+        setRecentActivities(activities)
+        setMetrics([
+          {
+            title: 'Total Saved YTD',
+            value: formatCurrencyShort(incidentStats.totalValueYtd),
+            change: `${valueDelta >= 0 ? '+' : ''}${valueDelta.toFixed(1)}%`,
+            trend: valueDelta >= 0 ? 'up' : 'down',
+            icon: Currency,
+            color: 'green'
+          },
+          {
+            title: 'Customer Satisfaction',
+            value: `${averageRatingScaled.toFixed(1)}/${ratingScale}`,
+            change: `${satisfactionDelta >= 0 ? '+' : ''}${satisfactionDelta.toFixed(1)}`,
+            trend: satisfactionDelta >= 0 ? 'up' : 'down',
+            icon: Star,
+            color: 'yellow'
+          },
+          {
+            title: 'Incidents Today',
+            value: `${todayCount}`,
+            change: `${todayCount - yesterdayCount >= 0 ? '+' : ''}${todayCount - yesterdayCount}`,
+            trend: todayCount <= yesterdayCount ? 'down' : 'up',
+            icon: AlertCircle,
+            color: 'red'
+          },
+          {
+            title: 'Active Guards',
+            value: `${employeeStats.activeEmployees}`,
+            change: `${employeeStats.activeEmployees}/${employeeStats.totalEmployees} active`,
+            trend: employeeStats.activeEmployees >= Math.round(employeeStats.totalEmployees * 0.9) ? 'up' : 'down',
+            icon: Users,
+            color: 'blue'
+          }
+        ])
+      } catch (error) {
+        console.error('❌ [AdminDashboard] Failed to load dashboard data:', error)
+        if (!isMounted) return
+        setDashboardError('Unable to load dashboard data. Please try again.')
+      } finally {
+        if (isMounted) setDashboardLoading(false)
+      }
+    }
+
+    void loadDashboardData()
+    const refreshInterval = window.setInterval(() => {
+      void loadDashboardData()
+    }, 5 * 60 * 1000)
+
+    return () => {
+      isMounted = false
+      window.clearInterval(refreshInterval)
+    }
+  }, [selectedCustomer, activePeriod])
+
+  const rawChartData = chartSeries[activePeriod.toLowerCase() as keyof typeof chartSeries] || []
+  const chartData = activePeriod === 'Yearly'
+    ? (rawChartData.filter(point => point.uniformOfficers + point.storeDetectives > 0).length > 0
+        ? rawChartData.filter(point => point.uniformOfficers + point.storeDetectives > 0)
+        : rawChartData)
+    : rawChartData
+  const dataKey = activePeriod === 'Daily' ? 'date' : activePeriod === 'Weekly' ? 'week' : activePeriod === 'Monthly' ? 'month' : 'year'
   
   // In a real app, we would fetch user-specific tasks from an API or context
   // This simulates loading user-specific tasks, which could be empty
@@ -655,6 +1127,11 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-[#EFF4FF] p-6">
       <div className="space-y-6">
         <DashboardGreeting />
+        {dashboardError && (
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {dashboardError}
+          </div>
+        )}
         
         {/* Customer Selection */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-4">
@@ -669,11 +1146,15 @@ const AdminDashboard = () => {
                 <SelectValue placeholder="Select customer" />
               </SelectTrigger>
               <SelectContent>
-                {customers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </SelectItem>
-                ))}
+                {customersOptions.length === 0 ? (
+                  <SelectItem value="all">All Customers</SelectItem>
+                ) : (
+                  customersOptions.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -681,7 +1162,13 @@ const AdminDashboard = () => {
 
         {/* Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          {metrics.map((metric, index) => {
+          {metrics.length === 0 ? (
+            <Card className="col-span-2 md:col-span-4 border-dashed border-slate-200 bg-white/70">
+              <CardContent className="p-6 text-center text-sm text-slate-500">
+                {dashboardLoading ? 'Loading metrics…' : 'No metrics available.'}
+              </CardContent>
+            </Card>
+          ) : metrics.map((metric, index) => {
             // Define gradient backgrounds based on color
             const getGradientClass = (color: string) => {
               switch(color) {
@@ -763,7 +1250,7 @@ const AdminDashboard = () => {
                     </span>
                     <span className="ml-2 text-xs text-white/70">{metric.trend === 'up' ? 'increase' : 'decrease'}</span>
                   </div>
-                  <div className="text-xs text-white/60 mt-1">Jan 01 - Jan 10</div>
+                  <div className="text-xs text-white/60 mt-1">{formatDateRangeLabel(activePeriod)}</div>
                   {renderVisualization(metric.color)}
                 </CardContent>
               </Card>
@@ -879,12 +1366,14 @@ const AdminDashboard = () => {
                 <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Recent Incidents</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                {/* Debug data info */}
-                <div className="p-2 text-xs text-muted-foreground">
-                  Data count: {incidentReports.length} incidents
-                </div>
-                <div className="px-2 pb-4 md:px-4 overflow-visible">
-                  <IncidentTable data={incidentReports.slice()} />
+                <div className="px-2 pb-4 md:px-4">
+                  {dashboardLoading && incidentReports.length === 0 ? (
+                    <div className="py-6 text-center text-sm text-slate-500">Loading incidents…</div>
+                  ) : incidentReports.length === 0 ? (
+                    <div className="py-6 text-center text-sm text-slate-500">No incidents found.</div>
+                  ) : (
+                    <IncidentTable data={incidentReports.slice()} />
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -892,10 +1381,10 @@ const AdminDashboard = () => {
 
           {/* Sidebar Content */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Recent Tasks - Replaces Tasks */}
+            {/* Recent Events - Replaces Tasks */}
             <Card>
               <CardHeader className="p-2 md:p-4 flex flex-row items-center justify-between">
-                <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Recent Tasks</CardTitle>
+                <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Recent Events</CardTitle>
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -909,77 +1398,34 @@ const AdminDashboard = () => {
                 </Button>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="divide-y">
-                  {/* Activity 1 */}
-                  <div className="flex items-start gap-3 p-3 hover:bg-[#EFF4FF]">
-                    <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-rose-500 text-white">
-                      <CheckCircle className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <p className="text-sm font-medium text-slate-900">Task Completed</p>
-                        <span className="text-xs text-slate-500">40 mins ago</span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-0.5">John Smith completed security audit task</p>
-                    </div>
+                {dashboardLoading && recentActivities.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-slate-500">Loading activities…</div>
+                ) : recentActivities.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-slate-500">No recent activities.</div>
+                ) : (
+                  <div className="divide-y">
+                    {recentActivities.map(activity => {
+                      const isCompleted = activity.status === 'completed'
+                      const isBlocked = activity.status === 'blocked'
+                      const colorClass = isCompleted ? 'bg-emerald-500' : isBlocked ? 'bg-rose-500' : activity.priority === 'high' ? 'bg-amber-500' : 'bg-slate-500'
+                      const Icon = isCompleted ? CheckCircle : isBlocked ? AlertCircle : activity.priority === 'high' ? MapPin : Briefcase
+                      return (
+                        <div key={activity.id} className="flex items-start gap-3 p-3 hover:bg-[#EFF4FF]">
+                          <div className={cn('flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full text-white', colorClass)}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-start gap-2">
+                              <p className="text-sm font-medium text-slate-900 truncate">{activity.title}</p>
+                              <span className="text-xs text-slate-500 whitespace-nowrap">{activity.timeLabel}</span>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-0.5 truncate">{activity.subtitle}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-
-                  {/* Activity 2 */}
-                  <div className="flex items-start gap-3 p-3 hover:bg-[#EFF4FF]">
-                    <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 text-white">
-                      <Briefcase className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <p className="text-sm font-medium text-slate-900">New Contract</p>
-                        <span className="text-xs text-slate-500">1 day ago</span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-0.5">Emma White added Tesco Express contract</p>
-                    </div>
-                  </div>
-
-                  {/* Activity 3 */}
-                  <div className="flex items-start gap-3 p-3 hover:bg-[#EFF4FF]">
-                    <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-cyan-500 text-white">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <p className="text-sm font-medium text-slate-900">Report Published</p>
-                        <span className="text-xs text-slate-500">40 mins ago</span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-0.5">Lisa Chen published monthly security report</p>
-                    </div>
-                  </div>
-
-                  {/* Activity 4 */}
-                  <div className="flex items-start gap-3 p-3 hover:bg-[#EFF4FF]">
-                    <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-amber-500 text-white">
-                      <MapPin className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <p className="text-sm font-medium text-slate-900">Site Visit Scheduled</p>
-                        <span className="text-xs text-slate-500">1 day ago</span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-0.5">Michael Brown scheduled visit to Store #4526</p>
-                    </div>
-                  </div>
-
-                  {/* Activity 5 */}
-                  <div className="flex items-start gap-3 p-3 hover:bg-[#EFF4FF]">
-                    <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white">
-                      <MessageSquare className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <p className="text-sm font-medium text-slate-900">Comment Added</p>
-                        <span className="text-xs text-slate-500">1 day ago</span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-0.5">David Lee added comment on incident report #2345</p>
-                    </div>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -987,83 +1433,79 @@ const AdminDashboard = () => {
             <Card className="overflow-hidden">
               <CardHeader className="p-2 md:p-4 flex flex-row items-center justify-between bg-gradient-to-r from-slate-50 to-white border-b">
                 <CardTitle className="text-base font-medium md:text-lg lg:text-xl">Equipment Distribution</CardTitle>
-                <Select defaultValue="all">
-                  <SelectTrigger className="w-[100px] h-7 text-xs border-slate-200">
-                    <SelectValue placeholder="Filter" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-xs">All Devices</SelectItem>
-                    <SelectItem value="active" className="text-xs">Active Only</SelectItem>
-                    <SelectItem value="inactive" className="text-xs">Inactive Only</SelectItem>
-                  </SelectContent>
-                </Select>
               </CardHeader>
               <CardContent className="pt-5 px-2 pb-2 md:pt-6 md:px-4 md:pb-4">
-                <div className="flex flex-col md:flex-row items-center gap-4">
-                  <div className="w-full md:w-1/2 h-[180px] sm:h-[200px] md:h-[230px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={equipmentData}
-                      cx="50%"
-                          cy="50%"
-                          innerRadius={45}
-                          outerRadius={70}
-                      paddingAngle={4}
-                      dataKey="value"
-                          cornerRadius={4}
-                          stroke="transparent"
-                    >
-                      {equipmentData.map((entry, index) => (
-                            <Cell 
-                              key={`cell-${index}`} 
-                              fill={entry.color} 
-                              className="drop-shadow-sm hover:opacity-90 transition-opacity"
-                            />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value, name) => [`${value} units`, name]} 
-                          contentStyle={{ 
-                            backgroundColor: 'white', 
-                            borderRadius: '0.5rem', 
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', 
-                            border: 'none', 
-                            fontSize: '0.75rem',
-                            padding: '8px'
-                          }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                  </div>
-                  <div className="w-full md:w-1/2">
-                    <div className="divide-y">
-                      {equipmentData.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between py-2">
-                          <div className="flex items-center">
-                            <div 
-                              className="w-3 h-3 rounded mr-2" 
-                              style={{ backgroundColor: item.color }} 
-                            />
-                            <span className="text-sm text-slate-700">{item.name}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <span className="text-sm font-medium text-slate-900">{item.value}</span>
-                            <span className="text-xs text-slate-500 ml-1">units</span>
-                          </div>
-                        </div>
-                      ))}
+                {dashboardLoading && equipmentData.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-slate-500">Loading equipment…</div>
+                ) : equipmentData.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-slate-500">No equipment data available.</div>
+                ) : (
+                  <div className="flex flex-col md:flex-row items-center gap-4">
+                    <div className="w-full md:w-1/2 h-[180px] sm:h-[200px] md:h-[230px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={equipmentData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={45}
+                            outerRadius={70}
+                            paddingAngle={4}
+                            dataKey="value"
+                            cornerRadius={4}
+                            stroke="transparent"
+                          >
+                            {equipmentData.map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={entry.color} 
+                                className="drop-shadow-sm hover:opacity-90 transition-opacity"
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(value, name) => [`${value} units`, name]} 
+                            contentStyle={{ 
+                              backgroundColor: 'white', 
+                              borderRadius: '0.5rem', 
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', 
+                              border: 'none', 
+                              fontSize: '0.75rem',
+                              padding: '8px'
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
                     </div>
-                    <div className="mt-4 pt-4 border-t">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-700">Total Devices</span>
-                        <span className="text-base font-semibold text-slate-900">
-                          {equipmentData.reduce((sum, item) => sum + item.value, 0)}
-                        </span>
+                    <div className="w-full md:w-1/2">
+                      <div className="divide-y">
+                        {equipmentData.map((item, index) => (
+                          <div key={index} className="flex items-center justify-between py-2">
+                            <div className="flex items-center">
+                              <div 
+                                className="w-3 h-3 rounded mr-2" 
+                                style={{ backgroundColor: item.color }} 
+                              />
+                              <span className="text-sm text-slate-700">{item.name}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <span className="text-sm font-medium text-slate-900">{item.value}</span>
+                              <span className="text-xs text-slate-500 ml-1">units</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 pt-4 border-t">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-slate-700">Total Devices</span>
+                          <span className="text-base font-semibold text-slate-900">
+                            {equipmentData.reduce((sum, item) => sum + item.value, 0)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>

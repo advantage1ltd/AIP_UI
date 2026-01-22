@@ -183,10 +183,7 @@ const buildDefaultPages = (): PageAccess[] => {
 		{ id: 'take-test', title: 'Take Test', path: '/recruitment/take-test' },
 		{ id: 'crm-dashboard', title: 'CRM Dashboard', path: '/crm/dashboard' },
 		{ id: 'crm-contacts', title: 'CRM Contacts', path: '/crm/contacts' },
-		{ id: 'crm-leads', title: 'CRM Leads', path: '/crm/leads' },
-		{ id: 'crm-deals', title: 'CRM Deals', path: '/crm/deals' },
-		{ id: 'crm-pipeline', title: 'CRM Pipeline', path: '/crm/pipeline' },
-		{ id: 'crm-tasks', title: 'CRM Tasks', path: '/crm/tasks' },
+		{ id: 'crm-pipeline', title: 'Sales Pipeline', path: '/crm/pipeline' },
 		{ id: 'customer-views-config', title: 'Customer Views Config', path: '/customer/views-config' },
 		{ id: 'customer-crime-intelligence', title: 'Crime Intelligence', path: '/customer/crime-intelligence' },
 	];
@@ -221,7 +218,7 @@ const buildDefaultSettings = (): PageAccessSettings => {
 				'diary', 'management-customer-reporting', 'manager-support',
 				'officer-performance', 'contract-renewal', 'password-register', 'asset-register',
 				'vetting', 'cbt', 'take-test', 'crm-dashboard', 'crm-contacts',
-				'crm-leads', 'crm-deals', 'crm-pipeline', 'crm-tasks',
+				'crm-pipeline',
 				'customer-mystery-shopper-report', 'customer-site-visit-reports', 'customer-crime-intelligence'
 			],
 			advantageoneofficer: [

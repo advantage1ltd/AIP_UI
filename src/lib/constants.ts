@@ -32,7 +32,8 @@ export const INDUSTRIES = [
   "Construction",
   "Hospitality",
   "Transportation",
-  "Energy"
+  "Energy",
+  "Other"
 ];
 
 export interface ServiceCategory {

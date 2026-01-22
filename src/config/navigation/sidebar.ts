@@ -127,29 +127,14 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 				icon: LayoutDashboard,
 			},
 			{
-				path: '/crm/leads',
-				label: 'Leads',
+				path: '/crm/contacts',
+				label: 'CRM Contacts',
 				icon: UserPlus,
 			},
 			{
-				path: '/crm/contacts',
-				label: 'Contacts',
-				icon: Users2,
-			},
-			{
-				path: '/crm/deals',
-				label: 'Deals',
-				icon: DollarSign,
-			},
-			{
 				path: '/crm/pipeline',
-				label: 'Pipeline',
+				label: 'Sales Pipeline',
 				icon: GitBranch,
-			},
-			{
-				path: '/crm/tasks',
-				label: 'Tasks',
-				icon: CheckSquare,
 			},
 		],
 	},
@@ -242,11 +227,11 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 				label: 'Officer Performance',
 				icon: UserCheck,
 			},
-			{
-				path: '/analytics/data-analytics-hub',
-				label: 'Data Analytics Hub',
-				icon: Brain,
-			},
+			// {
+			// 	path: '/analytics/data-analytics-hub',
+			// 	label: 'Data Analytics Hub',
+			// 	icon: Brain,
+			// },
 		],
 	},
 	{
@@ -276,11 +261,6 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 		label: 'Recruitment',
 		icon: GraduationCap,
 		links: [
-			{
-				path: '/recruitment/vetting',
-				label: 'Vetting',
-				icon: FileTextIcon,
-			},
 			{
 				path: '/recruitment/cbt',
 				label: 'CBT',
@@ -316,6 +296,11 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 				path: '/customer/daily-activity-report',
 				label: 'Daily Activity Report',
 				icon: FileText,
+			},
+			{
+				path: '/customer/daily-occurrence-book',
+				label: 'Daily Occurrence Book',
+				icon: BookOpen,
 			},
 			{
 				path: '/customer/be-safe-be-secure',

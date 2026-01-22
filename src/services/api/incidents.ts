@@ -122,9 +122,12 @@ export const incidentsApi = {
       try {
         const errorData = JSON.parse(errorText)
         errorMessage = errorData.message || errorMessage
+        console.error('Backend error response:', errorData)
       } catch {
         errorMessage = errorText || errorMessage
+        console.error('Backend error text:', errorText)
       }
+      console.error('Update incident failed:', { status: response.status, statusText: response.statusText, errorMessage })
       throw new Error(errorMessage)
     }
     

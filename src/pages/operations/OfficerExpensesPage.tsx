@@ -959,13 +959,13 @@ const OfficerExpensesPage = () => {
               </>
             )}
             {currentClaimId && approvalStatus === 'draft' && (
-              <Button
-                onClick={handleSubmit}
+          <Button
+            onClick={handleSubmit}
                 disabled={!hasExpenses || submitMutation.isPending}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-200"
-              >
-                {submitMutation.isPending ? 'Submitting...' : 'Submit'}
-              </Button>
+            className="bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-200"
+          >
+            {submitMutation.isPending ? 'Submitting...' : 'Submit'}
+          </Button>
             )}
             {isAdmin && currentClaimId && approvalStatus !== 'pending' && approvalStatus !== 'draft' && (
               <div className="text-sm text-gray-500 flex items-center">
@@ -1632,7 +1632,7 @@ const OfficerExpensesPage = () => {
                         {deleteLocationMutation.isPending ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
-                          <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-3 w-3" />
                         )}
                       </Button>
                     </div>
