@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Alert } from '@/components/ui/alert'
 import { toast } from '@/components/ui/use-toast'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Camera, Loader2, Save, User as UserIcon, KeyRound } from 'lucide-react'
 import { api } from '@/config/api'
 import { useAuth } from '@/contexts/AuthContext'
@@ -68,6 +69,13 @@ const Profile = () => {
 
 	const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
 	const fileInputRef = useRef<HTMLInputElement>(null)
+
+	const [cameraDialogOpen, setCameraDialogOpen] = useState(false)
+	const [cameraStarting, setCameraStarting] = useState(false)
+	const [cameraError, setCameraError] = useState<string | null>(null)
+	const videoRef = useRef<HTMLVideoElement | null>(null)
+	const canvasRef = useRef<HTMLCanvasElement | null>(null)
+	const mediaStreamRef = useRef<MediaStream | null>(null)
 
 	const employeeId = useMemo<number | null>(() => {
 		if (!user) return null
@@ -164,6 +172,90 @@ const Profile = () => {
 		fileInputRef.current?.click()
 	}
 
+	const stopCameraStream = () => {
+		try {
+			mediaStreamRef.current?.getTracks?.().forEach(track => track.stop())
+		} catch (error) {
+			console.warn('⚠️ [Profile] Failed stopping camera stream:', error)
+		} finally {
+			mediaStreamRef.current = null
+			if (videoRef.current) {
+				// @ts-expect-error - srcObject exists on HTMLMediaElement in DOM
+				videoRef.current.srcObject = null
+			}
+		}
+	}
+
+	const startCameraStream = async () => {
+		if (!cameraDialogOpen) return
+		if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+			setCameraError('Camera is not supported in this browser. Please use “Choose file” instead.')
+			return
+		}
+
+		setCameraStarting(true)
+		setCameraError(null)
+
+		try {
+			stopCameraStream()
+			const stream = await navigator.mediaDevices.getUserMedia({
+				video: {
+					facingMode: 'user',
+					width: { ideal: 1280 },
+					height: { ideal: 720 },
+				},
+				audio: false,
+			})
+			mediaStreamRef.current = stream
+			if (videoRef.current) {
+				// @ts-expect-error - srcObject exists on HTMLMediaElement in DOM
+				videoRef.current.srcObject = stream
+				await videoRef.current.play()
+			}
+		} catch (err) {
+			console.error('❌ [Profile] Failed to start camera:', err)
+			const message =
+				err instanceof Error
+					? err.message
+					: 'Unable to access the camera. Please check browser permissions or use “Choose file”.'
+			setCameraError(message)
+		} finally {
+			setCameraStarting(false)
+		}
+	}
+
+	const persistProfilePhoto = async (photoFile: string) => {
+		if (!user?.id) return
+
+		// Always allow local profile photo (works even without backend / employee link)
+		setLocalProfilePhotoFile(photoFile)
+		userProfilePhotoCache.set(user.id, photoFile)
+		window.dispatchEvent(new CustomEvent('user-profile-photo-updated', { detail: { userId: user.id } }))
+
+		// If we have an employeeId, also sync to employee profile photo
+		if (employeeId) {
+			setEmployeePhotoFile(photoFile)
+			profilePhotoCache.set(employeeId, photoFile)
+
+			try {
+				const response = await api.put<BackendApiResponse<EmployeeDetailResponse>>(`/employee/${employeeId}/photo`, { photoFile })
+				const apiResponse = response.data
+				if (!getApiSuccess(apiResponse)) {
+					const errors = getApiErrors(apiResponse)
+					throw new Error(errors[0] || getApiMessage(apiResponse) || 'Failed to update profile photo')
+				}
+				const updatedEmployee = getApiData(apiResponse)
+				const serverPhotoFile = updatedEmployee?.photoFile ?? photoFile
+				setEmployeePhotoFile(serverPhotoFile)
+				profilePhotoCache.set(employeeId, serverPhotoFile)
+				userProfilePhotoCache.set(user.id, serverPhotoFile)
+				window.dispatchEvent(new CustomEvent('user-profile-photo-updated', { detail: { userId: user.id } }))
+			} catch (apiErr) {
+				console.warn('⚠️ [Profile] Photo update API failed (kept local preview):', apiErr)
+			}
+		}
+	}
+
 	const handleProfilePhotoSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0]
 		if (!file) return
@@ -183,31 +275,7 @@ const Profile = () => {
 		setIsUploadingPhoto(true)
 		try {
 			const compressed = await compressImageFileToDataUrl(file, { maxSizePx: 256, mimeType: 'image/jpeg', quality: 0.85 })
-
-			// Always allow local profile photo (works even without backend / employee link)
-			setLocalProfilePhotoFile(compressed)
-			userProfilePhotoCache.set(user.id, compressed)
-
-			// If we have an employeeId, also sync to employee profile photo
-			if (employeeId) {
-				setEmployeePhotoFile(compressed)
-				profilePhotoCache.set(employeeId, compressed)
-
-				try {
-					const response = await api.put<BackendApiResponse<EmployeeDetailResponse>>(`/employee/${employeeId}/photo`, { photoFile: compressed })
-					const apiResponse = response.data
-					if (!getApiSuccess(apiResponse)) {
-						const errors = getApiErrors(apiResponse)
-						throw new Error(errors[0] || getApiMessage(apiResponse) || 'Failed to update profile photo')
-					}
-					const updatedEmployee = getApiData(apiResponse)
-					const serverPhotoFile = updatedEmployee?.photoFile ?? compressed
-					setEmployeePhotoFile(serverPhotoFile)
-					profilePhotoCache.set(employeeId, serverPhotoFile)
-				} catch (apiErr) {
-					console.warn('⚠️ [Profile] Photo update API failed (kept local preview):', apiErr)
-				}
-			}
+			await persistProfilePhoto(compressed)
 
 			toast({
 				title: 'Profile photo updated',
@@ -225,6 +293,70 @@ const Profile = () => {
 		} finally {
 			setIsUploadingPhoto(false)
 			event.target.value = ''
+		}
+	}
+
+	useEffect(() => {
+		if (!cameraDialogOpen) {
+			setCameraError(null)
+			stopCameraStream()
+			return
+		}
+		void startCameraStream()
+		return () => stopCameraStream()
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [cameraDialogOpen])
+
+	const handleCapturePhoto = async () => {
+		if (!user?.id) return
+		if (!videoRef.current || !canvasRef.current) return
+		if (cameraStarting || isUploadingPhoto) return
+
+		setIsUploadingPhoto(true)
+		setCameraError(null)
+		try {
+			const video = videoRef.current
+			const canvas = canvasRef.current
+
+			const width = Math.max(1, video.videoWidth || 0)
+			const height = Math.max(1, video.videoHeight || 0)
+			if (width <= 1 || height <= 1) {
+				throw new Error('Camera is not ready yet. Please wait a moment and try again.')
+			}
+
+			canvas.width = width
+			canvas.height = height
+			const ctx = canvas.getContext('2d')
+			if (!ctx) throw new Error('Unable to capture photo (canvas not supported).')
+
+			ctx.drawImage(video, 0, 0, width, height)
+
+			const blob: Blob = await new Promise((resolve, reject) => {
+				canvas.toBlob(
+					(b) => (b ? resolve(b) : reject(new Error('Failed to capture image. Please try again.'))),
+					'image/jpeg',
+					0.92
+				)
+			})
+
+			const file = new File([blob], `profile-photo-${Date.now()}.jpg`, { type: 'image/jpeg' })
+			const compressed = await compressImageFileToDataUrl(file, { maxSizePx: 256, mimeType: 'image/jpeg', quality: 0.85 })
+			await persistProfilePhoto(compressed)
+
+			setCameraDialogOpen(false)
+			toast({
+				title: 'Profile photo updated',
+				description: employeeId
+					? 'Your profile photo has been updated successfully.'
+					: 'Saved locally. It will sync to your employee profile once your account is linked.',
+			})
+		} catch (err) {
+			console.error('❌ [Profile] Camera capture failed:', err)
+			const message = err instanceof Error ? err.message : 'Failed to capture photo'
+			setCameraError(message)
+			toast({ title: 'Capture failed', description: message, variant: 'destructive' })
+		} finally {
+			setIsUploadingPhoto(false)
 		}
 	}
 
@@ -374,9 +506,9 @@ const Profile = () => {
 									<Button
 										size="icon"
 										className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full shadow-lg"
-										onClick={triggerFileInput}
+										onClick={() => setCameraDialogOpen(true)}
 										disabled={isUploadingPhoto || (employeeId ? employeeLoading : false)}
-										aria-label="Change profile photo"
+										aria-label="Take profile photo"
 									>
 										<Camera className="h-4 w-4" />
 									</Button>
@@ -400,24 +532,99 @@ const Profile = () => {
 											<p className="text-sm">{employeeError}</p>
 										</Alert>
 									)}
+									<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={triggerFileInput}
+											disabled={isUploadingPhoto || (employeeId ? employeeLoading : false)}
+										>
+											{isUploadingPhoto ? (
+												<>
+													<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+													Uploading…
+												</>
+											) : (
+												'Choose file'
+											)}
+										</Button>
+										<Button
+											variant="secondary"
+											size="sm"
+											onClick={() => setCameraDialogOpen(true)}
+											disabled={isUploadingPhoto || (employeeId ? employeeLoading : false)}
+										>
+											<Camera className="mr-2 h-4 w-4" />
+											Use camera
+										</Button>
+									</div>
+								</div>
+							</CardContent>
+						</Card>
+
+						<Dialog open={cameraDialogOpen} onOpenChange={setCameraDialogOpen}>
+							<DialogContent className="sm:max-w-[720px]">
+								<DialogHeader>
+									<DialogTitle>Take a profile photo</DialogTitle>
+									<DialogDescription>
+										Allow camera access, frame your face, then capture. The photo will be saved and synced just like an uploaded image.
+									</DialogDescription>
+								</DialogHeader>
+
+								<div className="space-y-3">
+									<div className="overflow-hidden rounded-xl border bg-slate-950/5">
+										<div className="relative aspect-video w-full">
+											<video
+												ref={videoRef}
+												className="h-full w-full object-cover"
+												playsInline
+												muted
+												autoPlay
+											/>
+											{cameraStarting && (
+												<div className="absolute inset-0 grid place-items-center bg-background/60 backdrop-blur">
+													<div className="flex items-center gap-2 text-sm text-muted-foreground">
+														<Loader2 className="h-4 w-4 animate-spin" />
+														Starting camera…
+													</div>
+												</div>
+											)}
+										</div>
+									</div>
+
+									{cameraError && (
+										<Alert variant="destructive" className="py-2">
+											<p className="text-sm">{cameraError}</p>
+										</Alert>
+									)}
+
+									<canvas ref={canvasRef} className="hidden" />
+								</div>
+
+								<DialogFooter>
 									<Button
 										variant="outline"
-										size="sm"
-										onClick={triggerFileInput}
-										disabled={isUploadingPhoto || (employeeId ? employeeLoading : false)}
+										onClick={() => setCameraDialogOpen(false)}
+										disabled={isUploadingPhoto}
+									>
+										Cancel
+									</Button>
+									<Button
+										onClick={() => void handleCapturePhoto()}
+										disabled={cameraStarting || isUploadingPhoto || Boolean(cameraError)}
 									>
 										{isUploadingPhoto ? (
 											<>
 												<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-												Uploading…
+												Saving…
 											</>
 										) : (
-											'Choose file'
+											'Capture photo'
 										)}
 									</Button>
-								</div>
-							</CardContent>
-						</Card>
+								</DialogFooter>
+							</DialogContent>
+						</Dialog>
 
 						<Card>
 							<CardHeader>

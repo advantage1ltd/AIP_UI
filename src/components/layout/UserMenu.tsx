@@ -23,6 +23,12 @@ export const UserMenu = ({ className = '' }: UserMenuProps) => {
   const authenticatedUser = getUser();
   const canAccessSettings = authenticatedUser?.role?.toLowerCase?.() === 'administrator';
 
+	const displayName = authenticatedUser
+		? `${authenticatedUser.firstName ?? ''} ${authenticatedUser.lastName ?? ''}`.trim() || authenticatedUser.username
+		: USER_DATA.name
+
+	const displayEmail = authenticatedUser?.email || authenticatedUser?.username || USER_DATA.email
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -38,9 +44,9 @@ export const UserMenu = ({ className = '' }: UserMenuProps) => {
       <DropdownMenuContent className="w-56" align="end">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm leading-none">{USER_DATA.name}</p>
+            <p className="text-sm leading-none">{displayName}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {USER_DATA.email}
+              {displayEmail}
             </p>
           </div>
         </DropdownMenuLabel>

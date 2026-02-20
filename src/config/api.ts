@@ -14,61 +14,69 @@ export const api = axios.create({
   timeout: 10000 // 10 second timeout to prevent hanging requests
 })
 
-// Add request interceptor to include auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = sessionStore.getToken()
-    if (import.meta.env.DEV) {
-      console.log('🔄 [API Interceptor] Making request', { 
-        url: config.url, 
-        method: config.method,
-        hasToken: !!token,
-        baseURL: config.baseURL
-      })
-    }
-        
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-      if (import.meta.env.DEV) {
-        console.log('🔑 [API Interceptor] Added Authorization header:', `Bearer ${token.substring(0, 20)}...`)
-      }
-    } else if (import.meta.env.DEV) {
-      console.info('ℹ️ [API Interceptor] Skipping Authorization header; no auth token for request:', config.url)
-    }
-    return config
-  },
-  (error) => {
-    console.error('❌ [API Interceptor] Request error:', error)
-    return Promise.reject(error)
+// Recruitment/CBT uses the same secure backend API by design.
+export const recruitmentApi = api
+
+const requestInterceptor = (config: any) => {
+  const token = sessionStore.getToken()
+  if (import.meta.env.DEV) {
+    console.log('🔄 [API Interceptor] Making request', {
+      url: config.url,
+      method: config.method,
+      hasToken: !!token,
+      baseURL: config.baseURL
+    })
   }
-)
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+    if (import.meta.env.DEV) {
+      console.log('🔑 [API Interceptor] Added Authorization header:', `Bearer ${token.substring(0, 20)}...`)
+    }
+  } else if (import.meta.env.DEV) {
+    console.info('ℹ️ [API Interceptor] Skipping Authorization header; no auth token for request:', config.url)
+  }
+  return config
+}
+const requestErrorInterceptor = (error: any) => {
+  console.error('❌ [API Interceptor] Request error:', error)
+  return Promise.reject(error)
+}
+
+// Add request interceptor to include auth token
+api.interceptors.request.use(requestInterceptor, requestErrorInterceptor)
+// recruitmentApi is an alias of api (single backend), so no extra interceptor needed.
+
+const responseSuccessInterceptor = (response: any) => {
+  if (import.meta.env.DEV) {
+    console.log('✅ [API Interceptor] Response received', {
+      url: response.config.url,
+      status: response.status
+    })
+  }
+  return response
+}
 
 // Add response interceptor for error handling
 api.interceptors.response.use(
-  (response) => {
-    if (import.meta.env.DEV) {
-      console.log('✅ [API Interceptor] Response received', { 
-        url: response.config.url, 
-        status: response.status
-      })
-    }
-    return response
-  },
+  responseSuccessInterceptor,
   (error) => {
     const status = error.response?.status;
     const url = error.config?.url || '';
-    
+    const isRecruitment = url.includes('/recruitment/');
+
     // For expected errors (404, etc.), log less verbosely
     const isExpectedError = status === 404 || status === 403;
-    
-    const shouldLogVerbose = import.meta.env.DEV;
-    const shouldLogWarningOnly = !shouldLogVerbose && isExpectedError;
+    // Recruitment admin get-by-id often returns 500 when backend is unavailable; avoid noisy logs
+    const isRecruitmentServerError = isRecruitment && status === 500;
+
+    const shouldLogVerbose = import.meta.env.DEV && !isRecruitmentServerError;
+    const shouldLogWarningOnly = !shouldLogVerbose && (isExpectedError || isRecruitmentServerError);
 
     if (shouldLogWarningOnly) {
       console.warn(`⚠️ [API Interceptor] ${status} ${error.config?.method?.toUpperCase()} ${url}`);
     } else if (shouldLogVerbose) {
       const errorDetails = {
-        url, 
+        url,
         method: error.config?.method,
         status,
         statusText: error.response?.statusText,

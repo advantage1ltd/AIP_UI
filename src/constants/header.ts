@@ -3,7 +3,7 @@ export const USER_DATA = {
   name: "David Ibanga",
   email: "david.ibanga@example.com",
   role: "Administrator",
-  avatar: "/A1logo1.png",
+  avatar: "/AdvantageOne.svg",
   initials: "DI"
 } as const;
 

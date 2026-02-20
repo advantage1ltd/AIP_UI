@@ -21,6 +21,16 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -52,6 +62,11 @@ interface BulkQuestionDraft {
 }
 
 const normalizeStatus = (value: string | null | undefined) => String(value ?? '').trim().toLowerCase()
+
+/** Safely get test id from a list item (handles camelCase and PascalCase from API) */
+function getTestId(t: RecruitmentTestSummary & { TestId?: string }): string {
+	return String((t as RecruitmentTestSummary).testId ?? t.TestId ?? '').trim()
+}
 
 const makeId = () => {
 	if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
@@ -131,6 +146,10 @@ const CBT = () => {
 	const [currentResult, setCurrentResult] = useState<RecruitmentAttemptDetail | null>(null)
 	const [resultLoading, setResultLoading] = useState(false)
 
+	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+	const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+	const [pendingDelete, setPendingDelete] = useState<{ testId: string; title: string } | null>(null)
+
 	const [resultsFilterTestId, setResultsFilterTestId] = useState<string>('all')
 	const [resultsDateFrom, setResultsDateFrom] = useState<string>('')
 	const [resultsDateTo, setResultsDateTo] = useState<string>('')
@@ -193,10 +212,38 @@ const CBT = () => {
 			: '0%'
 
 		return [
-			{ title: 'Total Tests', value: total, icon: BookOpen, accent: 'text-indigo-600', ring: 'bg-indigo-50' },
-			{ title: 'Completed', value: completed, icon: CheckCircle, accent: 'text-emerald-600', ring: 'bg-emerald-50' },
-			{ title: 'Active', value: active, icon: Clock, accent: 'text-amber-600', ring: 'bg-amber-50' },
-			{ title: 'Pass Rate', value: passRate, icon: AlertTriangle, accent: 'text-rose-600', ring: 'bg-rose-50' },
+			{
+				title: 'Total Tests',
+				value: total,
+				icon: BookOpen,
+				accent: 'text-indigo-200',
+				ring: 'bg-indigo-500/15 ring-1 ring-inset ring-indigo-400/20',
+				card: 'border-indigo-400/20 bg-gradient-to-br from-indigo-950/70 via-slate-950/70 to-slate-950/60',
+			},
+			{
+				title: 'Completed',
+				value: completed,
+				icon: CheckCircle,
+				accent: 'text-emerald-200',
+				ring: 'bg-emerald-500/15 ring-1 ring-inset ring-emerald-400/20',
+				card: 'border-emerald-400/20 bg-gradient-to-br from-emerald-950/65 via-slate-950/70 to-slate-950/60',
+			},
+			{
+				title: 'Active',
+				value: active,
+				icon: Clock,
+				accent: 'text-amber-200',
+				ring: 'bg-amber-500/15 ring-1 ring-inset ring-amber-400/20',
+				card: 'border-amber-400/20 bg-gradient-to-br from-amber-950/60 via-slate-950/70 to-slate-950/60',
+			},
+			{
+				title: 'Pass Rate',
+				value: passRate,
+				icon: AlertTriangle,
+				accent: 'text-rose-200',
+				ring: 'bg-rose-500/15 ring-1 ring-inset ring-rose-400/20',
+				card: 'border-rose-400/20 bg-gradient-to-br from-rose-950/65 via-slate-950/70 to-slate-950/60',
+			},
 		]
 	}, [attempts, tests])
 
@@ -300,7 +347,12 @@ const CBT = () => {
 		setCreateDialogOpen(true)
 	}
 
-	const openEditDialog = async (testId: string) => {
+	const openEditDialog = async (testIdOrSummary: string | (RecruitmentTestSummary & { TestId?: string })) => {
+		const testId = typeof testIdOrSummary === 'string' ? testIdOrSummary : getTestId(testIdOrSummary)
+		if (!testId) {
+			toast({ title: 'Invalid test', description: 'Test ID is missing.', variant: 'destructive' })
+			return
+		}
 		setEditMode(true)
 		setTestSaving(true)
 		try {
@@ -310,8 +362,15 @@ const CBT = () => {
 			setCurrentTestHasAttempts(testAttempts.length > 0)
 			setCreateDialogOpen(true)
 		} catch (err) {
-			console.error('❌ [CBT] Failed to load test:', err)
 			const message = err instanceof Error ? err.message : 'Failed to load test'
+			type AxResponse = { status?: number; data?: unknown; config?: { url?: string; baseURL?: string } }
+			const ax = err && typeof err === 'object' && 'response' in err ? (err as { response?: AxResponse }).response : null
+			console.error('❌ [CBT] Failed to load test:', {
+				message,
+				testId,
+				...(ax && { httpStatus: ax.status, requestUrl: ax.config?.url, baseURL: ax.config?.baseURL, responseBody: ax.data }),
+				...(err instanceof Error && (err as Error & { cause?: unknown }).cause !== undefined && { cause: (err as Error & { cause?: unknown }).cause }),
+			}, err)
 			toast({ title: 'Failed to load test', description: message, variant: 'destructive' })
 		} finally {
 			setTestSaving(false)
@@ -357,6 +416,7 @@ const CBT = () => {
 	}
 
 	const deleteTest = async (testId: string) => {
+		if (!testId) return
 		try {
 			await recruitmentTestService.deleteAdminTest(testId)
 			toast({ title: 'Deleted', description: 'Test deleted successfully' })
@@ -365,6 +425,28 @@ const CBT = () => {
 			console.error('❌ [CBT] Failed to delete test:', err)
 			const message = err instanceof Error ? err.message : 'Failed to delete test'
 			toast({ title: 'Delete failed', description: message, variant: 'destructive' })
+		}
+	}
+
+	const openDeleteDialog = (payload: { testId: string; title: string }) => {
+		if (!payload.testId) {
+			toast({ title: 'Invalid test', description: 'Test ID is missing.', variant: 'destructive' })
+			return
+		}
+		setPendingDelete(payload)
+		setDeleteDialogOpen(true)
+	}
+
+	const handleConfirmDelete = async () => {
+		if (!pendingDelete?.testId) return
+		if (deleteSubmitting) return
+		setDeleteSubmitting(true)
+		try {
+			await deleteTest(pendingDelete.testId)
+			setDeleteDialogOpen(false)
+			setPendingDelete(null)
+		} finally {
+			setDeleteSubmitting(false)
 		}
 	}
 
@@ -603,12 +685,12 @@ const CBT = () => {
 
 				<div className="grid grid-cols-2 gap-3 md:grid-cols-4">
 					{stats.map((stat) => (
-						<Card key={stat.title} className="border-slate-200/70 bg-white/90 shadow-sm">
+						<Card key={stat.title} className={cn('shadow-sm backdrop-blur', stat.card)}>
 							<CardContent className="p-4">
 								<div className="flex items-center justify-between">
 									<div>
-										<p className="text-xs font-medium uppercase tracking-wide text-slate-400">{stat.title}</p>
-										<p className="text-2xl font-semibold text-slate-900">{stat.value}</p>
+										<p className="text-xs font-medium uppercase tracking-wide text-slate-300">{stat.title}</p>
+										<p className="text-2xl font-semibold text-white">{stat.value}</p>
 									</div>
 									<div className={cn('flex h-10 w-10 items-center justify-center rounded-full', stat.ring)}>
 										<stat.icon className={cn('h-5 w-5', stat.accent)} />
@@ -660,54 +742,63 @@ const CBT = () => {
 									<div className="text-center py-12 text-sm text-slate-500">{testsError}</div>
 								) : filteredTests.length > 0 ? (
 									<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-										{filteredTests.map((t) => (
-											<Card key={t.testId} className="border-slate-200/70 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-												<CardContent className="p-4">
-													<div className="flex items-start justify-between gap-3">
-														<div className="space-y-1">
-															<h3 className="text-base font-semibold text-slate-900">{t.title}</h3>
-															<p className="text-xs text-slate-500">{t.description || 'No description provided.'}</p>
-														</div>
-														<Badge className={getStatusColor(t.status)}>{t.status.charAt(0).toUpperCase() + t.status.slice(1)}</Badge>
-													</div>
-
-													<div className="mt-4 grid gap-2 text-xs text-slate-500">
-														<div className="flex items-center gap-2">
-															<Timer className="h-4 w-4" />
-															<span>{t.durationMinutes} min duration</span>
-														</div>
-														<div className="flex items-center gap-2">
-															<FileText className="h-4 w-4" />
-															<span>{t.questionCount} questions</span>
-														</div>
-														<div className="flex items-center gap-2">
-															<AlertTriangle className="h-4 w-4" />
-															<span>{t.totalPoints} total points</span>
-														</div>
-														{t.scheduledDate && (
-															<div className="flex items-center gap-2 text-slate-400">
-																<span>Scheduled {formatDate(t.scheduledDate)}</span>
+										{filteredTests.map((t, idx) => {
+											const id = getTestId(t)
+											return (
+												<Card key={id || `test-${idx}`} className="border-slate-200/70 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+													<CardContent className="p-4">
+														<div className="flex items-start justify-between gap-3">
+															<div className="space-y-1">
+																<h3 className="text-base font-semibold text-slate-900">{t.title}</h3>
+																<p className="text-xs text-slate-500">{t.description || 'No description provided.'}</p>
 															</div>
-														)}
-													</div>
-
-													<div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-														<Button variant="ghost" size="sm" className="px-0 text-slate-500" onClick={() => openEditDialog(t.testId)}>
-															<Eye className="mr-2 h-4 w-4" />
-															View
-														</Button>
-														<div className="flex gap-1">
-															<Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => openEditDialog(t.testId)} aria-label="Edit test">
-																<Edit2 className="h-4 w-4" />
-															</Button>
-															<Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => void deleteTest(t.testId)} aria-label="Delete test">
-																<Trash2 className="h-4 w-4" />
-															</Button>
+															<Badge className={getStatusColor(t.status)}>{t.status.charAt(0).toUpperCase() + t.status.slice(1)}</Badge>
 														</div>
-													</div>
-												</CardContent>
-											</Card>
-										))}
+
+														<div className="mt-4 grid gap-2 text-xs text-slate-500">
+															<div className="flex items-center gap-2">
+																<Timer className="h-4 w-4" />
+																<span>{t.durationMinutes} min duration</span>
+															</div>
+															<div className="flex items-center gap-2">
+																<FileText className="h-4 w-4" />
+																<span>{t.questionCount} questions</span>
+															</div>
+															<div className="flex items-center gap-2">
+																<AlertTriangle className="h-4 w-4" />
+																<span>{t.totalPoints} total points</span>
+															</div>
+															{t.scheduledDate && (
+																<div className="flex items-center gap-2 text-slate-400">
+																	<span>Scheduled {formatDate(t.scheduledDate)}</span>
+																</div>
+															)}
+														</div>
+
+														<div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+															<Button variant="ghost" size="sm" className="px-0 text-slate-500" onClick={() => openEditDialog(t)}>
+																<Eye className="mr-2 h-4 w-4" />
+																View
+															</Button>
+															<div className="flex gap-1">
+																<Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => openEditDialog(t)} aria-label="Edit test">
+																	<Edit2 className="h-4 w-4" />
+																</Button>
+																<Button
+																	variant="ghost"
+																	size="sm"
+																	className="h-9 w-9 p-0"
+																	onClick={() => openDeleteDialog({ testId: id, title: t.title })}
+																	aria-label="Delete test"
+																>
+																	<Trash2 className="h-4 w-4" />
+																</Button>
+															</div>
+														</div>
+													</CardContent>
+												</Card>
+											)
+										})}
 									</div>
 								) : (
 									<div className="text-center py-12">
@@ -1253,6 +1344,30 @@ const CBT = () => {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			<AlertDialog
+				open={deleteDialogOpen}
+				onOpenChange={(open) => {
+					setDeleteDialogOpen(open)
+					if (!open) setPendingDelete(null)
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete test?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This will permanently delete{' '}
+							<span className="font-medium text-foreground">{pendingDelete?.title || 'this test'}</span>. This action cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={deleteSubmitting}>Cancel</AlertDialogCancel>
+						<AlertDialogAction onClick={() => void handleConfirmDelete()} disabled={deleteSubmitting}>
+							{deleteSubmitting ? 'Deleting…' : 'Delete'}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	)
 }

@@ -92,21 +92,37 @@ export const customerService = {
     }
   },
 
-  // Get a customer by ID from backend
+  // Get a customer by ID from backend.
+  // Tries GET /customer/:id; on 404 falls back to list and find by id (avoids 404 when backend does not expose GET by id).
   getCustomer: async (id: string): Promise<Customer | undefined> => {
+    const fallbackFromList = async (): Promise<Customer | undefined> => {
+      const customers = await customerService.getAllCustomers()
+      const found = customers.find(c => String(c.id) === String(id))
+      if (found) {
+        console.log('✅ [CustomerService] Found customer via list fallback:', found.companyName)
+        return found
+      }
+      return undefined
+    }
+
     try {
       console.log('🔄 [CustomerService] Fetching customer by ID:', id)
-      const response = await api.get<ApiResponse<any>>(`${CUSTOMER_ENDPOINTS.LIST}/${id}`)
-      
-      if (response.data.success && response.data.data) {
+      const response = await api.get<ApiResponse<any>>(CUSTOMER_ENDPOINTS.DETAIL(id))
+      if (response.data?.success && response.data?.data) {
         const customer = mapBackendCustomerToFrontend(response.data.data)
         console.log('✅ [CustomerService] Successfully fetched customer:', customer.companyName)
         return customer
-      } else {
-        console.error('❌ [CustomerService] Failed to fetch customer:', response.data.message)
-        return undefined
       }
-    } catch (error) {
+      return undefined
+    } catch (error: unknown) {
+      const status = (error as { response?: { status?: number } })?.response?.status
+      if (status === 404) {
+        try {
+          return await fallbackFromList()
+        } catch (fallbackError) {
+          console.error('❌ [CustomerService] Fallback fetch failed:', fallbackError)
+        }
+      }
       console.error('❌ [CustomerService] Error fetching customer:', error)
       return undefined
     }
@@ -119,11 +135,11 @@ export const customerService = {
       
       const backendData = mapFrontendCustomerToBackend({
         ...customerData,
-        id: 0, // Will be set by backend
+        id: '', // Will be set by backend
         createdAt: '',
         updatedAt: '',
         viewConfig: {} as any,
-        pageAssignments: {}
+        pageAssignments: []
       })
       
       const response = await api.post<ApiResponse<any>>(CUSTOMER_ENDPOINTS.LIST, backendData)
@@ -209,7 +225,7 @@ export const customerService = {
   },
 
   // Get available customers for dropdowns (simplified version)
-  getAvailableCustomers: async (): Promise<Array<{ id: number; name: string }>> => {
+  getAvailableCustomers: async (): Promise<Array<{ id: string; name: string }>> => {
     try {
       const customers = await customerService.getAllCustomers()
       return customers.map(customer => ({

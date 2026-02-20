@@ -164,21 +164,21 @@ export const TakeTest = () => {
 								<CardDescription className="text-xs">Progress snapshot for CBT assessments.</CardDescription>
 							</CardHeader>
 							<CardContent className="space-y-3">
-								<div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-									<div className="text-xs uppercase tracking-wide text-slate-400">Available</div>
-									<div className="text-2xl font-semibold text-slate-900">{availableTests.length}</div>
+								<div className="rounded-xl border border-indigo-400/20 bg-gradient-to-br from-indigo-950/70 via-slate-950/70 to-slate-950/60 px-4 py-3">
+									<div className="text-xs uppercase tracking-wide text-slate-300">Available</div>
+									<div className="text-2xl font-semibold text-white">{availableTests.length}</div>
 								</div>
-								<div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-									<div className="text-xs uppercase tracking-wide text-slate-400">Completed</div>
-									<div className="text-2xl font-semibold text-slate-900">{completedTests.length}</div>
+								<div className="rounded-xl border border-emerald-400/20 bg-gradient-to-br from-emerald-950/65 via-slate-950/70 to-slate-950/60 px-4 py-3">
+									<div className="text-xs uppercase tracking-wide text-slate-300">Completed</div>
+									<div className="text-2xl font-semibold text-white">{completedTests.length}</div>
 								</div>
-								<div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-									<div className="text-xs uppercase tracking-wide text-slate-400">Average Score</div>
-									<div className="text-2xl font-semibold text-slate-900">{avgScoreLabel}</div>
+								<div className="rounded-xl border border-amber-400/20 bg-gradient-to-br from-amber-950/60 via-slate-950/70 to-slate-950/60 px-4 py-3">
+									<div className="text-xs uppercase tracking-wide text-slate-300">Average Score</div>
+									<div className="text-2xl font-semibold text-white">{avgScoreLabel}</div>
 								</div>
-								<div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-									<div className="text-xs uppercase tracking-wide text-slate-400">Next Due</div>
-									<div className="text-sm font-medium text-slate-700">
+								<div className="rounded-xl border border-rose-400/20 bg-gradient-to-br from-rose-950/65 via-slate-950/70 to-slate-950/60 px-4 py-3">
+									<div className="text-xs uppercase tracking-wide text-slate-300">Next Due</div>
+									<div className="text-sm font-medium text-slate-100">
 										{availableTests.length > 0 ? formatDate(new Date()) : 'No upcoming tests'}
 									</div>
 								</div>

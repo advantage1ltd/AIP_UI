@@ -1,15 +1,21 @@
 import { z } from 'zod'
 
-export const recruitmentTestSummarySchema = z.object({
-	testId: z.string(),
-	title: z.string(),
-	description: z.string().nullable().optional(),
-	durationMinutes: z.number().int(),
-	totalPoints: z.number().int(),
-	status: z.string(),
-	scheduledDate: z.string().nullable().optional(),
-	questionCount: z.number().int(),
-})
+export const recruitmentTestSummarySchema = z
+	.object({
+		testId: z.string().optional(),
+		TestId: z.string().optional(),
+		title: z.string(),
+		description: z.string().nullable().optional(),
+		durationMinutes: z.number().int(),
+		totalPoints: z.number().int(),
+		status: z.string(),
+		scheduledDate: z.string().nullable().optional(),
+		questionCount: z.number().int(),
+	})
+	.transform((data) => ({
+		...data,
+		testId: (data.testId ?? data.TestId ?? '').trim(),
+	}))
 
 export const recruitmentTestTakeOptionSchema = z.object({
 	optionId: z.number().int(),
@@ -102,7 +108,7 @@ export const recruitmentAdminQuestionSchema = z.object({
 	points: z.number().int(),
 	sortOrder: z.number().int(),
 	correctAnswerText: z.string().nullable().optional(),
-	options: z.array(recruitmentAdminOptionSchema),
+	options: z.array(recruitmentAdminOptionSchema).optional().default([]),
 })
 
 export const recruitmentAdminTestSchema = z.object({
@@ -114,6 +120,10 @@ export const recruitmentAdminTestSchema = z.object({
 	passThresholdPercentage: z.number().optional().default(80),
 	status: z.string(),
 	scheduledDate: z.string().nullable().optional(),
-	questions: z.array(recruitmentAdminQuestionSchema),
-})
+	questions: z.array(recruitmentAdminQuestionSchema).optional().default([]),
+}).transform((data) => ({
+	...data,
+	testId: String(data.testId ?? '').trim(),
+	questions: Array.isArray(data.questions) ? data.questions : [],
+}))
 
