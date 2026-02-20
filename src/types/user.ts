@@ -70,6 +70,7 @@ export interface BaseUser {
   signature?: string;
   signatureCode?: string;
   jobTitle?: string;
+  profilePhotoFile?: string;
   recordIsDeleted?: boolean;
   createdAt: string;
   updatedAt: string;

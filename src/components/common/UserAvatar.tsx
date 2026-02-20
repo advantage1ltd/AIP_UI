@@ -4,6 +4,11 @@ import { USER_DATA } from '@/constants/header'
 import { sessionStore } from '@/state/sessionStore'
 import { userProfilePhotoCache } from '@/utils/userProfilePhotoCache'
 import type { User } from '@/types/user'
+import { profilePhotoCache } from '@/utils/profilePhotoCache'
+import { api } from '@/config/api'
+import type { EmployeeDetailResponse } from '@/services/employeeService'
+import type { BackendApiResponse } from '@/types/backend-api'
+import { getApiData, getApiSuccess } from '@/types/backend-api'
 
 interface UserAvatarProps {
   size?: 'sm' | 'md' | 'lg';
@@ -35,6 +40,14 @@ export function UserAvatar({
 	}, [])
 
 	const userId = user?.id ? String(user.id) : null
+	const employeeId = useMemo<number | null>(() => {
+		if (!user) return null
+		const legacy = user as User & { EmployeeId?: number | string }
+		const raw = user.employeeId ?? legacy.EmployeeId
+		if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+		if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) return Number(raw)
+		return null
+	}, [user])
 
 	const displayName = useMemo(() => {
 		const name = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim()
@@ -52,17 +65,42 @@ export function UserAvatar({
 	}, [user?.firstName, user?.lastName, user?.username])
 
 	const [photoSrc, setPhotoSrc] = useState<string>(() => {
-		if (!userId) return USER_DATA.avatar
-		return userProfilePhotoCache.get(userId) || USER_DATA.avatar
+		const serverPhoto = (user?.profilePhotoFile ?? '').trim()
+		if (serverPhoto) return serverPhoto
+		if (userId) {
+			const cached = userProfilePhotoCache.get(userId)
+			if (cached) return cached
+		}
+		if (employeeId) {
+			const cachedEmployee = profilePhotoCache.get(employeeId)
+			if (cachedEmployee) return cachedEmployee
+		}
+		return USER_DATA.avatar
 	})
 
 	useEffect(() => {
-		if (!userId) {
-			setPhotoSrc(USER_DATA.avatar)
+		const serverPhoto = (user?.profilePhotoFile ?? '').trim()
+		if (serverPhoto) {
+			setPhotoSrc(serverPhoto)
+			if (userId) userProfilePhotoCache.set(userId, serverPhoto)
 			return
 		}
-		setPhotoSrc(userProfilePhotoCache.get(userId) || USER_DATA.avatar)
-	}, [userId])
+		if (userId) {
+			const cached = userProfilePhotoCache.get(userId)
+			if (cached) {
+				setPhotoSrc(cached)
+				return
+			}
+		}
+		if (employeeId) {
+			const cachedEmployee = profilePhotoCache.get(employeeId)
+			if (cachedEmployee) {
+				setPhotoSrc(cachedEmployee)
+				return
+			}
+		}
+		setPhotoSrc(USER_DATA.avatar)
+	}, [employeeId, user?.profilePhotoFile, userId])
 
 	useEffect(() => {
 		const handlePhotoUpdated = (event: Event) => {
@@ -75,6 +113,36 @@ export function UserAvatar({
 		window.addEventListener('user-profile-photo-updated', handlePhotoUpdated as EventListener)
 		return () => window.removeEventListener('user-profile-photo-updated', handlePhotoUpdated as EventListener)
 	}, [userId])
+
+	useEffect(() => {
+		let cancelled = false
+
+		const hydrateFromEmployeeApi = async () => {
+			if (!employeeId) return
+			if (userId && userProfilePhotoCache.get(userId)) return
+			if (profilePhotoCache.get(employeeId)) return
+
+			try {
+				const response = await api.get<BackendApiResponse<EmployeeDetailResponse>>(`/employee/${employeeId}`)
+				const apiResponse = response.data
+				if (!getApiSuccess(apiResponse)) return
+				const data = getApiData(apiResponse)
+				const photoFile = data?.photoFile ?? null
+				if (!photoFile) return
+
+				profilePhotoCache.set(employeeId, photoFile)
+				if (userId) userProfilePhotoCache.set(userId, photoFile)
+				if (!cancelled) setPhotoSrc(photoFile)
+			} catch {
+				// Silent: header should never hard-fail due to avatar fetch
+			}
+		}
+
+		void hydrateFromEmployeeApi()
+		return () => {
+			cancelled = true
+		}
+	}, [employeeId, userId])
 
   return (
     <Avatar className={`${sizeClasses[size]} ${borderClass} ${className}`}>

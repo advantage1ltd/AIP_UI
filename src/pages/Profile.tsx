@@ -232,6 +232,24 @@ const Profile = () => {
 		userProfilePhotoCache.set(user.id, photoFile)
 		window.dispatchEvent(new CustomEvent('user-profile-photo-updated', { detail: { userId: user.id } }))
 
+		// Persist to user profile table (preferred source for header)
+		try {
+			const response = await api.put<BackendApiResponse<User>>('/Auth/me/profile-photo', { profilePhotoFile: photoFile })
+			const apiResponse = response.data
+			if (getApiSuccess(apiResponse)) {
+				const updatedUser = getApiData<User>(apiResponse)
+				if (updatedUser) {
+					sessionStore.setUser(updatedUser)
+					window.dispatchEvent(new CustomEvent<User>('user-assignments-updated', { detail: updatedUser }))
+				}
+			} else {
+				const errors = getApiErrors(apiResponse)
+				throw new Error(errors[0] || getApiMessage(apiResponse) || 'Failed to update profile photo')
+			}
+		} catch (apiErr) {
+			console.warn('⚠️ [Profile] User profile photo API failed (kept local preview):', apiErr)
+		}
+
 		// If we have an employeeId, also sync to employee profile photo
 		if (employeeId) {
 			setEmployeePhotoFile(photoFile)
