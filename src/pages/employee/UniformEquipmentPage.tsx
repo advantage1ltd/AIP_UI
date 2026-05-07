@@ -498,8 +498,8 @@ const UniformEquipmentPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#EFF4FF]">
-      <div className="container mx-auto px-4 py-6 max-w-7xl space-y-6">
+    <div className="min-h-screen overflow-x-hidden bg-[#EFF4FF]">
+      <div className="container mx-auto w-full max-w-7xl px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         
         {/* Modern Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -516,10 +516,10 @@ const UniformEquipmentPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
             <Button
               onClick={() => setIsRequestDialogOpen(true)}
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white gap-2"
+              className="w-full sm:w-auto bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white gap-2"
             >
               <Send className="h-4 w-4" />
               Request Equipment
@@ -531,7 +531,7 @@ const UniformEquipmentPage: React.FC = () => {
                   issuedForm.reset()
                   setIsIssuedDialogOpen(true)
                 }}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white gap-2"
+                className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white gap-2"
               >
                 <Plus className="h-4 w-4" />
                 Issue Equipment
@@ -603,19 +603,19 @@ const UniformEquipmentPage: React.FC = () => {
         <Card className="border-0 shadow-md bg-white">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <CardHeader className="border-b bg-gradient-to-r from-gray-50 to-white pb-0">
-              <TabsList className="h-auto p-1 bg-gray-100 rounded-lg">
+                <TabsList className="grid h-auto w-full grid-cols-2 p-1 bg-gray-100 rounded-lg">
                 {!isAdmin && (
                   <>
                     <TabsTrigger 
                       value="my-requests" 
-                      className="data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2"
+                      className="w-full justify-center data-[state=active]:bg-white data-[state=active]:shadow-sm px-2 sm:px-4 py-2 text-xs sm:text-sm"
                     >
                       <Send className="h-4 w-4 mr-2" />
                       My Requests
                     </TabsTrigger>
                     <TabsTrigger 
                       value="my-equipment" 
-                      className="data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2"
+                      className="w-full justify-center data-[state=active]:bg-white data-[state=active]:shadow-sm px-2 sm:px-4 py-2 text-xs sm:text-sm"
                     >
                       <Package className="h-4 w-4 mr-2" />
                       My Equipment
@@ -626,7 +626,7 @@ const UniformEquipmentPage: React.FC = () => {
                   <>
                     <TabsTrigger 
                       value="requests" 
-                      className="data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2"
+                      className="w-full justify-center data-[state=active]:bg-white data-[state=active]:shadow-sm px-2 sm:px-4 py-2 text-xs sm:text-sm"
                     >
                       <FileText className="h-4 w-4 mr-2" />
                       All Requests
@@ -636,20 +636,20 @@ const UniformEquipmentPage: React.FC = () => {
                     </TabsTrigger>
                     <TabsTrigger 
                       value="issued" 
-                      className="data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2"
+                      className="w-full justify-center data-[state=active]:bg-white data-[state=active]:shadow-sm px-2 sm:px-4 py-2 text-xs sm:text-sm"
                     >
                       <Package className="h-4 w-4 mr-2" />
                       Issued Equipment
                     </TabsTrigger>
                   </>
                 )}
-              </TabsList>
+                </TabsList>
             </CardHeader>
 
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               {/* Search Bar */}
-              <div className="flex items-center gap-4 mb-6">
-                <div className="relative flex-1 max-w-md">
+              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-4 mb-4 sm:mb-6">
+                <div className="relative flex-1 max-w-none sm:max-w-md">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     placeholder="Search..."
@@ -664,7 +664,7 @@ const UniformEquipmentPage: React.FC = () => {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-11 w-11"
+                  className="h-11 w-full sm:w-11 sm:flex-none"
                   onClick={() => queryClient.invalidateQueries({ queryKey: ['uniformEquipment'] })}
                 >
                   <RefreshCw className="h-6 w-6" />
@@ -1374,63 +1374,117 @@ const RequestsTable: React.FC<RequestsTableProps> = ({
   onCancel 
 }) => (
   <div className="border rounded-lg overflow-hidden">
-    <Table>
-      <TableHeader>
-        <TableRow className="bg-gray-50">
-          {isAdmin && <TableHead>Requested By</TableHead>}
-          <TableHead>Equipment</TableHead>
-          <TableHead className="hidden sm:table-cell">Size</TableHead>
-          <TableHead className="hidden sm:table-cell">Qty</TableHead>
-          <TableHead>Priority</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="hidden md:table-cell">Date</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {requests.map((request) => (
-          <TableRow key={request.id} className="hover:bg-gray-50">
-            {isAdmin && (
-              <TableCell className="font-medium">{request.requesterName}</TableCell>
+    <div className="space-y-2 p-2 sm:hidden">
+      {requests.map((request) => (
+        <div key={`mobile-request-${request.id}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-slate-800">{request.equipmentType}</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {isAdmin ? request.requesterName : format(new Date(request.createdAt), 'PP')}
+              </p>
+            </div>
+            <Badge className={REQUEST_STATUS_COLORS[request.status]}>{request.status}</Badge>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Size</p>
+              <p className="font-medium text-slate-700">{request.size || '-'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Quantity</p>
+              <p className="font-medium text-slate-700">{request.quantity}</p>
+            </div>
+          </div>
+          <div className="mt-2">
+            <Badge className={PRIORITY_COLORS[request.priority]}>{request.priority}</Badge>
+          </div>
+          <div className="mt-3 flex items-center justify-end gap-1.5">
+            <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => onView(request)}>
+              <Eye className="h-4 w-4" />
+              <span className="sr-only">View request</span>
+            </Button>
+            {isAdmin && request.status === 'Pending' && onReview && (
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 text-emerald-600" onClick={() => onReview(request)}>
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="sr-only">Review request</span>
+              </Button>
             )}
-            <TableCell>{request.equipmentType}</TableCell>
-            <TableCell className="hidden sm:table-cell">{request.size}</TableCell>
-            <TableCell className="hidden sm:table-cell">{request.quantity}</TableCell>
-            <TableCell>
-              <Badge className={PRIORITY_COLORS[request.priority]}>{request.priority}</Badge>
-            </TableCell>
-            <TableCell>
-              <Badge className={REQUEST_STATUS_COLORS[request.status]}>{request.status}</Badge>
-            </TableCell>
-            <TableCell className="hidden md:table-cell">
-              {format(new Date(request.createdAt), 'PP')}
-            </TableCell>
-            <TableCell className="text-right">
-              <div className="flex justify-end gap-1">
-                <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => onView(request)}>
-                  <Eye className="h-6 w-6" />
-                </Button>
-                {isAdmin && request.status === 'Pending' && onReview && (
-                  <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => onReview(request)}>
-                    <CheckCircle2 className="h-6 w-6 text-emerald-600" />
-                  </Button>
-                )}
-                {!isAdmin && request.status === 'Pending' && onCancel && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-11 w-11 text-red-600 hover:text-red-700"
-                    onClick={() => onCancel(request.id)}
-                  >
-                    <XCircle className="h-6 w-6" />
-                  </Button>
-                )}
-              </div>
-            </TableCell>
+            {!isAdmin && request.status === 'Pending' && onCancel && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                onClick={() => onCancel(request.id)}
+              >
+                <XCircle className="h-4 w-4" />
+                <span className="sr-only">Cancel request</span>
+              </Button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <div className="hidden overflow-x-auto sm:block">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-gray-50">
+            {isAdmin && <TableHead>Requested By</TableHead>}
+            <TableHead>Equipment</TableHead>
+            <TableHead className="hidden sm:table-cell">Size</TableHead>
+            <TableHead className="hidden sm:table-cell">Qty</TableHead>
+            <TableHead>Priority</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="hidden md:table-cell">Date</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {requests.map((request) => (
+            <TableRow key={request.id} className="hover:bg-gray-50">
+              {isAdmin && (
+                <TableCell className="font-medium">{request.requesterName}</TableCell>
+              )}
+              <TableCell>{request.equipmentType}</TableCell>
+              <TableCell className="hidden sm:table-cell">{request.size}</TableCell>
+              <TableCell className="hidden sm:table-cell">{request.quantity}</TableCell>
+              <TableCell>
+                <Badge className={PRIORITY_COLORS[request.priority]}>{request.priority}</Badge>
+              </TableCell>
+              <TableCell>
+                <Badge className={REQUEST_STATUS_COLORS[request.status]}>{request.status}</Badge>
+              </TableCell>
+              <TableCell className="hidden md:table-cell">
+                {format(new Date(request.createdAt), 'PP')}
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex justify-end gap-1">
+                  <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => onView(request)}>
+                    <Eye className="h-6 w-6" />
+                  </Button>
+                  {isAdmin && request.status === 'Pending' && onReview && (
+                    <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => onReview(request)}>
+                      <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                    </Button>
+                  )}
+                  {!isAdmin && request.status === 'Pending' && onCancel && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-11 w-11 text-red-600 hover:text-red-700"
+                      onClick={() => onCancel(request.id)}
+                    >
+                      <XCircle className="h-6 w-6" />
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   </div>
 )
 
@@ -1443,62 +1497,112 @@ interface IssuedTableProps {
 
 const IssuedTable: React.FC<IssuedTableProps> = ({ items, isAdmin, onEdit, onDelete }) => (
   <div className="border rounded-lg overflow-hidden">
-    <Table>
-      <TableHeader>
-        <TableRow className="bg-gray-50">
-          {isAdmin && <TableHead>Officer</TableHead>}
-          <TableHead>Equipment</TableHead>
-          <TableHead className="hidden sm:table-cell">Size</TableHead>
-          <TableHead className="hidden sm:table-cell">Qty</TableHead>
-          <TableHead>Condition</TableHead>
-          <TableHead className="hidden md:table-cell">Date Issued</TableHead>
-          {isAdmin && <TableHead className="hidden lg:table-cell">Issued By</TableHead>}
-          {isAdmin && <TableHead className="text-right">Actions</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((item) => (
-          <TableRow key={item.id} className="hover:bg-gray-50">
-            {isAdmin && (
-              <TableCell className="font-medium">{item.officerName}</TableCell>
-            )}
-            <TableCell>{item.equipmentType}</TableCell>
-            <TableCell className="hidden sm:table-cell">{item.size || '-'}</TableCell>
-            <TableCell className="hidden sm:table-cell">{item.quantity}</TableCell>
-            <TableCell>
-              <Badge className={CONDITION_COLORS[item.condition]}>{item.condition}</Badge>
-            </TableCell>
-            <TableCell className="hidden md:table-cell">
-              {format(new Date(item.dateIssued), 'PP')}
-            </TableCell>
-            {isAdmin && (
-              <TableCell className="hidden lg:table-cell">{item.issuedByName}</TableCell>
-            )}
-            {isAdmin && (
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-1">
-                  {onEdit && (
-                    <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => onEdit(item)}>
-                      <Pencil className="h-6 w-6" />
-                    </Button>
-                  )}
-                  {onDelete && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-11 w-11 text-red-600 hover:text-red-700"
-                      onClick={() => onDelete(item.id)}
-                    >
-                      <Trash2 className="h-6 w-6" />
-                    </Button>
-                  )}
-                </div>
-              </TableCell>
-            )}
+    <div className="space-y-2 p-2 sm:hidden">
+      {items.map((item) => (
+        <div key={`mobile-issued-${item.id}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-slate-800">{item.equipmentType}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{isAdmin ? item.officerName : item.issuedByName}</p>
+            </div>
+            <Badge className={CONDITION_COLORS[item.condition]}>{item.condition}</Badge>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Size</p>
+              <p className="font-medium text-slate-700">{item.size || '-'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Quantity</p>
+              <p className="font-medium text-slate-700">{item.quantity}</p>
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-slate-600">
+            Issued: {format(new Date(item.dateIssued), 'PP')}
+          </div>
+          {isAdmin && (
+            <div className="mt-3 flex items-center justify-end gap-1.5">
+              {onEdit && (
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => onEdit(item)}>
+                  <Pencil className="h-4 w-4" />
+                  <span className="sr-only">Edit record</span>
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                  onClick={() => onDelete(item.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">Delete record</span>
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+
+    <div className="hidden overflow-x-auto sm:block">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-gray-50">
+            {isAdmin && <TableHead>Officer</TableHead>}
+            <TableHead>Equipment</TableHead>
+            <TableHead className="hidden sm:table-cell">Size</TableHead>
+            <TableHead className="hidden sm:table-cell">Qty</TableHead>
+            <TableHead>Condition</TableHead>
+            <TableHead className="hidden md:table-cell">Date Issued</TableHead>
+            {isAdmin && <TableHead className="hidden lg:table-cell">Issued By</TableHead>}
+            {isAdmin && <TableHead className="text-right">Actions</TableHead>}
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {items.map((item) => (
+            <TableRow key={item.id} className="hover:bg-gray-50">
+              {isAdmin && (
+                <TableCell className="font-medium">{item.officerName}</TableCell>
+              )}
+              <TableCell>{item.equipmentType}</TableCell>
+              <TableCell className="hidden sm:table-cell">{item.size || '-'}</TableCell>
+              <TableCell className="hidden sm:table-cell">{item.quantity}</TableCell>
+              <TableCell>
+                <Badge className={CONDITION_COLORS[item.condition]}>{item.condition}</Badge>
+              </TableCell>
+              <TableCell className="hidden md:table-cell">
+                {format(new Date(item.dateIssued), 'PP')}
+              </TableCell>
+              {isAdmin && (
+                <TableCell className="hidden lg:table-cell">{item.issuedByName}</TableCell>
+              )}
+              {isAdmin && (
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-1">
+                    {onEdit && (
+                      <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => onEdit(item)}>
+                        <Pencil className="h-6 w-6" />
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-11 w-11 text-red-600 hover:text-red-700"
+                        onClick={() => onDelete(item.id)}
+                      >
+                        <Trash2 className="h-6 w-6" />
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              )}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   </div>
 )
 

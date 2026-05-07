@@ -181,84 +181,128 @@ export function SitesTable({ customerId, onEdit, onDataChange, updateTrigger }: 
         </div>
       ) : (
         <>
-          <div className="border rounded-lg overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Location</TableHead>
-                  <TableHead>SIN Number</TableHead>
-                  <TableHead className={getResponsiveClasses('address')}>Address</TableHead>
-                  <TableHead className={getResponsiveClasses('telephone')}>Telephone</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentSitesTable.map((site) => (
-                  <TableRow key={site.siteID}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{site.locationName}</div>
-                        {site.buildingName && (
-                          <div className="text-sm text-gray-500">{site.buildingName}</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">{site.sinNumber || "No SIN Number"}</span>
-                    </TableCell>
-                    <TableCell className={getResponsiveClasses('address')}>
-                      <div className="text-sm">
-                        <div>{site.numberandStreet || "No street address"}</div>
-                        <div className="text-gray-500">
-                          {[site.villageOrSuburb, site.town, site.county].filter(Boolean).join(", ")}
-                        </div>
-                        <div className="text-gray-500">{site.postcode || "No postcode"}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell className={getResponsiveClasses('telephone')}>
-                      <span className="text-sm">{site.telephoneNumber || "No telephone"}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={site.coreSiteYN ? "default" : "secondary"} className={site.coreSiteYN ? "bg-purple-600" : ""}>
-                        {site.coreSiteYN ? "Core Site" : "Site"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={site.recordIsDeletedYN ? "destructive" : "default"} className={site.recordIsDeletedYN ? "bg-red-600" : "bg-green-600"}>
-                        {site.recordIsDeletedYN ? "Inactive" : "Active"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(site.dateCreated).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onEdit(site)}
-                          disabled={site.recordIsDeletedYN}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteClick(site)}
-                          className="text-red-600 hover:text-red-700"
-                          disabled={isLoading}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+          <div className="border rounded-lg">
+            <div className="space-y-2 p-2 sm:hidden">
+              {currentSitesTable.map((site) => (
+                <div key={`mobile-${site.siteID}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">{site.locationName}</p>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">{site.sinNumber || 'No SIN Number'}</p>
+                    </div>
+                    <Badge variant={site.recordIsDeletedYN ? "destructive" : "default"} className={site.recordIsDeletedYN ? "bg-red-600 text-[10px]" : "bg-green-600 text-[10px]"}>
+                      {site.recordIsDeletedYN ? "Inactive" : "Active"}
+                    </Badge>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-600">
+                    <p className="truncate">{[site.numberandStreet, site.town, site.county].filter(Boolean).join(', ') || 'No address'}</p>
+                    <p className="mt-0.5">Created: {new Date(site.dateCreated).toLocaleDateString()}</p>
+                  </div>
+                  <div className="mt-3 flex items-center justify-end gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEdit(site)}
+                      disabled={site.recordIsDeletedYN}
+                      className="h-7 w-7 p-0 border-purple-200 text-purple-600 hover:bg-purple-50"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      <span className="sr-only">Edit site</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteClick(site)}
+                      className="h-7 w-7 p-0 border-red-200 text-red-600 hover:bg-red-50"
+                      disabled={isLoading}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span className="sr-only">Delete site</span>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Location</TableHead>
+                    <TableHead>SIN Number</TableHead>
+                    <TableHead className={getResponsiveClasses('address')}>Address</TableHead>
+                    <TableHead className={getResponsiveClasses('telephone')}>Telephone</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {currentSitesTable.map((site) => (
+                    <TableRow key={site.siteID}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{site.locationName}</div>
+                          {site.buildingName && (
+                            <div className="text-sm text-gray-500">{site.buildingName}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm">{site.sinNumber || "No SIN Number"}</span>
+                      </TableCell>
+                      <TableCell className={getResponsiveClasses('address')}>
+                        <div className="text-sm">
+                          <div>{site.numberandStreet || "No street address"}</div>
+                          <div className="text-gray-500">
+                            {[site.villageOrSuburb, site.town, site.county].filter(Boolean).join(", ")}
+                          </div>
+                          <div className="text-gray-500">{site.postcode || "No postcode"}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className={getResponsiveClasses('telephone')}>
+                        <span className="text-sm">{site.telephoneNumber || "No telephone"}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={site.coreSiteYN ? "default" : "secondary"} className={site.coreSiteYN ? "bg-purple-600" : ""}>
+                          {site.coreSiteYN ? "Core Site" : "Site"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={site.recordIsDeletedYN ? "destructive" : "default"} className={site.recordIsDeletedYN ? "bg-red-600" : "bg-green-600"}>
+                          {site.recordIsDeletedYN ? "Inactive" : "Active"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(site.dateCreated).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onEdit(site)}
+                            disabled={site.recordIsDeletedYN}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteClick(site)}
+                            className="text-red-600 hover:text-red-700"
+                            disabled={isLoading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
 
           {/* Pagination */}

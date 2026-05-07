@@ -51,6 +51,13 @@ const subtractMonths = (date: Date, months: number) => {
 const formatCurrency = (value: number) =>
   `£${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+const getTabLabel = (tab: OfficerPerformanceCategory) =>
+  tab === 'top-performers'
+    ? 'Top Performers'
+    : tab === 'needs-improvement'
+    ? 'Needs Improvement'
+    : 'Non-Reporters'
+
 const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, icon, iconBgColor, iconColor }) => (
   <Card className={`${iconBgColor} hover:opacity-95 transition-all h-full`}>
     <CardContent className="p-3 xs:p-4 sm:p-5 lg:p-6">
@@ -274,8 +281,52 @@ const OfficerPerformance = () => {
     })
   }
 
+  const renderMobileCards = (items: OfficerPerformanceItem[], isLoading: boolean) => {
+    if (isLoading) {
+      return (
+        <div className="px-4 py-6 text-center text-sm text-gray-500">
+          Loading officer performance...
+        </div>
+      )
+    }
+
+    if (!items.length) {
+      return (
+        <div className="px-4 py-6 text-center text-sm text-gray-500">
+          No officers found for the selected filters.
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-2 p-2 sm:hidden">
+        {items.map((officer, index) => {
+          const statusClass = STATUS_STYLES[officer.status] ?? STATUS_STYLES.default
+          return (
+            <div key={`mobile-${officer.officerName}-${index}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{officer.officerName}</p>
+                <Badge className={statusClass}>{officer.status}</Badge>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400">Incidents</p>
+                  <p className="font-medium text-slate-700">{officer.incidentCount}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400">Value saved</p>
+                  <p className="font-medium text-slate-700">{formatCurrency(officer.totalValueSaved)}</p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
-    <div className="container mx-auto px-1 xs:px-3 sm:px-4 py-2 xs:py-4 sm:py-6 md:px-6 lg:px-8 xl:px-12 2xl:px-16 max-w-screen-2xl">
+    <div className="container mx-auto max-w-screen-2xl overflow-x-hidden px-1 py-2 xs:px-3 xs:py-4 sm:px-4 sm:py-6 md:px-6 lg:px-8 xl:px-12 2xl:px-16">
       <div className="space-y-2 xs:space-y-4 sm:space-y-6">
         <div className="flex flex-col xs:flex-row justify-between xs:items-center gap-2">
           <div>
@@ -359,18 +410,14 @@ const OfficerPerformance = () => {
               setCurrentPage(1)
             }}
           >
-            <TabsList className="w-full xs:w-auto h-7 xs:h-8 sm:h-9 lg:h-10">
+            <TabsList className="grid h-auto w-full grid-cols-1 gap-1 xs:grid-cols-2 lg:grid-cols-3">
               {CATEGORY_TABS.map((tab) => (
                 <TabsTrigger
                   key={tab}
                   value={tab}
-                  className="flex-1 xs:flex-none text-[9px] xs:text-xs sm:text-sm lg:text-base h-6 xs:h-7 sm:h-8 lg:h-9 capitalize"
+                  className="w-full text-[10px] xs:text-xs sm:text-sm lg:text-base py-2"
                 >
-                  {tab === 'top-performers' 
-                    ? 'Top Performers' 
-                    : tab === 'needs-improvement' 
-                    ? 'Needs Improvement' 
-                    : 'Non-Reporters'}
+                  {getTabLabel(tab)}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -407,8 +454,10 @@ const OfficerPerformance = () => {
                       </div>
                     </div>
 
-                    <div className="relative overflow-x-auto">
-                      <div className="min-w-[360px] xs:min-w-full">
+                    {renderMobileCards(tab === activeTab ? tableItems : [], isLoadingData && tab === activeTab)}
+
+                    <div className="relative hidden overflow-x-auto sm:block">
+                      <div className="min-w-[640px]">
                         <table className="w-full text-left">
                           <thead className="bg-gray-50">
                             <tr className="border-b">

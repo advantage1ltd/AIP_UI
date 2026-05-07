@@ -26,8 +26,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   PlusCircle, 
   PoundSterling, 
+  ShieldCheck,
   Store, 
   AlertCircle, 
+  TrendingDown,
   Edit2,
   Trash2,
   Eye,
@@ -65,6 +67,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { incidentsApi } from "@/services/api/incidents"
 import { productService } from "@/services/productService"
 import { regionService } from "@/services/regionService"
+import { customerService } from "@/services/customerService"
 import type { Region } from "@/types/customer"
 import { Toaster } from '@/components/ui/toaster'
 import { useSearchParams } from 'react-router-dom'
@@ -93,10 +96,82 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
   const [toDateInput, setToDateInput] = useState("")
   const [incidentTypeFilter, setIncidentTypeFilter] = useState<string | null>(null)
   const [regionFilter, setRegionFilter] = useState<string>('all')
+  const [customerFilter, setCustomerFilter] = useState<string>('all')
+  const [customerOptions, setCustomerOptions] = useState<Array<{ id: string; name: string }>>([])
   const [regions, setRegions] = useState<Region[]>([])
   const [isLoadingRegions, setIsLoadingRegions] = useState(false)
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false)
   const [searchParams] = useSearchParams()
   const itemsPerPage = 10
+
+  const toSafeNumber = (value: unknown): number => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string') {
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed : 0
+    }
+    return 0
+  }
+
+  const getStolenItemsTotals = (incident: Incident) => {
+    if (!Array.isArray(incident.stolenItems) || incident.stolenItems.length === 0) {
+      return { totalAmount: 0, totalRecovered: 0, totalLost: 0 }
+    }
+
+    return incident.stolenItems.reduce(
+      (acc, item) => {
+        const itemTotalAmount = toSafeNumber(item.totalAmount) || (toSafeNumber(item.cost) * toSafeNumber(item.quantity))
+        const itemRecovered = toSafeNumber(item.valueSaved)
+        const itemLost = toSafeNumber(item.valueLost)
+        const derivedItemLost = Math.max(0, itemTotalAmount - itemRecovered)
+
+        acc.totalAmount += Math.max(0, itemTotalAmount)
+        acc.totalRecovered += Math.max(0, itemRecovered)
+        acc.totalLost += Math.max(0, itemLost || derivedItemLost)
+        return acc
+      },
+      { totalAmount: 0, totalRecovered: 0, totalLost: 0 }
+    )
+  }
+
+  const getIncidentRecoveredValue = (incident: Incident) => {
+    const explicitRecovered = toSafeNumber(
+      incident.totalValueRecovered ?? incident.valueRecovered ?? incident.amount ?? incident.value
+    )
+    if (explicitRecovered > 0) {
+      return explicitRecovered
+    }
+
+    return getStolenItemsTotals(incident).totalRecovered
+  }
+
+  const getIncidentLossValue = (incident: Incident) => {
+    const explicitLoss = toSafeNumber((incident as Incident & { totalValueLost?: number }).totalValueLost)
+    if (explicitLoss > 0) {
+      return explicitLoss
+    }
+
+    const stolenTotals = getStolenItemsTotals(incident)
+    if (stolenTotals.totalLost > 0) {
+      return stolenTotals.totalLost
+    }
+
+    if (stolenTotals.totalAmount > 0) {
+      return Math.max(0, stolenTotals.totalAmount - getIncidentRecoveredValue(incident))
+    }
+
+    return 0
+  }
+
+  const getIncidentFinancialMetrics = (incident: Incident) => {
+    const recovered = getIncidentRecoveredValue(incident)
+    const loss = getIncidentLossValue(incident)
+    return {
+      recovered,
+      loss,
+      netSaved: recovered - loss
+    }
+  }
 
   const formatDateInput = (date: Date) => {
     const year = date.getFullYear()
@@ -163,13 +238,15 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     setToDateInput("")
     setIncidentTypeFilter(null)
     setRegionFilter('all')
+    setCustomerFilter('all')
     setCurrentPage(1)
   }
 
   const isDateRangeActive = Boolean(fromDate || toDate)
   const isIncidentTypeFilterActive = Boolean(incidentTypeFilter)
   const isRegionFilterActive = regionFilter !== 'all'
-  const isClientFilterActive = isDateRangeActive || isIncidentTypeFilterActive || isRegionFilterActive
+  const isCustomerFilterActive = !isCustomerView && customerFilter !== 'all'
+  const isClientFilterActive = isDateRangeActive || isIncidentTypeFilterActive || isRegionFilterActive || isCustomerFilterActive
 
   useEffect(() => {
     const presetParam = searchParams.get('preset')
@@ -241,9 +318,38 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     }
   }, [isCustomerView, customerId])
 
+  useEffect(() => {
+    if (isCustomerView) return
+
+    let isMounted = true
+    const loadCustomers = async () => {
+      setIsLoadingCustomers(true)
+      try {
+        const customers = await customerService.getAvailableCustomers()
+        if (!isMounted) return
+        const normalized = customers.map(customer => ({ id: customer.id, name: customer.name }))
+        setCustomerOptions([{ id: 'all', name: 'All customers' }, ...normalized])
+      } catch (customerError) {
+        console.error('Failed to load customers for incident filtering', customerError)
+        if (isMounted) {
+          setCustomerOptions([{ id: 'all', name: 'All customers' }])
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingCustomers(false)
+        }
+      }
+    }
+
+    void loadCustomers()
+    return () => {
+      isMounted = false
+    }
+  }, [isCustomerView])
+
   // Fetch incidents using the API service
   const { data: incidentsResponse = { data: [], pagination: { currentPage: 1, totalPages: 1, pageSize: 10, totalCount: 0, hasPrevious: false, hasNext: false } }, isLoading, error } = useQuery({
-    queryKey: ['incidents', currentPage, searchTerm, customerId, siteId, fromDate, toDate, incidentTypeFilter, regionFilter],
+    queryKey: ['incidents', currentPage, searchTerm, customerId, customerFilter, siteId, fromDate, toDate, incidentTypeFilter, regionFilter],
     queryFn: () => incidentsApi.getIncidents({
       page: currentPage,
       pageSize: itemsPerPage,
@@ -253,6 +359,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
       ...(incidentTypeFilter && { incidentType: incidentTypeFilter }),
       ...(regionFilter !== 'all' && { regionId: regionFilter }),
       ...(isCustomerView && customerId && { customerId }),
+      ...(!isCustomerView && customerFilter !== 'all' && { customerId: customerFilter }),
       ...(siteId && { siteId })
     })
   })
@@ -310,80 +417,50 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
 
   // Fetch all incidents for stats calculation (separate query to get complete data)
   const { data: allIncidentsResponse } = useQuery({
-    queryKey: ['incidents-stats', searchTerm, customerId, siteId, fromDate, toDate, incidentTypeFilter, regionFilter],
+    queryKey: ['incidents-stats', searchTerm, customerId, customerFilter, siteId, fromDate, toDate, incidentTypeFilter, regionFilter],
     queryFn: () => incidentsApi.getIncidents({
       page: 1,
-      pageSize: 1000, // Large page size to get all incidents for stats
+      pageSize: 10000,
       search: searchTerm,
       ...(fromDate && { fromDate }),
       ...(toDate && { toDate }),
       ...(incidentTypeFilter && { incidentType: incidentTypeFilter }),
       ...(regionFilter !== 'all' && { regionId: regionFilter }),
       ...(isCustomerView && customerId && { customerId }),
+      ...(!isCustomerView && customerFilter !== 'all' && { customerId: customerFilter }),
       ...(siteId && { siteId })
     })
   })
 
-  const filteredIncidents = useMemo(() => {
-    const baseData = allIncidentsResponse?.data || incidentsResponse.data
+  const statsData = allIncidentsResponse?.data?.length ? allIncidentsResponse.data : incidentsResponse.data
 
-    if (!isClientFilterActive) {
-    	return baseData
-    }
+  // Blend data flow: stats and table use the same financial metrics.
+  const incidentRows = useMemo(
+    () => incidentsResponse.data.map((incident) => ({
+      incident,
+      metrics: getIncidentFinancialMetrics(incident)
+    })),
+    [incidentsResponse.data]
+  )
 
-    const fromBoundary = fromDate ? new Date(`${fromDate}T00:00:00`) : null
-    const toBoundary = toDate ? new Date(`${toDate}T23:59:59`) : null
-
-    const selectedRegion = regions.find((region) => region.regionID.toString() === regionFilter)
-    const selectedRegionName = selectedRegion?.regionName?.toLowerCase()
-
-    return baseData.filter((incident) => {
-      if (regionFilter !== 'all') {
-        const regionIdMatches = incident?.regionId?.toString() === regionFilter
-        const regionNameMatches = selectedRegionName
-          ? (incident?.regionName || '').toLowerCase() === selectedRegionName
-          : false
-        if (!regionIdMatches && !regionNameMatches) {
-          return false
-        }
-      }
-
-      const incidentTypeValue = (incident?.incidentType || incident?.type || '').toLowerCase()
-      if (incidentTypeFilter && incidentTypeValue !== incidentTypeFilter.toLowerCase()) {
-        return false
-      }
-
-      const incidentDateValue = incident?.dateOfIncident || incident?.date
-      if (!incidentDateValue) return false
-
-      const incidentDate = new Date(incidentDateValue)
-      if (Number.isNaN(incidentDate.getTime())) return false
-
-      if (fromBoundary && incidentDate < fromBoundary) return false
-      if (toBoundary && incidentDate > toBoundary) return false
-      return true
-    })
-  }, [allIncidentsResponse?.data, incidentsResponse.data, isClientFilterActive, fromDate, toDate, incidentTypeFilter, regionFilter, regions])
-
-  // Calculate statistics using useMemo with null checks
+  // Calculate statistics using shared metrics
   const stats = useMemo(() => {
-    // Use filtered data when a date range is active
-    const statsData = isClientFilterActive
-      ? filteredIncidents
-      : allIncidentsResponse?.data || incidentsResponse.data
-    
+    const totals = statsData.reduce(
+      (acc, incident) => {
+        const metrics = getIncidentFinancialMetrics(incident)
+        acc.totalAmountRecovered += metrics.recovered
+        acc.totalAmountLost += metrics.loss
+        acc.totalNetSaved += metrics.netSaved
+        return acc
+      },
+      { totalAmountRecovered: 0, totalAmountLost: 0, totalNetSaved: 0 }
+    )
+
     return {
-      totalAmountSaved: Array.prototype.reduce.call(
-        statsData,
-        (acc: number, incident: Incident) => acc + (incident.totalValueRecovered || 0),
-        0
-      ),
-      uniqueSites: new Set(statsData.map(incident => incident?.siteName).filter(Boolean)).size,
-      totalIncidents: isClientFilterActive
-        ? filteredIncidents.length
-        : allIncidentsResponse?.pagination?.totalCount || incidentsResponse.pagination?.totalCount || statsData.length
+      ...totals,
+      totalIncidents: allIncidentsResponse?.pagination?.totalCount || incidentsResponse.pagination?.totalCount || statsData.length
     }
-  }, [allIncidentsResponse?.data, allIncidentsResponse?.pagination?.totalCount, incidentsResponse.data, incidentsResponse.pagination?.totalCount, isClientFilterActive, filteredIncidents])
+  }, [allIncidentsResponse?.pagination?.totalCount, incidentsResponse.pagination?.totalCount, statsData])
 
   const handleSubmit = useCallback((incident: Incident) => {
     mutation.mutate(incident)
@@ -409,15 +486,9 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     }
   }, [deletingIncident, deleteMutation])
 
-  const clientTotalPages = Math.max(1, Math.ceil(filteredIncidents.length / itemsPerPage))
-  const totalPages = isClientFilterActive ? clientTotalPages : incidentsResponse.pagination?.totalPages || 1
+  const totalPages = Math.max(1, incidentsResponse.pagination?.totalPages || 1)
 
-  // Update the filtered and paginated incidents
-  const paginatedIncidents = isClientFilterActive
-    ? filteredIncidents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-    : incidentsResponse.data
-
-  const hasIncidents = paginatedIncidents.length > 0
+  const hasIncidents = incidentRows.length > 0
   const isSearchActive = Boolean(searchTerm)
 
   const handlePageChange = useCallback((page: number) => {
@@ -582,7 +653,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-background to-indigo-50/30 dark:from-slate-950 dark:to-indigo-950/20 flex items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-gray-600">Loading incident data...</p>
@@ -594,8 +665,8 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
   // Error state with retry option
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-sm">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-background to-indigo-50/30 dark:from-slate-950 dark:to-indigo-950/20 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-card rounded-xl border border-border/70 shadow-sm">
           <div className="mb-4">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
           </div>
@@ -627,19 +698,19 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50">
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-background to-indigo-50/30 dark:from-slate-950 dark:to-indigo-950/20">
       <Toaster />
       <div className="container mx-auto py-3 sm:py-4 md:py-6 lg:py-8 xl:py-10 2xl:py-12 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10 2xl:px-12 max-w-screen-2xl">
         {/* Header Section */}
         <div className="flex flex-col space-y-3 sm:space-y-4 md:space-y-6 lg:space-y-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+          <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-slate-800/80 dark:bg-slate-900/85 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-3 xl:gap-4">
               <div className="bg-blue-100 p-2 xl:p-3 rounded-lg">
                 <FileText className="w-5 h-5 sm:w-6 sm:h-6 xl:w-7 xl:h-7 text-blue-600" />
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900">Incident Reports</h1>
-                <p className="text-xs sm:text-sm md:text-base xl:text-lg text-gray-500">Track and manage security incidents across all sites</p>
+                <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-foreground">Incident Reports</h1>
+                <p className="text-xs sm:text-sm md:text-base xl:text-lg text-muted-foreground">Track and manage security incidents across all sites</p>
               </div>
             </div>
             <Button
@@ -656,26 +727,37 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 xl:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 xl:gap-6">
+            <Card className="bg-gradient-to-br from-emerald-800 to-emerald-900 border-emerald-700 shadow-md col-span-1">
+              <CardHeader className="flex flex-row items-center justify-between p-2 md:p-4 xl:p-6 pb-1 md:pb-2 xl:pb-3">
+                <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Recovered Value</CardTitle>
+                <ShieldCheck className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 text-emerald-300" />
+              </CardHeader>
+              <CardContent className="p-2 md:p-4 xl:p-6 pt-0 md:pt-1 xl:pt-2">
+                <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white">£{stats.totalAmountRecovered.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-rose-800 to-rose-900 border-rose-700 shadow-md col-span-1">
+              <CardHeader className="flex flex-row items-center justify-between p-2 md:p-4 xl:p-6 pb-1 md:pb-2 xl:pb-3">
+                <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Loss Value</CardTitle>
+                <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 text-rose-300" />
+              </CardHeader>
+              <CardContent className="p-2 md:p-4 xl:p-6 pt-0 md:pt-1 xl:pt-2">
+                <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white">£{stats.totalAmountLost.toFixed(2)}</div>
+              </CardContent>
+            </Card>
             <Card className="bg-gradient-to-br from-blue-800 to-blue-900 border-blue-700 shadow-md col-span-1">
               <CardHeader className="flex flex-row items-center justify-between p-2 md:p-4 xl:p-6 pb-1 md:pb-2 xl:pb-3">
-                <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Total Amount Saved</CardTitle>
+                <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Net Saved</CardTitle>
                 <PoundSterling className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 text-blue-300" />
               </CardHeader>
               <CardContent className="p-2 md:p-4 xl:p-6 pt-0 md:pt-1 xl:pt-2">
-                <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white">£{stats.totalAmountSaved.toFixed(2)}</div>
+                <div className={`text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold ${stats.totalNetSaved < 0 ? 'text-rose-200' : 'text-white'}`}>
+                  £{stats.totalNetSaved.toFixed(2)}
+                </div>
               </CardContent>
             </Card>
-            <Card className="bg-gradient-to-br from-emerald-800 to-emerald-900 border-emerald-700 shadow-md col-span-1">
-              <CardHeader className="flex flex-row items-center justify-between p-2 md:p-4 xl:p-6 pb-1 md:pb-2 xl:pb-3">
-                <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Unique Sites</CardTitle>
-                <Store className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 text-emerald-300" />
-              </CardHeader>
-              <CardContent className="p-2 md:p-4 xl:p-6 pt-0 md:pt-1 xl:pt-2">
-                <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white">{stats.uniqueSites}</div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-purple-800 to-purple-900 border-purple-700 shadow-md col-span-2 md:col-span-1">
+            <Card className="bg-gradient-to-br from-purple-800 to-purple-900 border-purple-700 shadow-md col-span-1">
               <CardHeader className="flex flex-row items-center justify-between p-2 md:p-4 xl:p-6 pb-1 md:pb-2 xl:pb-3">
                 <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Total Incidents</CardTitle>
                 <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 text-purple-300" />
@@ -688,9 +770,9 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
         </div>
 
         {/* Table Section */}
-        <div className="mt-3 sm:mt-4 md:mt-6 lg:mt-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="mt-3 sm:mt-4 md:mt-6 lg:mt-8 rounded-2xl border border-border/70 bg-card/95 shadow-sm overflow-hidden">
           {/* Search Bar */}
-          <div className="p-3 sm:p-4 md:p-6 border-b border-gray-200 space-y-4">
+          <div className="p-3 sm:p-4 md:p-6 border-b border-border/70 bg-muted/20 space-y-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 <Button
@@ -733,13 +815,30 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                   size="sm"
                   onClick={handleClearFilters}
                   className="h-9 text-xs sm:text-sm"
-                  disabled={!isDateRangeActive && !datePreset && !isIncidentTypeFilterActive && !isRegionFilterActive}
+                  disabled={!isDateRangeActive && !datePreset && !isIncidentTypeFilterActive && !isRegionFilterActive && !isCustomerFilterActive}
                 >
                   Clear
                 </Button>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full lg:w-auto">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 w-full lg:w-auto">
+                {!isCustomerView && (
+                  <Select value={customerFilter} onValueChange={(value) => {
+                    setCustomerFilter(value)
+                    setCurrentPage(1)
+                  }}>
+                    <SelectTrigger className="h-9 text-xs sm:text-sm w-full sm:w-[220px]">
+                      <SelectValue placeholder={isLoadingCustomers ? 'Loading customers...' : 'All customers'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customerOptions.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <Select value={regionFilter} onValueChange={(value) => {
                   setRegionFilter(value)
                   setCurrentPage(1)
@@ -756,19 +855,19 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="flex flex-col sm:flex-row gap-2 w-full">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                   <Input
                     type="date"
                     value={fromDateInput}
                     onChange={(e) => setFromDateInput(e.target.value)}
-                    className="h-9 text-xs sm:text-sm"
+                    className="h-9 text-xs sm:text-sm w-full sm:w-[170px]"
                     aria-label="Filter from date"
                   />
                   <Input
                     type="date"
                     value={toDateInput}
                     onChange={(e) => setToDateInput(e.target.value)}
-                    className="h-9 text-xs sm:text-sm"
+                    className="h-9 text-xs sm:text-sm w-full sm:w-[170px]"
                     aria-label="Filter to date"
                   />
                 </div>
@@ -788,7 +887,10 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
               <Input
                 placeholder="Search incidents..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setCurrentPage(1)
+                }}
                 className="pl-9 xl:pl-10 border-gray-300 text-sm xl:text-base xl:h-12"
               />
             </div>
@@ -846,7 +948,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
           {/* Mobile Card Layout - visible only on small screens */}
           {hasIncidents && (
             <div className="block md:hidden p-3 space-y-3">
-              {paginatedIncidents.map((incident) => (
+              {incidentRows.map(({ incident, metrics }) => (
                 <div key={incident.id} className="rounded-lg border bg-white shadow-sm p-4 space-y-3">
                   {/* Header with customer and amount */}
                   <div className="flex items-start justify-between gap-2">
@@ -855,21 +957,17 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                       <div className="text-xs text-gray-500 mt-0.5 truncate">{incident.siteName}</div>
                     </div>
                     <div className="text-right flex-shrink-0">
+                      <div className="text-[10px] uppercase tracking-wide text-gray-500">Recovered</div>
                       <div className="font-semibold text-sm text-green-600">
-                        £{(() => {
-                          const value = incident?.totalValueRecovered
-                          if (typeof value === 'number' && !isNaN(value)) {
-                            return value.toFixed(2)
-                          }
-                          if (Array.isArray(incident?.stolenItems) && incident.stolenItems.length > 0) {
-                            const total = incident.stolenItems.reduce(
-                              (sum, item) => sum + (typeof item?.totalAmount === 'number' ? item.totalAmount : 0),
-                              0
-                            )
-                            return total.toFixed(2)
-                          }
-                          return '0.00'
-                        })()}
+                        £{metrics.recovered.toFixed(2)}
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wide text-gray-500 mt-1">Loss</div>
+                      <div className="font-semibold text-sm text-rose-600">
+                        £{metrics.loss.toFixed(2)}
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wide text-gray-500 mt-1">Net</div>
+                      <div className={`font-semibold text-sm ${metrics.netSaved < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        £{metrics.netSaved.toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -927,56 +1025,42 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
           {/* Desktop Table Layout - visible on medium screens and above */}
           {hasIncidents && (
             <div className="hidden md:block overflow-x-auto">
-              <div className="min-w-[480px]">
-                <Table>
+                <Table className="w-full min-w-[760px]">
                   <TableHeader>
                     <TableRow className="bg-gray-50 hover:bg-gray-50">
-                      <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4 whitespace-nowrap">Customer Name</TableHead>
-                      <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4 whitespace-nowrap">Site Name</TableHead>
-                      <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4 whitespace-nowrap">Officer Name</TableHead>
+                      <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4">Customer Name</TableHead>
+                      <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4">Site Name</TableHead>
+                      <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4">Officer Name</TableHead>
                       <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4 whitespace-nowrap hidden lg:table-cell">
                         <div className="flex items-center gap-2 xl:gap-3">
                           <Calendar className="w-4 h-4 xl:w-5 xl:h-5 text-gray-500" />
                           <span>Incident Date</span>
                         </div>
                       </TableHead>
-                      <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4 whitespace-nowrap">Total Amount</TableHead>
+                      <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4 whitespace-nowrap">Recovered</TableHead>
+                      <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4 whitespace-nowrap">Loss</TableHead>
                       <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4 whitespace-nowrap hidden lg:table-cell">Incident Type</TableHead>
                       <TableHead className="font-medium text-sm lg:text-base xl:text-lg text-gray-900 py-3 xl:py-4 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedIncidents.map((incident) => (
+                    {incidentRows.map(({ incident, metrics }) => (
                       <TableRow 
                         key={incident.id}
                         className="hover:bg-gray-50 transition-colors text-sm lg:text-base xl:text-lg"
                       >
-                        <TableCell className="py-3 xl:py-4 font-medium whitespace-nowrap">
+                        <TableCell className="py-3 xl:py-4 font-medium">
                           {incident.customerName || 'N/A'}
                         </TableCell>
-                        <TableCell className="py-3 xl:py-4 font-medium whitespace-nowrap">
+                        <TableCell className="py-3 xl:py-4 font-medium">
                           {incident.siteName}
                         </TableCell>
-                        <TableCell className="py-3 xl:py-4 whitespace-nowrap">{incident.officerName || 'N/A'}</TableCell>
+                        <TableCell className="py-3 xl:py-4">{incident.officerName || 'N/A'}</TableCell>
                         <TableCell className="py-3 xl:py-4 hidden lg:table-cell whitespace-nowrap">
                           {incident.date ? new Date(incident.date).toLocaleDateString() : 'N/A'}
                         </TableCell>
-                        <TableCell className="py-3 xl:py-4 whitespace-nowrap">
-                          £{(() => {
-                            const value = incident?.totalValueRecovered
-                            if (typeof value === 'number' && !isNaN(value)) {
-                              return value.toFixed(2)
-                            }
-                            if (Array.isArray(incident?.stolenItems) && incident.stolenItems.length > 0) {
-                              const total = incident.stolenItems.reduce(
-                                (sum, item) => sum + (typeof item?.totalAmount === 'number' ? item.totalAmount : 0),
-                                0
-                              )
-                              return total.toFixed(2)
-                            }
-                            return '0.00'
-                          })()}
-                        </TableCell>
+                        <TableCell className="py-3 xl:py-4 whitespace-nowrap text-emerald-600 font-medium">£{metrics.recovered.toFixed(2)}</TableCell>
+                        <TableCell className="py-3 xl:py-4 whitespace-nowrap text-rose-600 font-medium">£{metrics.loss.toFixed(2)}</TableCell>
                         <TableCell className="py-3 xl:py-4 hidden lg:table-cell whitespace-nowrap">{incident.incidentType}</TableCell>
                         <TableCell className="py-3 xl:py-4">
                           <div className="flex items-center justify-end gap-2 xl:gap-3">
@@ -1013,7 +1097,6 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                     ))}
                   </TableBody>
                 </Table>
-              </div>
             </div>
           )}
         </div>
@@ -1093,7 +1176,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
           }
         }}
       >
-        <DialogContent className="w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-[95vw] sm:max-w-[92vw] md:max-w-[90vw] lg:max-w-[90vw] xl:max-w-[85vw] 2xl:max-w-[80vw] h-[90vh] p-0 bg-white">
+        <DialogContent className="w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-[95vw] sm:max-w-[92vw] md:max-w-[90vw] lg:max-w-[90vw] xl:max-w-[85vw] 2xl:max-w-[80vw] max-h-[90dvh] h-[90vh] p-0 bg-white">
           <DialogHeader className="px-4 py-3 border-b bg-white">
             <DialogTitle className="text-xl font-bold">
               {editingIncident ? 'Edit Incident Report' : 'New Incident Report'}
@@ -1124,7 +1207,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
         open={!!viewingIncident} 
         onOpenChange={(isOpen) => !isOpen && setViewingIncident(null)}
       >
-        <DialogContent className="w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-[95vw] sm:max-w-[92vw] md:max-w-[90vw] lg:max-w-[90vw] xl:max-w-[85vw] 2xl:max-w-[80vw] h-[90vh] p-0">
+        <DialogContent className="w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-[95vw] sm:max-w-[92vw] md:max-w-[90vw] lg:max-w-[90vw] xl:max-w-[85vw] 2xl:max-w-[80vw] max-h-[90dvh] h-[90vh] p-0">
           <DialogHeader className="px-4 py-3 border-b">
             <DialogTitle className="text-xl font-bold">View Incident Details</DialogTitle>
             <DialogDescription className="text-sm text-gray-500">
@@ -1195,9 +1278,13 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                       <div>
                         <label className="text-sm font-medium text-gray-500">Total Value Recovered</label>
                         <p className="mt-1 text-sm text-gray-900">
-                          £{typeof viewingIncident.totalValueRecovered === 'number' && !isNaN(viewingIncident.totalValueRecovered)
-                            ? viewingIncident.totalValueRecovered.toFixed(2)
-                            : '0.00'}
+                          £{getIncidentRecoveredValue(viewingIncident).toFixed(2)}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Total Value Lost</label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          £{getIncidentLossValue(viewingIncident).toFixed(2)}
                         </p>
                       </div>
                     </div>

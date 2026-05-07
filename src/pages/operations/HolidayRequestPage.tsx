@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { format, addDays, addWeeks, differenceInDays, addYears, isBefore, differenceInBusinessDays } from 'date-fns';
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { format, addDays, differenceInDays, differenceInBusinessDays } from 'date-fns';
 import {
   Table,
   TableBody,
@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
   SelectContent,
@@ -39,15 +38,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { employeeService } from '@/services/employeeService';
+import { userService } from '@/services/userService';
 import type { Employee } from '@/types/employee';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { CalendarIcon, Archive, ArchiveRestore } from "lucide-react";
 import { Pencil, Trash2, Eye, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -79,13 +74,33 @@ import { usePageAccess } from '@/contexts/PageAccessContext'
 const getStatusBadgeClass = (status: 'pending' | 'approved' | 'denied') => {
   switch (status) {
     case 'approved':
-      return "bg-green-100 text-green-800";
+      return "border border-emerald-200 bg-emerald-50 text-emerald-700";
     case 'denied':
-      return "bg-red-100 text-red-800";
+      return "border border-rose-200 bg-rose-50 text-rose-700";
     case 'pending':
     default:
-      return "bg-yellow-100 text-yellow-800";
+      return "border border-amber-200 bg-amber-50 text-amber-700";
   }
+};
+
+const formatDisplayDate = (value: Date | string) => format(new Date(value), 'dd MMM yyyy');
+
+const formatDateForInput = (date?: Date | null) => {
+  if (!date) return '';
+  const dateValue = new Date(date);
+  if (Number.isNaN(dateValue.getTime())) return '';
+  const year = dateValue.getFullYear();
+  const month = String(dateValue.getMonth() + 1).padStart(2, '0');
+  const day = String(dateValue.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateInput = (value: string) => {
+  if (!value) return undefined;
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
 };
 
 const formSchema = z.object({
@@ -173,14 +188,26 @@ export default function HolidayRequestPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
-  const [startDateOpen, setStartDateOpen] = useState(false);
-  const [endDateOpen, setEndDateOpen] = useState(false);
-  const [returnDateOpen, setReturnDateOpen] = useState(false);
+  const [managerOptions, setManagerOptions] = useState<Array<{ id: string; label: string }>>([]);
+  const [isLoadingManagers, setIsLoadingManagers] = useState(false);
+  const [selectedAuthorisingManagerId, setSelectedAuthorisingManagerId] = useState("");
   const { currentRole } = usePageAccess();
   const itemsPerPage = 10;
   const { toast } = useToast();
 
   const isAdminRole = currentRole && ['administrator', 'admin'].includes(currentRole.toLowerCase());
+
+  const resolveManagerByAuthorisedBy = useCallback((authorisedBy?: string | null) => {
+    if (!authorisedBy) {
+      return undefined
+    }
+
+    const normalizedValue = authorisedBy.trim().toLowerCase()
+    return managerOptions.find((manager) => (
+      manager.id.toLowerCase() === normalizedValue ||
+      manager.label.trim().toLowerCase() === normalizedValue
+    ))
+  }, [managerOptions])
 
   // Fetch employees
   const fetchEmployees = async () => {
@@ -204,6 +231,57 @@ export default function HolidayRequestPage() {
   useEffect(() => {
     fetchEmployees();
   }, []);
+
+  // Fetch manager users for approval flow
+  useEffect(() => {
+    const fetchManagers = async () => {
+      try {
+        setIsLoadingManagers(true);
+        const response = await userService.getUsers({
+          page: 1,
+          pageSize: 250,
+        });
+
+        const managers = response.data
+          .filter((user) => {
+            const role = user.role?.toLowerCase();
+            return role === 'manager' || role === 'administrator';
+          })
+          .map((user) => {
+          const firstName = user.firstName?.trim();
+          const lastName = user.lastName?.trim();
+          const fullName = `${firstName || ''} ${lastName || ''}`.trim();
+
+          return {
+            id: user.id,
+            label: fullName || user.username || user.email
+          };
+        });
+
+        setManagerOptions(managers);
+      } catch (error) {
+        console.error('Error fetching managers:', error);
+        setManagerOptions([]);
+        toast({
+          title: "Error",
+          description: "Failed to load authorising managers.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoadingManagers(false);
+      }
+    };
+
+    void fetchManagers();
+  }, [toast]);
+
+  useEffect(() => {
+    if (!viewingRequest) return;
+    const matchedManager = resolveManagerByAuthorisedBy(viewingRequest.authorisedBy);
+    if (matchedManager) {
+      setSelectedAuthorisingManagerId(matchedManager.id);
+    }
+  }, [managerOptions, resolveManagerByAuthorisedBy, viewingRequest]);
 
   // Fetch holiday requests
   const fetchRequests = async () => {
@@ -291,6 +369,27 @@ export default function HolidayRequestPage() {
 
   const startDate = form.watch("startDate");
   const endDate = form.watch("endDate");
+  const minStartDate = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return addDays(today, 60);
+  }, []);
+  const maxEndDate = startDate ? addDays(startDate, 14) : undefined;
+  const minReturnDate = endDate ? addDays(endDate, 1) : undefined;
+  const maxReturnDate = startDate ? addDays(startDate, 17) : undefined;
+
+  const isStartDateValidForPicker = (value: Date) => value >= minStartDate;
+
+  const isEndDateValidForPicker = (value: Date, start: Date) => {
+    const maxDate = addDays(start, 14);
+    return value >= start && value <= maxDate;
+  };
+
+  const isReturnDateValidForPicker = (value: Date, start: Date, end: Date) => {
+    const minDate = addDays(end, 1);
+    const maxDate = addDays(start, 17);
+    return value >= minDate && value <= maxDate;
+  };
 
   useEffect(() => {
     if (editingRequest) {
@@ -311,15 +410,14 @@ export default function HolidayRequestPage() {
   const handleCreateRequest = () => {
     setEditingRequest(null);
     form.reset();
-    setStartDateOpen(false);
-    setEndDateOpen(false);
-    setReturnDateOpen(false);
     setIsDialogOpen(true);
   };
 
   // View Holiday Request
   const handleViewRequest = (request: HolidayRequest) => {
     setViewingRequest(request);
+    const matchedManager = resolveManagerByAuthorisedBy(request.authorisedBy);
+    setSelectedAuthorisingManagerId(matchedManager?.id || "");
     setIsViewDialogOpen(true);
   };
 
@@ -336,9 +434,6 @@ export default function HolidayRequestPage() {
       status: request.status,
       comment: request.comment,
     });
-    setStartDateOpen(false);
-    setEndDateOpen(false);
-    setReturnDateOpen(false);
     setIsDialogOpen(true);
   };
 
@@ -475,9 +570,6 @@ export default function HolidayRequestPage() {
       setIsDialogOpen(false);
       setEditingRequest(null);
       form.reset();
-      setStartDateOpen(false);
-      setEndDateOpen(false);
-      setReturnDateOpen(false);
     } catch (error: any) {
       const errorDetails = {
         error,
@@ -583,10 +675,9 @@ export default function HolidayRequestPage() {
 
         {/* Table with search bar positioned above it */}
         <div className="mt-3 sm:mt-4 lg:mt-6 xl:mt-8 space-y-2 sm:space-y-3 xl:space-y-4">
-          {/* Search positioned above table */}
-          <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 xl:gap-4">
+          <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-4">
-              <h3 className="text-sm sm:text-base xl:text-lg font-medium text-gray-800">Holiday Request Records</h3>
+              <h3 className="text-sm font-semibold text-slate-800 sm:text-base xl:text-lg">Holiday Request Records</h3>
               {isAdminRole && (
                 <Button
                   type="button"
@@ -596,7 +687,7 @@ export default function HolidayRequestPage() {
                     setShowArchived(!showArchived);
                     setCurrentPage(1);
                   }}
-                  className="h-7 xs:h-8 text-[10px] xs:text-xs"
+                  className="h-7 border-slate-300 text-[10px] xs:h-8 xs:text-xs"
                 >
                   {showArchived ? 'Show Active' : 'Show Archived'}
                 </Button>
@@ -611,7 +702,7 @@ export default function HolidayRequestPage() {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="pl-8 h-8 sm:h-9 xl:h-12 text-xs sm:text-sm xl:text-base w-full"
+                className="h-8 w-full border-slate-300 pl-8 text-xs sm:h-9 sm:text-sm xl:h-11 xl:text-base"
               />
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 xl:h-5 xl:w-5 text-gray-400" />
               {searchTerm && (
@@ -633,19 +724,132 @@ export default function HolidayRequestPage() {
           </div>
 
           {/* Table itself */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto -mx-1 sm:mx-0">
-              <div className="min-w-[300px] max-w-full px-1 sm:px-0">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <div className="space-y-2 p-2 sm:hidden">
+                {isLoading ? (
+                  <div className="flex min-h-[140px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-purple-600"></div>
+                      <p className="text-xs text-gray-500">Loading holiday requests...</p>
+                    </div>
+                  </div>
+                ) : filteredRequests.length === 0 ? (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center">
+                    <p className="text-xs text-gray-500">No holiday requests found matching your search</p>
+                  </div>
+                ) : (
+                  paginatedRequests.map((request) => (
+                    <div key={`mobile-${request.id}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-800">{request.officerName}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">Req ID: {request.id.slice(0, 8)}</p>
+                        </div>
+                        <span
+                          className={cn(
+                            'inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium',
+                            getStatusBadgeClass(request.status)
+                          )}
+                        >
+                          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                        </span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-slate-400">Start</p>
+                          <p className="font-medium text-slate-700">{formatDisplayDate(request.startDate)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-slate-400">End</p>
+                          <p className="font-medium text-slate-700">{formatDisplayDate(request.endDate)}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setViewingRequest(request);
+                            setIsViewDialogOpen(true);
+                          }}
+                          className="h-7 w-7 p-0 text-purple-600 hover:bg-purple-50 hover:text-purple-700 border-purple-200"
+                          title="View Details"
+                          disabled={isLoading}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          <span className="sr-only">View</span>
+                        </Button>
+                        {!request.archived && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingRequest(request);
+                              setIsDialogOpen(true);
+                            }}
+                            className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700 border-blue-200"
+                            title="Edit Request"
+                            disabled={isLoading}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            <span className="sr-only">Edit</span>
+                          </Button>
+                        )}
+                        {isAdminRole && !request.archived && (request.status === 'approved' || request.status === 'denied') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleArchiveRequest(request.id)}
+                            className="h-7 w-7 p-0 text-orange-600 hover:bg-orange-50 hover:text-orange-700 border-orange-200"
+                            title="Archive Request"
+                            disabled={isLoading}
+                          >
+                            <Archive className="h-3.5 w-3.5" />
+                            <span className="sr-only">Archive</span>
+                          </Button>
+                        )}
+                        {isAdminRole && request.archived && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnarchiveRequest(request.id)}
+                            className="h-7 w-7 p-0 text-green-600 hover:bg-green-50 hover:text-green-700 border-green-200"
+                            title="Unarchive Request"
+                            disabled={isLoading}
+                          >
+                            <ArchiveRestore className="h-3.5 w-3.5" />
+                            <span className="sr-only">Unarchive</span>
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteClick(request.id)}
+                          className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                          title="Delete Request"
+                          disabled={isLoading}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden w-full min-w-0 max-w-full sm:block">
                 <Table className="w-full table-auto">
                   <TableHeader>
-                    <TableRow className="bg-gray-50 hover:bg-gray-50">
-                      <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4">Officer</TableHead>
-                      <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap hidden sm:table-cell">Date Requested</TableHead>
-                      <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap">Start Date</TableHead>
-                      <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap hidden xs:table-cell">End Date</TableHead>
-                      <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap hidden md:table-cell">Return Date</TableHead>
-                      <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4">Status</TableHead>
-                      <TableHead className="font-medium text-[10px] sm:text-xs lg:text-sm xl:text-base text-gray-900 py-1.5 sm:py-2 md:py-3 xl:py-4 w-[90px] lg:w-[120px] xl:w-[150px] text-right">Actions</TableHead>
+                    <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+                      <TableHead className="py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:text-xs lg:text-sm">Officer</TableHead>
+                      <TableHead className="hidden whitespace-nowrap py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:table-cell sm:text-xs lg:text-sm">Date Requested</TableHead>
+                      <TableHead className="whitespace-nowrap py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:text-xs lg:text-sm">Start Date</TableHead>
+                      <TableHead className="hidden whitespace-nowrap py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 xs:table-cell sm:text-xs lg:text-sm">End Date</TableHead>
+                      <TableHead className="hidden whitespace-nowrap py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 md:table-cell sm:text-xs lg:text-sm">Return Date</TableHead>
+                      <TableHead className="py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:text-xs lg:text-sm">Status</TableHead>
+                      <TableHead className="w-[120px] py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:text-xs lg:w-[140px] lg:text-sm xl:w-[160px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -673,31 +877,33 @@ export default function HolidayRequestPage() {
                       </TableRow>
                     ) : (
                       paginatedRequests.map((request) => (
-                        <TableRow key={request.id} className="hover:bg-gray-50 transition-colors text-[10px] sm:text-xs lg:text-sm xl:text-base">
+                        <TableRow key={request.id} className="text-[10px] transition-colors odd:bg-white even:bg-slate-50/30 hover:bg-purple-50/40 sm:text-xs lg:text-sm xl:text-base">
                           <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4">
-                            <div className="font-medium text-[11px] sm:text-sm xl:text-base text-purple-700">
+                            <div className="text-[11px] font-semibold text-slate-800 sm:text-sm xl:text-base">
                               {request.officerName}
                             </div>
-                            {/* Mobile view extras */}
-                            <div className="xs:hidden text-[9px] lg:text-xs xl:text-sm text-gray-500 mt-0.5">
-                              Ends: {format(request.endDate, 'dd/MM/yyyy')}
+                            <div className="mt-0.5 text-[9px] text-slate-500 lg:text-xs xl:text-sm">
+                              Req ID: {request.id.slice(0, 8)}
+                            </div>
+                            <div className="xs:hidden text-[9px] text-slate-500 lg:text-xs xl:text-sm">
+                              Ends: {formatDisplayDate(request.endDate)}
                             </div>
                           </TableCell>
                           <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4 hidden sm:table-cell whitespace-nowrap">
-                            {format(request.dateOfRequest, 'dd/MM/yyyy')}
+                            {formatDisplayDate(request.dateOfRequest)}
                           </TableCell>
                           <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap">
-                            {format(request.startDate, 'dd/MM/yyyy')}
+                            {formatDisplayDate(request.startDate)}
                           </TableCell>
                           <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap hidden xs:table-cell">
-                            {format(request.endDate, 'dd/MM/yyyy')}
+                            {formatDisplayDate(request.endDate)}
                           </TableCell>
                           <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4 whitespace-nowrap hidden md:table-cell">
-                            {format(request.returnToWorkDate, 'dd/MM/yyyy')}
+                            {formatDisplayDate(request.returnToWorkDate)}
                           </TableCell>
                           <TableCell className="py-1.5 sm:py-2 md:py-3 xl:py-4">
                             <span className={cn(
-                              "inline-flex px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-xs lg:text-sm xl:text-base font-medium",
+                              "inline-flex rounded-full px-2 py-0.5 text-[9px] font-medium sm:text-xs lg:text-sm xl:text-base",
                               getStatusBadgeClass(request.status)
                             )}>
                               {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
@@ -785,8 +991,8 @@ export default function HolidayRequestPage() {
 
           {/* Pagination */}
           {filteredRequests.length > 0 && (
-            <div className="flex justify-between items-center text-[10px] sm:text-xs xl:text-sm text-gray-500 pt-1 sm:pt-2 xl:pt-4">
-              <div>
+            <div className="flex items-center justify-between pt-1 text-[10px] text-slate-500 sm:pt-2 sm:text-xs xl:pt-4 xl:text-sm">
+              <div className="rounded-md border border-slate-200 bg-white px-2 py-1">
                 Showing {paginatedRequests.length} of {filteredRequests.length} records
               </div>
               
@@ -866,14 +1072,7 @@ export default function HolidayRequestPage() {
       </div>
 
       {/* Create/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={(open) => {
-        setIsDialogOpen(open);
-        if (!open) {
-          setStartDateOpen(false);
-          setEndDateOpen(false);
-          setReturnDateOpen(false);
-        }
-      }}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="w-[90%] xs:w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] md:max-w-[700px] mx-auto p-3 xs:p-4 sm:p-6 space-y-4 sm:space-y-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader className="space-y-2 sm:space-y-3">
             <DialogTitle className="text-base xs:text-lg sm:text-xl font-semibold text-gray-900">
@@ -936,63 +1135,34 @@ export default function HolidayRequestPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-col space-y-1.5 sm:space-y-2">
                       <FormLabel className="text-xs sm:text-sm font-medium text-gray-700">Start Date</FormLabel>
-                      <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              type="button"
-                              variant={"outline"}
-                              className={cn(
-                                "h-8 xs:h-9 sm:h-10 w-full pl-3 text-left font-normal text-xs sm:text-sm",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? format(field.value, "PPP") : "Select date"}
-                              <CalendarIcon className="ml-auto h-3 w-3 xs:h-4 xs:w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 max-w-[calc(100vw-2rem)]" align="start">
-                          <div className="p-2 xs:p-3 border-b border-gray-100">
-                            <h4 className="text-xs sm:text-sm font-medium text-gray-900">Select Start Date</h4>
-                            <p className="text-[10px] xs:text-xs text-gray-500 mt-0.5 xs:mt-1">Must be at least 60 days from booking date</p>
-                          </div>
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={(date) => {
-                              if (date) {
-                                const normalizedDate = new Date(date);
-                                normalizedDate.setHours(0, 0, 0, 0);
-                                field.onChange(normalizedDate);
-                                form.setValue('endDate', undefined);
-                                form.setValue('returnToWorkDate', undefined);
-                                setStartDateOpen(false);
-                              }
-                            }}
-                            initialFocus
-                            modifiers={{
-                              disabled: (date) => {
-                                // Disable dates before 60 days from today (booking date)
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-                                const dateToCheck = new Date(date);
-                                dateToCheck.setHours(0, 0, 0, 0);
-                                const minDate = addDays(today, 60);
-                                return isBefore(dateToCheck, minDate);
-                              }
-                            }}
-                            modifiersStyles={{
-                              disabled: { 
-                                color: '#DC2626',
-                                textDecoration: 'line-through',
-                                backgroundColor: '#FEE2E2',
-                                opacity: '0.6'
-                              }
-                            }}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          className="h-8 xs:h-9 sm:h-10 text-xs sm:text-sm"
+                          min={formatDateForInput(minStartDate)}
+                          value={formatDateForInput(field.value)}
+                          onChange={(event) => {
+                            const selectedDate = parseDateInput(event.target.value);
+                            if (!selectedDate) {
+                              field.onChange(undefined);
+                              return;
+                            }
+
+                            if (!isStartDateValidForPicker(selectedDate)) {
+                              form.setError("startDate", {
+                                type: "manual",
+                                message: "Start date must be at least 60 days from the booking date"
+                              });
+                              return;
+                            }
+
+                            form.clearErrors("startDate");
+                            field.onChange(selectedDate);
+                            form.setValue('endDate', undefined);
+                            form.setValue('returnToWorkDate', undefined);
+                          }}
+                        />
+                      </FormControl>
                       <FormDescription className="text-[10px] xs:text-xs text-gray-500">
                         Select a start date for your leave period
                       </FormDescription>
@@ -1008,69 +1178,35 @@ export default function HolidayRequestPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-col space-y-1.5 sm:space-y-2">
                       <FormLabel className="text-xs sm:text-sm font-medium text-gray-700">End Date</FormLabel>
-                      <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              type="button"
-                              variant={"outline"}
-                              className={cn(
-                                "h-8 xs:h-9 sm:h-10 w-full pl-3 text-left font-normal text-xs sm:text-sm",
-                                !field.value && "text-muted-foreground"
-                              )}
-                              disabled={!startDate}
-                            >
-                              {field.value ? format(field.value, "PPP") : "Select date"}
-                              <CalendarIcon className="ml-auto h-3 w-3 xs:h-4 xs:w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 max-w-[calc(100vw-2rem)]" align="start">
-                          <div className="p-2 xs:p-3 border-b border-gray-100">
-                            <h4 className="text-xs sm:text-sm font-medium text-gray-900">Select End Date</h4>
-                            <p className="text-[10px] xs:text-xs text-gray-500 mt-0.5 xs:mt-1">Must be within 14 days of start date</p>
-                          </div>
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={(date) => {
-                              if (date) {
-                                const normalizedDate = new Date(date);
-                                normalizedDate.setHours(0, 0, 0, 0);
-                                field.onChange(normalizedDate);
-                                form.setValue('returnToWorkDate', undefined);
-                                setEndDateOpen(false);
-                              }
-                            }}
-                            initialFocus
-                            modifiers={{
-                              disabled: (date) => {
-                                const startDate = form.getValues("startDate");
-                                if (!startDate) return true;
-                                
-                                const start = new Date(startDate);
-                                start.setHours(0, 0, 0, 0);
-                                const dateToCheck = new Date(date);
-                                dateToCheck.setHours(0, 0, 0, 0);
-                                const maxDate = addDays(start, 14);
-                                
-                                // Disable dates before start date or after 14 days from start date (inclusive of 14th day)
-                                // isBefore(dateToCheck, start) - disables dates before start
-                                // dateToCheck > maxDate - disables dates after maxDate (more than 14 days)
-                                return isBefore(dateToCheck, start) || dateToCheck > maxDate;
-                              }
-                            }}
-                            modifiersStyles={{
-                              disabled: { 
-                                color: '#DC2626',
-                                textDecoration: 'line-through',
-                                backgroundColor: '#FEE2E2',
-                                opacity: '0.6'
-                              }
-                            }}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          className="h-8 xs:h-9 sm:h-10 text-xs sm:text-sm"
+                          disabled={!startDate}
+                          min={startDate ? formatDateForInput(startDate) : undefined}
+                          max={maxEndDate ? formatDateForInput(maxEndDate) : undefined}
+                          value={formatDateForInput(field.value)}
+                          onChange={(event) => {
+                            const selectedDate = parseDateInput(event.target.value);
+                            if (!selectedDate) {
+                              field.onChange(undefined);
+                              return;
+                            }
+
+                            if (!startDate || !isEndDateValidForPicker(selectedDate, startDate)) {
+                              form.setError("endDate", {
+                                type: "manual",
+                                message: "End date must be on or after start date and within 14 days maximum"
+                              });
+                              return;
+                            }
+
+                            form.clearErrors("endDate");
+                            field.onChange(selectedDate);
+                            form.setValue('returnToWorkDate', undefined);
+                          }}
+                        />
+                      </FormControl>
                       <FormDescription className="text-[10px] xs:text-xs text-gray-500">
                         Select the last day of your leave period
                       </FormDescription>
@@ -1087,73 +1223,34 @@ export default function HolidayRequestPage() {
                 render={({ field }) => (
                   <FormItem className="flex flex-col space-y-1.5 sm:space-y-2">
                     <FormLabel className="text-xs sm:text-sm font-medium text-gray-700">Return to Work Date</FormLabel>
-                    <Popover open={returnDateOpen} onOpenChange={setReturnDateOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            type="button"
-                            variant={"outline"}
-                            className={cn(
-                              "h-8 xs:h-9 sm:h-10 w-full pl-3 text-left font-normal text-xs sm:text-sm",
-                              !field.value && "text-muted-foreground"
-                            )}
-                            disabled={!endDate}
-                          >
-                            {field.value ? format(field.value, "PPP") : "Select date"}
-                            <CalendarIcon className="ml-auto h-3 w-3 xs:h-4 xs:w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 max-w-[calc(100vw-2rem)]" align="start">
-                        <div className="p-2 xs:p-3 border-b border-gray-100">
-                          <h4 className="text-xs sm:text-sm font-medium text-gray-900">Select Return Date</h4>
-                          <p className="text-[10px] xs:text-xs text-gray-500 mt-0.5 xs:mt-1">Must be at least 1 day after end date, max 17 days from start (14 days + 3 day buffer)</p>
-                        </div>
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={(date) => {
-                            if (date) {
-                              const normalizedDate = new Date(date);
-                              normalizedDate.setHours(0, 0, 0, 0);
-                              field.onChange(normalizedDate);
-                              setReturnDateOpen(false);
-                            }
-                          }}
-                          initialFocus
-                          modifiers={{
-                            disabled: (date) => {
-                              const startDate = form.getValues("startDate");
-                              const endDate = form.getValues("endDate");
-                              if (!startDate || !endDate) return true;
-                              
-                              const start = new Date(startDate);
-                              start.setHours(0, 0, 0, 0);
-                              const end = new Date(endDate);
-                              end.setHours(0, 0, 0, 0);
-                              const dateToCheck = new Date(date);
-                              dateToCheck.setHours(0, 0, 0, 0);
-                              
-                              // Must be at least 1 day after end date
-                              const minDate = addDays(end, 1);
-                              // Can add up to 3 days to the 14-day window (start + 17 days max)
-                              const maxDate = addDays(start, 17);
-                              
-                              // Disable dates before minDate (1 day after end) or after maxDate (start + 17 days)
-                              return isBefore(dateToCheck, minDate) || dateToCheck > maxDate;
-                            }
-                          }}
-                          modifiersStyles={{
-                            disabled: { 
-                              color: '#DC2626',
-                              textDecoration: 'line-through',
-                              backgroundColor: '#FEE2E2',
-                              opacity: '0.6'
-                            }
-                          }}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className="h-8 xs:h-9 sm:h-10 text-xs sm:text-sm"
+                        disabled={!endDate}
+                        min={minReturnDate ? formatDateForInput(minReturnDate) : undefined}
+                        max={maxReturnDate ? formatDateForInput(maxReturnDate) : undefined}
+                        value={formatDateForInput(field.value)}
+                        onChange={(event) => {
+                          const selectedDate = parseDateInput(event.target.value);
+                          if (!selectedDate) {
+                            field.onChange(undefined);
+                            return;
+                          }
+
+                          if (!startDate || !endDate || !isReturnDateValidForPicker(selectedDate, startDate, endDate)) {
+                            form.setError("returnToWorkDate", {
+                              type: "manual",
+                              message: "Return date must be at least one day after end date and within 17 days from start date"
+                            });
+                            return;
+                          }
+
+                          form.clearErrors("returnToWorkDate");
+                          field.onChange(selectedDate);
+                        }}
+                      />
+                    </FormControl>
                     <FormDescription className="text-[10px] xs:text-xs text-gray-500">
                       Select the date you plan to return to work
                     </FormDescription>
@@ -1210,9 +1307,6 @@ export default function HolidayRequestPage() {
                   onClick={() => {
                     setIsDialogOpen(false);
                     form.reset();
-                    setStartDateOpen(false);
-                    setEndDateOpen(false);
-                    setReturnDateOpen(false);
                   }}
                   className="h-8 xs:h-9 text-xs sm:text-sm"
                   disabled={isSubmitting}
@@ -1297,9 +1391,15 @@ export default function HolidayRequestPage() {
                 </div>
                 <div className="col-span-2">
                   <h4 className="text-[10px] xs:text-xs font-medium text-gray-500">Authorised By</h4>
+                  {(() => {
+                    const managerFromAuthorisedBy = resolveManagerByAuthorisedBy(viewingRequest.authorisedBy)
+                    const authorisedByDisplay = managerFromAuthorisedBy?.label || viewingRequest.authorisedBy || 'Not authorised yet'
+                    return (
                   <p className="text-xs sm:text-sm text-gray-900">
-                    {viewingRequest.authorisedBy || 'Not authorised yet'}
+                    {authorisedByDisplay}
                   </p>
+                    )
+                  })()}
                 </div>
                 {viewingRequest.dateAuthorised && (
                   <div className="col-span-2">
@@ -1344,14 +1444,17 @@ export default function HolidayRequestPage() {
                     const decision = formData.get('decision') as 'approved' | 'denied';
                     const reason = formData.get('reason') as string;
                     const daysLeftYTD = formData.get('daysLeftYTD') ? Number(formData.get('daysLeftYTD')) : undefined;
-                    if (decision && reason && viewingRequest) {
+                    const selectedManager = managerOptions.find((manager) => manager.id === selectedAuthorisingManagerId);
+                    const authorisingManagerId = selectedManager?.id?.trim() || '';
+                    const authorisingManagerLabel = selectedManager?.label?.trim() || '';
+                    if (decision && reason && viewingRequest && authorisingManagerId) {
                       try {
                         setIsSubmitting(true);
                         const updateData: UpdateHolidayRequestDTO = {
                           status: decision,
                           reason: reason,
                           dateAuthorised: new Date(),
-                          // authorisedBy will be automatically set by backend to current user
+                          authorisedBy: authorisingManagerId,
                         };
                         
                         // Include daysLeftYTD if provided
@@ -1383,7 +1486,7 @@ export default function HolidayRequestPage() {
                               returnDate: format(viewingRequest.returnToWorkDate, 'PPP'),
                               status: decision,
                               reason: reason,
-                              authorisedBy: updatedRequest.authorisedBy || 'System'
+                              authorisedBy: authorisingManagerLabel || updatedRequest.authorisedBy || 'System'
                             });
                             // TODO: Call backend email service endpoint when available
                             // await holidayRequestService.sendHolidayRequestNotification(viewingRequest.id, decision);
@@ -1477,14 +1580,31 @@ export default function HolidayRequestPage() {
                       
                       <div>
                         <label className="text-[10px] xs:text-xs font-medium text-gray-700 mb-1 block">Authorising Manager</label>
-                        <input
-                          type="text"
-                          className="w-full border rounded px-2 py-1 text-xs sm:text-sm bg-gray-50"
-                          value="Current User (You)"
-                          disabled
-                          readOnly
-                        />
-                        <p className="text-[10px] text-gray-500 mt-1">The request will be authorized by your account</p>
+                        <Select
+                          value={selectedAuthorisingManagerId}
+                          onValueChange={setSelectedAuthorisingManagerId}
+                          disabled={isSubmitting || isLoadingManagers}
+                        >
+                          <SelectTrigger className="h-8 xs:h-9 sm:h-10 text-xs sm:text-sm">
+                            <SelectValue
+                              placeholder={isLoadingManagers ? "Loading managers..." : "Select authorising manager"}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {managerOptions.length > 0 ? (
+                              managerOptions.map((manager) => (
+                                <SelectItem key={manager.id} value={manager.id} className="text-xs sm:text-sm">
+                                  {manager.label}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="no-managers" disabled className="text-xs sm:text-sm">
+                                No managers available
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[10px] text-gray-500 mt-1">Select the manager authorising this request.</p>
                       </div>
                       
                       <div className="flex justify-end gap-2 xs:gap-3">

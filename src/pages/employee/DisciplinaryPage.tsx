@@ -331,7 +331,7 @@ const DisciplinaryPage: React.FC = () => {
   const isLoading = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#EFF4FF' }}>
+    <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#EFF4FF' }}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-screen-2xl">
         {/* Header */}
         <div className="mb-6 sm:mb-8">
@@ -349,7 +349,7 @@ const DisciplinaryPage: React.FC = () => {
             </div>
             <Button
               onClick={() => setIsFormDialogOpen(true)}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md"
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add New Record
@@ -404,9 +404,9 @@ const DisciplinaryPage: React.FC = () => {
               </div>
 
               {/* Filters */}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-[repeat(3,minmax(0,1fr))] w-full sm:w-auto gap-2">
                 <Select value={statusFilter || 'all'} onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-[140px] bg-gray-50">
+                  <SelectTrigger className="w-full sm:w-[140px] bg-gray-50">
                     <Filter className="h-4 w-4 mr-2 text-gray-400" />
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -419,7 +419,7 @@ const DisciplinaryPage: React.FC = () => {
                 </Select>
 
                 <Select value={severityFilter || 'all'} onValueChange={(v) => setSeverityFilter(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-[140px] bg-gray-50">
+                  <SelectTrigger className="w-full sm:w-[140px] bg-gray-50">
                     <AlertTriangle className="h-4 w-4 mr-2 text-gray-400" />
                     <SelectValue placeholder="Severity" />
                   </SelectTrigger>
@@ -434,7 +434,7 @@ const DisciplinaryPage: React.FC = () => {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-11 w-11"
+                  className="h-11 w-full sm:w-11"
                   onClick={() => queryClient.invalidateQueries({ queryKey: ['disciplinaryRecords'] })}
                 >
                   <RefreshCw className="h-5 w-5" />
@@ -444,8 +444,49 @@ const DisciplinaryPage: React.FC = () => {
           </CardHeader>
 
           <CardContent className="p-0">
+            {/* Mobile cards */}
+            {!isLoadingRecords && records.length > 0 && (
+              <div className="space-y-2 p-2 sm:hidden">
+                {records.map((record) => (
+                  <div key={`mobile-${record.id}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-800">{record.officerName}</p>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">{record.violationType}</p>
+                      </div>
+                      <Badge className={cn('border', STATUS_COLORS[record.status])}>{record.status}</Badge>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">Severity</p>
+                        <Badge className={cn('border', SEVERITY_COLORS[record.severity])}>{record.severity}</Badge>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">Date</p>
+                        <p className="font-medium text-slate-700">{format(new Date(record.incidentDate), 'PP')}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-end gap-1.5">
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => handleView(record)}>
+                        <Eye className="h-4 w-4" />
+                        <span className="sr-only">View record</span>
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => handleEdit(record)}>
+                        <Pencil className="h-4 w-4" />
+                        <span className="sr-only">Edit record</span>
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0 text-red-600 hover:text-red-700" onClick={() => handleDelete(record.id)}>
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete record</span>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Table */}
-            <div className="overflow-x-auto">
+            <div className="hidden overflow-x-auto sm:block">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50 hover:bg-gray-50">

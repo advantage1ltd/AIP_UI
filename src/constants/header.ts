@@ -19,7 +19,7 @@ export const BUTTON_STYLES = {
 export const COMMON_CLASSES = {
   mobileHeader: "flex h-18 items-center justify-between px-5 bg-header-bg text-header-text lg:hidden border-b border-header-border",
   desktopHeader: "hidden lg:flex h-20 items-center px-4 bg-header-bg text-header-text border-b border-header-border",
-  sheetContent: "w-[340px] sm:w-[400px] p-0 flex flex-col h-full bg-slate-800 text-white border-r border-slate-700",
+  sheetContent: "w-full max-w-sm sm:max-w-md p-0 flex flex-col h-full bg-slate-800 text-white border-r border-slate-700",
   searchInput: "w-full pl-9 h-10 rounded-full bg-white text-gray-900 placeholder:text-gray-500 border border-gray-200 focus-visible:ring-2 focus-visible:ring-accent-teal/60 focus-visible:ring-offset-0 focus-visible:border-accent-teal"
 } as const;
 
@@ -128,11 +128,6 @@ export const NAVIGATION_ITEMS = [
         title: "Incident Report",
         href: "/operations/incident-report",
         description: "Report and track incidents"
-      },
-      {
-        title: "Mystery Shopper",
-        href: "/operations/mystery-shopper",
-        description: "Mystery shopper program"
       },
       {
         title: "Site Visit",

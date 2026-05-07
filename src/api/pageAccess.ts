@@ -1,6 +1,7 @@
 import { CUSTOMER_PAGES } from '@/config/customerPages';
-import { ApiResponse, api } from '@/config/api';
+import { ApiResponse, api, isBackendUnavailableError } from '@/config/api';
 import { PAGE_DEFINITIONS, type PageDefinition } from '@/config/navigation/pageDefinitions';
+import { normalizeRoleId } from '@/utils/roles';
 
 export interface PageAccess {
 	id: string;
@@ -33,6 +34,13 @@ interface BackendPageAccessSettingsDto {
 	availablePages: BackendPageAccessDto[];
 }
 
+interface BackendSyncPagesResult {
+	created: number;
+	updated: number;
+	total: number;
+	message: string;
+}
+
 const ensureLeadingSlash = (path: string): string => {
 	if (!path) {
 		return '/';
@@ -52,8 +60,8 @@ const normalizePage = (page: BackendPageAccessDto): PageAccess => ({
 
 // Normalize role names to lowercase (backend stores roles in lowercase)
 const normalizeRoleKey = (roleKey: string): string => {
-	// Backend returns roles in lowercase, just ensure it's lowercase
-	return roleKey.toLowerCase();
+	const normalized = normalizeRoleId(roleKey);
+	return normalized ?? roleKey.toLowerCase();
 };
 
 const normalizeSettings = (dto: BackendPageAccessSettingsDto): PageAccessSettings => {
@@ -102,7 +110,8 @@ const normalizeSettings = (dto: BackendPageAccessSettingsDto): PageAccessSetting
 			const normalizedKey = normalizeRoleKey(roleKey);
 			// Convert all page IDs (which might be numeric database IDs) to pageId strings
 			const convertedPageIds = pageIds.map(convertToPageId);
-			normalizedPageAccessByRole[normalizedKey] = convertedPageIds;
+			const existingPages = normalizedPageAccessByRole[normalizedKey] ?? [];
+			normalizedPageAccessByRole[normalizedKey] = Array.from(new Set([...existingPages, ...convertedPageIds]));
 			
 			// Log conversion for debugging (only in dev mode)
 			if (import.meta.env.DEV && pageIds.length > 0) {
@@ -161,7 +170,6 @@ const buildDefaultPages = (): PageAccess[] => {
 		{ id: 'customer-page-settings', title: 'Customer Page Settings', path: '/administration/customer-page-settings' },
 		{ id: 'stock-control', title: 'Stock Control', path: '/administration/stock-control' },
 		{ id: 'incident-report', title: 'Incident Report', path: '/operations/incident-report' },
-		{ id: 'mystery-shopper', title: 'Mystery Shopper', path: '/operations/mystery-shopper' },
 		{ id: 'site-visit', title: 'Site Visit', path: '/operations/site-visit' },
 		{ id: 'holiday-requests', title: 'Holiday Requests', path: '/operations/holiday-requests' },
 		{ id: 'bank-holiday', title: 'Bank Holiday', path: '/operations/bank-holiday' },
@@ -209,21 +217,21 @@ const buildDefaultSettings = (): PageAccessSettings => {
 	return {
 		pageAccessByRole: {
 			administrator: availablePages.map(page => page.id),
-			advantageonehoofficer: [
+			manager: [
 				'dashboard', 'action-calendar', 'profile',
 				'user-setup', 'employee-registration', 'customer-setup', 'customer-page-settings', 'stock-control',
-				'incident-report', 'mystery-shopper', 'site-visit', 'holiday-requests',
+				'incident-report', 'site-visit', 'holiday-requests',
 				'bank-holiday', 'customer-satisfaction', 'safe-duress-words',
 				'officer-support', 'officer-expenses', 'uniform-equipment', 'disciplinary',
 				'diary', 'management-customer-reporting', 'manager-support',
 				'officer-performance', 'contract-renewal', 'password-register', 'asset-register',
 				'vetting', 'cbt', 'take-test', 'crm-dashboard', 'crm-contacts',
 				'crm-pipeline',
-				'customer-mystery-shopper-report', 'customer-site-visit-reports', 'customer-crime-intelligence'
+				'customer-site-visit-reports', 'customer-crime-intelligence'
 			],
-			advantageoneofficer: [
+			securityofficer: [
 				'dashboard', 'action-calendar', 'profile',
-				'incident-report', 'mystery-shopper', 'site-visit', 'holiday-requests',
+				'incident-report', 'site-visit', 'holiday-requests',
 				'bank-holiday', 'customer-satisfaction', 'safe-duress-words',
 				'officer-support', 'officer-expenses', 'uniform-equipment', 'disciplinary',
 				'diary', 'management-customer-reporting', 'manager-support',
@@ -232,16 +240,9 @@ const buildDefaultSettings = (): PageAccessSettings => {
 				'customer-daily-activity-report', 'customer-incident-graph', 'customer-incident-report',
 				'customer-satisfaction-report', 'customer-be-safe-be-secure', 'daily-occurrence-book',
 				'customer-officer-support', 'customer-views-config', 'customer-crime-intelligence',
-				'customer-site-visit-reports', 'customer-mystery-shopper-report'
+				'customer-site-visit-reports'
 			],
-			customerhomanager: [
-				'dashboard', 'action-calendar', 'profile',
-				'management-customer-reporting', 'customer-views-config', 'customer-incident-report',
-				'customer-satisfaction-report', 'customer-be-safe-be-secure',
-				'customer-daily-activity-report', 'customer-incident-graph', 'customer-crime-intelligence',
-				'customer-officer-support', 'daily-occurrence-book'
-			],
-			customersitemanager: [
+			customer: [
 				'dashboard', 'action-calendar', 'profile',
 				'management-customer-reporting', 'customer-views-config', 'customer-incident-report',
 				'customer-satisfaction-report', 'customer-be-safe-be-secure',
@@ -288,7 +289,7 @@ export const pageAccessApi = {
 			}
 			
 			console.log(`💾 [PageAccess API] Making PUT request to /PageAccess/settings`);
-			const response = await api.put<any>(
+			const response = await api.put<ApiResponse<BackendPageAccessSettingsDto>>(
 				'/PageAccess/settings',
 				{ pageAccessByRole }
 			);
@@ -312,13 +313,17 @@ export const pageAccessApi = {
 			}
 			
 			console.warn('⚠️ [PageAccess API] Save response missing data field');
-		} catch (error: any) {
+		} catch (error: unknown) {
+			const errorPayload = error as {
+				message?: string;
+				response?: { data?: unknown; status?: number; statusText?: string };
+			};
 			console.error('❌ [PageAccess API] Failed to save settings', error);
 			console.error('❌ [PageAccess API] Error details:', {
-				message: error?.message,
-				response: error?.response?.data,
-				status: error?.response?.status,
-				statusText: error?.response?.statusText
+				message: errorPayload?.message,
+				response: errorPayload?.response?.data,
+				status: errorPayload?.response?.status,
+				statusText: errorPayload?.response?.statusText
 			});
 			throw error;
 		}
@@ -327,7 +332,7 @@ export const pageAccessApi = {
 
 	getSettings: async (): Promise<PageAccessSettings> => {
 		try {
-			const response = await api.get<any>('/PageAccess/settings');
+			const response = await api.get<ApiResponse<BackendPageAccessSettingsDto>>('/PageAccess/settings');
 			
 			// Backend returns ApiResponseDto with capital Data, Success, Message
 			const apiResponse = response.data;
@@ -362,15 +367,20 @@ export const pageAccessApi = {
 				hasData: !!responseData,
 				message: apiResponse?.Message || apiResponse?.message
 			});
-			return buildDefaultSettings();
+			throw new Error('Page access settings response was invalid');
 		} catch (error) {
-			// Log error but don't throw - always return defaults to prevent app from breaking
-			console.error('❌ [PageAccess API] Request failed, using defaults:', {
-				message: error instanceof Error ? error.message : String(error),
-				type: error instanceof Error ? error.constructor.name : typeof error,
-				note: 'This may cause customer pages to appear for officers even if disabled in settings'
-			});
-			return buildDefaultSettings();
+			if (isBackendUnavailableError(error)) {
+				if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true') {
+					console.warn('⚠️ [PageAccess API] Backend unavailable, using fallback defaults');
+				}
+			} else {
+				console.error('❌ [PageAccess API] Request failed, using defaults:', {
+					message: error instanceof Error ? error.message : String(error),
+					type: error instanceof Error ? error.constructor.name : typeof error,
+					note: 'Page access settings request failed'
+				});
+			}
+			throw error;
 		}
 	},
 
@@ -390,7 +400,7 @@ export const pageAccessApi = {
 				}))
 			};
 
-			const response = await api.post<any>(
+			const response = await api.post<ApiResponse<BackendSyncPagesResult>>(
 				'/PageAccess/sync-pages',
 				syncRequest
 			);

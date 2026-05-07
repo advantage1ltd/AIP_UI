@@ -165,7 +165,7 @@ const EmployeeDiaryPage = () => {
 	const pendingTotal = pending.holiday.length + pending.expenses.length + pending.equipmentRequests.length
 
 	return (
-		<div className="h-full bg-gradient-to-b from-muted/30 to-background">
+		<div className="h-full overflow-x-hidden bg-gradient-to-b from-muted/30 to-background">
 			<div className="border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
 				<div className="px-4 md:px-6 py-4">
 					<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -188,12 +188,13 @@ const EmployeeDiaryPage = () => {
 							</p>
 						</div>
 
-						<div className="flex items-center gap-2">
+						<div className="flex w-full items-center gap-2 md:w-auto">
 							<Button
 								variant="outline"
 								onClick={() => selectedEmployeeId && setSelectedEmployeeId(selectedEmployeeId)}
 								disabled={!selectedEmployeeId || diaryLoading}
 								aria-label="Refresh employee diary"
+								className="w-full md:w-auto"
 							>
 								{diaryLoading ? (
 									<>
@@ -415,8 +416,8 @@ const EmployeeDiaryPage = () => {
 						</Card>
 
 						<Tabs defaultValue={pendingTotal > 0 ? 'pending' : 'holidays'} className="w-full">
-							<TabsList className="flex flex-wrap h-auto">
-								<TabsTrigger value="pending">
+							<TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-7">
+								<TabsTrigger value="pending" className="w-full px-2 py-2 text-xs sm:text-sm">
 									Pending
 									{pendingTotal > 0 && (
 										<span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-medium text-amber-800">
@@ -424,12 +425,12 @@ const EmployeeDiaryPage = () => {
 										</span>
 									)}
 								</TabsTrigger>
-								<TabsTrigger value="holidays">Holidays</TabsTrigger>
-								<TabsTrigger value="incidents">Incidents</TabsTrigger>
-								<TabsTrigger value="expenses">Expenses</TabsTrigger>
-								<TabsTrigger value="license">License</TabsTrigger>
-								<TabsTrigger value="equipment">Equipment</TabsTrigger>
-								<TabsTrigger value="training">Training</TabsTrigger>
+								<TabsTrigger value="holidays" className="w-full px-2 py-2 text-xs sm:text-sm">Holidays</TabsTrigger>
+								<TabsTrigger value="incidents" className="w-full px-2 py-2 text-xs sm:text-sm">Incidents</TabsTrigger>
+								<TabsTrigger value="expenses" className="w-full px-2 py-2 text-xs sm:text-sm">Expenses</TabsTrigger>
+								<TabsTrigger value="license" className="w-full px-2 py-2 text-xs sm:text-sm">License</TabsTrigger>
+								<TabsTrigger value="equipment" className="w-full px-2 py-2 text-xs sm:text-sm">Equipment</TabsTrigger>
+								<TabsTrigger value="training" className="w-full px-2 py-2 text-xs sm:text-sm">Training</TabsTrigger>
 							</TabsList>
 
 							<TabsContent value="pending" className="mt-4">
@@ -518,7 +519,31 @@ const EmployeeDiaryPage = () => {
 										{diary.holidays.length === 0 ? (
 											<p className="text-sm text-muted-foreground">No holiday requests found.</p>
 										) : (
-											<div className="overflow-x-auto">
+											<>
+												<div className="space-y-2 sm:hidden">
+													{diary.holidays.map(h => (
+														<div key={`holiday-mobile-${h.id}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+															<div className="flex items-start justify-between gap-2">
+																<div className="min-w-0 flex-1">
+																	<p className="text-sm font-semibold text-slate-800">{formatDate(h.startDate)} - {formatDate(h.endDate)}</p>
+																	<p className="mt-1 text-xs text-slate-500">{h.totalDays} day(s)</p>
+																</div>
+																<Badge variant={getStatusBadgeVariant(h.status)}>{h.status}</Badge>
+															</div>
+															<div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+																<div>
+																	<p className="text-[10px] uppercase tracking-wide text-slate-400">Requested</p>
+																	<p className="font-medium text-slate-700">{formatDate(h.dateOfRequest)}</p>
+																</div>
+																<div>
+																	<p className="text-[10px] uppercase tracking-wide text-slate-400">Return</p>
+																	<p className="font-medium text-slate-700">{formatDate(h.returnToWorkDate)}</p>
+																</div>
+															</div>
+														</div>
+													))}
+												</div>
+												<div className="hidden overflow-x-auto sm:block">
 												<Table>
 													<TableHeader className="border-b">
 														<TableRow>
@@ -543,7 +568,8 @@ const EmployeeDiaryPage = () => {
 														))}
 													</TableBody>
 												</Table>
-											</div>
+												</div>
+											</>
 										)}
 									</CardContent>
 								</Card>
@@ -559,7 +585,33 @@ const EmployeeDiaryPage = () => {
 										{diary.incidents.length === 0 ? (
 											<p className="text-sm text-muted-foreground">No incidents found.</p>
 										) : (
-											<div className="overflow-x-auto">
+											<>
+												<div className="space-y-2 sm:hidden">
+													{diary.incidents.map(i => (
+														<div key={`incident-mobile-${i.incidentId}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+															<p className="text-sm font-semibold text-slate-800">{i.incidentType}</p>
+															<div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+																<div>
+																	<p className="text-[10px] uppercase tracking-wide text-slate-400">Date</p>
+																	<p className="font-medium text-slate-700">{formatDate(i.dateOfIncident)}</p>
+																</div>
+																<div>
+																	<p className="text-[10px] uppercase tracking-wide text-slate-400">Site</p>
+																	<p className="font-medium text-slate-700">{i.siteName || '—'}</p>
+																</div>
+																<div>
+																	<p className="text-[10px] uppercase tracking-wide text-slate-400">Customer</p>
+																	<p className="font-medium text-slate-700">{i.customerName || '—'}</p>
+																</div>
+																<div>
+																	<p className="text-[10px] uppercase tracking-wide text-slate-400">Value recovered</p>
+																	<p className="font-medium text-slate-700">{formatMoney(i.valueRecovered ?? i.totalValueRecovered ?? null)}</p>
+																</div>
+															</div>
+														</div>
+													))}
+												</div>
+												<div className="hidden overflow-x-auto sm:block">
 												<Table>
 													<TableHeader className="border-b">
 														<TableRow>
@@ -582,7 +634,8 @@ const EmployeeDiaryPage = () => {
 														))}
 													</TableBody>
 												</Table>
-											</div>
+												</div>
+											</>
 										)}
 									</CardContent>
 								</Card>
@@ -598,7 +651,28 @@ const EmployeeDiaryPage = () => {
 										{diary.expenses.length === 0 ? (
 											<p className="text-sm text-muted-foreground">No expense claims found.</p>
 										) : (
-											<div className="overflow-x-auto">
+											<>
+												<div className="space-y-2 sm:hidden">
+													{diary.expenses.map(c => (
+														<div key={`expense-mobile-${c.id}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+															<div className="flex items-start justify-between gap-2">
+																<p className="text-sm font-semibold text-slate-800">{formatDate(c.weekStartDate)} - {formatDate(c.weekEndDate)}</p>
+																<Badge variant={getStatusBadgeVariant(c.status)}>{c.status}</Badge>
+															</div>
+															<div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+																<div>
+																	<p className="text-[10px] uppercase tracking-wide text-slate-400">Total</p>
+																	<p className="font-medium text-slate-700">{formatMoney(c.weekTotal)}</p>
+																</div>
+																<div>
+																	<p className="text-[10px] uppercase tracking-wide text-slate-400">Approved</p>
+																	<p className="font-medium text-slate-700">{c.approvedAt ? `${formatDate(c.approvedAt)} (${c.approvedByName || '—'})` : '—'}</p>
+																</div>
+															</div>
+														</div>
+													))}
+												</div>
+												<div className="hidden overflow-x-auto sm:block">
 												<Table>
 													<TableHeader className="border-b">
 														<TableRow>
@@ -619,7 +693,8 @@ const EmployeeDiaryPage = () => {
 														))}
 													</TableBody>
 												</Table>
-											</div>
+												</div>
+											</>
 										)}
 									</CardContent>
 								</Card>
@@ -693,7 +768,32 @@ const EmployeeDiaryPage = () => {
 											{diary.equipment.requests.length === 0 ? (
 												<p className="text-sm text-muted-foreground">No requests found.</p>
 											) : (
-												<div className="overflow-x-auto">
+												<>
+													<div className="space-y-2 sm:hidden">
+														{diary.equipment.requests.map(r => (
+															<div key={`equipment-request-mobile-${r.id}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+																<div className="flex items-start justify-between gap-2">
+																	<p className="text-sm font-semibold text-slate-800">{r.equipmentType}{r.size ? ` (${r.size})` : ''}</p>
+																	<Badge variant={getStatusBadgeVariant(r.status)}>{r.status}</Badge>
+																</div>
+																<div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+																	<div>
+																		<p className="text-[10px] uppercase tracking-wide text-slate-400">Quantity</p>
+																		<p className="font-medium text-slate-700">{r.quantity}</p>
+																	</div>
+																	<div>
+																		<p className="text-[10px] uppercase tracking-wide text-slate-400">Priority</p>
+																		<Badge variant="secondary">{r.priority}</Badge>
+																	</div>
+																	<div className="col-span-2">
+																		<p className="text-[10px] uppercase tracking-wide text-slate-400">Requested</p>
+																		<p className="font-medium text-slate-700">{formatDate(r.createdAt)}</p>
+																	</div>
+																</div>
+															</div>
+														))}
+													</div>
+													<div className="hidden overflow-x-auto sm:block">
 													<Table>
 														<TableHeader className="border-b">
 															<TableRow>
@@ -716,7 +816,8 @@ const EmployeeDiaryPage = () => {
 															))}
 														</TableBody>
 													</Table>
-												</div>
+													</div>
+												</>
 											)}
 										</CardContent>
 									</Card>
@@ -730,7 +831,33 @@ const EmployeeDiaryPage = () => {
 											{diary.equipment.issued.length === 0 ? (
 												<p className="text-sm text-muted-foreground">No issued items found.</p>
 											) : (
-												<div className="overflow-x-auto">
+												<>
+													<div className="space-y-2 sm:hidden">
+														{diary.equipment.issued.map(i => (
+															<div key={`equipment-issued-mobile-${i.id}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+																<p className="text-sm font-semibold text-slate-800">{i.equipmentType}{i.size ? ` (${i.size})` : ''}</p>
+																<div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+																	<div>
+																		<p className="text-[10px] uppercase tracking-wide text-slate-400">Quantity</p>
+																		<p className="font-medium text-slate-700">{i.quantity}</p>
+																	</div>
+																	<div>
+																		<p className="text-[10px] uppercase tracking-wide text-slate-400">Condition</p>
+																		<Badge variant="secondary">{i.condition}</Badge>
+																	</div>
+																	<div>
+																		<p className="text-[10px] uppercase tracking-wide text-slate-400">Issued</p>
+																		<p className="font-medium text-slate-700">{formatDate(i.dateIssued)}</p>
+																	</div>
+																	<div>
+																		<p className="text-[10px] uppercase tracking-wide text-slate-400">Returned</p>
+																		<p className="font-medium text-slate-700">{formatDate(i.dateReturned)}</p>
+																	</div>
+																</div>
+															</div>
+														))}
+													</div>
+													<div className="hidden overflow-x-auto sm:block">
 													<Table>
 														<TableHeader className="border-b">
 															<TableRow>
@@ -753,7 +880,8 @@ const EmployeeDiaryPage = () => {
 															))}
 														</TableBody>
 													</Table>
-												</div>
+													</div>
+												</>
 											)}
 										</CardContent>
 									</Card>
@@ -786,7 +914,28 @@ const EmployeeDiaryPage = () => {
 											{diary.training.tests.length === 0 ? (
 												<p className="text-sm text-muted-foreground">No test attempts found.</p>
 											) : (
-												<div className="overflow-x-auto">
+												<>
+													<div className="space-y-2 sm:hidden">
+														{diary.training.tests.map(t => (
+															<div key={`training-mobile-${t.id}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+																<div className="flex items-start justify-between gap-2">
+																	<p className="text-sm font-semibold text-slate-800">{t.testTitle}</p>
+																	<Badge variant={getStatusBadgeVariant(t.status)}>{t.status}</Badge>
+																</div>
+																<div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+																	<div>
+																		<p className="text-[10px] uppercase tracking-wide text-slate-400">Completed</p>
+																		<p className="font-medium text-slate-700">{formatDate(t.completedAt)}</p>
+																	</div>
+																	<div>
+																		<p className="text-[10px] uppercase tracking-wide text-slate-400">Score</p>
+																		<p className="font-medium text-slate-700">{Math.round(t.percentageScore)}%</p>
+																	</div>
+																</div>
+															</div>
+														))}
+													</div>
+													<div className="hidden overflow-x-auto sm:block">
 													<Table>
 														<TableHeader className="border-b">
 															<TableRow>
@@ -807,7 +956,8 @@ const EmployeeDiaryPage = () => {
 															))}
 														</TableBody>
 													</Table>
-												</div>
+													</div>
+												</>
 											)}
 										</CardContent>
 									</Card>

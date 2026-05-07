@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useTheme } from '../theme-provider'
 import { Footer } from '../Footer'
-import { ThemeToggle } from '../theme-toggle'
 import { SidebarNavigation } from '@/components/dashboard/SidebarNavigation'
 import { Logo } from './Logo'
-import { UserMenu } from './UserMenu'
 import { SearchBar } from './SearchBar'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Cog } from 'lucide-react'
@@ -22,7 +19,6 @@ interface LayoutProps {
 export const Layout = ({ children }: LayoutProps) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const location = useLocation()
-  const { theme } = useTheme()
   const navigate = useNavigate()
 
   // Close mobile menu on route change
@@ -31,12 +27,12 @@ export const Layout = ({ children }: LayoutProps) => {
   }, [location.pathname])
 
   return (
-    <div className="min-h-screen flex flex-col overflow-hidden">
+    <div className="min-h-screen flex flex-col overflow-x-hidden bg-gradient-to-br from-slate-50 via-background to-indigo-50/30 text-foreground dark:from-slate-950 dark:via-slate-950 dark:to-indigo-950/20">
       <div className="flex flex-1">
         {/* Desktop Sidebar - hidden on mobile */}
-        <aside className="hidden lg:flex w-64 flex-col fixed h-screen bg-[#1A1A1A] text-white border-r border-[#2A2A2A] z-30" style={{ backgroundColor: '#1A1A1A' }}>
+        <aside className="hidden lg:flex w-64 flex-col fixed h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white border-r border-slate-800/90 z-30 shadow-[8px_0_28px_-18px_rgba(2,6,23,0.85)]">
           {/* Logo Section */}
-          <div className="h-[var(--header-height)] border-b border-[#2A2A2A] px-6 pt-[27px] flex items-center">
+          <div className="h-[var(--header-height)] border-b border-slate-800/90 px-6 pt-[27px] flex items-center">
             <Logo />
           </div>
 
@@ -54,9 +50,9 @@ export const Layout = ({ children }: LayoutProps) => {
 
         {/* Mobile Sidebar */}
         {isMobileOpen && (
-          <aside className="fixed inset-y-0 left-0 z-50 lg:hidden w-64 flex flex-col bg-[#1A1A1A] text-white border-r border-[#2A2A2A]" style={{ backgroundColor: '#1A1A1A' }}>
+          <aside className="fixed inset-y-0 left-0 z-50 lg:hidden w-64 flex flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white border-r border-slate-800/90 shadow-[8px_0_28px_-18px_rgba(2,6,23,0.85)]">
             {/* Logo Section */}
-            <div className="h-[var(--header-height)] border-b border-[#2A2A2A] px-6 pt-[27px] flex items-center justify-between">
+            <div className="h-[var(--header-height)] border-b border-slate-800/90 px-6 pt-[27px] flex items-center justify-between">
               <Logo />
               <button
                 onClick={() => setIsMobileOpen(false)}
@@ -91,7 +87,7 @@ export const Layout = ({ children }: LayoutProps) => {
         )}
 
         {/* Main Content Area - full width on mobile, adjusted on desktop */}
-        <div className="flex-1 flex flex-col w-full lg:ml-64">
+        <div className="flex-1 flex min-w-0 flex-col w-full lg:ml-64">
           {/* Header */}
           <Header onMobileMenuClick={() => setIsMobileOpen(!isMobileOpen)} />
 
@@ -102,8 +98,8 @@ export const Layout = ({ children }: LayoutProps) => {
           />
 
           {/* Page Content */}
-          <main className="flex-1 bg-[#EFF4FF] flex flex-col">
-            <div className="flex-1 w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
+          <main className="flex min-w-0 flex-1 flex-col bg-gradient-to-b from-transparent via-background/60 to-background">
+            <div className="flex-1 w-full max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
               <div className="grid gap-4 sm:gap-6 md:gap-8">
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div

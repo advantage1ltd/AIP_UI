@@ -57,7 +57,67 @@ export function EmployeesTable({ employees, onNewEmployee, onEditEmployee, onDel
       />
 
       <div className="rounded-lg border bg-white/50 backdrop-blur-sm shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="space-y-2 p-2 sm:hidden">
+          {paginatedEmployees.length > 0 ? (
+            paginatedEmployees.map((employee, index) => (
+              <div key={`mobile-${employee.id || index}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-800">{`${employee.firstName || ''} ${employee.surname || ''}`}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">No: {employee.employeeNumber || '-'}</p>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                    employee.employeeStatus === 'Active'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    {employee.employeeStatus}
+                  </span>
+                </div>
+
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400">Position</p>
+                    <p className="truncate font-medium text-slate-700">{employee.position || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400">Start Date</p>
+                    <p className="truncate font-medium text-slate-700">
+                      {employee.startDate ? new Date(employee.startDate).toLocaleDateString() : '-'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center justify-end gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onEditEmployee(employee)}
+                    className="h-7 w-7 p-0 border-purple-200 text-purple-600 hover:bg-purple-50"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    <span className="sr-only">Edit</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onDeleteEmployee(employee)}
+                    className="h-7 w-7 p-0 border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span className="sr-only">Delete</span>
+                  </Button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center text-sm text-muted-foreground">
+              No employees found.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto sm:block">
           <Table>
             <TableHeader>
               <TableRow>

@@ -186,8 +186,8 @@ const CRMContactsHeader = React.memo(
 				</div>
 			</div>
 
-			<div className="grid grid-cols-5 gap-2">
-				<div className="col-span-3">
+			<div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+				<div className="sm:col-span-3">
 					<Select
 						value={filters.status || 'all'}
 						onValueChange={value =>
@@ -209,7 +209,7 @@ const CRMContactsHeader = React.memo(
 					</Select>
 				</div>
 				<Button
-					className="col-span-2 bg-primary text-white h-9 text-xs p-0 flex items-center justify-center gap-1"
+					className="sm:col-span-2 bg-primary text-white h-9 text-xs p-0 flex items-center justify-center gap-1 w-full"
 					onClick={onAddContact}
 				>
 					<Plus className="h-4 w-4" />
@@ -554,7 +554,109 @@ export default function CRMContacts() {
 								</Select>
 							</div>
 
-							<div className="overflow-x-auto">
+							<div className="p-2 sm:hidden">
+								{isLoading ? (
+									<div className="flex min-h-[140px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+										<div className="flex flex-col items-center justify-center gap-2">
+											<div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary"></div>
+											<p className="text-xs text-muted-foreground">Loading contacts...</p>
+										</div>
+									</div>
+								) : filteredContacts.length === 0 ? (
+									<EmptyState
+										searchQuery={searchQuery}
+										filters={filters}
+										onAddContact={() => {
+											setEditingContact(null)
+											setIsAddContactOpen(true)
+										}}
+									/>
+								) : (
+									<div className="space-y-2">
+										{filteredContacts.map(contact => (
+											<div key={`mobile-${contact.id}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+												<div className="flex items-start justify-between gap-2">
+													<div className="min-w-0 flex-1">
+														<p className="truncate text-sm font-semibold text-slate-800">{contact.fullName}</p>
+														<p className="mt-0.5 truncate text-xs text-slate-500">{contact.businessName}</p>
+													</div>
+													<Badge
+														variant={
+															contact.leadStatus === 'Won' || contact.leadStatus === 'Qualified'
+																? 'default'
+																: contact.leadStatus === 'Lost' || contact.leadStatus === 'Closed'
+																	? 'destructive'
+																	: 'secondary'
+														}
+														className="text-[10px]"
+													>
+														{contact.leadStatus}
+													</Badge>
+												</div>
+
+												<div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+													<div>
+														<p className="text-[10px] uppercase tracking-wide text-slate-400">Job Title</p>
+														<p className="truncate font-medium text-slate-700">{contact.jobTitle}</p>
+													</div>
+													<div>
+														<p className="text-[10px] uppercase tracking-wide text-slate-400">Email</p>
+														<p className="truncate font-medium text-slate-700">{contact.email}</p>
+													</div>
+												</div>
+
+												<div className="mt-2 flex flex-wrap gap-1">
+													{contact.services.slice(0, 2).map(service => (
+														<Badge key={service} variant="outline" className="text-[10px]">
+															{service.split(' > ').pop()}
+														</Badge>
+													))}
+													{contact.services.length > 2 && (
+														<Badge variant="outline" className="text-[10px]">
+															+{contact.services.length - 2}
+														</Badge>
+													)}
+												</div>
+
+												<div className="mt-3 flex items-center justify-end gap-1.5">
+													<Button
+														variant="outline"
+														size="sm"
+														onClick={() => handleEditContact(contact)}
+														className="h-7 px-2 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+													>
+														Edit
+													</Button>
+													<Button
+														variant="outline"
+														size="sm"
+														onClick={() => {
+															setViewingHistoryContact(contact)
+															setIsHistoryDialogOpen(true)
+														}}
+														className="h-7 w-7 p-0 border-slate-200"
+														title="View communication history"
+													>
+														<MessageSquare className="h-3.5 w-3.5" />
+														<span className="sr-only">History</span>
+													</Button>
+													<Button
+														variant="outline"
+														size="sm"
+														onClick={() => setContactToDelete(contact)}
+														className="h-7 w-7 p-0 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+													>
+														<Trash2 className="h-3.5 w-3.5" />
+														<span className="sr-only">Delete</span>
+													</Button>
+												</div>
+											</div>
+										))}
+									</div>
+								)}
+							</div>
+
+							<div className="hidden overflow-x-auto sm:block">
 								{isLoading ? (
 									<Table>
 										<TableHeader>

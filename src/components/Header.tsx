@@ -31,7 +31,6 @@ import {
   Radio,
   UserCog,
   FileWarning,
-  FileSearch,
   Building2,
   Store,
   CalendarRange,
@@ -59,7 +58,6 @@ import {
 } from "lucide-react"
 import { usePageAccess, PageAccessContext } from "@/contexts/PageAccessContext"
 import { Input } from "@/components/ui/input"
-import { useTheme } from "@/components/theme-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
@@ -223,9 +221,9 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   // If context is not available, return minimal header
   if (!pageAccessContext) {
     return (
-      <header className="h-[var(--header-height)] border-b border-header-border bg-header-bg">
+      <header className="h-[var(--header-height)] border-b border-border bg-[hsl(var(--header-bg))]/95 text-[hsl(var(--header-text))] backdrop-blur">
         <div className="flex items-center justify-between h-full px-4">
-          <div className="text-sm text-gray-500">Loading...</div>
+          <div className="text-sm text-muted-foreground">Loading...</div>
         </div>
       </header>
     );
@@ -233,8 +231,6 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   
 	const { currentRole } = pageAccessContext;
   
-  const { theme } = useTheme();
-
   // Get authenticated user info
   const authenticatedUser = getUser();
   const isAuthenticated = !!authenticatedUser;
@@ -331,12 +327,6 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           href: "/operations/incident-report",
           icon: <FileWarning className="h-4 w-4" />,
           roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
-        },
-        {
-          title: "Mystery Shopper",
-          href: "/operations/mystery-shopper",
-          icon: <FileSearch className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         },
         {
           title: "Site Visit",
@@ -548,19 +538,19 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
 	};
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur border-b border-slate-200 shadow-[0_1px_0_rgba(15,23,42,0.05)] text-slate-900">
+    <header className="sticky top-0 z-50 w-full border-b border-[hsl(var(--header-border))] bg-[hsl(var(--header-bg))]/95 text-[hsl(var(--header-text))] backdrop-blur-md shadow-[0_8px_26px_-18px_rgba(15,23,42,0.45)]">
       {/* Mobile & Tablet Header */}
-      <div className="w-full h-[96px] md:h-[88px] bg-transparent flex lg:hidden items-center px-4 md:px-6">
+      <div className="w-full min-h-[72px] sm:min-h-[80px] bg-gradient-to-r from-transparent via-slate-100/70 to-transparent dark:via-slate-800/40 flex lg:hidden items-center px-3 sm:px-4">
         {/* Left: Hamburger Menu */}
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
           <SheetTrigger asChild>
             <Button 
               variant="ghost" 
               size="icon" 
-              className="p-0 text-slate-700 hover:bg-slate-100"
+              className="p-0 text-foreground hover:bg-accent"
               aria-label="Menu"
             >
-              <Menu className="h-12 w-12 md:h-11 md:w-11" />
+              <Menu className="h-9 w-9 sm:h-10 sm:w-10" />
             </Button>
           </SheetTrigger>
           
@@ -570,7 +560,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                 <img 
                   src="/AdvantageOne.svg" 
                   alt="Advantage One"
-                  className="h-13 w-auto bg-transparent object-contain" 
+                  className="h-12 w-auto bg-transparent object-contain" 
                 />
               </SheetTitle>
               <SheetDescription className="sr-only">
@@ -635,18 +625,19 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           <img 
             src="/AdvantageOne.svg" 
             alt="Advantage One"
-            className="h-16 sm:h-20 md:h-24 w-auto max-w-[300px] sm:max-w-[360px] md:max-w-[420px] object-contain"
+            className="h-12 sm:h-14 w-auto max-w-[190px] sm:max-w-[240px] object-contain"
           />
         </div>
 
         {/* Right: Notifications and User Profile */}
-        <div className="flex items-center gap-2 md:gap-3 text-slate-700">
+        <div className="flex items-center gap-1.5 sm:gap-2 text-foreground">
           <NotificationBell />
+          <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <div className="flex items-center gap-2 cursor-pointer">
                 <UserAvatar size="sm" showBorder={true} />
-                <ChevronDown className="h-4 w-4 text-slate-500 hidden md:block" />
+                <ChevronDown className="hidden h-4 w-4 text-muted-foreground md:block" />
               </div>
             </DropdownMenuTrigger>
             <UserProfileDropdown canAccessSettings={canAccessSettings} />
@@ -655,9 +646,9 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
       </div>
 
       {/* Desktop Header */}
-      <div className="hidden lg:flex h-[88px] items-center px-6 bg-transparent">
+      <div className="hidden h-[88px] items-center bg-gradient-to-r from-transparent via-slate-100/60 to-transparent dark:via-slate-800/35 px-6 lg:flex">
         {/* Left: Logo */}
-        <div className="flex items-center text-slate-900">
+        <div className="flex items-center text-foreground">
           <Logo variant="desktop" />
         </div>
         
@@ -669,21 +660,22 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
         </div>
         
 		{/* Right: Notifications and User Profile */}
-				<div className="flex items-center gap-4 text-slate-900">
+				<div className="flex items-center gap-4 text-foreground">
           <NotificationBell />
+          <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <div className="flex items-center gap-2 cursor-pointer">
                 <UserAvatar size="md" showBorder={true} />
                 <div className="text-sm">
-                  <p className="font-medium text-slate-900">
+                  <p className="font-medium text-foreground">
                     {isAuthenticated ? `${authenticatedUser.firstName} ${authenticatedUser.lastName}` : 'David Ibanga'}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     {isAuthenticated ? authenticatedUser.role : 'IT manager'}
                   </p>
                 </div>
-								<ChevronDown className="h-4 w-4 text-slate-400" />
+								<ChevronDown className="h-4 w-4 text-muted-foreground" />
               </div>
             </DropdownMenuTrigger>
             <UserProfileDropdown canAccessSettings={canAccessSettings} />

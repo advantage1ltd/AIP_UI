@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { Plus, ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { Plus, ChevronLeft, ChevronRight, Search, Pencil, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { CustomerDialog } from "./CustomerDialog"
 import { CustomerTableRow } from "./CustomerTableRow"
@@ -317,31 +317,107 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
       {!isLoadingCustomers && allCustomers.length > 0 && (
         <>
           <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Company Name</TableHead>
-                  <TableHead>Company Number</TableHead>
-                  <TableHead>VAT Number</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Customer Type</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentCustomers.map((customer) => (
-                  <CustomerTableRow
-                    key={customer.id}
-                    customer={customer}
-                    isSelected={selectedRows.includes(String(customer.id))}
-                    onSelect={() => toggleRowSelection(String(customer.id))}
-                    onEdit={() => handleEdit(customer)}
-                    onDelete={() => handleDelete(customer)}
-                  />
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-2 p-2 sm:hidden">
+              {currentCustomers.map((customer) => {
+                const customerId = String(customer.id)
+                const isSelected = selectedRows.includes(customerId)
+                const companyName = customer.companyName || 'Unnamed'
+                const companyNumber = customer.companyNumber || '—'
+                const rawType = Array.isArray(customer.customerType) ? customer.customerType[0] : customer.customerType
+                const typeLabel = rawType
+                  ? String(rawType).charAt(0).toUpperCase() + String(rawType).slice(1).replace(/-/g, ' ')
+                  : '—'
+                const status = customer.status === 'inactive' ? 'inactive' : 'active'
+
+                return (
+                  <div
+                    key={`mobile-${customerId}`}
+                    onClick={() => toggleRowSelection(customerId)}
+                    className={`cursor-pointer rounded-lg border p-3 shadow-sm transition-colors ${
+                      isSelected ? 'border-purple-300 bg-purple-50/70' : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-800">{companyName}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">ID: {customerId}</p>
+                      </div>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        {status === 'active' ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">Company No</p>
+                        <p className="truncate font-medium text-slate-700">{companyNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">Type</p>
+                        <p className="truncate font-medium text-slate-700">{typeLabel}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-end gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleEdit(customer)
+                        }}
+                        className="h-7 w-7 p-0 border-purple-200 text-purple-600 hover:bg-purple-50"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        <span className="sr-only">Edit customer</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleDelete(customer)
+                        }}
+                        className="h-7 w-7 p-0 border-red-200 text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className="sr-only">Delete customer</span>
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Company Name</TableHead>
+                    <TableHead>Company Number</TableHead>
+                    <TableHead>VAT Number</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Customer Type</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentCustomers.map((customer) => (
+                    <CustomerTableRow
+                      key={customer.id}
+                      customer={customer}
+                      isSelected={selectedRows.includes(String(customer.id))}
+                      onSelect={() => toggleRowSelection(String(customer.id))}
+                      onEdit={() => handleEdit(customer)}
+                      onDelete={() => handleDelete(customer)}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
 
           {/* Pagination */}

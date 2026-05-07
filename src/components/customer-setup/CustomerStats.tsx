@@ -158,11 +158,11 @@ export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerSta
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
         {[...Array(4)].map((_, index) => (
-          <Card key={index} className="border-0 shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-gray-600 to-gray-800 text-white">
-              <CardContent className="p-4 sm:p-6">
+          <Card key={index} className="h-full border-0 shadow-lg overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-gray-600 to-gray-800 text-white">
+              <CardContent className="h-full p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <div className="h-4 bg-white/20 rounded animate-pulse"></div>
@@ -182,13 +182,13 @@ export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerSta
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
       {stats.map((stat, index) => {
         const IconComponent = stat.icon
         return (
-          <Card key={index} className="border-0 shadow-lg overflow-hidden">
-            <div className={`bg-gradient-to-r ${stat.gradient} text-white`}>
-              <CardContent className="p-4 sm:p-6">
+          <Card key={index} className="h-full border-0 shadow-lg overflow-hidden">
+            <div className={`h-full bg-gradient-to-r ${stat.gradient} text-white`}>
+              <CardContent className="h-full p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="text-xs sm:text-sm font-medium text-white/80">

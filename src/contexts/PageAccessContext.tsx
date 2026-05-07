@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { PageAccess, PageAccessSettings, pageAccessApi } from '@/api/pageAccess';
+import { isBackendUnavailableError } from '@/config/api';
 import { AuthContext } from '@/contexts/AuthContext';
 import { customerPageAccessCache } from '@/services/customerPageAccessCache';
 import { PAGE_DEFINITIONS } from '@/config/navigation/pageDefinitions';
 import { sessionStore } from '@/state/sessionStore';
+import { isCustomerRole, normalizeRoleId } from '@/utils/roles';
 
 interface PageAccessContextType {
 	hasAccess: (path: string) => boolean;
@@ -30,6 +32,7 @@ const EMPTY_PAGE_ACCESS_SETTINGS: PageAccessSettings = {
 	pageAccessByRole: {},
 	availablePages: []
 };
+const debugLogsEnabled = import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true';
 
 export const usePageAccess = () => {
 	const context = useContext(PageAccessContext);
@@ -121,7 +124,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			const data = await pageAccessApi.getSettings();
 			
 			// Log loaded settings for debugging
-			if (import.meta.env.DEV) {
+			if (debugLogsEnabled) {
 				console.group('📥 [PageAccess] Settings Loaded from API');
 				console.log('📊 Settings Summary:', {
 					availablePagesCount: data.availablePages.length,
@@ -144,8 +147,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					'customer-officer-support',
 					'customer-views-config',
 					'customer-crime-intelligence',
-					'customer-site-visit-reports',
-					'customer-mystery-shopper-report'
+					'customer-site-visit-reports'
 				];
 				const hasAllDefaultCustomerPages = defaultCustomerPages.every(pageId => 
 					officerPages.some(p => String(p).toLowerCase().trim() === pageId.toLowerCase().trim())
@@ -191,7 +193,11 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			setError(null);
 			return data;
 		} catch (error) {
-			console.error('❌ [PageAccess] Error loading settings:', error);
+			if (!isBackendUnavailableError(error)) {
+				console.error('❌ [PageAccess] Error loading settings:', error);
+			} else if (debugLogsEnabled) {
+				console.warn('⚠️ [PageAccess] Backend unavailable while loading settings; switched to offline mode');
+			}
 			setError(error instanceof Error ? error.message : 'Failed to load page access settings');
 			setStatus('offline');
 			// Return defaults on error
@@ -216,11 +222,15 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			const response = await customerPageAccessCache.get(customerId);
 			setCustomerAssignedPageIds(new Set(response.assignedPageIds));
 			lastCustomerContextId.current = customerId;
-		} catch (error: any) {
-			const status = error?.response?.status || error?.status;
+		} catch (error: unknown) {
+			const status = (() => {
+				if (!error || typeof error !== 'object') return undefined;
+				const maybeError = error as { response?: { status?: number }; status?: number };
+				return maybeError.response?.status ?? maybeError.status;
+			})();
 			const isExpectedError = status === 403 || status === 404;
 			
-			if (!isExpectedError && import.meta.env.DEV) {
+			if (!isExpectedError && debugLogsEnabled) {
 				console.warn('⚠️ [PageAccess] Error loading customer page assignments:', error);
 			}
 			
@@ -236,7 +246,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			// Allow access during loading or if no data loaded yet (prevents redirect loops)
 			// This check must come before the currentRole check to prevent redirect loops
 			if (status === 'loading' || Object.keys(pageAccessByRole).length === 0 || availablePages.length === 0) {
-				if (import.meta.env.DEV && path !== '/dashboard' && path !== '/') {
+				if (debugLogsEnabled && path !== '/dashboard' && path !== '/') {
 					console.log('✅ [PageAccess] Allowing access during initialization:', {
 						path,
 						status,
@@ -250,7 +260,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 			// No role = no access (except during initialization which is handled above)
 			if (!currentRole) {
-				if (import.meta.env.DEV && path !== '/dashboard' && path !== '/') {
+				if (debugLogsEnabled && path !== '/dashboard' && path !== '/') {
 					console.log('❌ [PageAccess] Access denied: No currentRole', {
 						path,
 						status,
@@ -279,7 +289,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			
 			if (!page) {
 				// Page not in available pages - deny access
-				if (import.meta.env.DEV) {
+				if (debugLogsEnabled) {
 					console.warn('🔒 [PageAccess] Page not found in availablePages:', {
 						originalPath: path,
 						normalizedPath,
@@ -291,7 +301,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 				return false;
 			}
 			
-			if (import.meta.env.DEV) {
+			if (debugLogsEnabled) {
 				console.log('🔍 [PageAccess] Found page:', {
 					path: normalizedPath,
 					pageId: page.id,
@@ -319,14 +329,14 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			}
 
 			// Administrators have full access
-			if (currentRole.toLowerCase() === 'administrator') {
+			if (normalizeRoleId(currentRole) === 'administrator') {
 				return true;
 			}
 
 			// Get role permissions
 			const roleKey = resolveRoleKey(currentRole);
 			if (!roleKey) {
-				if (import.meta.env.DEV) {
+				if (debugLogsEnabled) {
 					console.warn('🔒 [PageAccess] No role key resolved for role:', currentRole, 'Available keys:', Object.keys(pageAccessByRole));
 				}
 				return false;
@@ -334,7 +344,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 			const allowedPageIds = pageAccessByRole[roleKey];
 			if (!allowedPageIds || allowedPageIds.length === 0) {
-				if (import.meta.env.DEV) {
+				if (debugLogsEnabled) {
 					console.warn('🔒 [PageAccess] No page IDs found for role:', roleKey, 'Resolved from:', currentRole);
 				}
 				return false;
@@ -390,7 +400,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					});
 				});
 				
-				if (import.meta.env.DEV && hasRoleAccess) {
+				if (debugLogsEnabled && hasRoleAccess) {
 					console.log('✅ [PageAccess] Access granted via PATH-based matching:', {
 						path: pagePathLower,
 						matchingPages: pagesWithSamePath.map(p => ({ id: p.id, dbId: p.dbId }))
@@ -420,7 +430,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					});
 				}
 				
-				if (import.meta.env.DEV && hasRoleAccess) {
+				if (debugLogsEnabled && hasRoleAccess) {
 					console.log('✅ [PageAccess] Access granted via ID-based matching:', {
 						pageId: page.id,
 						pageDbId: page.dbId
@@ -430,14 +440,15 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			
 			// TERTIARY: For officers, allow access to specific pages they should always have
 			// (This happens BEFORE the debug logging so we can see if it worked)
-			const isOfficer = currentRole === 'advantageoneofficer' || currentRole === 'advantageonehoofficer';
+			const normalizedCurrentRole = normalizeRoleId(currentRole);
+			const isOfficer = normalizedCurrentRole === 'securityofficer' || normalizedCurrentRole === 'manager';
 			const isCustomerPage = page.path?.startsWith('/customer') || page.category === 'Customer';
 			const isManagementCustomerReporting = page.path === '/management/customer-reporting' || page.id === 'management-customer-reporting';
 			
 			if (!hasRoleAccess && isOfficer) {
 				// Officers can access customer pages (customer assignment checked at API level)
 				if (isCustomerPage) {
-					if (import.meta.env.DEV) {
+					if (debugLogsEnabled) {
 						console.log('✅ [PageAccess] Allowing customer page access for officer (customer assignment checked at API level):', {
 							path,
 							pageId: page.id,
@@ -449,7 +460,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 				}
 				// Officers should always have access to management customer reporting
 				else if (isManagementCustomerReporting) {
-					if (import.meta.env.DEV) {
+					if (debugLogsEnabled) {
 						console.log('✅ [PageAccess] Allowing management customer reporting for officer:', {
 							path,
 							pageId: page.id,
@@ -460,7 +471,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 				}
 			}
 			
-			if (import.meta.env.DEV && !hasRoleAccess) {
+			if (debugLogsEnabled && !hasRoleAccess) {
 				const debugInfo = {
 					originalPath: path,
 					normalizedPath,
@@ -597,11 +608,11 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			}
 
 			// For customer roles accessing customer pages, check customer assignments
-			const isCustomerRole = currentRole === 'customersitemanager' || currentRole === 'customerhomanager';
+			const customerRoleDetected = isCustomerRole(currentRole);
 
-			if (isCustomerRole && isCustomerPage && customerAssignedPageIds.size > 0) {
+			if (customerRoleDetected && isCustomerPage && customerAssignedPageIds.size > 0) {
 				const hasCustomerAssignment = customerAssignedPageIds.has(page.id);
-				if (import.meta.env.DEV) {
+				if (debugLogsEnabled) {
 					console.log('🔍 [PageAccess] Customer assignment check:', {
 						path,
 						pageId: page.id,
@@ -616,7 +627,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			}
 
 			// Success - access granted
-			if (import.meta.env.DEV) {
+			if (debugLogsEnabled) {
 				const endTime = performance.now();
 				const duration = endTime - startTime;
 				console.log('✅ [PageAccess] Access GRANTED:', {
@@ -626,7 +637,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					currentRole,
 					roleKey,
 					duration: `${duration.toFixed(2)}ms`,
-					reason: isCustomerRole && isCustomerPage 
+						reason: customerRoleDetected && isCustomerPage 
 						? 'Customer role with customer page (no assignment check needed)' 
 						: 'Role has access to page'
 				});
@@ -695,8 +706,8 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 		}
 
 		// Load customer assignments if needed
-		const isCustomerRole = normalizedRole === 'customersitemanager' || normalizedRole === 'customerhomanager';
-		if (isCustomerRole && user) {
+		const customerRoleDetected = isCustomerRole(normalizedRole);
+		if (customerRoleDetected && user) {
 			const customerId = 'customerId' in user ? user.customerId : null;
 			await loadCustomerPageAssignments(customerId);
 		} else {
@@ -709,7 +720,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 	// This runs synchronously on mount and whenever user changes
 	useEffect(() => {
 		if (user) {
-			const userRole = (user as any).pageAccessRole || user.role || null;
+			const userRole = user.pageAccessRole || user.role || null;
 			const normalizedRole = normalizeRoleName(userRole);
 			if (normalizedRole && normalizedRole !== currentRole) {
 				setCurrentRoleState(normalizedRole);
@@ -718,7 +729,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			// Clear role when user logs out
 			setCurrentRoleState(null);
 		}
-	}, [user?.id, user?.role, normalizeRoleName]); // Only depend on user.id and user.role, not currentRole
+	}, [user, currentRole, normalizeRoleName]);
 
 	// Initialize on mount and when user/auth token changes
 	useEffect(() => {
@@ -752,15 +763,15 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 				// Set role from user (in case it wasn't set yet)
 				if (user) {
-					const userRole = (user as any).pageAccessRole || user.role || null;
+					const userRole = user.pageAccessRole || user.role || null;
 					const normalizedRole = normalizeRoleName(userRole);
 					
 					if (normalizedRole) {
 						setCurrentRoleState(normalizedRole);
 						
 						// Load customer assignments if needed
-						const isCustomerRole = normalizedRole === 'customersitemanager' || normalizedRole === 'customerhomanager';
-						if (isCustomerRole && 'customerId' in user) {
+						const customerRoleDetected = isCustomerRole(normalizedRole);
+						if (customerRoleDetected && 'customerId' in user) {
 							await loadCustomerPageAssignments(user.customerId);
 						}
 					}
@@ -771,7 +782,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 				
 				// Set role from user even on error
 				if (user) {
-					const userRole = (user as any).pageAccessRole || user.role || null;
+					const userRole = user.pageAccessRole || user.role || null;
 					const normalizedRole = normalizeRoleName(userRole);
 					if (normalizedRole) {
 						setCurrentRoleState(normalizedRole);
@@ -783,7 +794,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 		};
 
 		initialize();
-	}, [hasAuthToken, user?.id, loadPageAccessSettings, normalizeRoleName, loadCustomerPageAssignments]);
+	}, [hasAuthToken, user, loadPageAccessSettings, normalizeRoleName, loadCustomerPageAssignments]);
 
 	// Reset when user logs out
 	useEffect(() => {

@@ -21,6 +21,7 @@ import { settingsService } from '@/services/settingsService'
 import { PageAccess } from '@/api/pageAccess'
 import { LoadingSpinner } from "@/components/ui/loading-state"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { roleDisplayName } from '@/utils/roles'
 
 // Define types for our page access configuration
 type Page = PageAccess;
@@ -37,14 +38,14 @@ const Settings = () => {
   // Define user roles (stored in lowercase to match backend)
   const userRoles: UserRole[] = [
     { 
-      id: 'advantageoneofficer', 
-      name: 'Advantage One Officer', 
-      description: 'Security officers working on site' 
+      id: 'securityofficer', 
+      name: 'Security Officer', 
+      description: 'Security officers working on site operations' 
     },
     { 
-      id: 'advantageonehoofficer', 
-      name: 'Advantage One HO Officer', 
-      description: 'Head office staff managing operations' 
+      id: 'manager', 
+      name: 'Manager', 
+      description: 'Management users with cross-functional oversight' 
     },
     { 
       id: 'administrator', 
@@ -52,14 +53,9 @@ const Settings = () => {
       description: 'System administrators with full access' 
     },
     { 
-      id: 'customersitemanager', 
-      name: 'Customer Site Manager', 
-      description: 'Client managers at specific locations' 
-    },
-    { 
-      id: 'customerhomanager', 
-      name: 'Customer Head Office Manager', 
-      description: 'Client executives overseeing all sites' 
+      id: 'customer', 
+      name: 'Customer', 
+      description: 'Customer users with client-facing access' 
     }
   ];
 
@@ -108,7 +104,7 @@ const Settings = () => {
     if (settingsKey !== lastSyncedSettingsRef.current) {
       // Log what we're syncing (for debugging)
       if (import.meta.env.DEV) {
-        const officerPages = settings.pageAccessByRole['advantageoneofficer'] || [];
+				const officerPages = settings.pageAccessByRole['securityofficer'] || [];
         const crmPages = officerPages.filter(id => id.startsWith('crm-'));
         console.log(`🔄 [Settings] Syncing from API - Officer has ${crmPages.length} CRM pages:`, crmPages);
       }
@@ -145,7 +141,7 @@ const Settings = () => {
     onSuccess: async (data) => {
       // Log what was saved
       if (import.meta.env.DEV) {
-        const officerPages = data.pageAccessByRole['advantageoneofficer'] || [];
+        const officerPages = data.pageAccessByRole['securityofficer'] || [];
         const customerReportingPages = officerPages.filter(id => 
           id === 'management-customer-reporting' || id === 'customer-reporting' || id.includes('customer-reporting')
         );
@@ -168,7 +164,7 @@ const Settings = () => {
       await refreshSettings();
       
       toast({
-        title: adminAccessModified ? "Warning: Admin Access Modified" : "Settings Saved",
+        title: adminAccessModified ? "Warning: admin access modified" : "Settings saved",
         description: adminAccessModified 
           ? "You have modified administrator access. This may affect system functionality."
           : "Page access settings have been saved successfully. Changes are now active.",
@@ -182,30 +178,43 @@ const Settings = () => {
       // Also invalidate to ensure fresh data on next load, but don't refetch immediately
       queryClient.invalidateQueries({ queryKey: ['pageAccess'] });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const errorPayload = error as {
+        message?: string
+        response?: {
+          data?: { message?: string; errors?: string[] }
+          status?: number
+          statusText?: string
+        }
+        config?: {
+          url?: string
+          data?: unknown
+        }
+      }
+
       // Log detailed error information
       console.error('❌ [Settings] Failed to save settings:', error);
       console.error('❌ [Settings] Error details:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-        statusText: error?.response?.statusText,
-        url: error?.config?.url,
-        requestData: error?.config?.data
+        message: errorPayload?.message,
+        response: errorPayload?.response?.data,
+        status: errorPayload?.response?.status,
+        statusText: errorPayload?.response?.statusText,
+        url: errorPayload?.config?.url,
+        requestData: errorPayload?.config?.data
       });
       
       // Extract error message from response
       let errorMessage = "There was a problem saving your changes. Please try again.";
-      if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error?.response?.data?.errors && Array.isArray(error.response.data.errors)) {
-        errorMessage = error.response.data.errors.join(', ');
-      } else if (error?.message) {
-        errorMessage = error.message;
+      if (errorPayload?.response?.data?.message) {
+        errorMessage = errorPayload.response.data.message;
+      } else if (errorPayload?.response?.data?.errors && Array.isArray(errorPayload.response.data.errors)) {
+        errorMessage = errorPayload.response.data.errors.join(', ');
+      } else if (errorPayload?.message) {
+        errorMessage = errorPayload.message;
       }
       
       toast({
-        title: "Error Saving Settings",
+        title: "Error saving settings",
         description: errorMessage,
         variant: "destructive",
       });
@@ -227,14 +236,14 @@ const Settings = () => {
       await refreshSettings();
       
       toast({
-        title: "Admin Access Reset",
+        title: "Admin access reset",
         description: "Administrator access has been restored to full access.",
       });
       queryClient.invalidateQueries({ queryKey: ['pageAccess'] });
     },
     onError: () => {
       toast({
-        title: "Error Resetting Admin Access",
+        title: "Error resetting admin access",
         description: "Failed to reset administrator access. Please try again.",
         variant: "destructive",
       });
@@ -242,13 +251,13 @@ const Settings = () => {
   });
 
   const officerCustomerReportingEnabled = useMemo(() => {
-    const officerPages = pageAccessByRole['advantageoneofficer'] || [];
+    const officerPages = pageAccessByRole['securityofficer'] || [];
     return officerPages.includes('management-customer-reporting');
   }, [pageAccessByRole]);
 
   if (queryLoading) {
     return (
-      <div className="w-full h-[50vh] flex items-center justify-center">
+      <div className="w-full min-h-[40vh] flex items-center justify-center">
         <LoadingSpinner size="lg" className="text-primary/80" />
       </div>
     );
@@ -372,7 +381,7 @@ const Settings = () => {
     // Prevent toggling Administrator access unless explicitly modifying
     if (roleId === 'administrator' && !adminAccessModified) {
       toast({
-        title: "Administrator Access Protected",
+        title: "Administrator access protected",
         description: "Administrator must have access to all pages by default. Use 'Reset Admin Access' to restore full access.",
         variant: "default",
       });
@@ -391,7 +400,7 @@ const Settings = () => {
   // Handle save changes
   // Handler for officer customer reporting toggle
   const handleOfficerReportingToggle = (enabled: boolean) => {
-    updateRoleAccess('advantageoneofficer', (pages) => {
+    updateRoleAccess('securityofficer', (pages) => {
       if (enabled) {
         pages.add('management-customer-reporting');
       } else {
@@ -399,7 +408,7 @@ const Settings = () => {
       }
     });
     toast({
-      title: "Setting Updated",
+      title: "Setting updated",
       description: `Officer Customer Reporting access has been ${enabled ? 'enabled' : 'disabled'}.`,
     });
   };
@@ -438,7 +447,7 @@ const Settings = () => {
     saveSettings({ pageAccessByRole: updatedSettings });
     setAdminAccessModified(false);
     toast({
-      title: "Admin Access Reset",
+      title: "Admin access reset",
       description: "Administrator access has been restored to full access.",
     });
   };
@@ -465,13 +474,13 @@ const Settings = () => {
         </Alert>
       )}
 
-      <div className="bg-white rounded-lg shadow-sm border border-border/40">
+      <div className="bg-card rounded-lg shadow-sm border border-border/40">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between p-2 sm:p-3 md:p-4 border-b">
           <div className="mb-2 md:mb-0">
             <h1 className="text-base sm:text-lg md:text-xl font-semibold flex items-center gap-1.5 sm:gap-2">
               <UserCog className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-              Configure User Role Access
+              Configure user role access
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">
               Manage which pages each user role can access in the application
@@ -589,10 +598,10 @@ const Settings = () => {
           <div className="border rounded-md shadow-sm">
             {/* Table for Larger Screens */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full min-w-[900px] 2xl:min-w-[1200px] 3xl:min-w-[1600px]">
+              <table className="w-full min-w-[760px] lg:min-w-[920px]">
                 <thead className="bg-muted/50 sticky top-0 z-10">
                   <tr>
-                    <th className="text-left py-2.5 px-3 sm:py-3 sm:px-4 font-medium text-xs sm:text-sm w-1/4">Page</th>
+                    <th className="text-left py-2.5 px-3 sm:py-3 sm:px-4 font-medium text-xs sm:text-sm w-[28%]">Page</th>
                     {userRoles.map((role) => (
                       <th key={role.id} className="text-center py-2.5 px-2 sm:py-3 sm:px-3 font-medium text-xs whitespace-nowrap">
                         <TooltipProvider>
@@ -646,8 +655,8 @@ const Settings = () => {
             </div>
 
             {/* Table for Small Screens */}
-            <div className="block md:hidden">
-              <table className="w-full min-w-[280px]">
+            <div className="block md:hidden overflow-x-auto">
+              <table className="w-full min-w-0">
                 <thead className="bg-muted/50 sticky top-0 z-10">
                   <tr>
                     <th className="text-left py-2.5 px-3 sm:py-3 sm:px-4 font-medium text-xs sm:text-sm w-3/5">Page</th>

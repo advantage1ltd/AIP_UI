@@ -175,60 +175,105 @@ export function RegionsTable({ customerId, onEdit, onDataChange, updateTrigger }
       ) : (
         <>
           <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Region Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentRegionsTable.map((region) => (
-                  <TableRow key={region.regionID}>
-                    <TableCell className="font-medium">{region.regionName}</TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {region.regionDescription || "No description"}
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        region.recordIsDeletedYN 
-                          ? 'bg-red-100 text-red-800' 
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {region.recordIsDeletedYN ? 'Deleted' : 'Active'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(region.dateCreated).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onEdit(region)}
-                          disabled={region.recordIsDeletedYN}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteClick(region)}
-                          className="text-red-600 hover:text-red-700"
-                          disabled={isLoading}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="space-y-2 p-2 sm:hidden">
+              {currentRegionsTable.map((region) => (
+                <div key={`mobile-${region.regionID}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">{region.regionName}</p>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">{region.regionDescription || 'No description'}</p>
+                    </div>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      region.recordIsDeletedYN ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                    }`}>
+                      {region.recordIsDeletedYN ? 'Deleted' : 'Active'}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-600">
+                    Created: {new Date(region.dateCreated).toLocaleDateString()}
+                  </div>
+                  <div className="mt-3 flex items-center justify-end gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEdit(region)}
+                      disabled={region.recordIsDeletedYN}
+                      className="h-7 w-7 p-0 border-purple-200 text-purple-600 hover:bg-purple-50"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      <span className="sr-only">Edit region</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteClick(region)}
+                      className="h-7 w-7 p-0 border-red-200 text-red-600 hover:bg-red-50"
+                      disabled={isLoading}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span className="sr-only">Delete region</span>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Region Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {currentRegionsTable.map((region) => (
+                    <TableRow key={region.regionID}>
+                      <TableCell className="font-medium">{region.regionName}</TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {region.regionDescription || "No description"}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          region.recordIsDeletedYN 
+                            ? 'bg-red-100 text-red-800' 
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {region.recordIsDeletedYN ? 'Deleted' : 'Active'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(region.dateCreated).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onEdit(region)}
+                            disabled={region.recordIsDeletedYN}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteClick(region)}
+                            className="text-red-600 hover:text-red-700"
+                            disabled={isLoading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
 
           {/* Pagination */}
