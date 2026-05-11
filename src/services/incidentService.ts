@@ -1,6 +1,23 @@
+/**
+ * Incident operations API (`/incidents`): CRUD, stats, repeat-offender search, graph DTO types.
+ * Flow: optional customer header → api/incidents or direct api calls → UI types for operations and reports.
+ * Overlap: services/api/incidents.ts exposes envelope-typed list/detail helpers; incidentGraphService.ts handles chart aggregates.
+ */
 import { Incident, IncidentStats, RepeatOffenderSearchPayload, RepeatOffenderSearchResponse } from '@/types/incidents'
+import { logger } from '@/utils/logger'
 import { getCurrentCustomerId } from '@/lib/utils'
-import { BASE_API_URL } from '@/config/api'
+import { api, handleApiError } from '@/config/api'
+import { incidentsApi } from '@/services/api/incidents'
+import type { GetIncidentsParams } from '@/types/api'
+
+const optionalCustomerHeaders = (): Record<string, string> => {
+	const customerId = getCurrentCustomerId()
+	const headers: Record<string, string> = {}
+	if (customerId) {
+		headers['X-Customer-Id'] = customerId.toString()
+	}
+	return headers
+}
 
 export interface IncidentGraphData {
 	id: string
@@ -34,8 +51,11 @@ export interface IncidentGraphData {
 		totalAmount: number
 	}>
 	totalValueRecovered: number
+	totalValueLost?: number
 	value: number
 	valueRecovered: number
+	recoveredValue?: number
+	lossValue?: number
 	quantityRecovered: number
 	quantity: number
 	amount: number
@@ -67,7 +87,7 @@ export interface IncidentGraphData {
 	arrestSaveComment: string
 	dateInputted: string
 	assignedTo: string
-	store?: string // Legacy field for backward compatibility
+	store?: string
 }
 
 export interface IncidentGraphResponse {
@@ -112,284 +132,167 @@ export interface IncidentGraphFilters {
 	graphType?: string
 }
 
-/**
- * Fetch incident graph data with filtering
- */
 export const fetchIncidentGraphData = async (
 	filters: IncidentGraphFilters
 ): Promise<IncidentGraphResponse> => {
-	const searchParams = new URLSearchParams()
-	
-	// Add filters to search params
-	searchParams.append('customerId', filters.customerId.toString())
-	if (filters.startDate) searchParams.append('startDate', filters.startDate)
-	if (filters.endDate) searchParams.append('endDate', filters.endDate)
-	if (filters.regionId) searchParams.append('regionId', filters.regionId)
-	if (filters.officerType) searchParams.append('officerType', filters.officerType)
-	if (filters.graphType) searchParams.append('graphType', filters.graphType)
+	try {
+		const searchParams = new URLSearchParams()
+		searchParams.append('customerId', filters.customerId.toString())
+		if (filters.startDate) searchParams.append('startDate', filters.startDate)
+		if (filters.endDate) searchParams.append('endDate', filters.endDate)
+		if (filters.regionId) searchParams.append('regionId', filters.regionId)
+		if (filters.officerType) searchParams.append('officerType', filters.officerType)
+		if (filters.graphType) searchParams.append('graphType', filters.graphType)
 
-	const response = await fetch(`${BASE_API_URL}/incidents/graph-data?${searchParams}`, {
-		method: 'GET',
-		headers: {
-			'Content-Type': 'application/json',
-			'X-Customer-Id': filters.customerId.toString()
-		}
-	})
-
-	if (!response.ok) {
-		throw new Error(`HTTP error! status: ${response.status}`)
+		const { data } = await api.get<IncidentGraphResponse>(
+			`/incidents/graph-data?${searchParams}`,
+			{ headers: { 'X-Customer-Id': filters.customerId.toString() } }
+		)
+		return data
+	} catch (error) {
+		throw new Error(handleApiError(error))
 	}
-
-	return response.json()
 }
 
-/**
- * Fetch incident types summary with filtering
- */
 export const fetchIncidentTypesData = async (
 	filters: Omit<IncidentGraphFilters, 'graphType'>
 ): Promise<IncidentTypesResponse> => {
-	const searchParams = new URLSearchParams()
-	
-	// Add filters to search params
-	searchParams.append('customerId', filters.customerId.toString())
-	if (filters.startDate) searchParams.append('startDate', filters.startDate)
-	if (filters.endDate) searchParams.append('endDate', filters.endDate)
-	if (filters.regionId) searchParams.append('regionId', filters.regionId)
-	if (filters.officerType) searchParams.append('officerType', filters.officerType)
+	try {
+		const searchParams = new URLSearchParams()
+		searchParams.append('customerId', filters.customerId.toString())
+		if (filters.startDate) searchParams.append('startDate', filters.startDate)
+		if (filters.endDate) searchParams.append('endDate', filters.endDate)
+		if (filters.regionId) searchParams.append('regionId', filters.regionId)
+		if (filters.officerType) searchParams.append('officerType', filters.officerType)
 
-	const response = await fetch(`${BASE_API_URL}/incidents/types-summary?${searchParams}`, {
-		method: 'GET',
-		headers: {
-			'Content-Type': 'application/json',
-			'X-Customer-Id': filters.customerId.toString()
-		}
-	})
-
-	if (!response.ok) {
-		throw new Error(`HTTP error! status: ${response.status}`)
+		const { data } = await api.get<IncidentTypesResponse>(
+			`/incidents/types-summary?${searchParams}`,
+			{ headers: { 'X-Customer-Id': filters.customerId.toString() } }
+		)
+		return data
+	} catch (error) {
+		throw new Error(handleApiError(error))
 	}
-
-	return response.json()
 }
 
-/**
- * Fetch available regions for a customer
- */
-export const fetchCustomerRegions = async (customerId: number): Promise<{ success: boolean; data: string[] }> => {
-	const response = await fetch(`${BASE_API_URL}/incidents/regions?customerId=${customerId}`, {
-		method: 'GET',
-		headers: {
-			'Content-Type': 'application/json',
-			'X-Customer-Id': customerId.toString()
-		}
-	})
-
-	if (!response.ok) {
-		throw new Error(`HTTP error! status: ${response.status}`)
+export const fetchCustomerRegions = async (
+	customerId: number
+): Promise<{ success: boolean; data: string[] }> => {
+	try {
+		const { data } = await api.get<{ success: boolean; data: string[] }>(
+			`/incidents/regions?customerId=${customerId}`,
+			{ headers: { 'X-Customer-Id': customerId.toString() } }
+		)
+		return data
+	} catch (error) {
+		throw new Error(handleApiError(error))
 	}
-
-	return response.json()
 }
+
+type IncidentItemEnvelope = { success: boolean; data: Incident; message?: string }
 
 export const incidentService = {
-	// Get all incidents (filtered by customer if customer ID available)
-	async getIncidents(): Promise<Incident[]> {
+	async getIncidents(params?: GetIncidentsParams): Promise<Incident[]> {
 		try {
-			const customerId = getCurrentCustomerId()
-			const headers: HeadersInit = {}
-			
-			if (customerId) {
-				headers['X-Customer-Id'] = customerId.toString()
-			}
-			
-			const response = await fetch(`${BASE_API_URL}/incidents`, { headers })
-			const result = await response.json()
-			
-			if (!result.success) {
-				throw new Error(result.message || 'Failed to fetch incidents')
-			}
-			
-			return result.data
+			const response = await incidentsApi.getIncidents({
+				page: 1,
+				pageSize: 50,
+				...params,
+			})
+			return response.data
 		} catch (error) {
-			console.error('Error fetching incidents:', error)
-			throw error
+			logger.error('Error fetching incidents:', error)
+			throw error instanceof Error ? error : new Error(handleApiError(error))
 		}
 	},
 
-	// Get incident by ID
 	async getIncidentById(id: string): Promise<Incident> {
 		try {
-			const customerId = getCurrentCustomerId()
-			const headers: HeadersInit = {}
-			
-			if (customerId) {
-				headers['X-Customer-Id'] = customerId.toString()
-			}
-			
-			const response = await fetch(`${BASE_API_URL}/incidents/${id}`, { headers })
-			const result = await response.json()
-			
+			const { data: result } = await api.get<IncidentItemEnvelope>(`/incidents/${id}`, {
+				headers: optionalCustomerHeaders(),
+			})
 			if (!result.success) {
 				throw new Error(result.message || 'Failed to fetch incident')
 			}
-			
 			return result.data
 		} catch (error) {
-			console.error('Error fetching incident:', error)
-			throw error
+			logger.error('Error fetching incident:', error)
+			throw error instanceof Error ? error : new Error(handleApiError(error))
 		}
 	},
 
-	// Get incidents by customer ID
 	async getIncidentsByCustomer(customerId: string): Promise<Incident[]> {
 		try {
-			const headers: HeadersInit = {
-				'X-Customer-Id': customerId
-			}
-			
-			const response = await fetch(`${BASE_API_URL}/incidents`, { headers })
-			const result = await response.json()
-			
-			if (!result.success) {
-				throw new Error(result.message || 'Failed to fetch incidents')
-			}
-			
-			return result.data
+			const response = await incidentsApi.getIncidents({
+				page: 1,
+				pageSize: 50,
+				customerId,
+			})
+			return response.data
 		} catch (error) {
-			console.error('Error fetching incidents by customer:', error)
-			throw error
+			logger.error('Error fetching incidents by customer:', error)
+			throw error instanceof Error ? error : new Error(handleApiError(error))
 		}
 	},
 
-	// Get incident statistics
-	async getIncidentStats(): Promise<IncidentStats> {
+	async getIncidentStats(filters?: GetIncidentsParams): Promise<IncidentStats> {
 		try {
-			const customerId = getCurrentCustomerId()
-			const headers: HeadersInit = {}
-			
-			if (customerId) {
-				headers['X-Customer-Id'] = customerId.toString()
-			}
-			
-			const response = await fetch(`${BASE_API_URL}/incidents/stats`, { headers })
-			const result = await response.json()
-			
-			if (!result.success) {
-				throw new Error(result.message || 'Failed to fetch incident stats')
-			}
-			
+			const result = await incidentsApi.getIncidentStats(filters)
+			if (!result.success) throw new Error(result.message || 'Failed to fetch incident stats')
 			return result.data
 		} catch (error) {
-			console.error('Error fetching incident stats:', error)
-			throw error
+			logger.error('Error fetching incident stats:', error)
+			throw error instanceof Error ? error : new Error(handleApiError(error))
 		}
 	},
 
-	// Create new incident
 	async createIncident(incident: Partial<Incident>): Promise<void> {
 		try {
-			const customerId = getCurrentCustomerId()
-			const headers: HeadersInit = {
-				'Content-Type': 'application/json'
-			}
-			
-			if (customerId) {
-				headers['X-Customer-Id'] = customerId.toString()
-			}
-			
-			const response = await fetch(`${BASE_API_URL}/incidents`, {
-				method: 'POST',
-				headers,
-				body: JSON.stringify(incident)
-			})
-			
-			const result = await response.json()
-			
-			if (!result.success) {
-				throw new Error(result.message || 'Failed to create incident')
-			}
+			await incidentsApi.createIncident(incident as Omit<Incident, 'id' | 'dateInputted'>)
 		} catch (error) {
-			console.error('Error creating incident:', error)
-			throw error
+			logger.error('Error creating incident:', error)
+			throw error instanceof Error ? error : new Error(handleApiError(error))
 		}
 	},
 
-	// Update incident
 	async updateIncident(id: string, incident: Partial<Incident>): Promise<void> {
 		try {
-			const customerId = getCurrentCustomerId()
-			const headers: HeadersInit = {
-				'Content-Type': 'application/json'
-			}
-			
-			if (customerId) {
-				headers['X-Customer-Id'] = customerId.toString()
-			}
-			
-			const response = await fetch(`${BASE_API_URL}/incidents/${id}`, {
-				method: 'PUT',
-				headers,
-				body: JSON.stringify(incident)
-			})
-			
-			const result = await response.json()
-			
-			if (!result.success) {
-				throw new Error(result.message || 'Failed to update incident')
-			}
+			await incidentsApi.updateIncident(id, incident as Omit<Incident, 'id' | 'dateInputted'>)
 		} catch (error) {
-			console.error('Error updating incident:', error)
-			throw error
+			logger.error('Error updating incident:', error)
+			throw error instanceof Error ? error : new Error(handleApiError(error))
 		}
 	},
 
-	// Delete incident
 	async deleteIncident(id: string): Promise<void> {
 		try {
-			const customerId = getCurrentCustomerId()
-			const headers: HeadersInit = {}
-			
-			if (customerId) {
-				headers['X-Customer-Id'] = customerId.toString()
-			}
-			
-			const response = await fetch(`${BASE_API_URL}/incidents/${id}`, {
-				method: 'DELETE',
-				headers
-			})
-			
-			const result = await response.json()
-			
-			if (!result.success) {
-				throw new Error(result.message || 'Failed to delete incident')
-			}
+			await incidentsApi.deleteIncident(id)
 		} catch (error) {
-			console.error('Error deleting incident:', error)
-			throw error
+			logger.error('Error deleting incident:', error)
+			throw error instanceof Error ? error : new Error(handleApiError(error))
 		}
 	},
 
-	async searchRepeatOffenders(payload: RepeatOffenderSearchPayload): Promise<RepeatOffenderSearchResponse> {
-		const searchParams = new URLSearchParams()
-		if (payload.name) searchParams.append('name', payload.name)
-		if (payload.dateOfBirth) searchParams.append('dateOfBirth', payload.dateOfBirth)
-		if (payload.marks) searchParams.append('marks', payload.marks)
-		if (payload.page) searchParams.append('page', payload.page.toString())
-		if (payload.pageSize) searchParams.append('pageSize', payload.pageSize.toString())
+	async searchRepeatOffenders(
+		payload: RepeatOffenderSearchPayload
+	): Promise<RepeatOffenderSearchResponse> {
+		try {
+			const searchParams = new URLSearchParams()
+			if (payload.name) searchParams.append('name', payload.name)
+			if (payload.dateOfBirth) searchParams.append('dateOfBirth', payload.dateOfBirth)
+			if (payload.marks) searchParams.append('marks', payload.marks)
+			if (payload.page) searchParams.append('page', payload.page.toString())
+			if (payload.pageSize) searchParams.append('pageSize', payload.pageSize.toString())
 
-		const response = await fetch(`${BASE_API_URL}/incidents/repeat-offenders?${searchParams}`, {
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json'
+			const { data: result } = await api.get<RepeatOffenderSearchResponse>(
+				`/incidents/repeat-offenders?${searchParams}`
+			)
+			if (!result.success) {
+				throw new Error(result.message || 'Failed to search repeat offenders')
 			}
-		})
-
-		const result: RepeatOffenderSearchResponse = await response.json()
-		if (!response.ok || !result.success) {
-			throw new Error(result.message || 'Failed to search repeat offenders')
+			return result
+		} catch (error) {
+			throw error instanceof Error ? error : new Error(handleApiError(error))
 		}
-
-		return result
-	}
-} 
+	},
+}

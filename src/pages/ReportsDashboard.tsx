@@ -1,3 +1,7 @@
+/**
+ * Customer reporting dashboard: incident analytics tabs fed by incidentService.
+ * Flow: shared incident filters → tabbed charts/tables → drill-down links into operations routes.
+ */
 import { useState, useMemo, useEffect } from "react"
 import { useSelector } from "react-redux"
 import { 
@@ -25,8 +29,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { NativeDateInput } from "@/components/ui/native-date-input"
 import { Badge } from "@/components/ui/badge"
 import { 
   ChartContainer, 
@@ -50,7 +53,7 @@ import {
   Area
 } from "recharts"
 import { 
-  Calendar as CalendarIcon, 
+  Calendar,
   ChevronDown, 
   ChevronRight, 
   Download, 
@@ -62,13 +65,11 @@ import {
   TrendingUp, 
   ShoppingBag,
   Clock,
-  Calendar as CalendarDay,
   Shield,
   Users,
   ShieldCheck
 } from "lucide-react"
 import { format } from "date-fns"
-import type { DateRange } from "react-day-picker"
 import { cn } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 
@@ -80,115 +81,29 @@ import {
   IncidentInvolved
 } from "@/types/incidents"
 
-// Define colors for charts
-const COLORS = [
-  '#3b82f6', // blue-500
-  '#8b5cf6', // violet-500
-  '#f43f5e', // rose-500
-  '#f97316', // orange-500
-  '#10b981', // emerald-500
-  '#6366f1', // indigo-500
-  '#ec4899', // pink-500
-  '#94a3b8'  // slate-400
-];
-
-// Color scheme for incident types
-const incidentTypeColors: Record<string, string> = {
-  [IncidentType.ARREST]: '#3b82f6', // Blue
-  [IncidentType.DETER]: '#8b5cf6', // Purple
-  [IncidentType.THEFT]: '#f43f5e', // Rose
-  [IncidentType.CRIMINAL_DAMAGE]: '#f97316', // Orange
-  [IncidentType.CREDIT_CARD_FRAUD]: '#ec4899', // Pink
-  [IncidentType.SUSPICIOUS_BEHAVIOUR]: '#10b981', // Emerald 
-  [IncidentType.UNDERAGE_PURCHASE]: '#06b6d4', // Cyan
-  [IncidentType.ANTI_SOCIAL]: '#6366f1', // Indigo
-  [IncidentType.OTHERS]: '#94a3b8', // Slate
-  [IncidentInvolved.SELF_SCAN_TILLS]: '#3b82f6', // Blue
-  [IncidentInvolved.ABUSIVE_BEHAVIOUR]: '#f43f5e', // Rose
-  [IncidentInvolved.THREATS_AND_INTIMIDATION]: '#f97316', // Orange
-  [IncidentInvolved.SPITTING]: '#ec4899', // Pink
-  [IncidentInvolved.BAN_FROM_STORE]: '#10b981', // Emerald
-  [IncidentInvolved.VIOLENT_BEHAVIOR]: '#6366f1', // Indigo
-  [IncidentInvolved.SCAN_AND_GO]: '#8b5cf6', // Purple
-  [IncidentInvolved.POLICE_FAILED_TO_ATTEND]: '#facc15' // Yellow
-}
-
-// Dashboard components
-const StatsCard = ({ title, value, icon: Icon, change, changeType, backgroundClass }: {
-  title: string
-  value: string | number
-  icon: React.ElementType
-  change?: string
-  changeType?: "positive" | "negative" | "neutral"
-  backgroundClass: string // Added prop for background
-}) => {
-  // Determine text color based on changeType for the change text
-  const changeTextColor = 
-    changeType === "positive" ? "text-emerald-200" :
-    changeType === "negative" ? "text-rose-200" :
-    "text-slate-300"; // Neutral
-
-  return (
-    <Card className={cn(
-      `bg-gradient-to-br text-white shadow-lg`,
-      backgroundClass // Use the passed background class
-    )}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-200">{title}</p>
-            <h4 className="text-2xl font-bold mt-1">{value}</h4>
-            {change && (
-              <p className={cn(
-                "text-xs font-medium mt-1",
-                changeTextColor // Apply specific color to change text only
-              )}>
-                {change}
-              </p>
-            )}
-          </div>
-          <div className={cn(
-            "p-2 rounded-lg bg-white/20" // Use a consistent semi-transparent white background for the icon
-          )}>
-            <Icon className="h-5 w-5" /> {/* Icon color will be white due to parent text-white */}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+import { COLORS, incidentTypeColors } from './reportsDashboard/constants'
+import { parseIncidentHour } from './reportsDashboard/utils'
+import { StatsCard } from './reportsDashboard/StatsCard'
+import { useReportsFilters, useReportsIncidentData } from './reportsDashboard/useReportsData'
 
 const ReportsDashboard = () => {
-  // State for filters and date ranges
-  const [activeTab, setActiveTab] = useState("overview")
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(new Date().setDate(new Date().getDate() - 30)),
-    to: new Date()
-  })
-  const [customerFilter, setCustomerFilter] = useState<string>("all")
-  const [storeFilter, setStoreFilter] = useState<string>("all")
-  const [incidentTypeFilter, setIncidentTypeFilter] = useState<string>("all")
-  const [incidentInvolvedFilter, setIncidentInvolvedFilter] = useState<string>("all")
 
-  // State for incidents data
-  const [incidents, setIncidents] = useState<Incident[]>([])
-  const [loading, setLoading] = useState(true)
+  const { incidents, loading } = useReportsIncidentData()
+  const {
+    activeTab,
+    setActiveTab,
+    dateRange,
+    setDateRange,
+    customerFilter,
+    setCustomerFilter,
+    storeFilter,
+    setStoreFilter,
+    incidentTypeFilter,
+    setIncidentTypeFilter,
+    incidentInvolvedFilter,
+    setIncidentInvolvedFilter,
+  } = useReportsFilters()
 
-  // Load incidents data
-  useEffect(() => {
-    const loadIncidents = async () => {
-      try {
-        const data = await incidentService.getIncidents()
-        setIncidents(data)
-      } catch (error) {
-        console.error('Error loading incidents:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    loadIncidents()
-  }, [])
 
   // Show loading state while data is being fetched
   if (loading) {
@@ -303,7 +218,10 @@ const ReportsDashboard = () => {
     filteredIncidents
       .filter(incident => incident.incidentType === IncidentType.THEFT)
       .forEach(incident => {
-        const date = new Date(incident.date)
+        const raw = incident.date ?? incident.dateOfIncident
+        if (!raw) return
+        const date = new Date(raw)
+        if (Number.isNaN(date.getTime())) return
         const monthYear = format(date, 'MMM yyyy')
         
         months[monthYear] = (months[monthYear] || 0) + 1
@@ -359,45 +277,191 @@ const ReportsDashboard = () => {
       .sort((a, b) => b.value - a.value) // Sort by count descending
   }, [filteredIncidents])
 
+  /** Stolen line items grouped by product category (counts), for pie charts. */
+  const theftCategoryPieData = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const inc of filteredIncidents) {
+      for (const item of inc.stolenItems ?? []) {
+        const cat = item.category?.trim() || 'Other'
+        counts.set(cat, (counts.get(cat) ?? 0) + 1)
+      }
+    }
+    const palette = ['#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#94a3b8']
+    return Array.from(counts.entries())
+      .map(([name, value], i) => ({
+        name,
+        value,
+        color: palette[i % palette.length],
+      }))
+      .filter((d) => d.value > 0)
+      .sort((a, b) => b.value - a.value)
+  }, [filteredIncidents])
+
+  /** Value of stolen items by category (from incident stolen line items). */
+  const financialImpactByCategory = useMemo(() => {
+    const map = new Map<string, { category: string; stolen: number; recovered: number }>()
+    for (const inc of filteredIncidents) {
+      for (const item of inc.stolenItems ?? []) {
+        const cat = item.category?.trim() || 'Other'
+        if (!map.has(cat)) {
+          map.set(cat, { category: cat, stolen: 0, recovered: 0 })
+        }
+        const row = map.get(cat)!
+        const amt = Number(item.totalAmount ?? (Number(item.cost) || 0) * (Number(item.quantity) || 0))
+        if (item.isRecovered) {
+          row.recovered += Number(item.valueSaved ?? amt)
+        } else {
+          row.stolen += amt
+        }
+      }
+    }
+    return Array.from(map.values())
+      .filter((r) => r.stolen > 0 || r.recovered > 0)
+      .sort((a, b) => b.stolen + b.recovered - (a.stolen + a.recovered))
+  }, [filteredIncidents])
+
+  const financialTotalsFromStolenItems = useMemo(() => {
+    const stolen = financialImpactByCategory.reduce((s, r) => s + r.stolen, 0)
+    const recovered = financialImpactByCategory.reduce((s, r) => s + r.recovered, 0)
+    const denom = stolen + recovered
+    const pct = denom > 0 ? Math.round((recovered / denom) * 1000) / 10 : 0
+    return { stolen, recovered, pct }
+  }, [financialImpactByCategory])
+
+  /** Average £ value per stolen line item (filtered incidents). */
+  const avgStolenLineItemValue = useMemo(() => {
+    let total = 0
+    let count = 0
+    for (const inc of filteredIncidents) {
+      for (const item of inc.stolenItems ?? []) {
+        total += Number(item.totalAmount ?? 0)
+        count += 1
+      }
+    }
+    if (count === 0) return null
+    return total / count
+  }, [filteredIncidents])
+
+  /** Most common weekday for theft-type incidents (by local date). */
+  const peakTheftDayLabel = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const inc of filteredIncidents) {
+      if (inc.incidentType !== IncidentType.THEFT) continue
+      const raw = inc.date ?? inc.dateOfIncident
+      if (!raw) continue
+      const d = new Date(raw)
+      if (Number.isNaN(d.getTime())) continue
+      const day = format(d, 'EEEE')
+      counts.set(day, (counts.get(day) ?? 0) + 1)
+    }
+    if (counts.size === 0) return null
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  }, [filteredIncidents])
+
+  /** Mode hour for theft incidents where `timeOfIncident` is present. */
+  const peakTheftHourLabel = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const inc of filteredIncidents) {
+      if (inc.incidentType !== IncidentType.THEFT) continue
+      const hour = parseIncidentHour(inc.timeOfIncident)
+      if (hour === null) continue
+      counts.set(hour, (counts.get(hour) ?? 0) + 1)
+    }
+    if (counts.size === 0) return null
+    const [hour, n] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]
+    return { hour, count: n }
+  }, [filteredIncidents])
+
+  /** Highest store incident count vs mean across stores (only theft counts all incidents per site). */
+  const storeTheftConcentrationRatio = useMemo(() => {
+    const bySite: Record<string, number> = {}
+    for (const inc of filteredIncidents) {
+      if (inc.incidentType !== IncidentType.THEFT) continue
+      const site = inc.siteName || 'Unknown'
+      bySite[site] = (bySite[site] ?? 0) + 1
+    }
+    const vals = Object.values(bySite)
+    if (vals.length === 0) return null
+    const max = Math.max(...vals)
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length
+    if (mean <= 0) return null
+    return Math.round((max / mean) * 10) / 10
+  }, [filteredIncidents])
+
+  /** Top stolen-item category by line count (same ordering as category pie). */
+  const topTheftCategoryLabel = useMemo(() => {
+    if (theftCategoryPieData.length === 0) return null
+    return theftCategoryPieData[0].name
+  }, [theftCategoryPieData])
+
+  const riskFactorSummaryLines = useMemo(() => {
+    const lines: string[] = []
+    if (storeTheftConcentrationRatio != null) {
+      lines.push(
+        `The busiest site has ${storeTheftConcentrationRatio}× the average theft count per site (among sites with at least one theft in this view).`
+      )
+    }
+    if (topTheftCategoryLabel) {
+      lines.push(`Most recorded stolen-item category: ${topTheftCategoryLabel}.`)
+    }
+    if (peakTheftHourLabel) {
+      lines.push(
+        `Among thefts with a time of incident, the most common hour is ${peakTheftHourLabel.hour}:00 (${peakTheftHourLabel.count} record${peakTheftHourLabel.count === 1 ? '' : 's'}).`
+      )
+    }
+    if (lines.length === 0) {
+      lines.push('Record time of incident and item categories on theft reports to unlock automatic concentration and timing insights.')
+    }
+    return lines
+  }, [storeTheftConcentrationRatio, topTheftCategoryLabel, peakTheftHourLabel])
+
+  /** Top product/description labels from stolen line items. */
+  const topStolenProductRows = useMemo(() => {
+    const map = new Map<string, { name: string; value: number; recovery: number; loss: number }>()
+    for (const inc of filteredIncidents) {
+      for (const item of inc.stolenItems ?? []) {
+        const label = item.productName?.trim() || item.description?.trim() || 'Unknown product'
+        const prev = map.get(label) ?? { name: label, value: 0, recovery: 0, loss: 0 }
+        prev.value += 1
+        if (item.isRecovered) {
+          prev.recovery += 1
+        } else {
+          prev.loss += 1
+        }
+        map.set(label, prev)
+      }
+    }
+    return Array.from(map.values())
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 15)
+  }, [filteredIncidents])
+
   // Filter UI section
   const renderFilters = () => (
     <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-md shadow-sm">
       <div className="flex-1 space-y-2">
-        <Label htmlFor="date-range" className="text-xs font-medium">Date Range</Label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              id="date-range"
-              variant="outline"
-              className={cn(
-                "w-full justify-start text-left font-normal",
-                !dateRange && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {dateRange?.from ? (
-                dateRange.to ? (
-                  <>
-                    {format(dateRange.from, "LLL dd, y")} -{" "}
-                    {format(dateRange.to, "LLL dd, y")}
-                  </>
-                ) : (
-                  format(dateRange.from, "LLL dd, y")
-                )
-              ) : (
-                <span>Pick a date range</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0">
-            <Calendar
-              mode="range"
-              selected={dateRange}
-              onSelect={setDateRange}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
+        <Label className="text-xs font-medium">Date Range</Label>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <NativeDateInput
+            value={dateRange?.from}
+            onDateChange={(d) =>
+              setDateRange((prev) => {
+                const next = { ...prev, from: d }
+                if (next.to && d && next.to < d) next.to = d
+                return next.from || next.to ? next : undefined
+              })
+            }
+            className="bg-white"
+            aria-label="Filter start date"
+          />
+          <NativeDateInput
+            value={dateRange?.to}
+            onDateChange={(d) => setDateRange((prev) => ({ ...prev, to: d }))}
+            minDate={dateRange?.from}
+            className="bg-white"
+            aria-label="Filter end date"
+          />
+        </div>
       </div>
       
       <div className="flex-1 space-y-2">
@@ -888,7 +952,7 @@ const ReportsDashboard = () => {
                       <div className="w-2 h-2 rounded-full bg-red-500"></div>
                       <span className="font-medium">Enhance Camera Systems</span>
                     </div>
-                    <p className="mt-1 pl-3 text-slate-600">12 blind spots identified</p>
+                    <p className="mt-1 pl-3 text-slate-600">Review CCTV coverage with each site risk assessment</p>
                   </div>
                   <div className="bg-white p-2 rounded border text-xs">
                     <div className="flex items-center gap-1">
@@ -924,13 +988,9 @@ const ReportsDashboard = () => {
                     data={incidentsByStore
                       .sort((a, b) => b.incidents - a.incidents)
                       .slice(0, 10)
-                      .map(store => ({
+                      .map((store) => ({
                         ...store,
                         risk: store.incidents > 20 ? 'High' : store.incidents > 10 ? 'Medium' : 'Low',
-                        theftRate: (store.incidents / (Math.random() * 500 + 1000)).toFixed(3), // Simulated theft rate per customer
-                        recoveryRate: Math.round(Math.random() * 60 + 20), // Simulated recovery rate
-                        theftValue: Math.round(store.incidents * (Math.random() * 200 + 150)), // Simulated value of stolen items
-                        staffRatio: (Math.random() * 0.5 + 0.5).toFixed(2) // Simulated security staff ratio
                       }))}
                     margin={{ top: 10, right: 30, left: 120, bottom: 20 }}
                     layout="vertical"
@@ -947,9 +1007,6 @@ const ReportsDashboard = () => {
                     <Tooltip 
                       formatter={(value, name) => {
                         if (name === "incidents") return [`${value} incidents`];
-                        if (name === "theftRate") return [`${(Number(value) * 100).toFixed(1)}% per 100 customers`];
-                        if (name === "theftValue") return [`£${value}`];
-                        if (name === "staffRatio") return [`${value} per 1000 sq ft`];
                         return [value];
                       }}
                       labelFormatter={(label) => `Store: ${label}`}
@@ -962,13 +1019,6 @@ const ReportsDashboard = () => {
                       fill="#f43f5e" 
                       radius={[0, 4, 4, 0]} 
                       barSize={20}
-                    />
-                    <Bar 
-                      dataKey="recoveryRate" 
-                      name="Recovery Rate" 
-                      fill="#10b981"
-                      radius={[0, 4, 4, 0]}
-                      barSize={10}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -1090,20 +1140,30 @@ const ReportsDashboard = () => {
                     <div className="mt-2 space-y-2">
                       <div className="bg-white p-2 rounded border">
                         <div className="flex justify-between text-xs">
-                          <span>Avg. value stolen per incident:</span>
-                          <span className="font-semibold text-red-600">£248.32</span>
+                          <span>Avg. value per stolen line item:</span>
+                          <span className="font-semibold text-red-600">
+                            {avgStolenLineItemValue != null
+                              ? `£${avgStolenLineItemValue.toFixed(2)}`
+                              : '—'}
+                          </span>
                         </div>
                       </div>
                       <div className="bg-white p-2 rounded border">
                         <div className="flex justify-between text-xs">
-                          <span>Peak shoplifting day:</span>
-                          <span className="font-semibold text-amber-600">Saturday</span>
+                          <span>Peak shoplifting day (theft incidents):</span>
+                          <span className="font-semibold text-amber-600">
+                            {peakTheftDayLabel ?? '—'}
+                          </span>
                         </div>
                       </div>
                       <div className="bg-white p-2 rounded border">
                         <div className="flex justify-between text-xs">
-                          <span>Peak shoplifting time:</span>
-                          <span className="font-semibold text-amber-600">4PM - 8PM</span>
+                          <span>Peak shoplifting time (thefts with time recorded):</span>
+                          <span className="font-semibold text-amber-600">
+                            {peakTheftHourLabel != null
+                              ? `~${peakTheftHourLabel.hour}:00 (${peakTheftHourLabel.count} records)`
+                              : '—'}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1111,44 +1171,30 @@ const ReportsDashboard = () => {
                   
                   <div className="pt-2 border-t">
                     <h4 className="text-xs font-medium text-slate-500">RISK FACTORS</h4>
-                    <ul className="mt-2 text-xs space-y-1">
-                      <li className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                        <span>High-risk stores see 3.2x more thefts than average</span>
-                      </li>
-                      <li className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                        <span>Evening hours (4-8pm) show highest activity</span>
-                      </li>
-                      <li className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                        <span>Electronics and cosmetics are primary targets</span>
-                      </li>
-                      <li className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                        <span>73% of thefts occur in security camera blind spots</span>
-                      </li>
+                    <ul className="mt-2 text-xs space-y-2">
+                      {riskFactorSummaryLines.map((line, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" aria-hidden />
+                          <span>{line}</span>
+                        </li>
+                      ))}
                     </ul>
                   </div>
                   
                   <div className="pt-2 border-t">
                     <h4 className="text-xs font-medium text-slate-500">RECOMMENDED ACTIONS</h4>
-                    <ul className="mt-2 text-xs space-y-1">
-                      <li className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                        <span>Increase security staffing during peak hours</span>
+                    <ul className="mt-2 text-xs space-y-2">
+                      <li className="flex items-start gap-2">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+                        <span>Use the High-Risk Stores and Stolen Items tabs to prioritise follow-up by site and category.</span>
                       </li>
-                      <li className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                        <span>Install 6 additional PTZ cameras in electronics area</span>
+                      <li className="flex items-start gap-2">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+                        <span>When peak day or hour appears above, align staffing or patrols with those windows.</span>
                       </li>
-                      <li className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                        <span>Relocate high-value items away from store exits</span>
-                      </li>
-                      <li className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                        <span>Implement enhanced EAS tagging in high-risk zones</span>
+                      <li className="flex items-start gap-2">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+                        <span>Share filtered results with regional or store management for operational planning.</span>
                       </li>
                     </ul>
                   </div>
@@ -1157,45 +1203,15 @@ const ReportsDashboard = () => {
               
               <Card>
                 <CardHeader className="py-3">
-                  <CardTitle className="text-sm font-medium">Security Coverage Analysis</CardTitle>
+                  <CardTitle className="text-sm font-medium">Security coverage</CardTitle>
+                  <CardDescription className="text-xs">
+                    Camera, EAS, and staffing coverage scores are not part of the incident export. Connect a site or audit
+                    data source to show real coverage metrics here.
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="py-0">
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between mb-1 text-xs">
-                        <span>Camera Coverage</span>
-                        <span className="font-medium text-amber-600">68%</span>
-                      </div>
-                      <Progress value={68} className="h-1.5 bg-amber-100" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1 text-xs">
-                        <span>Security Staff Ratio</span>
-                        <span className="font-medium text-red-600">52%</span>
-                      </div>
-                      <Progress value={52} className="h-1.5 bg-red-100" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1 text-xs">
-                        <span>EAS Tag Coverage</span>
-                        <span className="font-medium text-blue-600">82%</span>
-                      </div>
-                      <Progress value={82} className="h-1.5 bg-blue-100" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1 text-xs">
-                        <span>Staff Training Level</span>
-                        <span className="font-medium text-emerald-600">76%</span>
-                      </div>
-                      <Progress value={76} className="h-1.5 bg-emerald-100" />
-                    </div>
-                  </div>
+                <CardContent className="py-2 text-xs text-muted-foreground">
+                  No coverage data loaded.
                 </CardContent>
-                <CardFooter className="pt-2 pb-3">
-                  <Button variant="outline" size="sm" className="text-xs w-full">
-                    View Detailed Coverage Report
-                  </Button>
-                </CardFooter>
               </Card>
             </div>
           </div>
@@ -1285,7 +1301,7 @@ const ReportsDashboard = () => {
                 <Card className="shadow-sm hover:shadow-md transition-all">
                   <CardHeader className="pb-2 bg-gradient-to-r from-orange-50 to-amber-50">
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <CalendarDay className="h-5 w-5 text-orange-600" />
+                      <Calendar className="h-5 w-5 text-orange-600" />
                       Theft by Day of Week
                     </CardTitle>
                     <CardDescription>Identifying high-risk days for theft</CardDescription>
@@ -1411,10 +1427,9 @@ const ReportsDashboard = () => {
                         <div className="mt-4 pt-3 border-t">
                           <h4 className="text-sm font-medium mb-2">Risk Insights</h4>
                           <ul className="text-xs space-y-1 text-muted-foreground">
-                            <li>• Electronics section has highest theft rate</li>
-                            <li>• Self-checkout areas show increased risk</li>
-                            <li>• Store corners have lower visibility</li>
-                            <li>• Entrance proximity increases risk</li>
+                            <li>• Insights reflect filtered incidents and stolen line items in this period</li>
+                            <li>• Category and product charts need category/product fields on stolen items</li>
+                            <li>• Compare stores using incident counts and financial impact tabs</li>
                           </ul>
                         </div>
                       </div>
@@ -1469,22 +1484,20 @@ const ReportsDashboard = () => {
                   <CardHeader className="pb-2 bg-gradient-to-r from-sky-50 to-blue-50">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <FileText className="h-5 w-5 text-sky-600" />
-                      Methods of Theft
+                      Incident involvement
                     </CardTitle>
-                    <CardDescription>Common theft techniques used</CardDescription>
+                    <CardDescription>Flags recorded on incidents in the selected period</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="h-[250px]">
                       <ResponsiveContainer width="100%" height="100%" minHeight={250}>
                         <PieChart>
                           <Pie
-                            data={[
-                              { name: 'Concealment', value: 42, description: 'Hiding items in clothing/bags' },
-                              { name: 'Self-checkout', value: 27, description: 'Not scanning all items' },
-                              { name: 'Tag removal', value: 15, description: 'Removing security tags' },
-                              { name: 'Price switching', value: 9, description: 'Changing price tags' },
-                              { name: 'Distraction', value: 7, description: 'Creating diversions' },
-                            ]}
+                            data={incidentsByInvolvement.map(({ name, value, color }) => ({
+                              name,
+                              value,
+                              color,
+                            }))}
                             cx="50%"
                             cy="50%"
                             innerRadius={60}
@@ -1492,21 +1505,12 @@ const ReportsDashboard = () => {
                             paddingAngle={2}
                             dataKey="value"
                           >
-                            {[
-                              { name: 'Concealment', color: '#3b82f6' }, 
-                              { name: 'Self-checkout', color: '#6366f1' },
-                              { name: 'Tag removal', color: '#8b5cf6' },
-                              { name: 'Price switching', color: '#a855f7' },
-                              { name: 'Distraction', color: '#d946ef' },
-                            ].map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            {incidentsByInvolvement.map((entry, index) => (
+                              <Cell key={`inv-${index}`} fill={entry.color} />
                             ))}
                           </Pie>
                           <Tooltip 
-                            formatter={(value, name, props) => {
-                              const item = props.payload;
-                              return [`${value}% of thefts`, `${name}: ${item.description}`];
-                            }} 
+                            formatter={(value, name) => [`${value} incidents`, String(name)]}
                             contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #f0f0f0' }}
                           />
                           <Legend 
@@ -1538,18 +1542,7 @@ const ReportsDashboard = () => {
                   <div className="h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={[
-                          { name: 'Smartphones', value: 35, recovery: 22, loss: 13 },
-                          { name: 'Designer Clothing', value: 28, recovery: 15, loss: 13 },
-                          { name: 'Cosmetics', value: 22, recovery: 8, loss: 14 },
-                          { name: 'Alcohol', value: 18, recovery: 10, loss: 8 },
-                          { name: 'Headphones', value: 16, recovery: 9, loss: 7 },
-                          { name: 'Razors', value: 15, recovery: 6, loss: 9 },
-                          { name: 'Fragrances', value: 14, recovery: 5, loss: 9 },
-                          { name: 'Baby Formula', value: 12, recovery: 7, loss: 5 },
-                          { name: 'OTC Medicines', value: 10, recovery: 4, loss: 6 },
-                          { name: 'Designer Handbags', value: 9, recovery: 4, loss: 5 },
-                        ]}
+                        data={topStolenProductRows}
                         layout="vertical"
                         margin={{ top: 10, right: 30, left: 120, bottom: 20 }}
                       >
@@ -1563,17 +1556,9 @@ const ReportsDashboard = () => {
                         />
                         <Tooltip 
                           formatter={(value, name) => {
-                            if (name === "Items Stolen") return [`${value} incidents`];
-                            if (name === "Recovered") {
-                              const numValue = parseFloat(value as string);
-                              const percentage = Math.round(numValue/35*100);
-                              return [`${value} items (${percentage}%)`];
-                            }
-                            if (name === "Lost") {
-                              const numValue = parseFloat(value as string);
-                              const percentage = Math.round(numValue/35*100);
-                              return [`${value} items (${percentage}%)`];
-                            }
+                            if (name === "Items Stolen") return [`${value} line items`];
+                            if (name === "Recovered") return [`${value} recovered`];
+                            if (name === "Lost") return [`${value} not recovered`];
                             return [value];
                           }}
                           contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #f0f0f0' }}
@@ -1621,14 +1606,7 @@ const ReportsDashboard = () => {
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={[
-                              { name: 'Electronics', value: 35, color: '#3b82f6' },
-                              { name: 'Clothing', value: 22, color: '#6366f1' },
-                              { name: 'Cosmetics', value: 18, color: '#8b5cf6' },
-                              { name: 'Alcohol', value: 12, color: '#d946ef' },
-                              { name: 'Food Items', value: 8, color: '#ec4899' },
-                              { name: 'Health & Beauty', value: 5, color: '#f43f5e' },
-                            ]}
+                            data={theftCategoryPieData}
                             cx="50%"
                             cy="50%"
                             outerRadius={80}
@@ -1637,19 +1615,12 @@ const ReportsDashboard = () => {
                             label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                             labelLine={{ stroke: '#c0c0c0', strokeWidth: 1 }}
                           >
-                            {[
-                              { name: 'Electronics', color: '#3b82f6' },
-                              { name: 'Clothing', color: '#6366f1' },
-                              { name: 'Cosmetics', color: '#8b5cf6' },
-                              { name: 'Alcohol', color: '#d946ef' },
-                              { name: 'Food Items', color: '#ec4899' },
-                              { name: 'Health & Beauty', color: '#f43f5e' },
-                            ].map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            {theftCategoryPieData.map((entry, index) => (
+                              <Cell key={`cat-${index}`} fill={entry.color} />
                             ))}
                           </Pie>
                           <Tooltip 
-                            formatter={(value, name) => [`${value}% of thefts`]}
+                            formatter={(value, name) => [`${value} stolen line items`, String(name)]}
                             contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #f0f0f0' }}
                           />
                         </PieChart>
@@ -1670,13 +1641,7 @@ const ReportsDashboard = () => {
                     <div className="h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
-                          data={[
-                            { category: 'Electronics', stolen: 4250, recovered: 2650 },
-                            { category: 'Clothing', stolen: 3200, recovered: 1400 },
-                            { category: 'Cosmetics', stolen: 1850, recovered: 650 },
-                            { category: 'Alcohol', stolen: 1200, recovered: 850 },
-                            { category: 'Other', stolen: 980, recovered: 420 },
-                          ]}
+                          data={financialImpactByCategory}
                           margin={{ top: 20, right: 30, left: 30, bottom: 20 }}
                         >
                           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -1712,7 +1677,9 @@ const ReportsDashboard = () => {
                     </div>
                     <div className="text-center mt-4">
                       <Badge variant="outline" className="text-rose-600 font-medium">
-                        Total Loss: £5,730 (49.7% of stolen value)
+                        {financialTotalsFromStolenItems.stolen + financialTotalsFromStolenItems.recovered > 0
+                          ? `Recorded value — stolen: £${financialTotalsFromStolenItems.stolen.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} · recovered: £${financialTotalsFromStolenItems.recovered.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} (${financialTotalsFromStolenItems.pct}% recovered share)`
+                          : 'No stolen item values in filtered incidents'}
                       </Badge>
                     </div>
                   </CardContent>
@@ -1737,10 +1704,9 @@ const ReportsDashboard = () => {
                         data={incidentsByStore
                           .sort((a, b) => b.incidents - a.incidents)
                           .slice(0, 8)
-                          .map(store => ({
+                          .map((store) => ({
                             ...store,
                             risk: store.incidents > 20 ? 'High' : store.incidents > 10 ? 'Medium' : 'Low',
-                            recoveryRate: Math.round(Math.random() * 60 + 20) // Simulated recovery rate between 20-80%
                           }))}
                         margin={{ top: 10, right: 30, left: 120, bottom: 20 }}
                         layout="vertical"
@@ -1754,9 +1720,8 @@ const ReportsDashboard = () => {
                           width={110}
                         />
                         <Tooltip 
-                          formatter={(value, name, props) => {
+                          formatter={(value, name) => {
                             if (name === "Incidents") return [`${value} incidents`];
-                            if (name === "Recovery Rate") return [`${value}%`];
                             return [value];
                           }}
                           labelFormatter={(label) => `Store: ${label}`}
@@ -1769,13 +1734,6 @@ const ReportsDashboard = () => {
                           fill="#f43f5e" 
                           radius={[0, 4, 4, 0]} 
                           barSize={25}
-                        />
-                        <Bar 
-                          dataKey="recoveryRate" 
-                          name="Recovery Rate" 
-                          fill="#10b981"
-                          radius={[0, 4, 4, 0]}
-                          barSize={10}
                         />
                       </BarChart>
                     </ResponsiveContainer>
@@ -1811,30 +1769,12 @@ const ReportsDashboard = () => {
                         {incidentsByStore
                           .sort((a, b) => b.incidents - a.incidents)
                           .map((store, index) => {
-                            // Generate sample data for each store
                             const riskLevel = store.incidents > 20 ? 'High' : store.incidents > 10 ? 'Medium' : 'Low';
                             const riskColorClass = 
                               riskLevel === 'High' ? 'bg-red-100 text-red-800' : 
                               riskLevel === 'Medium' ? 'bg-amber-100 text-amber-800' : 
                               'bg-blue-100 text-blue-800';
-                              
-                            const theftRate = (store.incidents / (Math.random() * 500 + 1000) * 1000).toFixed(1);
-                            
-                            const items = ['Smartphones', 'Clothing', 'Cosmetics', 'Headphones', 'Fragrances'];
-                            const mostStolenItem = items[Math.floor(Math.random() * items.length)];
-                            
-                            const times = ['2-4 PM', '4-6 PM', '12-2 PM', '6-8 PM'];
-                            const peakTime = times[Math.floor(Math.random() * times.length)];
-                            
-                            const recoveryRate = Math.round(Math.random() * 60 + 20);
-                            
-                            const trends = ['up', 'down', 'steady'];
-                            const trend = trends[Math.floor(Math.random() * trends.length)];
-                            const trendIcon = 
-                              trend === 'up' ? <TrendingUp className="h-4 w-4 text-red-500" /> : 
-                              trend === 'down' ? <TrendingUp className="h-4 w-4 text-emerald-500 transform rotate-180" /> : 
-                              <div className="h-0.5 w-4 bg-slate-400 mx-auto" />;
-                            
+
                             return (
                               <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-[#EFF4FF]'}>
                                 <td className="px-4 py-3 text-sm font-medium text-slate-900">{store.name}</td>
@@ -1844,15 +1784,11 @@ const ReportsDashboard = () => {
                                     {riskLevel}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-sm text-center">{theftRate}</td>
-                                <td className="px-4 py-3 text-sm text-center">{mostStolenItem}</td>
-                                <td className="px-4 py-3 text-sm text-center">{peakTime}</td>
-                                <td className="px-4 py-3 text-sm text-center">{recoveryRate}%</td>
-                                <td className="px-4 py-3 text-center">
-                                  <div className="flex justify-center">
-                                    {trendIcon}
-                                  </div>
-                                </td>
+                                <td className="px-4 py-3 text-sm text-center text-muted-foreground">—</td>
+                                <td className="px-4 py-3 text-sm text-center text-muted-foreground">—</td>
+                                <td className="px-4 py-3 text-sm text-center text-muted-foreground">—</td>
+                                <td className="px-4 py-3 text-sm text-center text-muted-foreground">—</td>
+                                <td className="px-4 py-3 text-center text-muted-foreground text-sm">—</td>
                               </tr>
                             );
                           })}
@@ -1869,62 +1805,15 @@ const ReportsDashboard = () => {
                       <FileText className="h-5 w-5 text-purple-600" />
                       Risk Factors Analysis
                     </CardTitle>
-                    <CardDescription>Correlation of store characteristics and theft rates</CardDescription>
+                    <CardDescription>
+                      Store layout, footfall, and inventory attributes are not in the incident export; correlation scores are
+                      not shown.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between mb-1 text-sm">
-                          <span>Store Size</span>
-                          <span className="font-medium text-purple-600">High Correlation (0.85)</span>
-                        </div>
-                        <Progress value={85} className="h-2 bg-purple-100" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1 text-sm">
-                          <span>Proximity to Exit</span>
-                          <span className="font-medium text-purple-600">High Correlation (0.78)</span>
-                        </div>
-                        <Progress value={78} className="h-2 bg-purple-100" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1 text-sm">
-                          <span>Staff to Customer Ratio</span>
-                          <span className="font-medium text-purple-600">Medium Correlation (0.65)</span>
-                        </div>
-                        <Progress value={65} className="h-2 bg-purple-100" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1 text-sm">
-                          <span>Security Measures</span>
-                          <span className="font-medium text-purple-600">Medium Correlation (0.62)</span>
-                        </div>
-                        <Progress value={62} className="h-2 bg-purple-100" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1 text-sm">
-                          <span>Urban Location</span>
-                          <span className="font-medium text-purple-600">Medium Correlation (0.54)</span>
-                        </div>
-                        <Progress value={54} className="h-2 bg-purple-100" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1 text-sm">
-                          <span>High-Value Inventory</span>
-                          <span className="font-medium text-purple-600">Medium Correlation (0.51)</span>
-                        </div>
-                        <Progress value={51} className="h-2 bg-purple-100" />
-                      </div>
-                    </div>
-                    
-                    <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-100">
-                      <h4 className="text-sm font-medium text-purple-700 mb-2">Risk Insights</h4>
-                      <ul className="text-xs text-purple-800 space-y-1">
-                        <li>• Larger stores have higher theft rates due to surveillance challenges</li>
-                        <li>• Items near exits are 78% more likely to be stolen</li>
-                        <li>• Every 10% decrease in staff ratio correlates to 14% more thefts</li>
-                        <li>• CCTV with analytics reduces theft by up to 23%</li>
-                      </ul>
+                    <div className="rounded-lg border border-purple-100 bg-purple-50 p-4 text-sm text-purple-900">
+                      Use incident counts, financial impact, and filters above to compare sites. Statistical correlation with
+                      store characteristics requires linking external site master or survey data.
                     </div>
                   </CardContent>
                 </Card>
@@ -1942,38 +1831,9 @@ const ReportsDashboard = () => {
                       <div className="text-center p-6">
                         <MapPin className="h-10 w-10 text-blue-400 mx-auto mb-2" />
                         <p className="text-sm text-blue-700">
-                          Interactive map visualization would display here showing regional distribution
-                          of theft incidents with color-coded regions indicating risk levels.
+                          A regional map can be added when incidents include consistent region or coordinates. Use the
+                          store and date filters to compare locations with the charts above.
                         </p>
-                        <div className="flex items-center justify-center gap-6 mt-4">
-                          <div className="text-center">
-                            <div className="text-xl font-bold text-blue-700">42%</div>
-                            <div className="text-xs text-blue-600">Urban</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-xl font-bold text-blue-700">35%</div>
-                            <div className="text-xs text-blue-600">Suburban</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-xl font-bold text-blue-700">23%</div>
-                            <div className="text-xs text-blue-600">Rural</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-4 grid grid-cols-3 gap-2">
-                      <div className="p-2 text-center bg-blue-50 rounded border border-blue-100">
-                        <div className="text-lg font-bold text-blue-700">London</div>
-                        <div className="text-xs text-blue-600">Highest Risk Region</div>
-                      </div>
-                      <div className="p-2 text-center bg-blue-50 rounded border border-blue-100">
-                        <div className="text-lg font-bold text-blue-700">32%</div>
-                        <div className="text-xs text-blue-600">Above Avg. in Cities</div>
-                      </div>
-                      <div className="p-2 text-center bg-blue-50 rounded border border-blue-100">
-                        <div className="text-lg font-bold text-blue-700">4.2×</div>
-                        <div className="text-xs text-blue-600">Urban vs. Rural Ratio</div>
                       </div>
                     </div>
                   </CardContent>
@@ -2098,60 +1958,9 @@ const ReportsDashboard = () => {
                     <CardDescription>Impact of current security measures on theft prevention</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={[
-                            { measure: 'Security Guards', effectiveness: 72, incidents: 8 },
-                            { measure: 'CCTV Systems', effectiveness: 68, incidents: 12 },
-                            { measure: 'Product Tags', effectiveness: 64, incidents: 15 },
-                            { measure: 'Security Training', effectiveness: 58, incidents: 18 },
-                            { measure: 'Store Layout', effectiveness: 42, incidents: 24 },
-                            { measure: 'Entrance Controls', effectiveness: 38, incidents: 28 },
-                          ]}
-                          margin={{ top: 20, right: 30, left: 100, bottom: 10 }}
-                          layout="vertical"
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                          <XAxis type="number" domain={[0, 100]} />
-                          <YAxis 
-                            dataKey="measure" 
-                            type="category" 
-                            tick={{ fontSize: 12 }}
-                            width={90}
-                          />
-                          <Tooltip 
-                            formatter={(value, name) => [
-                              name === "effectiveness" ? `${value}% effective` : `${value} incidents`,
-                              name === "effectiveness" ? "Effectiveness" : "Post-Implementation Incidents"
-                            ]}
-                            contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #f0f0f0' }}
-                          />
-                          <Legend />
-                          <Bar 
-                            dataKey="effectiveness" 
-                            name="Effectiveness" 
-                            fill="#3b82f6"
-                            radius={[0, 4, 4, 0]} 
-                            barSize={20}
-                          />
-                          <Bar 
-                            dataKey="incidents" 
-                            name="Post-Implementation Incidents" 
-                            fill="#f97316"
-                            radius={[0, 4, 4, 0]} 
-                            barSize={10}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="mt-4 p-3 bg-[#EFF4FF] rounded-lg border">
-                      <h4 className="text-sm font-medium mb-2">Effectiveness Analysis</h4>
-                      <p className="text-xs text-slate-700">
-                        Security guards provide the highest effectiveness but with significant cost implications. CCTV systems
-                        offer good cost-to-effectiveness ratio. Product tags and staff training show moderate effectiveness but
-                        have implementation challenges. Store layout changes are recommended as a high-priority low-cost improvement.
-                      </p>
+                    <div className="h-[300px] flex items-center justify-center rounded-lg border border-dashed bg-slate-50 px-4 text-center text-sm text-muted-foreground">
+                      Security measure effectiveness is not calculated from incident exports. Wire a loss-prevention or audit API to
+                      populate this chart.
                     </div>
                   </CardContent>
                 </Card>
@@ -2165,71 +1974,9 @@ const ReportsDashboard = () => {
                     <CardDescription>Correlation between security staff levels and theft incidents</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={[
-                            { staff: 'Very Low', ratio: 0.5, incidents: 35, recovery: 12 },
-                            { staff: 'Low', ratio: 0.75, incidents: 28, recovery: 15 },
-                            { staff: 'Moderate', ratio: 1, incidents: 18, recovery: 22 },
-                            { staff: 'High', ratio: 1.25, incidents: 12, recovery: 30 },
-                            { staff: 'Very High', ratio: 1.5, incidents: 8, recovery: 35 },
-                          ]}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="staff" />
-                          <YAxis yAxisId="left" orientation="left" domain={[0, 40]} />
-                          <YAxis yAxisId="right" orientation="right" domain={[0, 40]} />
-                          <Tooltip 
-                            formatter={(value, name) => {
-                              if (name === "incidents") return [`${value} incidents`];
-                              if (name === "recovery") return [`${value}% recovery rate`];
-                              if (name === "ratio") return [`${value} staff per 1000 sq ft`];
-                              return [value];
-                            }}
-                            contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #f0f0f0' }}
-                          />
-                          <Legend />
-                          <Line
-                            yAxisId="left"
-                            type="monotone"
-                            dataKey="incidents"
-                            name="Theft Incidents"
-                            stroke="#f43f5e"
-                            strokeWidth={2}
-                            dot={{ fill: '#f43f5e', r: 4 }}
-                            activeDot={{ r: 6 }}
-                          />
-                          <Line
-                            yAxisId="right"
-                            type="monotone"
-                            dataKey="recovery"
-                            name="Recovery Rate"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            dot={{ fill: '#10b981', r: 4 }}
-                            activeDot={{ r: 6 }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="mt-4 grid grid-cols-3 gap-2">
-                      <div className="p-2 bg-blue-50 rounded-lg border text-center">
-                        <div className="text-lg font-bold text-blue-600">-57%</div>
-                        <div className="text-xs text-blue-700">Incident Reduction</div>
-                        <div className="text-xs text-blue-600">With optimal staffing</div>
-                      </div>
-                      <div className="p-2 bg-blue-50 rounded-lg border text-center">
-                        <div className="text-lg font-bold text-blue-600">+22%</div>
-                        <div className="text-xs text-blue-700">Recovery Rate</div>
-                        <div className="text-xs text-blue-600">Increase with High staffing</div>
-                      </div>
-                      <div className="p-2 bg-blue-50 rounded-lg border text-center">
-                        <div className="text-lg font-bold text-blue-600">1.25</div>
-                        <div className="text-xs text-blue-700">Optimal Ratio</div>
-                        <div className="text-xs text-blue-600">Staff per 1000 sq ft</div>
-                      </div>
+                    <div className="h-[300px] flex items-center justify-center rounded-lg border border-dashed bg-slate-50 px-4 text-center text-sm text-muted-foreground">
+                      Staffing correlation charts require staffing levels and floor areas per site. These fields are not part of the
+                      standard incident payload.
                     </div>
                   </CardContent>
                 </Card>
@@ -2245,59 +1992,9 @@ const ReportsDashboard = () => {
                     <CardDescription>Impact of response time on theft prevention</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[250px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={[
-                              { name: 'Prevented (< 3 min)', value: 65, color: '#10b981' },
-                              { name: 'Recovered (3-5 min)', value: 22, color: '#3b82f6' },
-                              { name: 'Partial Recovery (5-10 min)', value: 8, color: '#f97316' },
-                              { name: 'Lost (> 10 min)', value: 5, color: '#f43f5e' },
-                            ]}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={45}
-                            outerRadius={70}
-                            paddingAngle={2}
-                            dataKey="value"
-                          >
-                            {[
-                              { name: 'Prevented (< 3 min)', color: '#10b981' },
-                              { name: 'Recovered (3-5 min)', color: '#3b82f6' },
-                              { name: 'Partial Recovery (5-10 min)', color: '#f97316' },
-                              { name: 'Lost (> 10 min)', color: '#f43f5e' },
-                            ].map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip 
-                            formatter={(value) => [`${value}% of incidents`]}
-                            contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #f0f0f0' }}
-                          />
-                          <Legend
-                            layout="vertical"
-                            verticalAlign="bottom"
-                            align="center"
-                            iconType="circle"
-                            iconSize={8}
-                            formatter={(value, entry) => <span className="text-xs">{value}</span>}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="mt-3 bg-emerald-50 p-3 rounded-lg border border-emerald-100">
-                      <div className="text-sm font-medium text-emerald-700 mb-1">Current Metrics</div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <div className="text-slate-600">Average Response</div>
-                          <div className="font-bold text-emerald-800">8.2 minutes</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-600">Target Response</div>
-                          <div className="font-bold text-emerald-800">5 minutes</div>
-                        </div>
-                      </div>
+                    <div className="min-h-[200px] flex flex-col items-center justify-center rounded-lg border border-dashed bg-slate-50 px-4 py-8 text-center text-sm text-muted-foreground">
+                      Response-time buckets are not captured on incidents. Add timestamps or dispatch workflow data to enable this
+                      breakdown.
                     </div>
                   </CardContent>
                 </Card>
@@ -2323,65 +2020,12 @@ const ReportsDashboard = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-amber-100">
-                          {[
-                            {
-                              area: 'Electronics Section',
-                              risk: 'High',
-                              impact: 'Most stolen high-value items are from unmonitored sections',
-                              recommendation: 'Install 6 additional PTZ cameras with AI detection',
-                              priority: 'Critical'
-                            },
-                            {
-                              area: 'Weekend Evening Hours',
-                              risk: 'High',
-                              impact: '32% of thefts occur during understaffed evening shifts',
-                              recommendation: 'Increase security personnel during peak hours',
-                              priority: 'High'
-                            },
-                            {
-                              area: 'Staff Training',
-                              risk: 'Medium',
-                              impact: 'Staff miss 42% of suspicious behaviors',
-                              recommendation: 'Implement quarterly security protocol training',
-                              priority: 'Medium'
-                            },
-                            {
-                              area: 'Store Exits',
-                              risk: 'Medium',
-                              impact: 'Exit monitoring fails to detect 35% of concealed items',
-                              recommendation: 'Upgrade to advanced RFID gates at all exits',
-                              priority: 'Medium'
-                            },
-                            {
-                              area: 'Self-Checkout',
-                              risk: 'High',
-                              impact: '28% of thefts involve item-switching at self-checkout',
-                              recommendation: 'Install weight verification and visual AI systems',
-                              priority: 'High'
-                            },
-                          ].map((gap, index) => (
-                            <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'}>
-                              <td className="px-4 py-3 text-sm font-medium">{gap.area}</td>
-                              <td className="px-4 py-3 text-center">
-                                <Badge className={
-                                  gap.risk === 'High' ? 'bg-red-500' : 
-                                  gap.risk === 'Medium' ? 'bg-amber-500' : 'bg-blue-500'
-                                }>
-                                  {gap.risk}
-                                </Badge>
-                              </td>
-                              <td className="px-4 py-3 text-sm">{gap.impact}</td>
-                              <td className="px-4 py-3 text-sm">{gap.recommendation}</td>
-                              <td className="px-4 py-3 text-center">
-                                <Badge className={
-                                  gap.priority === 'Critical' ? 'bg-red-500' : 
-                                  gap.priority === 'High' ? 'bg-amber-500' : 'bg-blue-500'
-                                }>
-                                  {gap.priority}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))}
+                          <tr className="bg-white">
+                            <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={5}>
+                              Automated gap analysis is not generated from incident data. Use operational audits and site visits to
+                              record vulnerabilities; an API can populate this table later.
+                            </td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>
@@ -2398,163 +2042,9 @@ const ReportsDashboard = () => {
                   <CardDescription>Security investment effectiveness and financial return</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                    <div className="lg:col-span-3">
-                      <div className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={[
-                              { 
-                                month: 'Jan', 
-                                losses: 8500, 
-                                prevention: 3200, 
-                                investment: 2800,
-                                roi: 1.14
-                              },
-                              { 
-                                month: 'Feb', 
-                                losses: 7800, 
-                                prevention: 3600, 
-                                investment: 2800,
-                                roi: 1.29
-                              },
-                              { 
-                                month: 'Mar', 
-                                losses: 9200, 
-                                prevention: 4100, 
-                                investment: 3200,
-                                roi: 1.28
-                              },
-                              { 
-                                month: 'Apr', 
-                                losses: 8200, 
-                                prevention: 4300, 
-                                investment: 3200,
-                                roi: 1.34
-                              },
-                              { 
-                                month: 'May', 
-                                losses: 10500, 
-                                prevention: 4800, 
-                                investment: 3500,
-                                roi: 1.37
-                              },
-                              { 
-                                month: 'Jun', 
-                                losses: 9800, 
-                                prevention: 5200, 
-                                investment: 3500,
-                                roi: 1.49
-                              },
-                            ]}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                            <XAxis dataKey="month" />
-                            <YAxis 
-                              yAxisId="left"
-                              orientation="left"
-                              label={{ value: 'Value (£)', angle: -90, position: 'insideLeft', dx: -15 }}
-                            />
-                            <YAxis 
-                              yAxisId="right" 
-                              orientation="right" 
-                              domain={[0, 2]}
-                              tickFormatter={(value) => value.toFixed(1)}
-                              label={{ value: 'ROI Ratio', angle: 90, position: 'insideRight', dx: 15 }}
-                            />
-                            <Tooltip 
-                              formatter={(value, name) => {
-                                if (name === "losses") return [`£${value.toLocaleString()}`, "Theft Losses"];
-                                if (name === "prevention") return [`£${value.toLocaleString()}`, "Loss Prevention Value"];
-                                if (name === "investment") return [`£${value.toLocaleString()}`, "Security Investment"];
-                                if (name === "roi") return [`${Number(value).toFixed(2)}x`, "ROI Ratio"];
-                                return [value];
-                              }}
-                              contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #f0f0f0' }}
-                            />
-                            <Legend />
-                            <Bar 
-                              yAxisId="left"
-                              dataKey="losses" 
-                              name="Theft Losses" 
-                              fill="#f43f5e" 
-                              radius={[2, 2, 0, 0]} 
-                              barSize={20}
-                            />
-                            <Bar 
-                              yAxisId="left"
-                              dataKey="prevention" 
-                              name="Loss Prevention Value" 
-                              fill="#10b981" 
-                              radius={[2, 2, 0, 0]} 
-                              barSize={20}
-                            />
-                            <Bar 
-                              yAxisId="left"
-                              dataKey="investment" 
-                              name="Security Investment" 
-                              fill="#6366f1" 
-                              radius={[2, 2, 0, 0]} 
-                              barSize={20}
-                            />
-                            <Line 
-                              yAxisId="right"
-                              type="monotone" 
-                              dataKey="roi" 
-                              name="ROI Ratio" 
-                              stroke="#f97316" 
-                              strokeWidth={2}
-                              dot={{ fill: '#f97316', r: 4 }}
-                            />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                    
-                    <div className="lg:col-span-2">
-                      <div className="bg-[#EFF4FF] h-full p-4 rounded-lg border">
-                        <h3 className="text-sm font-medium mb-3">ROI Summary</h3>
-                        <div className="space-y-3">
-                          <div>
-                            <div className="flex justify-between mb-1 text-sm">
-                              <span>Total Theft Losses</span>
-                              <span className="font-medium text-red-600">£54,000</span>
-                            </div>
-                            <div className="flex justify-between mb-1 text-sm">
-                              <span>Loss Prevention Value</span>
-                              <span className="font-medium text-emerald-600">£25,200</span>
-                            </div>
-                            <div className="flex justify-between mb-1 text-sm">
-                              <span>Security Investment</span>
-                              <span className="font-medium text-blue-600">£19,000</span>
-                            </div>
-                            <div className="flex justify-between text-sm font-semibold pt-2 border-t mt-2">
-                              <span>Overall ROI</span>
-                              <span className="text-amber-600">1.33x</span>
-                            </div>
-                          </div>
-                          
-                          <div className="pt-3 border-t">
-                            <h4 className="text-xs font-medium text-slate-700 mb-2">KEY INSIGHTS</h4>
-                            <ul className="text-xs space-y-2">
-                              <li className="flex items-start gap-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1"></div>
-                                <span>Each £1 invested in security provides £1.33 in theft prevention value</span>
-                              </li>
-                              <li className="flex items-start gap-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1"></div>
-                                <span>Monthly ROI is improving as staff become more effective with security protocols</span>
-                              </li>
-                              <li className="flex items-start gap-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1"></div>
-                                <span>Increasing investment in high-risk stores could improve overall ROI to 1.5x</span>
-                              </li>
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="min-h-[220px] flex flex-col items-center justify-center rounded-lg border border-dashed bg-slate-50 px-4 py-10 text-center text-sm text-muted-foreground">
+                    ROI and security investment figures require finance and capex feeds. They are not inferred from incident records
+                    alone.
                   </div>
                 </CardContent>
               </Card>

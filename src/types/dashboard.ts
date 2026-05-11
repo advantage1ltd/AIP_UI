@@ -1,8 +1,7 @@
+/** Home dashboard widgets, store/region metrics, and chart series types. */
 import { UserRole } from './user';
 
 export type { UserRole };
-
-export type CustomerRole = 'administrator' | 'customersitemanager' | 'customerhomanager';
 
 export interface Metric {
   title: string;
@@ -45,8 +44,7 @@ export interface CustomerStoreData {
   name: string;
   customerId: number;
   metrics: {
-    customerhomanager: Metric[];
-    customersitemanager: Metric[];
+    customer: Metric[];
   };
   recentIncidents: RecentIncident[];
   incidentData: {
@@ -134,55 +132,6 @@ export interface RegionalData {
 
 export type Period = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
-export interface OfficerDashboardData {
-  name: string
-  badgeNumber: string
-  role: string
-  avatar: string
-  shiftStatus: 'On Duty' | 'Off Duty'
-  shiftStart: string
-  shiftEnd: string
-  location: string
-  stats: {
-    incidentsThisMonth: number
-    incidentsLastMonth: number
-    totalValueSaved: number
-    expensesYTD: number
-    completionRate: number
-    holidayBooked: number
-    hoursWorked: number
-    sitesVisited: number
-  }
-  monthlyTarget: {
-    incidents: number
-    valueSaved: number
-    current: {
-      incidents: number
-      valueSaved: number
-    }
-  }
-  recentActivities: Activity[]
-  upcomingTasks: Task[]
-}
-
-export interface Activity {
-  id: string
-  type: 'incident' | 'patrol' | 'report'
-  title: string
-  location: string
-  time: string
-  value?: number
-  status: 'resolved' | 'submitted' | 'in-progress'
-}
-
-export interface Task {
-  id: string
-  type: string
-  title: string
-  dueDate: string
-  priority: 'high' | 'medium' | 'low'
-}
-
 export interface Site {
   id: string;
   locationName: string;
@@ -199,4 +148,74 @@ export interface Site {
   status: string;
   createdAt: string;
   updatedAt: string;
-} 
+}
+
+export interface AdminIncidentDateRange {
+  startDate: Date
+  endDate: Date
+}
+
+export interface NormalizedAdminIncident {
+  id: string
+  date: Date
+  timeOfIncident?: string
+  incidentType: string
+  storeName: string
+  customerName: string
+  officerName: string
+  offenderName: string
+  policeInvolvement: boolean
+  recoveredValue: number
+  lossValue: number
+  lossValueIsEstimated: boolean
+}
+
+export interface AdminIncidentKpiSummary {
+  totalIncidents: number
+  totalRecoveredValue: number
+  totalLossValue: number
+  averageLossPerIncident: number
+  estimatedLossSamples: number
+}
+
+export interface AdminIncidentTrendItem {
+  dateKey: string
+  label: string
+  recoveredValue: number
+  lossValue: number
+  incidentCount: number
+}
+
+export interface AdminIncidentByTypeItem {
+  type: string
+  incidentCount: number
+  recoveredValue: number
+  lossValue: number
+}
+
+export interface AdminIncidentStoreItem {
+  storeName: string
+  incidentCount: number
+  recoveredValue: number
+  lossValue: number
+}
+
+export interface AdminIncidentByHourItem {
+  hour: number
+  label: string
+  incidentCount: number
+}
+
+export interface AdminIncidentByDayItem {
+  day: string
+  incidentCount: number
+}
+
+export interface AdminIncidentAnalytics {
+  kpis: AdminIncidentKpiSummary
+  recoveredVsLossTrend: AdminIncidentTrendItem[]
+  incidentsByType: AdminIncidentByTypeItem[]
+  topStoresByIncidents: AdminIncidentStoreItem[]
+  peakHours: AdminIncidentByHourItem[]
+  incidentsByDay: AdminIncidentByDayItem[]
+}

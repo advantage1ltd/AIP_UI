@@ -10,6 +10,7 @@ import {
   SidebarMenuButton,
 } from "@/components/ui/sidebar"
 
+// === Component ===
 export function AdminSection() {
   return (
     <div className="pl-4 space-y-2">

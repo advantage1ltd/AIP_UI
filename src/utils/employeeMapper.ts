@@ -1,6 +1,5 @@
 import { Employee } from '@/types/employee'
 import { EmployeeRegistrationRequest, EmployeeDetailResponse } from '@/services/employeeService'
-import { run } from 'node:test'
 
 /**
  * Maps frontend Employee interface to backend EmployeeRegistrationRequest
@@ -19,7 +18,6 @@ export const mapToBackendRequest = (employee: Partial<Employee>): EmployeeRegist
     EmploymentType: employee.employmentType || '',
     
     // Optional fields
-    AipAccessLevel: employee.aipAccessLevel,
     Region: employee.region,
     Email: employee.email,
     ContactNumber: employee.contactNumber,
@@ -94,7 +92,6 @@ export const mapFromBackendResponse = (response: EmployeeDetailResponse): Employ
     employmentType: response.employmentType || '',
     
     // Optional Fields
-    aipAccessLevel: response.aipAccessLevel,
     region: response.region,
     email: response.email,
     contactNumber: response.contactNumber,
@@ -191,7 +188,6 @@ export const mapFromListResponse = (response: any): Employee => {
     email: response.email,
     
     // Default values for fields not in list response
-    aipAccessLevel: '',
     region: '',
     contactNumber: '',
     houseName: '',
@@ -255,7 +251,6 @@ export const mapToBackendUpdateRequest = (employee: Partial<Employee>): any => {
     // Only include defined values for update
     ...(employee.employeeNumber && { EmployeeNumber: employee.employeeNumber }),
     ...(employee.title && { Title: employee.title }),
-    ...(employee.aipAccessLevel && { AipAccessLevel: employee.aipAccessLevel }),
     ...(employee.firstName && { FirstName: employee.firstName }),
     ...(employee.surname && { Surname: employee.surname }),
     ...(employee.startDate && { StartDate: new Date(employee.startDate) }),

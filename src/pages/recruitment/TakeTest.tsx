@@ -1,3 +1,7 @@
+/**
+ * Candidate test-taking flow for recruitment.
+ * Flow: test catalog → session start → timed question navigation and submission.
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, Calendar, CheckCircle, Clock, FileText, Search, Timer } from 'lucide-react'
@@ -138,54 +142,83 @@ export const TakeTest = () => {
 	}
 
 	return (
-		<div className="min-h-screen bg-slate-50 w-full overflow-x-hidden">
-			<div className="container mx-auto max-w-full space-y-5 px-3 py-3 sm:p-4 md:max-w-[96%] md:p-6 lg:max-w-7xl lg:p-8">
-				<div className="rounded-2xl border border-slate-200/70 bg-white/90 shadow-sm backdrop-blur">
+		<div className="min-h-screen bg-[#EFF4FF] w-full overflow-x-hidden">
+			<div className="container mx-auto max-w-screen-2xl space-y-5 px-4 py-4 lg:px-8 lg:py-8">
+				<div className="rounded-xl border border-slate-200 bg-white shadow-sm">
 					<div className="flex flex-col gap-4 p-4 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
 						<div className="space-y-2">
-							<Badge variant="outline" className="border-slate-200/80 text-xs uppercase tracking-wide text-slate-500">CBT exam center</Badge>
+							<Badge variant="outline" className="border-slate-200 text-xs uppercase tracking-wide text-slate-500">CBT exam center</Badge>
 							<div>
 								<h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">Assessment Tests</h1>
 								<p className="text-sm text-slate-500">Start your assigned CBT tests and review completed results.</p>
 							</div>
 						</div>
-						<div className="text-sm text-right">
+						<div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-right">
 							<div className="font-medium text-slate-900">{officerName}</div>
 							<div className="text-xs text-slate-500">{officerRoleLabel}</div>
 						</div>
 					</div>
 				</div>
 
+				<div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+					<Card className="border-slate-200 bg-white shadow-sm">
+						<CardContent className="p-4">
+							<p className="text-xs font-medium uppercase tracking-wide text-slate-500">Available</p>
+							<p className="text-2xl font-semibold text-slate-900">{availableTests.length}</p>
+						</CardContent>
+					</Card>
+					<Card className="border-slate-200 bg-white shadow-sm">
+						<CardContent className="p-4">
+							<p className="text-xs font-medium uppercase tracking-wide text-slate-500">Completed</p>
+							<p className="text-2xl font-semibold text-slate-900">{completedTests.length}</p>
+						</CardContent>
+					</Card>
+					<Card className="border-slate-200 bg-white shadow-sm">
+						<CardContent className="p-4">
+							<p className="text-xs font-medium uppercase tracking-wide text-slate-500">Average score</p>
+							<p className="text-2xl font-semibold text-slate-900">{avgScoreLabel}</p>
+						</CardContent>
+					</Card>
+					<Card className="border-slate-200 bg-white shadow-sm">
+						<CardContent className="p-4">
+							<p className="text-xs font-medium uppercase tracking-wide text-slate-500">Next due</p>
+							<p className="text-sm font-semibold text-slate-900">
+								{availableTests.length > 0 ? formatDate(new Date()) : 'No upcoming tests'}
+							</p>
+						</CardContent>
+					</Card>
+				</div>
+
 				<div className="grid gap-5 lg:grid-cols-[280px_1fr]">
 					<div className="space-y-4">
-						<Card className="border-slate-200/70 bg-white/90 shadow-sm">
+						<Card className="border-slate-200 bg-white shadow-sm">
 							<CardHeader className="pb-2">
 								<CardTitle className="text-base">Your Overview</CardTitle>
 								<CardDescription className="text-xs">Progress snapshot for CBT assessments.</CardDescription>
 							</CardHeader>
 							<CardContent className="space-y-3">
-								<div className="rounded-xl border border-indigo-400/20 bg-gradient-to-br from-indigo-950/70 via-slate-950/70 to-slate-950/60 px-4 py-3">
-									<div className="text-xs uppercase tracking-wide text-slate-300">Available</div>
-									<div className="text-2xl font-semibold text-white">{availableTests.length}</div>
+								<div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+									<div className="text-xs uppercase tracking-wide text-indigo-700">Available</div>
+									<div className="text-2xl font-semibold text-indigo-900">{availableTests.length}</div>
 								</div>
-								<div className="rounded-xl border border-emerald-400/20 bg-gradient-to-br from-emerald-950/65 via-slate-950/70 to-slate-950/60 px-4 py-3">
-									<div className="text-xs uppercase tracking-wide text-slate-300">Completed</div>
-									<div className="text-2xl font-semibold text-white">{completedTests.length}</div>
+								<div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+									<div className="text-xs uppercase tracking-wide text-emerald-700">Completed</div>
+									<div className="text-2xl font-semibold text-emerald-900">{completedTests.length}</div>
 								</div>
-								<div className="rounded-xl border border-amber-400/20 bg-gradient-to-br from-amber-950/60 via-slate-950/70 to-slate-950/60 px-4 py-3">
-									<div className="text-xs uppercase tracking-wide text-slate-300">Average Score</div>
-									<div className="text-2xl font-semibold text-white">{avgScoreLabel}</div>
+								<div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+									<div className="text-xs uppercase tracking-wide text-amber-700">Average Score</div>
+									<div className="text-2xl font-semibold text-amber-900">{avgScoreLabel}</div>
 								</div>
-								<div className="rounded-xl border border-rose-400/20 bg-gradient-to-br from-rose-950/65 via-slate-950/70 to-slate-950/60 px-4 py-3">
-									<div className="text-xs uppercase tracking-wide text-slate-300">Next Due</div>
-									<div className="text-sm font-medium text-slate-100">
+								<div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3">
+									<div className="text-xs uppercase tracking-wide text-rose-700">Next Due</div>
+									<div className="text-sm font-medium text-rose-900">
 										{availableTests.length > 0 ? formatDate(new Date()) : 'No upcoming tests'}
 									</div>
 								</div>
 							</CardContent>
 						</Card>
 
-						<Card className="border-slate-200/70 bg-white/90 shadow-sm">
+						<Card className="border-slate-200 bg-white shadow-sm">
 							<CardHeader className="pb-2">
 								<CardTitle className="text-base">Exam Tips</CardTitle>
 								<CardDescription className="text-xs">Stay focused during your assessment.</CardDescription>
@@ -207,7 +240,7 @@ export const TakeTest = () => {
 						</Card>
 					</div>
 
-					<Card className="border-slate-200/70 bg-white/90 shadow-sm">
+					<Card className="border-slate-200 bg-white shadow-sm overflow-hidden">
 						<CardContent className="p-4 sm:p-6">
 							<Tabs defaultValue="available" value={activeTab} onValueChange={(v) => setActiveTab(v as 'available' | 'completed')}>
 								<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

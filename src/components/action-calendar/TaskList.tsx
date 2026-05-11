@@ -1,21 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+/**
+ * Action calendar task cards and edit dialog.
+ * Flow: task cards → permission-gated edit/delete → TaskListEditDialog updates parent callbacks.
+ */
+import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+import { TaskListEditDialog } from './TaskListEditDialog'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
 import { Task } from '@/pages/ActionCalendar'
 import { cn } from '@/lib/utils'
-import { Label } from '@/components/ui/label'
-import { Clock, AlertCircle, CheckCircle2, PauseCircle, User, Calendar, ArrowUpCircle, MinusCircle, ArrowDownCircle, Pencil, Trash2, Activity, Loader2 } from 'lucide-react'
+import { Clock, AlertCircle, CheckCircle2, PauseCircle, User, Calendar, ArrowUpCircle, MinusCircle, ArrowDownCircle, Pencil, Trash2, Activity } from 'lucide-react'
 import { format, isToday } from 'date-fns'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Calendar as CalendarPicker } from '@/components/ui/calendar'
 import { useToast } from '@/hooks/use-toast'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { employeeService } from '@/services/employeeService'
-import { Employee } from '@/types/employee'
+import { useTaskListEmployees } from './useTaskListEmployees'
+import type { Employee } from '@/types/employee'
 
 interface TaskListProps {
   tasks: Task[]
@@ -30,36 +28,10 @@ export function TaskList({ tasks, onOpenProgress, onUpdateTask, onDeleteTask, ca
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editedTask, setEditedTask] = useState<Partial<Task>>({})
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [loadingEmployees, setLoadingEmployees] = useState(false)
+  const { employees, loadingEmployees, assignableEmployees } = useTaskListEmployees()
+  const hasAssignableEmployees = assignableEmployees.length > 0
   const { toast } = useToast()
 
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        setLoadingEmployees(true)
-        const activeEmployees = await employeeService.getActiveEmployees()
-        setEmployees(activeEmployees)
-      } catch (error) {
-        console.error('Failed to load employees for action calendar editing:', error)
-        toast({
-          title: 'Unable to load employees',
-          description: 'We could not fetch employee assignments. Please retry or contact support.',
-          variant: 'destructive'
-        })
-      } finally {
-        setLoadingEmployees(false)
-      }
-    }
-
-    fetchEmployees()
-  }, [toast])
-
-  const assignableEmployees = useMemo(
-    () => employees.filter(employee => employee.userId),
-    [employees]
-  )
-  const hasAssignableEmployees = assignableEmployees.length > 0
   const currentAssigneeMissing = Boolean(
     editedTask.assignee && !employees.some(employee => employee.userId === editedTask.assignee)
   )
@@ -257,146 +229,25 @@ export function TaskList({ tasks, onOpenProgress, onUpdateTask, onDeleteTask, ca
         </Card>
       ))}
 
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-[500px] p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle>Edit Task</DialogTitle>
-            <DialogDescription>
-              Update the task details below. All fields are required.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2 sm:py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-title">Title</Label>
-              <Input
-                id="edit-title"
-                value={editedTask.title || ""}
-                onChange={(e) => setEditedTask({ ...editedTask, title: e.target.value })}
-                className="w-full"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={editedTask.description || ""}
-                onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
-                className="min-h-[100px]"
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-priority">Priority</Label>
-                <Select 
-                  value={editedTask.priority} 
-                  onValueChange={(value: Task['priority']) => setEditedTask({ ...editedTask, priority: value })}
-                >
-                  <SelectTrigger id="edit-priority">
-                    <SelectValue placeholder="Select Priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-assignee">Assignee</Label>
-                {!loadingEmployees && employees.length > 0 && !hasAssignableEmployees && (
-                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded p-2">
-                    Employees without user accounts cannot be assigned tasks. Create accounts under Administration → Users.
-                  </p>
-                )}
-                <Select
-                  value={editedTask.assignee || undefined}
-                  onValueChange={(value) => {
-                    if (value.startsWith('no-user-')) return
-                    setEditedTask({ ...editedTask, assignee: value })
-                  }}
-                  disabled={loadingEmployees || employees.length === 0}
-                >
-                  <SelectTrigger id="edit-assignee">
-                    {loadingEmployees ? (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Loading employees...
-                      </div>
-                    ) : (
-                      <SelectValue placeholder="Select assignee" />
-                    )}
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingEmployees ? (
-                      <SelectItem value="loading" disabled>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Loading employees...
-                        </div>
-                      </SelectItem>
-                    ) : employees.length === 0 ? (
-                      <SelectItem value="no-employees" disabled>
-                        No employees available
-                      </SelectItem>
-                    ) : (
-                      <>
-                        {employees.map((employee) => (
-                          <SelectItem
-                            key={employee.id}
-                            value={employee.userId ?? `no-user-${employee.id}`}
-                            disabled={!employee.userId}
-                            className={cn(
-                              'text-sm',
-                              !employee.userId && 'text-muted-foreground'
-                            )}
-                          >
-                            {getEmployeeDisplayName(employee)}
-                            {!employee.userId && ' — no user account'}
-                          </SelectItem>
-                        ))}
-                        {currentAssigneeMissing && editedTask.assignee && (
-                          <SelectItem value={editedTask.assignee} disabled className="text-xs italic text-muted-foreground">
-                            Current assignee (no longer active)
-                          </SelectItem>
-                        )}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Due Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !editedTask.date && "text-muted-foreground"
-                    )}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    {editedTask.date ? format(editedTask.date, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarPicker
-                    mode="single"
-                    selected={editedTask.date}
-                    onSelect={(date) => date && setEditedTask({ ...editedTask, date })}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveEdit}>Save Changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TaskListEditDialog
+        open={isEditDialogOpen}
+        selectedTask={selectedTask}
+        editedTask={editedTask}
+        employees={employees}
+        loadingEmployees={loadingEmployees}
+        hasAssignableEmployees={hasAssignableEmployees}
+        currentAssigneeMissing={currentAssigneeMissing}
+        getEmployeeDisplayName={getEmployeeDisplayName}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open)
+          if (!open) {
+            setSelectedTask(null)
+            setEditedTask({})
+          }
+        }}
+        onEditedTaskChange={(patch) => setEditedTask((prev) => ({ ...prev, ...patch }))}
+        onSave={handleSaveEdit}
+      />
     </div>
   )
 }

@@ -1,3 +1,6 @@
+/**
+ * Operations section links in the sidebar.
+ */
 import { Link } from "react-router-dom"
 import { SidebarMenuButton } from "@/components/ui/sidebar"
 import { Clipboard, MapPinned, Calendar, MessageSquareMore, FileText, Users } from "lucide-react"
@@ -9,12 +12,6 @@ export const OperationsSection = () => {
         <Link to="/operations/incident-report">
           <Clipboard className="w-4 h-4" />
           <span>Incident Report</span>
-        </Link>
-      </SidebarMenuButton>
-      <SidebarMenuButton asChild>
-        <Link to="/operations/mystery-shopper">
-          <Clipboard className="w-4 h-4" />
-          <span>Mystery Shopper</span>
         </Link>
       </SidebarMenuButton>
       <SidebarMenuButton asChild>

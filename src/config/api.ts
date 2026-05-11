@@ -1,22 +1,52 @@
-import axios from 'axios'
-import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+/**
+ * Shared axios client, base URL resolution, and auth refresh interceptors.
+ * All domain services should import `api` from here rather than creating their own axios instance.
+ * Flow: session token on request → 401 refresh queue → normalized `ApiResponse` errors for callers.
+ */
+import axios, { AxiosHeaders, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { sessionStore } from '@/state/sessionStore'
+import { logger } from '@/utils/logger'
 
-// Base API URL for the .NET backend
-// Configure via VITE_API_BASE_URL environment variable or defaults to http://localhost:5128/api
-export const BASE_API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5128/api'
+const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, '')
 
+/**
+ * API root including `/api` (e.g. `https://api.example.com/api`).
+ * - Deployed builds: set `VITE_API_BASE_URL`.
+ * - Local dev: defaults to `/api` so Vite proxies to the .NET API (`vite.config` server.proxy).
+ */
+export const BASE_API_URL = ((): string => {
+	const raw = import.meta.env.VITE_API_BASE_URL
+	if (typeof raw === 'string' && raw.trim().length > 0) {
+		return trimTrailingSlashes(raw.trim())
+	}
+	if (import.meta.env.DEV) {
+		return '/api'
+	}
+	throw new Error(
+		'VITE_API_BASE_URL must be set for production builds (include /api suffix, e.g. https://host.example/api). See .env.example.'
+	)
+})()
+
+const resolveTimeoutMs = (): number => {
+	const raw = import.meta.env.VITE_API_TIMEOUT_MS
+	if (raw === undefined || raw === '') return 30000
+	const n = Number(raw)
+	return Number.isFinite(n) && n > 0 ? n : 30000
+}
+
+// === Axios instance ===
 export const api = axios.create({
-  baseURL: BASE_API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  },
-  timeout: 10000 // 10 second timeout to prevent hanging requests
+	baseURL: BASE_API_URL,
+	headers: {
+		'Content-Type': 'application/json',
+		Accept: 'application/json',
+	},
+	timeout: resolveTimeoutMs(),
 })
 
 // Recruitment/CBT uses the same secure backend API by design.
 export const recruitmentApi = api
+
 const debugLogsEnabled = import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true'
 type ApiErrorPayload = { message?: string; errors?: string[] }
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
@@ -48,6 +78,11 @@ type BackendConnectionDetail = {
 let isRefreshingToken = false
 let pendingRefreshSubscribers: Array<(token: string | null) => void> = []
 let backendConnectionDegraded = false
+let consecutiveBackendFailures = 0
+let consecutiveBackendSuccesses = 0
+
+const BACKEND_DEGRADED_FAILURE_THRESHOLD = 2
+const BACKEND_RECOVERY_SUCCESS_THRESHOLD = 2
 
 const emitBackendConnectionEvent = (detail: BackendConnectionDetail) => {
   if (typeof window === 'undefined') return
@@ -109,7 +144,7 @@ const performTokenRefresh = async (): Promise<string> => {
         'Accept': 'application/json',
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
       },
-      timeout: 10000
+      timeout: resolveTimeoutMs()
     }
   )
 
@@ -136,7 +171,7 @@ const performTokenRefresh = async (): Promise<string> => {
 const requestInterceptor = (config: InternalAxiosRequestConfig) => {
   const token = sessionStore.getToken()
   if (debugLogsEnabled) {
-    console.log('🔄 [API Interceptor] Making request', {
+    logger.debug('[API] request', {
       url: config.url,
       method: config.method,
       hasToken: !!token,
@@ -146,16 +181,16 @@ const requestInterceptor = (config: InternalAxiosRequestConfig) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
     if (debugLogsEnabled) {
-      console.log('🔑 [API Interceptor] Added Authorization header')
+      logger.debug('[API] Authorization header set')
     }
   } else if (debugLogsEnabled) {
-    console.info('ℹ️ [API Interceptor] Skipping Authorization header; no auth token for request:', config.url)
+    logger.debug('[API] no token', config.url)
   }
   return config
 }
 const requestErrorInterceptor = (error: unknown) => {
   if (debugLogsEnabled) {
-    console.error('❌ [API Interceptor] Request error:', error)
+    logger.debug('[API] request error', error)
   }
   return Promise.reject(error)
 }
@@ -166,15 +201,22 @@ api.interceptors.request.use(requestInterceptor, requestErrorInterceptor)
 
 const responseSuccessInterceptor = (response: AxiosResponse) => {
   if (backendConnectionDegraded) {
-    backendConnectionDegraded = false
-    emitBackendConnectionEvent({
-      status: 'recovered',
-      message: 'Backend connection restored.'
-    })
+    consecutiveBackendSuccesses += 1
+    if (consecutiveBackendSuccesses >= BACKEND_RECOVERY_SUCCESS_THRESHOLD) {
+      backendConnectionDegraded = false
+      consecutiveBackendFailures = 0
+      consecutiveBackendSuccesses = 0
+      emitBackendConnectionEvent({
+        status: 'recovered',
+        message: 'Backend connection restored.'
+      })
+    }
+  } else {
+    consecutiveBackendFailures = 0
   }
 
   if (debugLogsEnabled) {
-    console.log('✅ [API Interceptor] Response received', {
+    logger.debug('[API] response', {
       url: response.config.url,
       status: response.status
     })
@@ -182,6 +224,7 @@ const responseSuccessInterceptor = (response: AxiosResponse) => {
   return response
 }
 
+// Response pipeline: on 401, refresh access token once and retry except for auth/settings endpoints (see branch below).
 // Add response interceptor for error handling
 api.interceptors.response.use(
   responseSuccessInterceptor,
@@ -201,13 +244,13 @@ api.interceptors.response.use(
     const shouldLogWarningOnly = !shouldLogVerbose && (isExpectedError || isRecruitmentServerError);
 
     if (!axiosError?.response && debugLogsEnabled) {
-      console.warn('⚠️ [API Interceptor] Network error or backend unavailable', {
+      logger.debug('[API] network error', {
         url,
         method: axiosError?.config?.method,
         message: axiosError?.message ?? 'Unknown network error',
       })
     } else if (shouldLogWarningOnly) {
-      console.warn(`⚠️ [API Interceptor] ${status} ${axiosError?.config?.method?.toUpperCase()} ${url}`);
+      logger.debug(`[API] ${status} ${axiosError?.config?.method?.toUpperCase()} ${url}`)
     } else if (shouldLogVerbose) {
       const errorDetails = {
         url,
@@ -217,22 +260,33 @@ api.interceptors.response.use(
         message: axiosError?.message,
         responseData: axiosError?.response?.data,
         requestData: axiosError?.config?.data,
-        headers: axiosError?.config?.headers,
-        authHeader: axiosError?.config?.headers?.Authorization ? 'Present' : 'Missing',
+        authHeader: axiosError?.config?.headers?.Authorization ? 'present' : 'missing',
       }
-      console.error('❌ [API Interceptor] Response error:', errorDetails)
-      if (axiosError?.response?.data) {
-        console.error('❌ [API Interceptor] Error response data:', JSON.stringify(axiosError.response.data, null, 2))
-      }
+      logger.error('[API] response error', errorDetails)
     }
 
-    const backendUnavailable = !axiosError?.response || (typeof status === 'number' && status >= 500)
-    if (backendUnavailable && !backendConnectionDegraded) {
-      backendConnectionDegraded = true
-      emitBackendConnectionEvent({
-        status: 'degraded',
-        message: 'Backend connection is unstable. Reconnecting...'
-      })
+    const isCanceledRequest = axiosError?.code === 'ERR_CANCELED'
+      || axiosError?.message?.toLowerCase() === 'canceled'
+      || axios.isCancel(error)
+
+    const backendUnavailable = !isCanceledRequest
+      && (!axiosError?.response || (typeof status === 'number' && status >= 500))
+
+    if (backendUnavailable) {
+      consecutiveBackendFailures += 1
+      consecutiveBackendSuccesses = 0
+      if (
+        !backendConnectionDegraded
+        && consecutiveBackendFailures >= BACKEND_DEGRADED_FAILURE_THRESHOLD
+      ) {
+        backendConnectionDegraded = true
+        emitBackendConnectionEvent({
+          status: 'degraded',
+          message: 'Backend connection is unstable. Reconnecting...'
+        })
+      }
+    } else if (!isCanceledRequest) {
+      consecutiveBackendFailures = 0
     }
     
     if (status === 401 && retryableConfig) {
@@ -265,8 +319,8 @@ api.interceptors.response.use(
             }
 
             const replayConfig = { ...retryableConfig }
-            replayConfig.headers = replayConfig.headers ?? {}
-            replayConfig.headers.Authorization = `Bearer ${newToken}`
+            replayConfig.headers = AxiosHeaders.from(retryableConfig.headers ?? {})
+            replayConfig.headers.set('Authorization', `Bearer ${newToken}`)
             resolve(api(replayConfig))
           })
         })
@@ -278,8 +332,8 @@ api.interceptors.response.use(
       try {
         const refreshedToken = await performTokenRefresh()
         notifyRefreshSubscribers(refreshedToken)
-        retryableConfig.headers = retryableConfig.headers ?? {}
-        retryableConfig.headers.Authorization = `Bearer ${refreshedToken}`
+        retryableConfig.headers = AxiosHeaders.from(retryableConfig.headers ?? {})
+        retryableConfig.headers.set('Authorization', `Bearer ${refreshedToken}`)
         return api(retryableConfig)
       } catch (refreshError) {
         notifyRefreshSubscribers(null)

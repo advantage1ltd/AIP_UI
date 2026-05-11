@@ -1,3 +1,7 @@
+/**
+ * Compliance asset create/edit form.
+ * Flow: asset type and assignment fields → validated dialog submit → parent persistence callback.
+ */
 import React, { useState, useEffect } from 'react'
 import {
 	Dialog,
@@ -17,14 +21,8 @@ import {
 	SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { NativeDateInput } from '@/components/ui/native-date-input'
 import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from '@/components/ui/popover'
-import { Calendar } from '@/components/ui/calendar'
-import {
-	CalendarIcon,
 	Loader2,
 	Laptop,
 	Smartphone,
@@ -38,7 +36,6 @@ import {
 	User,
 	FileText
 } from 'lucide-react'
-import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 
 // Asset types
@@ -277,29 +274,13 @@ export const AssetForm: React.FC<AssetFormProps> = ({
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 								<div className="space-y-2">
 									<Label className="text-slate-700">Purchase Date <span className="text-red-500">*</span></Label>
-									<Popover>
-										<PopoverTrigger asChild>
-											<Button
-												variant="outline"
-												disabled={isLoading}
-												className={cn(
-													'w-full h-10 justify-start text-left font-normal border-slate-200',
-													!date && 'text-muted-foreground'
-												)}
-											>
-												<CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
-												{date ? format(date, 'PPP') : <span>Pick a date</span>}
-											</Button>
-										</PopoverTrigger>
-										<PopoverContent className="w-auto p-0" align="start">
-											<Calendar
-												mode="single"
-												selected={date}
-												onSelect={handleDateChange}
-												initialFocus
-											/>
-										</PopoverContent>
-									</Popover>
+									<NativeDateInput
+										value={date}
+										onDateChange={handleDateChange}
+										disabled={isLoading}
+										className="w-full bg-white border-slate-200"
+										aria-label="Purchase date"
+									/>
 								</div>
 
 								<div className="space-y-2">

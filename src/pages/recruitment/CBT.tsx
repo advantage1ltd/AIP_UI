@@ -1,4 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+/**
+ * Recruitment CBT administration: tests, questions, and assignments.
+ * Flow: test catalog → question editor → assign sessions to candidates.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
 	AlertTriangle,
 	AlignLeft,
@@ -6,6 +10,8 @@ import {
 	CheckCircle,
 	CheckSquare,
 	Clock,
+	ChevronLeft,
+	ChevronRight,
 	Edit2,
 	Eye,
 	FileText,
@@ -62,6 +68,7 @@ interface BulkQuestionDraft {
 }
 
 const normalizeStatus = (value: string | null | undefined) => String(value ?? '').trim().toLowerCase()
+const cbtDateFormatter = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
 /** Safely get test id from a list item (handles camelCase and PascalCase from API) */
 function getTestId(t: RecruitmentTestSummary & { TestId?: string }): string {
@@ -92,6 +99,32 @@ const normalizeBulkOptions = (options: RecruitmentAdminOption[]) => options
 	.filter(option => option.text !== '')
 	.map((option, index) => ({ ...option, sortOrder: index + 1 }))
 
+const parseDateInput = (value: string, endOfDay = false) => {
+	if (!value) return null
+	const parts = value.split('-').map(part => Number(part))
+	if (parts.length !== 3 || parts.some(Number.isNaN)) return null
+	const [year, month, day] = parts
+	const date = endOfDay
+		? new Date(year, month - 1, day, 23, 59, 59, 999)
+		: new Date(year, month - 1, day, 0, 0, 0, 0)
+	if (Number.isNaN(date.getTime())) return null
+	return date
+}
+
+const parseDateTime = (value?: string | null) => {
+	if (!value) return null
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return null
+	return date
+}
+
+const formatDate = (value?: string | null) => {
+	const date = parseDateTime(value)
+	return date ? cbtDateFormatter.format(date) : '—'
+}
+
+const escapeCsvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`
+
 const applyBulkTypeDefaults = (draft: BulkQuestionDraft, nextType: RecruitmentQuestionType): BulkQuestionDraft => {
 	const normalizedType = normalizeStatus(nextType) as RecruitmentQuestionType
 	const isChoice = normalizedType === 'multiple-choice' || normalizedType === 'multiple-answer'
@@ -118,9 +151,14 @@ const applyBulkTypeDefaults = (draft: BulkQuestionDraft, nextType: RecruitmentQu
 }
 
 const CBT = () => {
+	const TESTS_PAGE_SIZE = 9
+	const RESULTS_PAGE_SIZE = 10
+
 	const [activeTab, setActiveTab] = useState<'tests' | 'results'>('tests')
 	const [searchTerm, setSearchTerm] = useState('')
 	const [filterStatus, setFilterStatus] = useState<'all' | TestStatus>('all')
+	const [testsPage, setTestsPage] = useState(1)
+	const [resultsPage, setResultsPage] = useState(1)
 
 	const [testsLoading, setTestsLoading] = useState(false)
 	const [testsError, setTestsError] = useState<string | null>(null)
@@ -154,7 +192,7 @@ const CBT = () => {
 	const [resultsDateFrom, setResultsDateFrom] = useState<string>('')
 	const [resultsDateTo, setResultsDateTo] = useState<string>('')
 
-	const loadTests = async () => {
+	const loadTests = useCallback(async () => {
 		setTestsLoading(true)
 		setTestsError(null)
 		try {
@@ -168,9 +206,9 @@ const CBT = () => {
 		} finally {
 			setTestsLoading(false)
 		}
-	}
+	}, [])
 
-	const loadAttempts = async () => {
+	const loadAttempts = useCallback(async () => {
 		setAttemptsLoading(true)
 		setAttemptsError(null)
 		try {
@@ -184,15 +222,15 @@ const CBT = () => {
 		} finally {
 			setAttemptsLoading(false)
 		}
-	}
+	}, [resultsFilterTestId])
 
 	useEffect(() => {
 		void loadTests()
-	}, [])
+	}, [loadTests])
 
 	useEffect(() => {
 		void loadAttempts()
-	}, [resultsFilterTestId])
+	}, [loadAttempts])
 
 	const filteredTests = useMemo(() => {
 		const term = searchTerm.trim().toLowerCase()
@@ -202,6 +240,12 @@ const CBT = () => {
 			return matchesSearch && matchesStatus
 		})
 	}, [filterStatus, searchTerm, tests])
+
+	const totalTestPages = Math.max(1, Math.ceil(filteredTests.length / TESTS_PAGE_SIZE))
+	const paginatedTests = useMemo(() => {
+		const start = (testsPage - 1) * TESTS_PAGE_SIZE
+		return filteredTests.slice(start, start + TESTS_PAGE_SIZE)
+	}, [filteredTests, testsPage])
 
 	const stats = useMemo(() => {
 		const total = tests.length
@@ -254,42 +298,53 @@ const CBT = () => {
 			case 'scheduled':
 				return 'bg-blue-100 text-blue-800'
 			case 'draft':
-				return 'bg-gray-100 text-gray-800'
+				return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
 			case 'completed':
 				return 'bg-amber-100 text-amber-800'
 			default:
-				return 'bg-gray-100 text-gray-800'
+				return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
 		}
 	}
 
-	const formatDate = (value?: string | null) => {
-		if (!value) return '—'
-		const date = new Date(value)
-		if (Number.isNaN(date.getTime())) return '—'
-		return new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).format(date)
-	}
-
-	const parseDateInput = (value: string, endOfDay = false) => {
-		if (!value) return null
-		const date = new Date(value)
-		if (Number.isNaN(date.getTime())) return null
-		if (endOfDay) date.setHours(23, 59, 59, 999)
-		return date
-	}
+	const sortedCurrentQuestions = useMemo(() => {
+		if (!currentTest?.questions?.length) return []
+		return [...currentTest.questions].sort((a, b) => a.sortOrder - b.sortOrder)
+	}, [currentTest?.questions])
 
 	const filteredAttempts = useMemo(() => {
 		const from = parseDateInput(resultsDateFrom)
 		const to = parseDateInput(resultsDateTo, true)
 		return attempts.filter(attempt => {
 			if (resultsFilterTestId !== 'all' && attempt.testId !== resultsFilterTestId) return false
-			if (!attempt.completedAt) return false
-			const completedAt = new Date(attempt.completedAt)
-			if (Number.isNaN(completedAt.getTime())) return false
+			const completedAt = parseDateTime(attempt.completedAt)
+			if (!completedAt) return false
 			if (from && completedAt < from) return false
 			if (to && completedAt > to) return false
 			return true
 		})
 	}, [attempts, resultsDateFrom, resultsDateTo, resultsFilterTestId])
+
+	const totalResultsPages = Math.max(1, Math.ceil(filteredAttempts.length / RESULTS_PAGE_SIZE))
+	const paginatedAttempts = useMemo(() => {
+		const start = (resultsPage - 1) * RESULTS_PAGE_SIZE
+		return filteredAttempts.slice(start, start + RESULTS_PAGE_SIZE)
+	}, [filteredAttempts, resultsPage])
+
+	useEffect(() => {
+		setTestsPage(prev => Math.min(Math.max(1, prev), totalTestPages))
+	}, [totalTestPages])
+
+	useEffect(() => {
+		setResultsPage(prev => Math.min(Math.max(1, prev), totalResultsPages))
+	}, [totalResultsPages])
+
+	useEffect(() => {
+		setTestsPage(1)
+	}, [searchTerm, filterStatus])
+
+	useEffect(() => {
+		setResultsPage(1)
+	}, [resultsDateFrom, resultsDateTo, resultsFilterTestId])
 
 	const handleExportResultsCsv = () => {
 		if (filteredAttempts.length === 0) return
@@ -317,7 +372,7 @@ const CBT = () => {
 			attempt.percentageScore,
 			attempt.status,
 			attempt.completedAt ?? '',
-		]).map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
+		]).map(escapeCsvCell).join(','))
 
 		const csv = [headers.join(','), ...rows].join('\n')
 		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -356,9 +411,11 @@ const CBT = () => {
 		setEditMode(true)
 		setTestSaving(true)
 		try {
-			const test = await recruitmentTestService.getAdminTestById(testId)
+			const [test, testAttempts] = await Promise.all([
+				recruitmentTestService.getAdminTestById(testId),
+				recruitmentTestService.getAdminAttempts(testId),
+			])
 			setCurrentTest({ ...test, passThresholdPercentage: test.passThresholdPercentage ?? 80 })
-			const testAttempts = await recruitmentTestService.getAdminAttempts(testId)
 			setCurrentTestHasAttempts(testAttempts.length > 0)
 			setCreateDialogOpen(true)
 		} catch (err) {
@@ -452,10 +509,6 @@ const CBT = () => {
 
 	const upsertQuestion = async (question: RecruitmentAdminQuestion) => {
 		if (!currentTest) return
-		if (currentTestHasAttempts) {
-			toast({ title: 'Locked', description: 'This test already has attempts; questions are locked.', variant: 'destructive' })
-			return
-		}
 
 		const isEdit = Boolean(currentQuestion)
 		const normalized: RecruitmentAdminQuestion = {
@@ -484,10 +537,6 @@ const CBT = () => {
 
 	const removeQuestion = async (questionId: string) => {
 		if (!currentTest) return
-		if (currentTestHasAttempts) {
-			toast({ title: 'Locked', description: 'This test already has attempts; questions are locked.', variant: 'destructive' })
-			return
-		}
 
 		const nextTest: RecruitmentAdminTest = {
 			...currentTest,
@@ -568,10 +617,6 @@ const CBT = () => {
 
 	const saveBulkQuestions = async () => {
 		if (!currentTest) return
-		if (currentTestHasAttempts) {
-			toast({ title: 'Locked', description: 'This test already has attempts; questions are locked.', variant: 'destructive' })
-			return
-		}
 
 		const errors: string[] = []
 
@@ -663,21 +708,21 @@ const CBT = () => {
 		}
 	}
 	return (
-		<div className="min-h-screen bg-slate-50 w-full overflow-x-hidden">
-			<div className="container mx-auto px-3 py-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-5 lg:space-y-6 max-w-full md:max-w-[96%] lg:max-w-7xl">
-				<div className="rounded-2xl border border-slate-200/70 bg-white/90 shadow-sm backdrop-blur">
+		<div className="min-h-screen bg-[#EFF4FF] w-full overflow-x-hidden">
+			<div className="container mx-auto max-w-screen-2xl px-4 py-4 lg:px-8 lg:py-8 space-y-4 sm:space-y-5 lg:space-y-6">
+				<div className="rounded-xl border border-slate-200 bg-white shadow-sm">
 					<div className="flex flex-col gap-4 p-4 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
 						<div className="space-y-2">
-							<Badge variant="outline" className="border-slate-200/80 text-xs uppercase tracking-wide text-slate-500">CBT administration</Badge>
+							<Badge variant="outline" className="border-slate-200 text-xs uppercase tracking-wide text-slate-500">CBT administration</Badge>
 							<div>
-								<h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">Assessment Test Console</h1>
+								<h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">Assessment test console</h1>
 								<p className="text-sm text-slate-500">Create, schedule, and monitor CBT assessments in one place.</p>
 							</div>
 						</div>
 						<div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto">
 							<Button className="h-10 w-full sm:w-auto" onClick={openCreateDialog}>
 								<Plus className="h-4 w-4 mr-2" />
-								Create New Test
+								Create new test
 							</Button>
 						</div>
 					</div>
@@ -685,15 +730,15 @@ const CBT = () => {
 
 				<div className="grid grid-cols-2 gap-3 md:grid-cols-4">
 					{stats.map((stat) => (
-						<Card key={stat.title} className={cn('shadow-sm backdrop-blur', stat.card)}>
+						<Card key={stat.title} className="border-slate-200 bg-white shadow-sm">
 							<CardContent className="p-4">
 								<div className="flex items-center justify-between">
 									<div>
-										<p className="text-xs font-medium uppercase tracking-wide text-slate-300">{stat.title}</p>
-										<p className="text-2xl font-semibold text-white">{stat.value}</p>
+										<p className="text-xs font-medium uppercase tracking-wide text-slate-500">{stat.title}</p>
+										<p className="text-2xl font-semibold text-slate-900">{stat.value}</p>
 									</div>
-									<div className={cn('flex h-10 w-10 items-center justify-center rounded-full', stat.ring)}>
-										<stat.icon className={cn('h-5 w-5', stat.accent)} />
+									<div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 ring-1 ring-inset ring-blue-100">
+										<stat.icon className="h-5 w-5 text-blue-600" />
 									</div>
 								</div>
 							</CardContent>
@@ -701,7 +746,7 @@ const CBT = () => {
 					))}
 				</div>
 
-				<Card className="border-slate-200/70 bg-white/90 shadow-sm">
+				<Card className="border-slate-200 bg-white shadow-sm overflow-hidden">
 					<CardContent className="p-4 sm:p-6">
 						<Tabs defaultValue="tests" value={activeTab} onValueChange={(v) => setActiveTab(v as 'tests' | 'results')}>
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -725,7 +770,7 @@ const CBT = () => {
 											<SelectValue placeholder="Filter by status" />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="all">All Statuses</SelectItem>
+											<SelectItem value="all">All statuses</SelectItem>
 											<SelectItem value="draft">Draft</SelectItem>
 											<SelectItem value="active">Active</SelectItem>
 											<SelectItem value="scheduled">Scheduled</SelectItem>
@@ -737,25 +782,25 @@ const CBT = () => {
 
 							<TabsContent value="tests" className="space-y-4 pt-4">
 								{testsLoading ? (
-									<div className="text-center py-12 text-sm text-slate-500">Loading tests…</div>
+									<div className="text-center py-12 text-sm text-slate-500 dark:text-slate-400">Loading tests...</div>
 								) : testsError ? (
-									<div className="text-center py-12 text-sm text-slate-500">{testsError}</div>
+									<div className="text-center py-12 text-sm text-slate-500 dark:text-slate-400">{testsError}</div>
 								) : filteredTests.length > 0 ? (
 									<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-										{filteredTests.map((t, idx) => {
+										{paginatedTests.map((t, idx) => {
 											const id = getTestId(t)
 											return (
-												<Card key={id || `test-${idx}`} className="border-slate-200/70 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+												<Card key={id || `test-${idx}`} className="border-slate-200/70 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
 													<CardContent className="p-4">
 														<div className="flex items-start justify-between gap-3">
 															<div className="space-y-1">
-																<h3 className="text-base font-semibold text-slate-900">{t.title}</h3>
-																<p className="text-xs text-slate-500">{t.description || 'No description provided.'}</p>
+																<h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t.title}</h3>
+																<p className="text-xs text-slate-500 dark:text-slate-400">{t.description || 'No description provided.'}</p>
 															</div>
 															<Badge className={getStatusColor(t.status)}>{t.status.charAt(0).toUpperCase() + t.status.slice(1)}</Badge>
 														</div>
 
-														<div className="mt-4 grid gap-2 text-xs text-slate-500">
+														<div className="mt-4 grid gap-2 text-xs text-slate-500 dark:text-slate-400">
 															<div className="flex items-center gap-2">
 																<Timer className="h-4 w-4" />
 																<span>{t.durationMinutes} min duration</span>
@@ -775,7 +820,7 @@ const CBT = () => {
 															)}
 														</div>
 
-														<div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+														<div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-700">
 															<Button variant="ghost" size="sm" className="px-0 text-slate-500" onClick={() => openEditDialog(t)}>
 																<Eye className="mr-2 h-4 w-4" />
 																View
@@ -805,10 +850,38 @@ const CBT = () => {
 										<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
 											<FileText className="h-6 w-6 text-slate-500" />
 										</div>
-										<h3 className="mt-3 text-lg font-medium text-slate-900">No tests yet</h3>
+										<h3 className="mt-3 text-lg font-medium text-slate-900 dark:text-slate-100">No tests yet</h3>
 										<p className="text-sm text-slate-500">
 											{searchTerm || filterStatus !== 'all' ? 'Try adjusting your search or filters.' : 'Create your first CBT assessment to get started.'}
 										</p>
+									</div>
+								)}
+								{filteredTests.length > TESTS_PAGE_SIZE && (
+									<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
+										<span>
+											Showing {(testsPage - 1) * TESTS_PAGE_SIZE + 1}-{Math.min(testsPage * TESTS_PAGE_SIZE, filteredTests.length)} of {filteredTests.length}
+										</span>
+										<div className="flex items-center gap-2">
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => setTestsPage(p => Math.max(1, p - 1))}
+												disabled={testsPage === 1}
+											>
+												<ChevronLeft className="mr-1 h-3.5 w-3.5" />
+												<span className="hidden sm:inline">Previous</span>
+											</Button>
+											<span>Page {testsPage} of {totalTestPages}</span>
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => setTestsPage(p => Math.min(totalTestPages, p + 1))}
+												disabled={testsPage === totalTestPages}
+											>
+												<span className="hidden sm:inline">Next</span>
+												<ChevronRight className="ml-1 h-3.5 w-3.5" />
+											</Button>
+										</div>
 									</div>
 								)}
 							</TabsContent>
@@ -862,14 +935,14 @@ const CBT = () => {
 								</div>
 
 								{attemptsLoading ? (
-									<div className="text-center py-12 text-sm text-slate-500">Loading attempts…</div>
+									<div className="text-center py-12 text-sm text-slate-500">Loading attempts...</div>
 								) : attemptsError ? (
 									<div className="text-center py-12 text-sm text-slate-500">{attemptsError}</div>
 								) : (
-									<div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white">
+									<div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white dark:border-slate-700 dark:bg-slate-900">
 										<div className="overflow-x-auto">
 											<table className="w-full text-sm">
-												<thead className="bg-slate-50 text-slate-500 sticky top-0">
+												<thead className="sticky top-0 bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
 													<tr>
 														<th className="px-4 py-3 text-left font-medium">Officer</th>
 														<th className="px-4 py-3 text-left font-medium">Test</th>
@@ -880,9 +953,9 @@ const CBT = () => {
 													</tr>
 												</thead>
 												<tbody className="divide-y">
-													{filteredAttempts.length > 0 ? (
-														filteredAttempts.map(a => (
-															<tr key={a.attemptId} className="hover:bg-slate-50">
+													{paginatedAttempts.length > 0 ? (
+														paginatedAttempts.map(a => (
+															<tr key={a.attemptId} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
 																<td className="px-4 py-3">{a.officerName}</td>
 																<td className="px-4 py-3">{a.testTitle}</td>
 																<td className="px-4 py-3">{a.completedAt ? formatDate(a.completedAt) : '—'}</td>
@@ -901,18 +974,46 @@ const CBT = () => {
 																<td className="px-4 py-3 text-right">
 																	<Button variant="ghost" size="sm" onClick={() => void openResultDetails(a.attemptId)}>
 																		<Eye className="mr-2 h-4 w-4" />
-																		View Details
+																		View details
 																	</Button>
 																</td>
 															</tr>
 														))
 													) : (
 														<tr>
-															<td colSpan={6} className="px-4 py-8 text-center text-slate-500">No attempts found</td>
+															<td colSpan={6} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">No attempts found</td>
 														</tr>
 													)}
 												</tbody>
 											</table>
+										</div>
+									</div>
+								)}
+								{filteredAttempts.length > RESULTS_PAGE_SIZE && (
+									<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
+										<span>
+											Showing {(resultsPage - 1) * RESULTS_PAGE_SIZE + 1}-{Math.min(resultsPage * RESULTS_PAGE_SIZE, filteredAttempts.length)} of {filteredAttempts.length}
+										</span>
+										<div className="flex items-center gap-2">
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => setResultsPage(p => Math.max(1, p - 1))}
+												disabled={resultsPage === 1}
+											>
+												<ChevronLeft className="mr-1 h-3.5 w-3.5" />
+												<span className="hidden sm:inline">Previous</span>
+											</Button>
+											<span>Page {resultsPage} of {totalResultsPages}</span>
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => setResultsPage(p => Math.min(totalResultsPages, p + 1))}
+												disabled={resultsPage === totalResultsPages}
+											>
+												<span className="hidden sm:inline">Next</span>
+												<ChevronRight className="ml-1 h-3.5 w-3.5" />
+											</Button>
 										</div>
 									</div>
 								)}
@@ -923,24 +1024,31 @@ const CBT = () => {
 			</div>
 
 			<Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-				<DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+				<DialogContent className="w-[calc(100%-1.5rem)] sm:w-auto sm:max-w-[980px] max-h-[90vh] overflow-y-auto border-slate-200 bg-white p-0">
 					<DialogHeader>
-						<DialogTitle>{editMode ? 'Edit Test' : 'Create New Test'}</DialogTitle>
-						<DialogDescription>
+						<div className="border-b border-slate-200 px-6 py-4">
+							<DialogTitle>{editMode ? 'Edit test' : 'Create new test'}</DialogTitle>
+							<DialogDescription>
 							{editMode ? 'Update the details and questions for this test' : 'Define the basic details and questions for your new assessment test'}
-						</DialogDescription>
+							</DialogDescription>
+						</div>
 						{editMode && currentTestHasAttempts && (
 							<p className="text-xs text-amber-700">
-								This test already has attempts. **Questions are locked** (you can still update title/duration/status).
+								This test already has attempts. Admins can still update the test; officers who already attempted remain locked from retaking.
 							</p>
 						)}
 					</DialogHeader>
 
 					{currentTest && (
-						<div className="space-y-6">
-							<div className="grid gap-4">
+						<div className="space-y-6 px-6 pb-6">
+							<div className="rounded-lg border border-slate-200 p-4">
+								<div className="mb-3">
+									<h3 className="text-sm font-semibold text-slate-900">Test details</h3>
+									<p className="text-xs text-slate-500">Configure the main properties before adding questions.</p>
+								</div>
+								<div className="grid gap-4">
 								<div className="grid gap-2">
-									<Label htmlFor="title">Test Title</Label>
+									<Label htmlFor="title">Test title</Label>
 									<Input
 										id="title"
 										placeholder="Enter test title"
@@ -949,7 +1057,7 @@ const CBT = () => {
 									/>
 								</div>
 								<div className="grid gap-2">
-									<Label htmlFor="description">Description (Optional)</Label>
+									<Label htmlFor="description">Description (optional)</Label>
 									<Textarea
 										id="description"
 										placeholder="Briefly describe the purpose of this test"
@@ -969,7 +1077,7 @@ const CBT = () => {
 										/>
 									</div>
 									<div className="grid gap-2">
-										<Label htmlFor="points">Total Points</Label>
+										<Label htmlFor="points">Total points</Label>
 										<Input
 											id="points"
 											type="number"
@@ -979,7 +1087,7 @@ const CBT = () => {
 										/>
 									</div>
 								<div className="grid gap-2">
-									<Label htmlFor="pass-threshold">Pass Threshold (%)</Label>
+									<Label htmlFor="pass-threshold">Pass threshold (%)</Label>
 									<Input
 										id="pass-threshold"
 										type="number"
@@ -1009,7 +1117,7 @@ const CBT = () => {
 										</Select>
 									</div>
 									<div className="grid gap-2">
-										<Label>Scheduled Date (optional)</Label>
+										<Label>Scheduled date (optional)</Label>
 										<Input
 											type="date"
 											value={currentTest.scheduledDate ? String(currentTest.scheduledDate).slice(0, 10) : ''}
@@ -1017,38 +1125,37 @@ const CBT = () => {
 										/>
 									</div>
 								</div>
+								</div>
 							</div>
 
-							<div className="border rounded-md">
-								<div className="p-4 flex flex-col gap-3 border-b sm:flex-row sm:items-center sm:justify-between">
+							<div className="rounded-lg border border-slate-200">
+								<div className="p-4 flex flex-col gap-3 border-b border-slate-200 bg-slate-50/60 sm:flex-row sm:items-center sm:justify-between">
 									<div>
-										<div className="font-medium">Questions</div>
-										<div className="text-xs text-muted-foreground">{currentTest.questions.length} total</div>
+										<div className="font-medium text-slate-900">Questions</div>
+										<div className="text-xs text-slate-500">{currentTest.questions.length} total</div>
 									</div>
 									<div className="flex flex-col gap-2 sm:flex-row">
 										<Button
 											variant="outline"
 											size="sm"
-											disabled={currentTestHasAttempts}
 											onClick={() => {
 												setBulkQuestions([createBulkDraft()])
 												setBulkDialogOpen(true)
 											}}
 										>
 											<Plus className="h-4 w-4 mr-1" />
-											Bulk Add
+											Bulk add
 										</Button>
 										<Button
 											variant="default"
 											size="sm"
-											disabled={currentTestHasAttempts}
 											onClick={() => {
 												setCurrentQuestion(null)
 												setQuestionDialogOpen(true)
 											}}
 										>
 											<Plus className="h-4 w-4 mr-1" />
-											Add Question
+											Add question
 										</Button>
 									</div>
 								</div>
@@ -1057,11 +1164,8 @@ const CBT = () => {
 									<div className="p-8 text-center text-sm text-muted-foreground">No questions yet.</div>
 								) : (
 									<div className="divide-y">
-										{currentTest.questions
-											.slice()
-											.sort((a, b) => a.sortOrder - b.sortOrder)
-											.map((q, idx) => (
-												<div key={q.questionId} className="p-4 hover:bg-[#EFF4FF]">
+										{sortedCurrentQuestions.map((q, idx) => (
+											<div key={q.questionId} className="p-4 hover:bg-[#EFF4FF]">
 													<div className="flex justify-between items-start">
 														<div className="space-y-2">
 															<div className="flex items-center gap-2">
@@ -1079,7 +1183,6 @@ const CBT = () => {
 														<Button
 															variant="outline"
 															size="sm"
-															disabled={currentTestHasAttempts}
 															onClick={() => {
 																setCurrentQuestion(q)
 																setQuestionDialogOpen(true)
@@ -1091,7 +1194,6 @@ const CBT = () => {
 														<Button
 															variant="outline"
 															size="sm"
-															disabled={currentTestHasAttempts}
 															onClick={() => void removeQuestion(q.questionId)}
 														>
 															<Trash2 className="h-4 w-4 mr-1" />
@@ -1107,35 +1209,35 @@ const CBT = () => {
 						</div>
 					)}
 
-					<DialogFooter>
-						<Button variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={testSaving}>Cancel</Button>
-						<Button onClick={() => currentTest && void saveTest(currentTest)} disabled={testSaving || !currentTest?.title.trim()}>
-							{testSaving ? 'Saving…' : editMode ? 'Update Test' : 'Create Test'}
+					<DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+						<Button className="w-full sm:w-auto" variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={testSaving}>Cancel</Button>
+						<Button className="w-full sm:w-auto" onClick={() => currentTest && void saveTest(currentTest)} disabled={testSaving || !currentTest?.title.trim()}>
+							{testSaving ? 'Saving...' : editMode ? 'Update test' : 'Create test'}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 
 			<Dialog open={questionDialogOpen} onOpenChange={setQuestionDialogOpen}>
-				<DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-					<DialogHeader>
-						<DialogTitle>{currentQuestion ? 'Edit Question' : 'Add Question'}</DialogTitle>
-						<DialogDescription>Create a question for your test.</DialogDescription>
+				<DialogContent className="w-[calc(100%-1.5rem)] sm:w-auto sm:max-w-[1024px] max-h-[92vh] overflow-y-auto border-slate-200 bg-white p-0">
+					<DialogHeader className="border-b border-slate-200 px-6 py-4">
+						<DialogTitle className="text-xl">{currentQuestion ? 'Edit question' : 'Add question'}</DialogTitle>
+						<DialogDescription className="text-sm">Create a question for your test.</DialogDescription>
 					</DialogHeader>
-
-					<QuestionEditor
-						key={currentQuestion?.questionId || 'new'}
-						initial={currentQuestion}
-						onSubmit={(q) => void upsertQuestion(q)}
-						disabled={currentTestHasAttempts}
-					/>
+					<div className="px-6 pb-6 pt-4">
+						<QuestionEditor
+							key={currentQuestion?.questionId || 'new'}
+							initial={currentQuestion}
+							onSubmit={(q) => void upsertQuestion(q)}
+						/>
+					</div>
 				</DialogContent>
 			</Dialog>
 
 			<Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
-				<DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+				<DialogContent className="w-[calc(100%-1.5rem)] sm:w-auto sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
 					<DialogHeader>
-						<DialogTitle>Bulk Add Questions</DialogTitle>
+						<DialogTitle>Bulk add questions</DialogTitle>
 						<DialogDescription>Add multiple questions quickly. You can edit options after saving.</DialogDescription>
 					</DialogHeader>
 					<div className="space-y-4">
@@ -1154,7 +1256,7 @@ const CBT = () => {
 								</div>
 								<div className="grid gap-3 sm:grid-cols-3">
 									<div className="grid gap-2 sm:col-span-2">
-										<Label htmlFor={`bulk-text-${question.id}`}>Question Text</Label>
+										<Label htmlFor={`bulk-text-${question.id}`}>Question text</Label>
 										<Textarea
 											id={`bulk-text-${question.id}`}
 											value={question.text}
@@ -1185,7 +1287,7 @@ const CBT = () => {
 													<SelectItem value="multiple-choice">Multiple Choice</SelectItem>
 													<SelectItem value="multiple-answer">Multiple Answer</SelectItem>
 													<SelectItem value="true-false">True / False</SelectItem>
-													<SelectItem value="text">Short Answer</SelectItem>
+													<SelectItem value="text">Short answer</SelectItem>
 													<SelectItem value="essay">Essay</SelectItem>
 												</SelectContent>
 											</Select>
@@ -1194,7 +1296,7 @@ const CBT = () => {
 								</div>
 							{(question.type === 'multiple-choice' || question.type === 'multiple-answer') && (
 								<div className="space-y-3">
-									<Label>Answer Options</Label>
+									<Label>Answer options</Label>
 									{question.options.map((option, optionIndex) => (
 										<div key={`${question.id}-option-${optionIndex}`} className="flex items-center gap-2">
 											{question.type === 'multiple-choice' ? (
@@ -1232,7 +1334,7 @@ const CBT = () => {
 							)}
 							{question.type === 'true-false' && (
 								<div className="space-y-3">
-									<Label>Correct Answer</Label>
+									<Label>Correct answer</Label>
 									<RadioGroup
 										value={question.correctAnswerText || 'true'}
 										onValueChange={(value) => handleBulkQuestionChange(question.id, { correctAnswerText: value })}
@@ -1250,7 +1352,7 @@ const CBT = () => {
 							)}
 							{(question.type === 'text' || question.type === 'essay') && (
 								<div className="space-y-2">
-									<Label>Expected Answer (optional)</Label>
+									<Label>Expected answer (optional)</Label>
 									<Textarea
 										value={question.correctAnswerText}
 										onChange={(e) => handleBulkQuestionChange(question.id, { correctAnswerText: e.target.value })}
@@ -1262,27 +1364,27 @@ const CBT = () => {
 						))}
 						<Button variant="outline" onClick={handleAddBulkQuestionRow}>
 							<Plus className="h-4 w-4 mr-1" />
-							Add Another Question
+							Add another question
 						</Button>
 					</div>
 					<DialogFooter className="gap-2 sm:gap-0">
 						<Button variant="outline" onClick={() => setBulkDialogOpen(false)}>Cancel</Button>
-						<Button onClick={() => void saveBulkQuestions()} disabled={currentTestHasAttempts}>
-							Save Questions
+						<Button onClick={() => void saveBulkQuestions()}>
+							Save questions
 						</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 
 			<Dialog open={resultDetailsOpen} onOpenChange={setResultDetailsOpen}>
-				<DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+				<DialogContent className="w-[calc(100%-1.5rem)] sm:w-auto sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
 					<DialogHeader>
-						<DialogTitle>Attempt Details</DialogTitle>
-						<DialogDescription>Detailed view of an officer's attempt</DialogDescription>
+						<DialogTitle>Attempt details</DialogTitle>
+						<DialogDescription>Detailed view of an officer's attempt.</DialogDescription>
 					</DialogHeader>
 
 					{resultLoading ? (
-						<div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
+						<div className="py-10 text-center text-sm text-muted-foreground">Loading...</div>
 					) : currentResult ? (
 						<div className="space-y-6">
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1292,7 +1394,7 @@ const CBT = () => {
 									</CardHeader>
 									<CardContent className="text-sm space-y-1">
 										<div><span className="text-muted-foreground">Name:</span> <span className="font-medium">{currentResult.officerName}</span></div>
-										<div><span className="text-muted-foreground">UserId:</span> {currentResult.officerId}</div>
+										<div><span className="text-muted-foreground">User ID:</span> {currentResult.officerId}</div>
 									</CardContent>
 								</Card>
 								<Card>
@@ -1322,13 +1424,13 @@ const CBT = () => {
 											<div className="text-sm text-muted-foreground">Percentage</div>
 											<div className="text-xs">
 												<Badge className={normalizeStatus(currentResult.status) === 'passed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-													{normalizeStatus(currentResult.status) === 'passed' ? 'PASSED' : 'FAILED'}
+													{normalizeStatus(currentResult.status) === 'passed' ? 'Passed' : 'Failed'}
 												</Badge>
 											</div>
 										</div>
 										<div className="border rounded-lg p-4 flex flex-col items-center justify-center">
 											<div className="text-3xl font-bold">{currentResult.answers.filter(a => a.isCorrect).length}</div>
-											<div className="text-sm text-muted-foreground">Correct Answers</div>
+											<div className="text-sm text-muted-foreground">Correct answers</div>
 											<div className="text-xs">Out of {currentResult.answers.length}</div>
 										</div>
 									</div>
@@ -1339,8 +1441,8 @@ const CBT = () => {
 						<div className="py-10 text-center text-sm text-muted-foreground">No data.</div>
 					)}
 
-					<DialogFooter>
-						<Button variant="outline" onClick={() => setResultDetailsOpen(false)}>Close</Button>
+					<DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+						<Button className="w-full sm:w-auto" variant="outline" onClick={() => setResultDetailsOpen(false)}>Close</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
@@ -1363,7 +1465,7 @@ const CBT = () => {
 					<AlertDialogFooter>
 						<AlertDialogCancel disabled={deleteSubmitting}>Cancel</AlertDialogCancel>
 						<AlertDialogAction onClick={() => void handleConfirmDelete()} disabled={deleteSubmitting}>
-							{deleteSubmitting ? 'Deleting…' : 'Delete'}
+							{deleteSubmitting ? 'Deleting...' : 'Delete'}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -1403,9 +1505,9 @@ const QuestionEditor = ({ initial, onSubmit, disabled }: QuestionEditorProps) =>
 			setCorrectAnswerText('')
 		}
 		if (normalizedType === 'true-false') {
-			setCorrectAnswerText(correctAnswerText || 'true')
+			setCorrectAnswerText(prev => prev || 'true')
 		}
-	}, [questionType])
+	}, [normalizedType])
 
 	const addOption = () => setOptions(prev => [...prev, { optionId: null, text: '', sortOrder: prev.length + 1, isCorrect: false }])
 	const removeOption = (index: number) => {
@@ -1428,24 +1530,24 @@ const QuestionEditor = ({ initial, onSubmit, disabled }: QuestionEditorProps) =>
 	const canSubmit = questionText.trim() !== '' && questionPoints > 0
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-6">
 			<div>
-				<Label htmlFor="questionType">Question Type</Label>
+				<Label htmlFor="questionType" className="text-sm font-semibold text-slate-800">Question type</Label>
 				<Select value={questionType} onValueChange={setQuestionType} disabled={disabled}>
-					<SelectTrigger id="questionType" className="w-full">
+					<SelectTrigger id="questionType" className="w-full h-11 text-base">
 						<SelectValue placeholder="Select question type" />
 					</SelectTrigger>
 					<SelectContent>
 						<SelectItem value="multiple-choice">
 							<div className="flex items-center gap-2">
 								<CheckSquare className="h-4 w-4" />
-								<span>Multiple Choice (Single Answer)</span>
+								<span>Multiple choice (single answer)</span>
 							</div>
 						</SelectItem>
 						<SelectItem value="multiple-answer">
 							<div className="flex items-center gap-2">
 								<List className="h-4 w-4" />
-								<span>Multiple Choice (Multiple Answers)</span>
+								<span>Multiple choice (multiple answers)</span>
 							</div>
 						</SelectItem>
 						<SelectItem value="true-false">
@@ -1457,13 +1559,13 @@ const QuestionEditor = ({ initial, onSubmit, disabled }: QuestionEditorProps) =>
 						<SelectItem value="text">
 							<div className="flex items-center gap-2">
 								<Type className="h-4 w-4" />
-								<span>Short Answer</span>
+								<span>Short answer</span>
 							</div>
 						</SelectItem>
 						<SelectItem value="essay">
 							<div className="flex items-center gap-2">
 								<AlignLeft className="h-4 w-4" />
-								<span>Essay/Long Answer</span>
+								<span>Essay/long answer</span>
 							</div>
 						</SelectItem>
 					</SelectContent>
@@ -1471,34 +1573,35 @@ const QuestionEditor = ({ initial, onSubmit, disabled }: QuestionEditorProps) =>
 			</div>
 
 			<div>
-				<Label htmlFor="questionText">Question Text</Label>
+				<Label htmlFor="questionText" className="text-sm font-semibold text-slate-800">Question text</Label>
 				<Textarea
 					id="questionText"
 					placeholder="Enter your question here"
 					value={questionText}
 					onChange={(e) => setQuestionText(e.target.value)}
-					className="min-h-[100px]"
+					className="min-h-[120px] text-base"
 					disabled={disabled}
 				/>
 			</div>
 
 			<div>
-				<Label htmlFor="points">Points</Label>
+				<Label htmlFor="points" className="text-sm font-semibold text-slate-800">Points</Label>
 				<Input
 					id="points"
 					type="number"
 					min="1"
 					value={questionPoints}
 					onChange={(e) => setQuestionPoints(Math.max(1, Number(e.target.value || 1)))}
+					className="h-11 text-base"
 					disabled={disabled}
 				/>
 			</div>
 
 			{(normalizedType === 'multiple-choice' || normalizedType === 'multiple-answer') && (
 				<div className="space-y-3">
-					<Label>Answer Options</Label>
+					<Label className="text-sm font-semibold text-slate-800">Answer options</Label>
 					{options.map((opt, index) => (
-						<div key={index} className="flex items-center gap-2">
+						<div key={index} className="flex items-center gap-2 rounded-lg border border-slate-200 p-2">
 							{normalizedType === 'multiple-choice' ? (
 								<Checkbox
 									checked={opt.isCorrect}
@@ -1516,15 +1619,15 @@ const QuestionEditor = ({ initial, onSubmit, disabled }: QuestionEditorProps) =>
 								value={opt.text}
 								onChange={(e) => updateOption(index, { text: e.target.value })}
 								placeholder={`Option ${index + 1}`}
-								className="flex-1"
+								className="flex-1 h-10"
 								disabled={disabled}
 							/>
-							<Button type="button" variant="ghost" size="icon" onClick={() => removeOption(index)} disabled={disabled || options.length <= 2}>
+							<Button type="button" variant="outline" size="icon" onClick={() => removeOption(index)} disabled={disabled || options.length <= 2}>
 								<Trash2 className="h-4 w-4" />
 							</Button>
 						</div>
 					))}
-					<Button type="button" variant="outline" size="sm" onClick={addOption} disabled={disabled}>
+					<Button type="button" variant="outline" size="sm" className="h-10 px-4" onClick={addOption} disabled={disabled}>
 						Add Option
 					</Button>
 				</div>
@@ -1532,7 +1635,7 @@ const QuestionEditor = ({ initial, onSubmit, disabled }: QuestionEditorProps) =>
 
 			{normalizedType === 'true-false' && (
 				<div className="space-y-3">
-					<Label>Correct Answer</Label>
+					<Label>Correct answer</Label>
 					<RadioGroup value={correctAnswerText} onValueChange={setCorrectAnswerText} disabled={disabled}>
 						<div className="flex items-center space-x-2">
 							<RadioGroupItem value="true" id="true" />
@@ -1548,7 +1651,7 @@ const QuestionEditor = ({ initial, onSubmit, disabled }: QuestionEditorProps) =>
 
 			{(normalizedType === 'text' || normalizedType === 'essay') && (
 				<div className="space-y-2">
-					<Label>Expected Answer (optional)</Label>
+					<Label>Expected answer (optional)</Label>
 					<Textarea
 						value={correctAnswerText}
 						onChange={(e) => setCorrectAnswerText(e.target.value)}
@@ -1558,8 +1661,8 @@ const QuestionEditor = ({ initial, onSubmit, disabled }: QuestionEditorProps) =>
 				</div>
 			)}
 
-			<div className="flex justify-end gap-2 pt-4">
-				<Button variant="outline" onClick={() => onSubmit({
+			<div className="flex justify-end gap-2 border-t border-slate-200 pt-5">
+				<Button className="h-11 px-6" onClick={() => onSubmit({
 					questionId: initial?.questionId || '',
 					type: questionType,
 					text: questionText,
@@ -1568,7 +1671,7 @@ const QuestionEditor = ({ initial, onSubmit, disabled }: QuestionEditorProps) =>
 					correctAnswerText: correctAnswerText || null,
 					options: options.map((o, idx) => ({ ...o, sortOrder: idx + 1 })),
 				})} disabled={disabled || !canSubmit}>
-					{initial ? 'Update Question' : 'Add Question'}
+					{initial ? 'Update question' : 'Add question'}
 				</Button>
 			</div>
 		</div>

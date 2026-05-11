@@ -1,3 +1,7 @@
+/**
+ * Employee roster administration and EmployeeForm entry.
+ * Flow: roster stats and table → EmployeeForm create/edit overlay → employeeService persistence.
+ */
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { EmployeeForm } from "@/components/employee-registration/EmployeeForm"
@@ -30,7 +34,10 @@ export default function EmployeeRegistration() {
 
   const fetchEmployees = async () => {
     try {
-      const result = await employeeService.getEmployeesAsFrontendInterface()
+      const result = await employeeService.getEmployeesAsFrontendInterface({
+        page: 1,
+        pageSize: 50
+      })
       setEmployees(result.employees)
     } catch (error) {
       toast({

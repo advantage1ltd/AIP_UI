@@ -1,6 +1,7 @@
+/** Recruitment CBT quiz builder state (local Redux; not persisted to API). */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 
-// Types
+// === Types ===
 export type QuestionType = 'multiple-choice' | 'true-false' | 'text' | 'essay' | 'multiple-answer'
 
 export interface Question {

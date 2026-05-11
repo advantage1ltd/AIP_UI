@@ -1,7 +1,13 @@
+/**
+ * Officer support requests and follow-up.
+ * Flow: paginated updates feed → manager publish/edit → officer declaration signing.
+ */
 import React, { useState, useCallback, useEffect } from 'react';
 import { officerSupportService, type OfficerSupportUpdate, type OfficerSupportDeclaration } from '@/services/officerSupportService';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
+import { usePageAccess } from '@/contexts/PageAccessContext';
+import { getUser } from '@/services/auth';
+import { harmonizeRole, normalizeRoleId, roleDisplayName } from '@/utils/roles';
 import {
   Card,
   CardContent,
@@ -28,12 +34,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -41,9 +41,7 @@ import {
   FileText, 
   Upload, 
   Plus, 
-  MoreVertical, 
   Eye, 
-  PenSquare, 
   Trash2,
   Calendar,
   FileSignature,
@@ -171,9 +169,18 @@ const EmptyState = ({
 );
 
 const OfficerSupportPage: React.FC = () => {
-  const { user } = useAuth();
-  const normalizedRole = (user?.role || (user as any)?.Role || '').toLowerCase();
-  const canManageUpdates = normalizedRole === 'administrator';
+  const { currentRole, isTestMode, testRole } = usePageAccess();
+  const viewer = getUser();
+  const effectiveNavigationRole = isTestMode && testRole ? testRole : currentRole;
+  const harmonizedRole =
+    normalizeRoleId(effectiveNavigationRole ?? '') ??
+    normalizeRoleId(viewer?.pageAccessRole ?? viewer?.role ?? '') ??
+    harmonizeRole(viewer?.pageAccessRole ?? viewer?.role ?? '');
+  const canManageUpdates =
+    harmonizedRole === 'administrator' || harmonizedRole === 'manager';
+  /** Only security officers sign declarations; admins/managers publish; other roles view only. */
+  const canSignDeclarations = harmonizedRole === 'securityofficer';
+
   const { toast } = useToast();
   const [updates, setUpdates] = useState<OfficerSupportUpdate[]>([]);
   const [declarations, setDeclarations] = useState<OfficerSupportDeclaration[]>([]);
@@ -211,7 +218,7 @@ const OfficerSupportPage: React.FC = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const itemsPerPage = 10;
   
-  // Fetch updates from API
+  // Updates list is paged; selecting a row loads declaration acknowledgements for that bulletin.
   const fetchUpdates = useCallback(async () => {
     try {
       setLoading(true);
@@ -252,7 +259,21 @@ const OfficerSupportPage: React.FC = () => {
       fetchDeclarations(selectedUpdate.id);
     }
   }, [selectedUpdate, fetchDeclarations]);
-  
+
+  useEffect(() => {
+    if (!canManageUpdates) {
+      setShowAddDialog(false);
+      setShowEditDialog(false);
+      setShowDeleteDialog(false);
+    }
+  }, [canManageUpdates]);
+
+  useEffect(() => {
+    if (!canSignDeclarations && showSignDialog) {
+      setShowSignDialog(false);
+    }
+  }, [canSignDeclarations, showSignDialog]);
+
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
   };
@@ -261,7 +282,7 @@ const OfficerSupportPage: React.FC = () => {
     if (!canManageUpdates) {
       toast({
         title: 'Permission denied',
-        description: 'Only administrators can manage officer support updates.',
+        description: 'Only administrators and managers can manage officer support updates.',
         variant: 'destructive'
       });
       return;
@@ -320,6 +341,15 @@ const OfficerSupportPage: React.FC = () => {
   }, [formData, toast, fetchUpdates, canManageUpdates]);
 
   const handleSignDeclaration = useCallback(async () => {
+    if (!canSignDeclarations) {
+      toast({
+        title: 'Permission denied',
+        description: 'Only security officers can sign declarations.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!selectedUpdate || !signatureData.officerName || !signatureData.signature) return;
 
     try {
@@ -353,13 +383,13 @@ const OfficerSupportPage: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  }, [selectedUpdate, signatureData, toast, fetchDeclarations, fetchUpdates]);
+  }, [selectedUpdate, signatureData, toast, fetchDeclarations, fetchUpdates, canSignDeclarations]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!canManageUpdates) {
       toast({
         title: 'Permission denied',
-        description: 'Only administrators can manage officer support updates.',
+        description: 'Only administrators and managers can manage officer support updates.',
         variant: 'destructive'
       });
       return;
@@ -397,7 +427,7 @@ const OfficerSupportPage: React.FC = () => {
     if (!canManageUpdates) {
       toast({
         title: 'Permission denied',
-        description: 'Only administrators can manage officer support updates.',
+        description: 'Only administrators and managers can manage officer support updates.',
         variant: 'destructive'
       });
       return;
@@ -469,25 +499,32 @@ const OfficerSupportPage: React.FC = () => {
     <div className="min-h-screen bg-[#EFF4FF] flex flex-col">
       <div className="container mx-auto px-2 sm:px-4 lg:px-6 xl:px-8 2xl:px-12 py-2 sm:py-4 lg:py-6 xl:py-8 2xl:py-10 max-w-screen-2xl flex-grow">
         <div className="space-y-4 md:space-y-6 xl:space-y-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6 xl:mb-8">
-            <div className="flex items-center gap-2 sm:gap-3 xl:gap-4">
-              <div className="bg-blue-100 p-2 xl:p-3 rounded-lg">
-                <FileText className="w-5 h-5 sm:w-6 sm:h-6 xl:w-7 xl:h-7 text-blue-600" />
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:mb-6 xl:mb-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 sm:gap-3 xl:gap-4">
+                <div className="rounded-lg bg-blue-100 p-2 xl:p-3">
+                  <FileText className="w-5 h-5 sm:w-6 sm:h-6 xl:w-7 xl:h-7 text-blue-600" />
+                </div>
+                <div>
+                  <h1 className="text-xl sm:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-gray-900">Officer Support</h1>
+                  <p className="text-sm xl:text-base text-gray-500">Manage and track security officer documentation and declarations</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-gray-900">Officer Support</h1>
-                <p className="text-sm xl:text-base text-gray-500">Manage and track security officer documentation and declarations</p>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-600">
+                  {roleDisplayName(harmonizedRole)}
+                </Badge>
+                {canManageUpdates && (
+                  <Button
+                    onClick={() => setShowAddDialog(true)}
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 h-9 sm:h-10 xl:h-12 px-4 xl:px-6 text-sm xl:text-base"
+                  >
+                    <Plus className="w-4 h-4 xl:w-5 xl:h-5" />
+                    Add New Update
+                  </Button>
+                )}
               </div>
             </div>
-            {canManageUpdates && (
-              <Button
-                onClick={() => setShowAddDialog(true)}
-                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 h-9 sm:h-10 xl:h-12 px-4 xl:px-6 text-sm xl:text-base"
-              >
-                <Plus className="w-4 h-4 xl:w-5 xl:h-5" />
-                Add New Update
-              </Button>
-            )}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 xl:gap-6">
@@ -511,8 +548,8 @@ const OfficerSupportPage: React.FC = () => {
             />
           </div>
 
-          <Card className="w-full shadow-sm">
-            <CardHeader className="p-2 md:p-4 xl:p-6">
+          <Card className="w-full overflow-hidden border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-200 bg-slate-50/50 p-2 md:p-4 xl:p-6">
               <CardTitle className="text-base sm:text-xl xl:text-2xl flex items-center gap-2 xl:gap-3">
                 <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 xl:h-6 xl:w-6 text-blue-600" />
                 Security Updates & Declarations
@@ -522,30 +559,38 @@ const OfficerSupportPage: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
+              <div className="flex items-center justify-between bg-slate-50/30 px-3 py-2">
+                <div className="text-xs sm:text-sm font-medium text-slate-600">
+                  {updates.length} {updates.length === 1 ? 'update' : 'updates'} loaded
+                </div>
+                <div className="text-xs text-slate-500">
+                  Page {currentPage} of {totalPages}
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-50 hover:bg-gray-50">
+                    <TableRow className="bg-slate-50/70 hover:bg-slate-50/70">
                       <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 xl:p-6 w-[35%] sm:w-[30%] lg:w-[25%]">
                         <div className="flex items-center gap-2 xl:gap-3">
                           <FileText className="w-4 h-4 xl:w-5 xl:h-5 text-gray-500" />
-                          <span className="text-sm xl:text-base">Update</span>
+                          <span className="text-xs sm:text-sm xl:text-base uppercase tracking-wide text-slate-600">Update</span>
                         </div>
                       </TableHead>
-                      <TableHead className="font-semibold text-gray-900 p-2 md:p-4 xl:p-6 w-[45%] sm:w-[40%] lg:w-[35%] text-sm xl:text-base">Description</TableHead>
+                      <TableHead className="font-semibold text-gray-900 p-2 md:p-4 xl:p-6 w-[45%] sm:w-[40%] lg:w-[35%] text-xs sm:text-sm xl:text-base uppercase tracking-wide text-slate-600">Description</TableHead>
                       <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 xl:p-6 hidden md:table-cell w-[15%]">
                         <div className="flex items-center gap-2 xl:gap-3">
                           <Calendar className="w-4 h-4 xl:w-5 xl:h-5 text-gray-500" />
-                          <span className="text-sm xl:text-base">Date</span>
+                          <span className="text-xs sm:text-sm xl:text-base uppercase tracking-wide text-slate-600">Date</span>
                         </div>
                       </TableHead>
                       <TableHead className="font-semibold text-gray-900 whitespace-nowrap p-2 md:p-4 xl:p-6 hidden md:table-cell w-[15%]">
                         <div className="flex items-center gap-2 xl:gap-3">
                           <Users className="w-4 h-4 xl:w-5 xl:h-5 text-gray-500" />
-                          <span className="text-sm xl:text-base">Signed</span>
+                          <span className="text-xs sm:text-sm xl:text-base uppercase tracking-wide text-slate-600">Signed</span>
                         </div>
                       </TableHead>
-                      <TableHead className="font-semibold text-gray-900 text-right p-2 md:p-4 xl:p-6 w-[90px] md:w-[120px] xl:w-[150px] text-sm xl:text-base">Actions</TableHead>
+                      <TableHead className="font-semibold text-gray-900 text-right p-2 md:p-4 xl:p-6 w-[90px] md:w-[120px] xl:w-[150px] text-xs sm:text-sm xl:text-base uppercase tracking-wide text-slate-600">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -574,7 +619,7 @@ const OfficerSupportPage: React.FC = () => {
                       updates.map((update) => (
                       <TableRow 
                         key={update.id}
-                        className="hover:bg-gray-50 transition-colors"
+                        className="transition-colors odd:bg-white even:bg-slate-50/20 hover:bg-blue-50/30"
                       >
                         <TableCell className="font-medium text-gray-900 p-2 md:p-4 xl:p-6 truncate max-w-[100px] sm:max-w-[150px] md:max-w-none text-sm xl:text-base">
                           {update.name}
@@ -712,12 +757,7 @@ const OfficerSupportPage: React.FC = () => {
         </div>
       </div>
 
-      <footer className="w-full bg-white border-t border-gray-200 py-4 xl:py-6 mt-auto">
-        <div className="container mx-auto px-4 md:px-6 xl:px-8 max-w-screen-2xl">
-          {/* Footer content removed */}
-        </div>
-      </footer>
-
+      {canManageUpdates && (
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="w-[calc(100%-32px)] sm:max-w-[600px] p-2 md:p-4 max-h-[90vh] overflow-y-auto">
           <DialogHeader className="space-y-2">
@@ -781,6 +821,7 @@ const OfficerSupportPage: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
 
       <Dialog open={showDeclarationsDialog} onOpenChange={setShowDeclarationsDialog}>
         <DialogContent className="sm:max-w-[800px]">
@@ -835,16 +876,18 @@ const OfficerSupportPage: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowSignDialog(true)}
-                  className="flex items-center gap-2 flex-1 sm:flex-none justify-center h-9"
-                >
-                  <FileSignature className="h-4 w-4" />
-                  <span className="hidden sm:inline">Sign Declaration</span>
-                  <span className="sm:hidden">Sign</span>
-                </Button>
+                {canSignDeclarations ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSignDialog(true)}
+                    className="flex items-center gap-2 flex-1 sm:flex-none justify-center h-9"
+                  >
+                    <FileSignature className="h-4 w-4" />
+                    <span className="hidden sm:inline">Sign Declaration</span>
+                    <span className="sm:hidden">Sign</span>
+                  </Button>
+                ) : null}
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -891,12 +934,14 @@ const OfficerSupportPage: React.FC = () => {
                         Officers who have signed this document
                       </p>
                     </div>
-                    <Button
-                      onClick={() => setShowSignDialog(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
-                    >
-                      Sign Declaration
-                    </Button>
+                    {canSignDeclarations ? (
+                      <Button
+                        onClick={() => setShowSignDialog(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
+                      >
+                        Sign Declaration
+                      </Button>
+                    ) : null}
                   </div>
                   
                   <div className="overflow-x-auto min-w-[320px]">
@@ -930,13 +975,19 @@ const OfficerSupportPage: React.FC = () => {
                               <div className="flex flex-col items-center gap-2">
                                 <FileSignature className="h-8 w-8 text-gray-400" />
                                 <p className="text-gray-500 text-sm">No declarations yet</p>
-                                <Button
-                                  variant="link"
-                                  onClick={() => setShowSignDialog(true)}
-                                  className="text-blue-600"
-                                >
-                                  Be the first to sign
-                                </Button>
+                                {canSignDeclarations ? (
+                                  <Button
+                                    variant="link"
+                                    onClick={() => setShowSignDialog(true)}
+                                    className="text-blue-600"
+                                  >
+                                    Be the first to sign
+                                  </Button>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">
+                                    Security officers sign once this update is published.
+                                  </p>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -951,6 +1002,7 @@ const OfficerSupportPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      {canSignDeclarations && (
       <AlertDialog open={showSignDialog} onOpenChange={setShowSignDialog}>
         <AlertDialogContent className="w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-[500px] p-2 md:p-4 max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
@@ -1001,7 +1053,9 @@ const OfficerSupportPage: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      )}
 
+      {canManageUpdates && (
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-[600px] p-2 md:p-4 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1088,7 +1142,9 @@ const OfficerSupportPage: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
 
+      {canManageUpdates && (
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-[500px] p-2 md:p-4">
           <AlertDialogHeader>
@@ -1115,6 +1171,7 @@ const OfficerSupportPage: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      )}
     </div>
   );
 };

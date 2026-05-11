@@ -1,6 +1,10 @@
+/**
+ * Top header with navigation, search, and user menu.
+ * Flow: auth-aware actions → global search entry → profile and sign-out menu.
+ */
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { cn } from "@/lib/utils"
-import React, { useState } from "react"
+import React, { useState, useCallback } from "react"
 import { 
 	DropdownMenu, 
 	DropdownMenuContent, 
@@ -61,20 +65,21 @@ import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
-import { USER_DATA, BUTTON_STYLES, COMMON_CLASSES } from "@/constants/header";
+import { BUTTON_STYLES, COMMON_CLASSES } from "@/constants/header";
 import { NotificationBell } from "./header/NotificationBell";
 import { Logo } from "./header/Logo";
 import { SearchInput } from "./header/SearchInput";
 import { UserAvatar } from "./common/UserAvatar";
 import { logout, getUser } from "@/services/auth"
+import { harmonizeRole, roleDisplayName } from '@/utils/roles'
 
 // Define navigation items structure
 interface NavItem {
   title: string;
   href: string;
   icon: React.ReactNode;
-  roles: string[]; // Which roles can access this item
 }
+
 
 // Header props interface
 interface HeaderProps {
@@ -136,13 +141,17 @@ const NavigationMenu = ({
 		const mainSection = navigationItems.find(section => section.section === 'Quick Access')
 		const moduleSections = navigationItems.filter(section => section.section !== 'Quick Access')
 
+		const iconSvgProps = (
+			isActive: boolean
+		): Partial<React.SVGProps<SVGSVGElement>> => ({
+			className: cn('h-5 w-5', isActive ? 'text-red-100 fill-current' : 'text-slate-300'),
+			strokeWidth: isActive ? 1.5 : 2,
+			fill: isActive ? 'currentColor' : 'none',
+		})
+
 		const renderIcon = (icon: React.ReactNode, isActive: boolean) => {
-			if (!React.isValidElement(icon)) return icon
-			return React.cloneElement(icon, {
-				className: cn('h-5 w-5', isActive ? 'text-red-100 fill-current' : 'text-slate-300'),
-				strokeWidth: isActive ? 1.5 : 2,
-				fill: isActive ? 'currentColor' : 'none',
-			})
+			if (!React.isValidElement<React.SVGProps<SVGSVGElement>>(icon)) return icon
+			return React.cloneElement(icon, iconSvgProps(isActive))
 		}
 
 		const renderLink = (item: NavItem) => {
@@ -208,6 +217,7 @@ const NavigationMenu = ({
 export function Header({ onMobileMenuClick }: HeaderProps) {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 	const location = useLocation();
+	const navigate = useNavigate()
   
   // Try to get context, but handle gracefully if not available
   let pageAccessContext;
@@ -229,12 +239,18 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
     );
   }
   
-	const { currentRole } = pageAccessContext;
+	const { currentRole, hasAccess: pageHasAccess } = pageAccessContext;
   
   // Get authenticated user info
   const authenticatedUser = getUser();
   const isAuthenticated = !!authenticatedUser;
-  const canAccessSettings = authenticatedUser?.role?.toLowerCase?.() === 'administrator';
+  const effectiveRoleForUi =
+    authenticatedUser?.pageAccessRole ?? authenticatedUser?.role ?? null;
+  const profileRoleLabel =
+    isAuthenticated && effectiveRoleForUi
+      ? roleDisplayName(effectiveRoleForUi)
+      : 'IT manager';
+  const canAccessSettings = harmonizeRole(effectiveRoleForUi) === 'administrator';
 
   // Define navigation sections to match SidebarNavigation
   const navigationItems = [
@@ -245,19 +261,21 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           title: "Dashboard",
           href: "/",
           icon: <LayoutGrid className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
         },
         {
           title: "Action Calendar",
           href: "/action-calendar",
           icon: <Calendar className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
+        },
+        {
+          title: "Customer Reporting",
+          href: "/management/customer-reporting",
+          icon: <BarChart3 className="h-4 w-4" />,
         },
         {
           title: "Data Analytics Hub",
           href: "/analytics/data-analytics-hub",
-          icon: <BarChart3 className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'customer-ho'],
+          icon: <BarChart4 className="h-4 w-4" />,
         }
       ]
     },
@@ -268,19 +286,16 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           title: "Dashboard",
           href: "/crm/dashboard",
           icon: <LayoutDashboard className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
         },
         {
           title: "CRM Contacts",
           href: "/crm/contacts",
           icon: <UserPlus className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
         },
         {
           title: "Sales Pipeline",
           href: "/crm/pipeline",
           icon: <GitBranch className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
         }
       ]
     },
@@ -291,31 +306,26 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           title: "User Setup",
           href: "/administration/user-setup",
           icon: <User className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         },
         {
           title: "Employee Registration",
           href: "/administration/employee-registration",
           icon: <Users className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         },
         {
           title: "Customer Setup",
           href: "/administration/customer-setup",
           icon: <Building2 className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         },
         {
           title: "Customer Page Settings",
           href: "/administration/customer-page-settings",
           icon: <Cog className="h-4 w-4" />,
-          roles: ['administrator'],
         },
         {
           title: "Stock Control",
           href: "/administration/stock-control",
           icon: <Store className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         }
       ]
     },
@@ -326,49 +336,41 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           title: "Incident Report",
           href: "/operations/incident-report",
           icon: <FileWarning className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
         },
         {
           title: "Site Visit",
           href: "/operations/site-visit",
           icon: <Building className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer'],
         },
         {
           title: "Holiday Requests",
           href: "/operations/holiday-requests",
           icon: <Calendar className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer'],
         },
         {
           title: "Bank Holiday",
           href: "/operations/bank-holiday",
           icon: <CalendarRange className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         },
         {
           title: "Customer Satisfaction",
           href: "/operations/customer-satisfaction",
           icon: <BadgeCheck className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         },
         {
           title: "Safe/Duress Words",
           href: "/operations/safe-duress-words",
           icon: <Key className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         },
         {
           title: "Officer Support",
           href: "/operations/officer-support",
           icon: <HelpCircle className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer'],
         },
         {
           title: "Officer Expenses",
           href: "/operations/officer-expenses",
           icon: <Wallet className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer'],
         }
       ]
     },
@@ -379,19 +381,16 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           title: "Uniform & Equipment",
           href: "/employee/uniform-equipment",
           icon: <Shirt className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer'],
         },
         {
           title: "Disciplinary",
           href: "/employee/disciplinary",
           icon: <AlertTriangle className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         },
         {
           title: "Diary",
           href: "/employee/diary",
           icon: <FileText className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer'],
         }
       ]
     },
@@ -399,22 +398,14 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
       section: "Management",
       items: [
         {
-          title: "Customer Reporting",
-          href: "/management/customer-reporting",
-          icon: <FileText className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
-        },
-        {
           title: "Officer Performance",
           href: "/management/officer-performance",
           icon: <CheckSquare className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'customer-ho'],
         },
         {
           title: "Manager Support",
           href: "/management/manager-support",
           icon: <Building2 className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         }
       ]
     },
@@ -425,19 +416,16 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           title: "Contract Renewal",
           href: "/compliance/contract-renewal",
           icon: <FileText className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         },
         {
           title: "Password Register",
           href: "/compliance/password-register",
           icon: <Key className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         },
         {
           title: "Asset Register",
           href: "/compliance/asset-register",
           icon: <Boxes className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         }
       ]
     },
@@ -448,13 +436,11 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           title: "CBT",
           href: "/recruitment/cbt",
           icon: <BookOpen className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho'],
         },
         {
           title: "Take Test",
           href: "/recruitment/take-test",
           icon: <FileQuestion className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'advantage-officer', 'customer-ho', 'customer-site'],
         }
       ]
     },
@@ -465,66 +451,67 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
           title: "Daily Activity Report",
           href: "/customer/daily-activity-report",
           icon: <FileText className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'customer-ho', 'customer-site'],
         },
         {
           title: "Daily Occurrence Book",
           href: "/customer/daily-occurrence-book",
           icon: <BookOpen className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'customer-ho', 'customer-site'],
         },
         {
           title: "Daily Activity Report Graph",
           href: "/customer/be-safe-be-secure",
           icon: <ShieldCheck className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'customer-ho', 'customer-site'],
         },
         {
           title: "Incident Graph",
           href: "/customer/incident-graph",
           icon: <BarChart2 className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'customer-ho', 'customer-site'],
         },
         {
           title: "Incident Report",
           href: "/customer/incident-report",
           icon: <FileWarning className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'customer-ho', 'customer-site'],
         },
         {
           title: "Satisfaction Reports",
           href: "/customer/satisfaction-report",
           icon: <FileText className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'customer-ho'],
         },
         {
           title: "Crime Intelligence",
           href: "/customer/crime-intelligence",
           icon: <TrendingUp className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'customer-ho', 'customer-site'],
         },
         {
           title: "Officer Support",
           href: "/customer/officer-support",
           icon: <HelpCircle className="h-4 w-4" />,
-          roles: ['administrator', 'advantage-ho', 'customer-ho', 'customer-site'],
         }
       ]
     }
   ];
 
-	const getEffectiveRoleId = () => {
-		if (isAuthenticated && authenticatedUser?.pageAccessRole) {
-			return authenticatedUser.pageAccessRole.toLowerCase();
-		}
-		return currentRole?.toLowerCase() || null;
-	};
-
-  // Check if user has access to a navigation item
-  const hasAccess = (item: NavItem) => {
-		const roleId = getEffectiveRoleId();
-		return roleId ? item.roles.includes(roleId) : false;
-  };
+	const mobileNavItemVisible = useCallback(
+		(item: NavItem) => {
+			const raw =
+				isAuthenticated && authenticatedUser?.pageAccessRole
+					? authenticatedUser.pageAccessRole
+					: (authenticatedUser?.role ?? currentRole ?? null)
+			const canonicalRole = raw ? harmonizeRole(raw) : null
+			if (!canonicalRole) return false
+			// Match SidebarNavigation: admins see full catalog; others follow Settings / PageAccess.
+			if (canonicalRole === 'administrator') return true
+			const path = item.href.split('?')[0]
+			return pageHasAccess(path)
+		},
+		[
+			isAuthenticated,
+			authenticatedUser?.pageAccessRole,
+			authenticatedUser?.role,
+			currentRole,
+			pageHasAccess,
+		],
+	)
 
   // Handle navigation and close sheet
   const handleNavigate = () => {
@@ -572,7 +559,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
               <div className="px-5 py-4">
                 <NavigationMenu 
                   navigationItems={navigationItems}
-                  hasAccess={hasAccess}
+                  hasAccess={mobileNavItemVisible}
                   handleNavigate={handleNavigate}
 									currentPath={location.pathname}
                 />
@@ -612,7 +599,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                     {isAuthenticated ? `${authenticatedUser.firstName} ${authenticatedUser.lastName}` : 'David Ibanga'}
                   </p>
                   <p className="text-xs text-slate-300">
-                    {isAuthenticated ? authenticatedUser.role : 'IT manager'}
+                    {profileRoleLabel}
                   </p>
                 </div>
               </div>
@@ -672,7 +659,7 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
                     {isAuthenticated ? `${authenticatedUser.firstName} ${authenticatedUser.lastName}` : 'David Ibanga'}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {isAuthenticated ? authenticatedUser.role : 'IT manager'}
+                    {profileRoleLabel}
                   </p>
                 </div>
 								<ChevronDown className="h-4 w-4 text-muted-foreground" />

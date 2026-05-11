@@ -1,3 +1,7 @@
+/**
+ * Sidebar navigation tree: sections, links, icons, and role/access guards.
+ * Consumed by SidebarNavigation; pageDefinitions.ts mirrors paths for backend page-access sync.
+ */
 import {
 	AlertTriangle,
 	BadgeCheck,
@@ -10,7 +14,6 @@ import {
 	CheckSquare,
 	DollarSign,
 	FileQuestion,
-	FileSearch,
 	FileText,
 	FileText as FileTextIcon,
 	FileWarning,
@@ -30,7 +33,7 @@ import {
 	Wallet,
 	Building,
 	Cog,
-	Brain,
+	BarChart4,
 } from 'lucide-react'
 
 import type { LucideIcon } from 'lucide-react'
@@ -76,7 +79,7 @@ export const SIDEBAR_TOP_LINKS: SidebarNavLink[] = [
 	{
 		path: '/analytics/data-analytics-hub',
 		label: 'Data Analytics Hub',
-		icon: Brain,
+		icon: BarChart4,
 	},
 ]
 
@@ -86,7 +89,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 		label: 'Administration',
 		icon: UserCog,
 		// Remove section-level guard - let individual links be controlled by page access settings
-		// This allows CustomerHOManager to see User Setup if granted in settings
+		// Customer-portal users can see links here when granted in page access settings
 		guard: undefined,
 		links: [
 			{
@@ -147,11 +150,6 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 				path: '/operations/incident-report',
 				label: 'Incident Report',
 				icon: AlertTriangle,
-			},
-			{
-				path: '/operations/mystery-shopper',
-				label: 'Mystery Shopper',
-				icon: FileSearch,
 			},
 			{
 				path: '/operations/site-visit',
@@ -230,7 +228,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 			// {
 			// 	path: '/analytics/data-analytics-hub',
 			// 	label: 'Data Analytics Hub',
-			// 	icon: Brain,
+			// 	icon: BarChart4,
 			// },
 		],
 	},
@@ -304,7 +302,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 			},
 			{
 				path: '/customer/be-safe-be-secure',
-				label: 'Daily Activity Report Graph',
+				label: 'DAR Graphs',
 				icon: BarChart2,
 			},
 			{
@@ -324,7 +322,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
 			},
 			{
 				path: '/customer/satisfaction-report',
-				label: 'Satisfaction Reports',
+				label: 'Satisfaction Report',
 				icon: FileText,
 			},
 			{

@@ -1,3 +1,7 @@
+/**
+ * User administration list and UserForm dialogs.
+ * Flow: Redux paginated fetch → search and role filter → UserDialog create/update → refetch and confirm delete.
+ */
 import React, { useState, useMemo, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/hooks/redux'
 import { RootState } from '@/store/store'
@@ -71,6 +75,7 @@ import {
 } from '@/components/ui/pagination'
 import { userService } from '@/services/userService'
 import { useAvailableCustomers, findCustomerById } from '@/hooks/useAvailableCustomers'
+import { harmonizeRole, roleDisplayName } from '@/utils/roles'
 
 const UserSetup = () => {
   const dispatch = useAppDispatch()
@@ -94,10 +99,9 @@ const UserSetup = () => {
     return map
   }, [availableCustomers])
 
-  // Get users and loading state from Redux store
   const { users, pagination, loading, error } = useAppSelector((state: RootState) => state.users)
 
-  // Fetch users on mount and when pagination/search changes
+  // Server-backed pagination and search through the users Redux slice.
   useEffect(() => {
     dispatch(fetchUsers({
       page: currentPage,
@@ -125,6 +129,7 @@ const UserSetup = () => {
     setCurrentPage((prevPage) => Math.min(Math.max(1, prevPage), totalPages))
   }, [totalPages])
 
+  // Dialog mutations close the form and refetch the current page slice.
   const handleCreateUser = async (data: CreateUserInput) => {
     console.log('🔄 [UserSetup] Creating user started', { data })
     
@@ -166,7 +171,7 @@ const UserSetup = () => {
       const result = await dispatch(updateUserAsync(data)).unwrap()
       console.log('✅ [UserSetup] updateUserAsync completed:', {
         id: result.id,
-        customerId: result.customerId,
+        customerId: 'customerId' in result ? result.customerId : undefined,
         customerName: (result as any).customerName,
         role: result.role,
         fullResult: result
@@ -245,7 +250,7 @@ const UserSetup = () => {
     try {
       const detail = await userService.getUserById(user.id)
 
-      const role = ((detail as any).role ?? (detail as any).Role) as UserRole
+      const role = harmonizeRole(((detail as any).role ?? (detail as any).Role) as string) as UserRole
       
       const base = {
         id: (detail as any).id ?? (detail as any).Id,
@@ -254,7 +259,7 @@ const UserSetup = () => {
         lastName: (detail as any).lastName ?? (detail as any).LastName ?? '',
         email: (detail as any).email ?? (detail as any).Email,
         role,
-        pageAccessRole: ((detail as any).pageAccessRole ?? (detail as any).PageAccessRole ?? role) as UserRole,
+        pageAccessRole: harmonizeRole(((detail as any).pageAccessRole ?? (detail as any).PageAccessRole ?? role) as string) as UserRole,
         signature: (detail as any).signature ?? (detail as any).Signature,
         signatureCode: (detail as any).signatureCode ?? (detail as any).SignatureCode,
         jobTitle: (detail as any).jobTitle ?? (detail as any).JobTitle,
@@ -267,8 +272,7 @@ const UserSetup = () => {
       }
 
       let normalized: User
-      const normalizedRole = role?.toLowerCase() as UserRole
-      if (normalizedRole === 'customersitemanager' || normalizedRole === 'customerhomanager') {
+      if (role === 'customer') {
         // Properly handle customerId - preserve the value from backend
         const rawCustomerId = (detail as any).customerId ?? (detail as any).CustomerId ?? base.customerId
         const customerId = rawCustomerId != null && rawCustomerId !== undefined && rawCustomerId !== '' 
@@ -277,12 +281,12 @@ const UserSetup = () => {
         // Only set customerId if it's a valid positive number
         normalized = { 
           ...(base as any), 
-          role: normalizedRole, 
+          role, 
           customerId: customerId != null && !isNaN(customerId) && customerId > 0 ? customerId : undefined
         } as User
       } else {
         const assignedCustomerIds = ((detail as any).assignedCustomerIds ?? (detail as any).AssignedCustomerIds ?? []).map((id: any) => Number(id))
-        normalized = { ...(base as any), role: normalizedRole, assignedCustomerIds } as User
+        normalized = { ...(base as any), role, assignedCustomerIds } as User
       }
 
       setSelectedUser(normalized)
@@ -310,29 +314,18 @@ const UserSetup = () => {
   const handleCloseView = () => setViewUser(undefined)
 
   // Helper to format role for display (PascalCase)
-  const formatRoleForDisplay = (role: UserRole): string => {
-    const roleMap: Record<UserRole, string> = {
-      'administrator': 'Administrator',
-      'advantageoneofficer': 'AdvantageOneOfficer',
-      'advantageonehoofficer': 'AdvantageOneHOOfficer',
-      'customersitemanager': 'CustomerSiteManager',
-      'customerhomanager': 'CustomerHOManager'
-    };
-    return roleMap[role] || role;
-  };
+  const formatRoleForDisplay = (role: UserRole): string => roleDisplayName(role)
 
   const getStatusColor = (role: UserRole) => {
     switch (role) {
       case 'administrator':
         return 'bg-red-100 text-red-800'
-      case 'advantageonehoofficer':
+      case 'manager':
         return 'bg-purple-100 text-purple-800'
-      case 'advantageoneofficer':
+      case 'securityofficer':
         return 'bg-green-100 text-green-800'
-      case 'customersitemanager':
+      case 'customer':
         return 'bg-orange-100 text-orange-800'
-      case 'customerhomanager':
-        return 'bg-yellow-100 text-yellow-800'
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
     }
@@ -342,12 +335,11 @@ const UserSetup = () => {
     switch (role) {
       case 'administrator':
         return <Shield className="h-4 w-4 text-red-600" />
-      case 'advantageonehoofficer':
+      case 'manager':
         return <UserCheck className="h-4 w-4 text-purple-600" />
-      case 'advantageoneofficer':
+      case 'securityofficer':
         return <Users className="h-4 w-4 text-green-600" />
-      case 'customersitemanager':
-      case 'customerhomanager':
+      case 'customer':
         return <Building2 className="h-4 w-4 text-orange-600" />
       default:
         return <UserX className="h-4 w-4 text-gray-600 dark:text-gray-300" />
@@ -357,16 +349,15 @@ const UserSetup = () => {
   // Stats (using all filtered users, not paginated)
   const totalFilteredUsers = displayUsers.length
   const activeStatusList: UserRole[] = [
-    'advantageoneofficer',
-    'advantageonehoofficer',
     'administrator',
-    'customersitemanager',
-    'customerhomanager'
+    'manager',
+    'securityofficer',
+    'customer'
   ]
   const activeUsers = displayUsers.filter(u => activeStatusList.includes(u.role)).length
   const adminUsers = displayUsers.filter(u => u.role === 'administrator').length
   const adminPercent = totalFilteredUsers > 0 ? ((adminUsers / totalFilteredUsers) * 100).toFixed(1) : '0.0'
-  const officerUsers = displayUsers.filter(u => u.role === 'advantageoneofficer').length
+  const officerUsers = displayUsers.filter(u => u.role === 'securityofficer').length
 
   return (
     <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-slate-50 via-background to-indigo-50/20 dark:from-slate-950 dark:to-indigo-950/20">
@@ -406,8 +397,11 @@ const UserSetup = () => {
               </Select>
             </div>
             </div>
-            <Button onClick={() => setShowUserDialog(true)} className="w-full sm:w-auto h-9 sm:h-10 text-sm sm:text-base">
-              <UserPlus className="h-4 w-4 mr-2" />
+            <Button
+              onClick={() => setShowUserDialog(true)}
+              className="inline-flex h-9 shrink-0 gap-2 whitespace-nowrap px-4 sm:h-10 sm:px-5 text-sm sm:text-base w-full sm:w-auto sm:self-center"
+            >
+              <UserPlus className="h-4 w-4 shrink-0" aria-hidden />
               Add User
             </Button>
           </div>
@@ -536,7 +530,7 @@ const UserSetup = () => {
                   <TableHead className="text-xs sm:text-sm hidden md:table-cell">Job Title</TableHead>
                   <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Customer</TableHead>
                   <TableHead className="text-xs sm:text-sm">Status</TableHead>
-                  <TableHead className="text-xs sm:text-sm hidden md:table-cell">Officer Type</TableHead>
+                  <TableHead className="text-xs sm:text-sm hidden md:table-cell">Role</TableHead>
                   <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Assigned Customers</TableHead>
                   <TableHead className="w-[120px] sm:w-[160px] text-xs sm:text-sm">Actions</TableHead>
               </TableRow>
@@ -563,7 +557,7 @@ const UserSetup = () => {
                   </TableCell>
                     <TableCell className="text-xs sm:text-sm hidden lg:table-cell">
                       <div className="text-xs sm:text-sm text-muted-foreground">
-                      {user.customerId 
+                      {'customerId' in user && user.customerId 
                         ? ((user as any).customerName || customerNameMap.get(user.customerId) || `Customer ID: ${user.customerId}`)
                         : 'N/A'}
                     </div>
@@ -787,7 +781,7 @@ const UserSetup = () => {
                     <div>
                       <div className="mb-1 text-xs text-gray-500 dark:text-gray-400">Customer</div>
                       <div className="font-medium text-base">
-                        {viewUser.customerId 
+                        {'customerId' in viewUser && viewUser.customerId 
                           ? ((viewUser as any).customerName || customerNameMap.get(viewUser.customerId) || `Customer ID: ${viewUser.customerId}`)
                           : 'N/A'}
                       </div>

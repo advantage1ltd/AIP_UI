@@ -1,6 +1,12 @@
-import { StoreData, RegionalData, Period, UserRole, OfficerDashboardData, RecentIncident, CustomerStoreData, Region, SatisfactionDataPoint, BeSafeDataPoint, DailyActivity, Site, IncidentDataPoint } from '@/types/dashboard';
+/**
+ * Dashboard and home widgets: stores, regions, satisfaction, Be Safe, aggregated incidents.
+ * Flow: session-scoped customer context → parallel API reads → chart/table DTOs for dashboard pages.
+ * Overlap: domain services (incidentService, analyticsService) own resource CRUD; this module composes multi-endpoint dashboard payloads.
+ */
+import { StoreData, RegionalData, Period, UserRole, RecentIncident, CustomerStoreData, Region, SatisfactionDataPoint, BeSafeDataPoint, DailyActivity, Site, IncidentDataPoint } from '@/types/dashboard';
+import { logger } from '@/utils/logger';
 import axios from 'axios';
-import { BASE_API_URL, api, type ApiResponse } from '@/config/api';
+import { BASE_API_URL, api } from '@/config/api';
 import { extractApiResponseData } from '@/utils/apiResponseHelper';
 import { extractCustomerId } from '@/utils/customerId';
 import { sessionStore } from '@/state/sessionStore';
@@ -14,97 +20,6 @@ const getActiveUser = () => {
   }
   return activeUser
 }
-const FALLBACK_OFFICER_DASHBOARD: OfficerDashboardData = {
-  name: 'Advantage Officer',
-  badgeNumber: 'AIP-2045',
-  role: 'AdvantageOneOfficer',
-  avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=AO',
-  shiftStatus: 'On Duty',
-  shiftStart: new Date().toISOString(),
-  shiftEnd: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
-  location: 'Central England COOP',
-  stats: {
-    incidentsThisMonth: 18,
-    incidentsLastMonth: 14,
-    totalValueSaved: 42000,
-    expensesYTD: 3850,
-    completionRate: 92,
-    holidayBooked: 12,
-    hoursWorked: 1420,
-    sitesVisited: 8
-  },
-  monthlyTarget: {
-    incidents: 20,
-    valueSaved: 50000,
-    current: {
-      incidents: 18,
-      valueSaved: 42000
-    }
-  },
-  recentActivities: [
-    {
-      id: 'activity-1',
-      type: 'incident',
-      title: 'High-value recovery',
-      location: 'Central England COOP',
-      time: '08:30',
-      value: 1800,
-      status: 'resolved'
-    },
-    {
-      id: 'activity-2',
-      type: 'patrol',
-      title: 'Early morning patrol',
-      location: 'Midcounties COOP',
-      time: '06:10',
-      status: 'completed'
-    },
-    {
-      id: 'activity-3',
-      type: 'report',
-      title: 'Incident report submitted',
-      location: 'Heart of England',
-      time: '07:55',
-      value: 0,
-      status: 'submitted'
-    }
-  ],
-  upcomingTasks: [
-    {
-      id: 'task-1',
-      type: 'Training',
-      title: 'Customer service refresher',
-      dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-      priority: 'medium'
-    },
-    {
-      id: 'task-2',
-      type: 'Patrol',
-      title: 'Late shift perimeter patrol',
-      dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-      priority: 'high'
-    }
-  ]
-};
-
-const FALLBACK_RECENT_INCIDENTS: RecentIncident[] = Array.from({ length: 6 }).map((_, index) => ({
-  id: `incident-${index + 1}`,
-  customerId: 21,
-  date: new Date(Date.now() - index * 6 * 60 * 60 * 1000).toISOString(),
-  regionId: '1',
-  regionName: 'Central Region',
-  siteId: `site-${(index % 3) + 1}`,
-  siteName: ['Central England COOP', 'Heart of England', 'Midcounties COOP'][index % 3],
-  type: index % 2 === 0 ? 'Theft Prevention' : 'Patrol',
-  value: index % 2 === 0 ? 120 + index * 30 : 0,
-  assignedTo: 'AdvantageOneOfficer',
-  customerName: ['Central England COOP', 'Heart of England', 'Midcounties COOP'][index % 3],
-  store: ['Central England COOP', 'Heart of England', 'Midcounties COOP'][index % 3],
-  officerName: ['David Brown', 'Karen Walsh', 'Lee Richards'][index % 3],
-  amount: index % 2 === 0 ? 120 + index * 30 : 0,
-  incidentType: index % 2 === 0 ? 'Recovery' : 'Patrol'
-}));
-
 class APIError extends Error {
   constructor(
     message: string,
@@ -115,55 +30,6 @@ class APIError extends Error {
     this.name = 'APIError';
   }
 }
-
-class DashboardService {
-  async getOfficerDashboard(): Promise<OfficerDashboardData> {
-    try {
-      // TODO: Implement officer dashboard endpoint in backend at /dashboard/officer
-      // For now, return mock data since endpoint doesn't exist
-      console.info('ℹ️ [DashboardService] Officer dashboard endpoint not implemented, using mock data');
-      return FALLBACK_OFFICER_DASHBOARD;
-    } catch (error: any) {
-      console.warn('⚠️ [DashboardService] Error with officer dashboard, using fallback');
-      return FALLBACK_OFFICER_DASHBOARD;
-    }
-  }
-
-  async getRecentIncidents(): Promise<RecentIncident[]> {
-    try {
-      // Use the existing incidents endpoint with pagination for recent incidents
-      const response = await api.get<ApiResponse<any>>('/incidents?page=1&pageSize=10');
-      const incidents = response.data?.data || [];
-
-      // Transform backend incident format to frontend RecentIncident format
-      const transformedIncidents: RecentIncident[] = incidents.map((inc: any) => ({
-        id: inc.Id || inc.id?.toString() || '',
-        customerId: inc.CustomerId || inc.customerId || 0,
-        date: inc.DateOfIncident || inc.Date || inc.date || inc.incidentDate || '',
-        regionId: inc.RegionId?.toString() || inc.regionId?.toString() || '',
-        regionName: inc.RegionName || inc.regionName || '',
-        siteId: inc.SiteId?.toString() || inc.siteId?.toString() || '',
-        siteName: inc.SiteName || inc.siteName || '',
-        type: inc.IncidentType || inc.incidentType || inc.type || '',
-        value: inc.TotalValueRecovered || inc.Value || inc.value || 0,
-        assignedTo: inc.AssignedTo || inc.assignedTo || '',
-        customerName: inc.CustomerName || inc.customerName || '',
-        store: inc.SiteName || inc.siteName || '',
-        officerName: inc.OfficerName || inc.officerName || '',
-        amount: inc.TotalValueRecovered || inc.Amount || inc.amount || inc.value || 0,
-        incidentType: inc.IncidentType || inc.incidentType || inc.type || ''
-      }));
-
-      return transformedIncidents;
-    } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || 'Failed to fetch recent incidents';
-      console.warn('⚠️ [DashboardService] Falling back to mock incidents:', message);
-      return FALLBACK_RECENT_INCIDENTS;
-    }
-  }
-}
-
-export const dashboardService = new DashboardService()
 
 export const dashboardApi = {
   async getStoreData(storeId: string): Promise<StoreData> {
@@ -218,8 +84,9 @@ export const dashboardApi = {
 
   async getIncidentData(storeId: string, period: Period) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/incidents`, {
-        params: { storeId, period }
+      const response = await api.get('/incidents', {
+        params: { storeId, period },
+        headers: getHeaders(),
       });
       return response.data;
     } catch (error) {
@@ -236,8 +103,9 @@ export const dashboardApi = {
 
   async getRecentIncidents(storeId: string) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/incidents/recent`, {
-        params: { storeId }
+      const response = await api.get('/incidents/recent', {
+        params: { storeId },
+        headers: getHeaders(),
       });
       return response.data;
     } catch (error) {
@@ -476,43 +344,34 @@ const calculateIncidentChartData = (incidents: Array<{ date: string; officerRole
 };
 
 const getSites = async (signal?: AbortSignal): Promise<Site[]> => {
-  const response = await fetch(`${BASE_API_URL}/dashboard/sites`, { 
+  const { data } = await api.get<Site[]>('/dashboard/sites', {
     signal,
-    headers: getHeaders()
+    headers: getHeaders() as Record<string, string>,
   });
-  if (!response.ok) {
-    throw new Error('Failed to fetch sites');
-  }
-  return response.json();
+  return data;
 };
 
 const getStores = async (signal?: AbortSignal): Promise<StoreData[]> => {
-  const response = await fetch(`${BASE_API_URL}/dashboard/stores`, { 
+  const { data } = await api.get<StoreData[]>('/dashboard/stores', {
     signal,
-    headers: getHeaders()
+    headers: getHeaders() as Record<string, string>,
   });
-  if (!response.ok) {
-    throw new Error('Failed to fetch stores');
-  }
-  return response.json();
+  return data;
 };
 
 const getRegions = async (signal?: AbortSignal): Promise<Region[]> => {
-  const response = await fetch(`${BASE_API_URL}/dashboard/regions`, { 
+  const { data } = await api.get<Region[]>('/dashboard/regions', {
     signal,
-    headers: getHeaders()
+    headers: getHeaders() as Record<string, string>,
   });
-  if (!response.ok) {
-    throw new Error('Failed to fetch regions');
-  }
-  return response.json();
+  return data;
 };
 
 class CustomerDashboardService {
   private baseUrl = BASE_API_URL;
 
   private getHeaders() {
-    const token = localStorage.getItem('authToken');
+    const token = sessionStore.getToken();
     const user = getActiveUser();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -536,9 +395,9 @@ class CustomerDashboardService {
     
     if (customerId) {
       headers['X-Customer-Id'] = customerId.toString();
-      console.log('🔍 [DashboardService] Setting X-Customer-Id header:', customerId);
+      logger.debug('🔍 [DashboardService] Setting X-Customer-Id header:', customerId);
     } else {
-      console.warn('⚠️ [DashboardService] No customerId found in user object:', {
+      logger.warn('⚠️ [DashboardService] No customerId found in user object:', {
         user,
         userRole: user.role || user.Role,
         localStorageUserRole: sessionStore.getUser()?.role
@@ -551,7 +410,7 @@ class CustomerDashboardService {
   private async fetchWithSignal<T>(endpoint: string, signal?: AbortSignal): Promise<T> {
     try {
       const fullUrl = `${this.baseUrl}${endpoint}`;
-      console.log(`🔍 [DashboardService] Fetching: ${fullUrl}`);
+      logger.debug(`🔍 [DashboardService] Fetching: ${fullUrl}`);
       
       const response = await fetch(fullUrl, {
         signal,
@@ -559,7 +418,7 @@ class CustomerDashboardService {
       });
 
       if (!response.ok) {
-        console.error(`❌ [DashboardService] HTTP error ${response.status} for ${fullUrl}`);
+        logger.error(`❌ [DashboardService] HTTP error ${response.status} for ${fullUrl}`);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -569,16 +428,16 @@ class CustomerDashboardService {
       // Backend uses { Success, Data, Message } format (PascalCase)
       if (result && typeof result === 'object') {
         if ('Data' in result) {
-          console.log(`✅ [DashboardService] Response Data property found for ${fullUrl}`);
+          logger.debug(`✅ [DashboardService] Response Data property found for ${fullUrl}`);
           return result.Data as T;
         }
         if ('data' in result) {
-          console.log(`✅ [DashboardService] Response data property found for ${fullUrl}`);
+          logger.debug(`✅ [DashboardService] Response data property found for ${fullUrl}`);
           return result.data as T;
         }
       }
       
-      console.log(`✅ [DashboardService] Returning raw result for ${fullUrl}`);
+      logger.debug(`✅ [DashboardService] Returning raw result for ${fullUrl}`);
       return result as T;
     } catch (error) {
       // Don't log AbortError as it's expected during cleanup
@@ -587,7 +446,7 @@ class CustomerDashboardService {
       }
       // Log and wrap other errors
       const fullUrl = `${this.baseUrl}${endpoint}`;
-      console.error(`❌ [DashboardService] Failed to fetch ${fullUrl}:`, error);
+      logger.error(`❌ [DashboardService] Failed to fetch ${fullUrl}:`, error);
       throw new Error(`Failed to fetch ${fullUrl}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -742,8 +601,7 @@ class CustomerDashboardService {
           name: siteName,
           customerId: customerId || userCustomerId || 0,
           metrics: {
-            customerhomanager: [],
-            customersitemanager: []
+            customer: []
           },
           recentIncidents: [],
           incidentData: {
@@ -754,7 +612,7 @@ class CustomerDashboardService {
           }
         };
       }
-      console.warn('⚠️ [DashboardService] Could not fetch incidents:', error);
+      logger.warn('⚠️ [DashboardService] Could not fetch incidents:', error);
       // Continue with empty incidents on error
     }
     
@@ -769,8 +627,7 @@ class CustomerDashboardService {
       name: siteName,
       customerId: customerId || userCustomerId || 0,
       metrics: {
-        customerhomanager: [],
-        customersitemanager: []
+        customer: []
       },
       recentIncidents,
       incidentData
@@ -910,7 +767,7 @@ class CustomerDashboardService {
         return [];
       }
       // Only log actual errors
-      console.warn('⚠️ [DashboardService] Could not fetch satisfaction data:', error);
+      logger.warn('⚠️ [DashboardService] Could not fetch satisfaction data:', error);
       return [];
     }
   }
@@ -1072,8 +929,8 @@ class CustomerDashboardService {
         });
       
       if (import.meta.env.DEV && result.length > 0) {
-        console.log('📊 [BeSafe] Processed data points:', result);
-        console.log('📊 [BeSafe] Sample data point:', result[0]);
+        logger.debug('📊 [BeSafe] Processed data points:', result);
+        logger.debug('📊 [BeSafe] Sample data point:', result[0]);
       }
       
       return result;
@@ -1083,7 +940,7 @@ class CustomerDashboardService {
         return [];
       }
       // Only log actual errors
-      console.warn('⚠️ [DashboardService] Could not fetch Be Safe Be Secure data:', error);
+      logger.warn('⚠️ [DashboardService] Could not fetch Be Safe Be Secure data:', error);
       return [];
     }
   }
@@ -1184,8 +1041,7 @@ class CustomerDashboardService {
           name: `Aggregated (${sites.length} sites)`,
           customerId: customerId || 0,
           metrics: {
-            customerhomanager: [],
-            customersitemanager: []
+            customer: []
           },
           recentIncidents: [],
           incidentData: {
@@ -1196,7 +1052,7 @@ class CustomerDashboardService {
           }
         };
       }
-      console.warn('⚠️ [DashboardService] Could not fetch aggregated incidents:', error);
+      logger.warn('⚠️ [DashboardService] Could not fetch aggregated incidents:', error);
       // Continue with empty incidents on error
     }
     
@@ -1209,8 +1065,7 @@ class CustomerDashboardService {
       name: `Aggregated (${sites.length} sites)`,
       customerId: customerId || 0,
       metrics: {
-        customerhomanager: [],
-        customersitemanager: []
+        customer: []
       },
       recentIncidents: allIncidents.slice(0, 10), // Limit to 10 most recent
       incidentData

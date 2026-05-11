@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +31,7 @@ const generateValidEAN13 = (base: string = '400638133393'): string => {
 };
 
 /**
- * Fix check digit for database EANs (they may have incorrect check digits)
+ * Normalize to a valid EAN-13 (padding + check digit) for barcode image generation
  */
 const fixEANCheckDigit = (ean: string): string => {
 	let baseDigits: string;
@@ -49,77 +49,28 @@ const fixEANCheckDigit = (ean: string): string => {
 	return baseDigits + checkDigit;
 };
 
-/**
- * Sample EANs from your database
- */
-const SAMPLE_DB_EANS = [
-	'0000000000004',
-	'0000000000018',
-	'0000000000024',
-	'0000000000031',
-	'0000000000048',
-	'0000000000055',
-	'0000000000062',
-	'0000000000079',
-	'0000000000086',
-	'0000000000093',
-	'0000000000109',
-	'0000000000116',
-	'0000000000123',
-	'0000000000130',
-	'0000000000147',
-	'0000000000154',
-	'0000000000161',
-	'0000000000178',
-	'0000000000185',
-	'0000000000192',
-	'0000000000208',
-	'0000000000215',
-	'0000000000222',
-	'0000000000239',
-	'0000000000246',
-	'0000000000253',
-	'0000000000260',
-	'0000000000277',
-	'0000000000284',
-	'0000000000291',
-	'0000000000307',
-	'0000000000314',
-	'0000000000321',
-	'4444',
-	'11024',
-];
-
 const BarcodeTestGenerator: React.FC = () => {
-	// Initialize with a valid EAN (0000000000000 has correct check digit)
-	const [ean13, setEan13] = useState<string>('0000000000000');
+	const [ean13, setEan13] = useState<string>(() => generateValidEAN13('000000000000'));
 	const [customBase, setCustomBase] = useState<string>('000000000000');
 	const [barcodeUrl, setBarcodeUrl] = useState<string>('');
-	const [selectedDbEan, setSelectedDbEan] = useState<string>('0000000000004');
-	const [originalDbEan, setOriginalDbEan] = useState<string>('');
-	
-	// Initialize with first DB EAN (corrected)
-	React.useEffect(() => {
-		if (selectedDbEan) {
-			handleUseDbEan(selectedDbEan);
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+	/** Last pasted / entered code before normalization (for display only) */
+	const [rawInputEan, setRawInputEan] = useState<string>('');
+	const rawEanInputRef = useRef<HTMLInputElement>(null);
 
 	const handleGenerate = () => {
 		const validEAN = generateValidEAN13(customBase);
+		setRawInputEan('');
 		setEan13(validEAN);
-		const url = `https://barcode.tec-it.com/barcode.ashx?data=${validEAN}&code=EAN13&dpi=300&scale=3`;
-		setBarcodeUrl(url);
 	};
 
-	const handleUseDbEan = (ean: string) => {
-		setSelectedDbEan(ean);
-		setOriginalDbEan(ean);
-		
-		// Fix the check digit for barcode generation
-		const validEAN = fixEANCheckDigit(ean);
-		setEan13(validEAN);
+	const handleApplyRawTestEan = () => {
+		const raw = rawEanInputRef.current?.value ?? '';
+		const trimmed = raw.trim();
+		if (!trimmed) return;
+		const digitsOnly = trimmed.replace(/\D/g, '');
+		if (!digitsOnly) return;
+		setRawInputEan(trimmed);
+		setEan13(fixEANCheckDigit(digitsOnly));
 	};
 
 	const handleCopy = () => {
@@ -165,37 +116,33 @@ const BarcodeTestGenerator: React.FC = () => {
 							<Copy className="h-4 w-4" />
 						</Button>
 					</div>
-					{originalDbEan && originalDbEan !== ean13 && (
-						<p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-							⚠️ Database EAN: <span className="font-mono">{originalDbEan}</span> → Corrected to: <span className="font-mono">{ean13}</span> (check digit fixed)
+					{rawInputEan.trim() !== '' && (
+						<p className="text-xs text-muted-foreground rounded bg-muted/50 p-2">
+							From <span className="font-mono">{rawInputEan}</span> → EAN-13 used for image:{' '}
+							<span className="font-mono">{ean13}</span>
 						</p>
 					)}
 					<p className="text-xs text-muted-foreground">
-						This EAN has been corrected with a valid check digit for barcode generation. 
-						{originalDbEan && originalDbEan !== ean13 && (
-							<> <strong>Note:</strong> Your database stores <span className="font-mono">{originalDbEan}</span>, but the scanner will read <span className="font-mono">{ean13}</span>. You may need to update your database or handle both values in the lookup.</>
-						)}
+						The displayed code uses a valid EAN-13 check digit for image generation. Product lookup in the app may use the code from your catalog as stored.
 					</p>
 				</div>
 
 				<div className="space-y-2">
-					<Label>Quick Select: EANs from Your Database</Label>
-					<div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border rounded-lg">
-						{SAMPLE_DB_EANS.map((ean) => (
-							<Button
-								key={ean}
-								variant={selectedDbEan === ean ? 'default' : 'outline'}
-								size="sm"
-								onClick={() => handleUseDbEan(ean)}
-								className="font-mono text-xs"
-							>
-								{ean}
-							</Button>
-						))}
+					<Label htmlFor="raw-ean">Paste a code to test (any length; padded / check digit corrected)</Label>
+					<div className="flex gap-2">
+						<Input
+							ref={rawEanInputRef}
+							id="raw-ean"
+							placeholder="e.g. from product file or scanner"
+							className="font-mono"
+							onKeyDown={(e) => {
+								if (e.key === 'Enter') handleApplyRawTestEan();
+							}}
+						/>
+						<Button type="button" variant="secondary" onClick={handleApplyRawTestEan}>
+							Apply
+						</Button>
 					</div>
-					<p className="text-xs text-muted-foreground">
-						Click any EAN to generate its barcode. Shorter codes will be padded to 13 digits for EAN-13 format.
-					</p>
 				</div>
 
 				<div className="space-y-2">

@@ -1,3 +1,7 @@
+/**
+ * Customer-facing module launcher respecting page assignments and role access.
+ * Flow: assigned customer pages → locked/unlocked cards → deep links into customer routes.
+ */
 import { useMemo } from "react"
 import { Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
@@ -15,6 +19,7 @@ interface CustomerViewConfigProps {
   initialConfig?: CustomerViewConfigType
 }
 
+// === Component ===
 export function CustomerViewConfig({ customerType = 'retail', initialConfig }: CustomerViewConfigProps) {
   const { user } = useAuth()
   const enabledPages = initialConfig?.enabledPages ?? []

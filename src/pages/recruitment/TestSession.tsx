@@ -1,3 +1,7 @@
+/**
+ * Recruitment test session proctoring UI.
+ * Flow: session timer and question index → answer capture → submit and results handoff.
+ */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Timer } from 'lucide-react'
@@ -241,7 +245,7 @@ export const TestSession = () => {
 
 	if (loading) {
 		return (
-			<div className="min-h-screen bg-slate-50 flex items-center justify-center">
+			<div className="min-h-screen bg-[#EFF4FF] flex items-center justify-center px-4">
 				<div className="text-center">
 					<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto" />
 					<p className="mt-4 text-slate-600">Loading test…</p>
@@ -252,8 +256,8 @@ export const TestSession = () => {
 
 	if (!test || error) {
 		return (
-			<div className="min-h-screen bg-slate-50 flex items-center justify-center">
-				<Card className="w-full max-w-md border-slate-200/70 bg-white/90 shadow-sm">
+			<div className="min-h-screen bg-[#EFF4FF] flex items-center justify-center px-4">
+				<Card className="w-full max-w-md border-slate-200 bg-white shadow-sm">
 					<CardContent className="pt-6 pb-4 px-6">
 						<div className="text-center">
 							<AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -272,8 +276,8 @@ export const TestSession = () => {
 	if (showResults && result) {
 		const answerByQuestionId = new Map(result.answers.map(a => [a.questionId, a]))
 		return (
-			<div className="min-h-screen bg-slate-50 p-4 sm:p-6 md:p-8">
-				<Card className="w-full max-w-4xl mx-auto border-slate-200/70 bg-white/90 shadow-sm">
+			<div className="min-h-screen bg-[#EFF4FF] p-4 sm:p-6 md:p-8">
+				<Card className="w-full max-w-4xl mx-auto border-slate-200 bg-white shadow-sm">
 					<CardHeader>
 						<div className="flex items-center justify-between">
 							<div>
@@ -373,14 +377,15 @@ export const TestSession = () => {
 	// Intro
 	if (!testStarted) {
 		return (
-			<div className="min-h-screen bg-slate-50 p-4 sm:p-6 md:p-8">
-				<Card className="w-full max-w-3xl mx-auto border-slate-200/70 bg-white/90 shadow-sm">
+			<div className="min-h-screen bg-[#EFF4FF] p-4 sm:p-6 md:p-8">
+				<div className="container mx-auto max-w-screen-2xl px-0 sm:px-2 lg:px-8">
+					<Card className="w-full max-w-5xl mx-auto border-slate-200 bg-white shadow-sm">
 					<CardHeader>
 						<CardTitle className="text-xl sm:text-2xl">{test.title}</CardTitle>
 						<CardDescription>{test.description}</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
-						<div className="p-4 bg-slate-50 rounded-md border border-slate-200/60">
+						<div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
 							<h3 className="font-medium text-slate-900 mb-2">Test Instructions</h3>
 							<ul className="space-y-2 text-sm text-slate-600">
 								<li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-blue-500" /><span>This test has {test.questions.length} questions worth a total of {test.totalPoints} points.</span></li>
@@ -414,7 +419,8 @@ export const TestSession = () => {
 							{submitting ? 'Starting…' : 'Start Test'}
 						</Button>
 					</CardFooter>
-				</Card>
+					</Card>
+				</div>
 			</div>
 		)
 	}
@@ -424,9 +430,9 @@ export const TestSession = () => {
 	const qAnswer = answers[q.questionId]
 
 	return (
-		<div className="min-h-screen bg-slate-50">
-			<div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur">
-				<div className="container mx-auto flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
+		<div className="min-h-screen bg-[#EFF4FF]">
+			<div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+				<div className="container mx-auto max-w-screen-2xl flex flex-col gap-3 px-4 py-3 lg:px-8 md:flex-row md:items-center md:justify-between">
 					<div>
 						<p className="text-xs uppercase tracking-wide text-slate-400">CBT Test Session</p>
 						<p className="text-lg font-semibold text-slate-900">{test.title}</p>
@@ -457,8 +463,8 @@ export const TestSession = () => {
 				</div>
 			</div>
 
-			<div className="container mx-auto grid gap-6 px-4 pb-8 pt-6 lg:grid-cols-[260px_1fr]">
-				<Card className="hidden h-fit border-slate-200/70 bg-white/90 shadow-sm lg:block">
+			<div className="container mx-auto max-w-screen-2xl grid gap-6 px-4 pb-8 pt-6 lg:px-8 lg:grid-cols-[260px_1fr]">
+				<Card className="hidden h-fit border-slate-200 bg-white shadow-sm lg:block">
 					<CardHeader className="pb-2">
 						<CardTitle className="text-base">Question Navigator</CardTitle>
 						<CardDescription className="text-xs">Jump to any question.</CardDescription>
@@ -487,7 +493,7 @@ export const TestSession = () => {
 					</CardContent>
 				</Card>
 
-				<Card className="border-slate-200/70 bg-white/90 shadow-sm">
+				<Card className="border-slate-200 bg-white shadow-sm">
 					<CardHeader className="space-y-3">
 						<div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 							<div className="space-y-1">

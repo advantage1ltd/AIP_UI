@@ -1,4 +1,4 @@
-import { defineConfig, UserConfig } from "vite"
+import { defineConfig, loadEnv, UserConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
@@ -12,11 +12,13 @@ const fixFramerMotionPlugin = () => {
   return {
     name: 'fix-framer-motion',
     config(config: UserConfig) {
+      const prev = config.optimizeDeps
+      const { rollupOptions: _omitDeprecatedRollup, ...restOptimizeDeps } = prev ?? {}
       return {
         optimizeDeps: {
-          ...config.optimizeDeps,
+          ...restOptimizeDeps,
           include: [
-            ...(config.optimizeDeps?.include || []),
+            ...(prev?.include || []),
             'framer-motion',
             'framer-motion/dom',
             'react',
@@ -29,9 +31,6 @@ const fixFramerMotionPlugin = () => {
             'lucide-react'
           ],
           force: true,
-          esbuildOptions: {
-            target: 'esnext'
-          }
         }
       }
     }
@@ -39,22 +38,28 @@ const fixFramerMotionPlugin = () => {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const devProxyTarget = env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:5128'
+
+  return ({
   base: mode === 'production' ? '/' : '/',
   server: {
     host: '0.0.0.0',
     port: 5173,
     strictPort: false,
+    proxy: {
+      '/api': {
+        target: devProxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   plugins: [
     react({
       jsxRuntime: 'automatic',
       jsxImportSource: 'react',
-      babel: {
-        plugins: [
-          ['@babel/plugin-transform-react-jsx', { runtime: 'automatic' }]
-        ]
-      }
     }),
     fixFramerMotionPlugin(),
     ...(mode === 'production' ? [visualizer({ 
@@ -126,7 +131,6 @@ export default defineConfig(({ mode }) => ({
       'recharts',
       'sonner',
       'react-toastify',
-      'react-day-picker',
       'react-csv',
       '@tanstack/react-table',
       
@@ -149,14 +153,7 @@ export default defineConfig(({ mode }) => ({
         drop_console: true,
         drop_debugger: true
       }
-    },
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['framer-motion', '@radix-ui/react-primitive']
-        }
-      }
     }
   }
-}))
+  })
+})

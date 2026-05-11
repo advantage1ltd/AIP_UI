@@ -1,3 +1,7 @@
+/**
+ * Site visit reporting for operations; uses site and customer APIs.
+ * Flow: customer/region/location cascades → paginated visit list → create/edit dialog → siteVisitService persistence.
+ */
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
@@ -185,6 +189,7 @@ interface SiteVisitPageProps {
   siteId?: string;
 }
 
+// === Component ===
 export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps) {
   const { selectedCustomerId } = useCustomerSelection();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -199,7 +204,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Resolve customer ID from prop or context
+  // Customer context comes from route props or CustomerSelectionContext.
   const resolvedCustomerId = customerId ? parseInt(customerId, 10) : selectedCustomerId;
 
   // State for dropdown options

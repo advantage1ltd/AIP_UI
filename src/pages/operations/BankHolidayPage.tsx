@@ -1,3 +1,7 @@
+/**
+ * Bank holiday authorization workflow.
+ * Flow: role-scoped officer list → request form → manager approval → archive and pagination.
+ */
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
@@ -52,13 +56,36 @@ import { Badge } from "@/components/ui/badge";
 import { bankHolidayService } from "@/services/bankHolidayService";
 import type { BankHoliday, BankHolidayStatus } from "@/types/bankHoliday";
 import { employeeService } from '@/services/employeeService'
+import { userService } from '@/services/userService'
 import { useAuth } from '@/contexts/AuthContext'
+import { usePageAccess } from '@/contexts/PageAccessContext'
+import { getUser } from '@/services/auth'
+import { harmonizeRole, normalizeRoleId } from '@/utils/roles'
 import type { Employee } from '@/types/employee'
+
+const bankHolidayMatchesViewer = (
+	holiday: BankHoliday,
+	viewer: ReturnType<typeof getUser>
+): boolean => {
+	if (!viewer) return false
+	if (viewer.employeeId != null && Number(viewer.employeeId) === Number(holiday.officerId)) return true
+	const label = `${viewer.firstName ?? ''} ${viewer.lastName ?? ''}`.trim().toLowerCase()
+	if (!label) return false
+	const on = holiday.officerName.trim().toLowerCase()
+	return on === label || on.includes(label)
+}
 
 interface EmployeeOption {
 	id: number;
 	fullName: string;
 	position?: string;
+}
+
+interface ApproverOption {
+	userId: string;
+	employeeId?: number;
+	label: string;
+	role: string;
 }
 
 const formSchema = z.object({
@@ -76,10 +103,16 @@ const toEmployeeOption = (employee: Employee): EmployeeOption => ({
 	position: employee.position
 })
 
-const isManagerOption = (employee: EmployeeOption): boolean =>
-	employee.position?.toLowerCase().includes('manager') ?? false
-
 const toDate = (value: string): Date => new Date(value)
+const formatDateForInput = (value?: Date) => (value ? format(value, 'yyyy-MM-dd') : '')
+const parseDateInput = (value: string): Date | undefined => {
+	if (!value) return undefined
+	const parsed = new Date(`${value}T00:00:00`)
+	if (Number.isNaN(parsed.getTime())) return undefined
+	parsed.setHours(0, 0, 0, 0)
+	return parsed
+}
+const formatDisplayDate = (value: string) => format(toDate(value), 'dd MMM yyyy')
 
 // Reusable DateField component
 const DateField = ({ 
@@ -97,13 +130,13 @@ const DateField = ({
 			<Input
 				type="date"
 				{...field}
-				value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+				value={formatDateForInput(field.value)}
 				onChange={e => {
-					const date = new Date(e.target.value);
+					const date = parseDateInput(e.target.value);
 					field.onChange(date);
 				}}
 				disabled={disabled}
-				className="pl-8 text-sm h-9"
+				className="h-9 border-slate-300 pl-8 text-sm"
 			/>
 			<Calendar className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
 		</div>
@@ -160,6 +193,9 @@ const SelectField = ({
 // Reusable action buttons component
 const ActionButtons = ({ 
   holiday,
+  canEdit,
+  canDelete,
+  canArchive,
   onEdit,
   onView,
   onDelete,
@@ -167,6 +203,9 @@ const ActionButtons = ({
   onUnarchive
 }: { 
   holiday: BankHoliday;
+  canEdit: boolean;
+  canDelete: boolean;
+  canArchive: boolean;
   onEdit: (holiday: BankHoliday) => void;
   onView: (holiday: BankHoliday) => void;
   onDelete: (id: string) => void;
@@ -174,15 +213,17 @@ const ActionButtons = ({
   onUnarchive: (id: string) => void;
 }) => (
   <div className="flex items-center justify-center gap-2">
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => onEdit(holiday)}
-      className="h-8 w-8 rounded-full bg-blue-50 border-blue-200 hover:bg-blue-100 p-0"
-      title="Edit Holiday"
-    >
-      <Pencil className="h-3.5 w-3.5 text-blue-600" />
-    </Button>
+    {canEdit ? (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onEdit(holiday)}
+        className="h-8 w-8 rounded-full bg-blue-50 border-blue-200 hover:bg-blue-100 p-0"
+        title="Edit Holiday"
+      >
+        <Pencil className="h-3.5 w-3.5 text-blue-600" />
+      </Button>
+    ) : null}
     <Button
       variant="outline"
       size="sm"
@@ -192,7 +233,7 @@ const ActionButtons = ({
     >
       <Eye className="h-3.5 w-3.5 text-gray-600" />
     </Button>
-    {holiday.status === 'authorized' && (
+    {canArchive && holiday.status === 'authorized' ? (
       <Button
         variant="outline"
         size="sm"
@@ -206,21 +247,22 @@ const ActionButtons = ({
           <Archive className="h-3.5 w-3.5 text-purple-600" />
         )}
       </Button>
-    )}
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => onDelete(holiday.id)}
-      className="h-8 w-8 rounded-full bg-red-50 border-red-200 hover:bg-red-100 p-0"
-      title="Delete Holiday"
-    >
-      <Trash2 className="h-3.5 w-3.5 text-red-600" />
-    </Button>
+    ) : null}
+    {canDelete ? (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onDelete(holiday.id)}
+        className="h-8 w-8 rounded-full bg-red-50 border-red-200 hover:bg-red-100 p-0"
+        title="Delete Holiday"
+      >
+        <Trash2 className="h-3.5 w-3.5 text-red-600" />
+      </Button>
+    ) : null}
   </div>
 );
 
-// Pagination component
-const Pagination = ({
+const BankHolidayPaginationBar = ({
   currentPage,
   totalPages,
   onPageChange
@@ -283,21 +325,31 @@ const StatusBadge = ({ status }: { status: BankHolidayStatus }) => {
 // Reusable mobile card view for holidays
 const HolidayMobileCard = ({
   holiday,
+  canEdit,
+  canDelete,
+  canArchive,
   onEdit,
   onView,
-  onDelete
+  onDelete,
+  onArchive,
+  onUnarchive
 }: {
   holiday: BankHoliday;
+  canEdit: boolean;
+  canDelete: boolean;
+  canArchive: boolean;
   onEdit: (holiday: BankHoliday) => void;
   onView: (holiday: BankHoliday) => void;
   onDelete: (id: string) => void;
+  onArchive: (id: string) => void;
+  onUnarchive: (id: string) => void;
 }) => (
-  <Card className="mb-2 shadow-sm sm:hidden">
+  <Card className="mb-2 border-slate-200 shadow-sm sm:hidden">
     <CardContent className="p-3">
       <div className="flex justify-between items-start mb-2">
         <div>
-          <h3 className="font-medium text-sm">{holiday.officerName}</h3>
-          <p className="text-xs text-muted-foreground">{format(toDate(holiday.holidayDate), 'dd MMM yyyy')}</p>
+          <h3 className="text-sm font-semibold text-slate-800">{holiday.officerName}</h3>
+          <p className="text-xs text-muted-foreground">{formatDisplayDate(holiday.holidayDate)}</p>
         </div>
         <MemoizedStatusBadge status={holiday.status} />
       </div>
@@ -315,24 +367,39 @@ const HolidayMobileCard = ({
           >
             <Eye className="h-3 w-3" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onEdit(holiday)}
-            className="h-6 w-6 p-0"
-            title="Edit Holiday"
-          >
-            <Pencil className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onDelete(holiday.id)}
-            className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
-            title="Delete Holiday"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
+          {canEdit ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onEdit(holiday)}
+              className="h-6 w-6 p-0"
+              title="Edit Holiday"
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+          ) : null}
+          {canDelete ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(holiday.id)}
+              className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
+              title="Delete Holiday"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          ) : null}
+          {canArchive && holiday.status === 'authorized' ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => holiday.archived ? onUnarchive(holiday.id) : onArchive(holiday.id)}
+              className="h-6 w-6 p-0 text-purple-600 hover:bg-purple-50"
+              title={holiday.archived ? "Unarchive Holiday" : "Archive Holiday"}
+            >
+              <Archive className="h-3 w-3" />
+            </Button>
+          ) : null}
         </div>
       </div>
     </CardContent>
@@ -371,6 +438,7 @@ const LoadingCard = () => (
   </Card>
 );
 
+// === Component ===
 export default function BankHolidayPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -383,11 +451,42 @@ export default function BankHolidayPage() {
   const [viewingHoliday, setViewingHoliday] = useState<BankHoliday | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [showArchived, setShowArchived] = useState(false);
   const [officerOptions, setOfficerOptions] = useState<EmployeeOption[]>([]);
-  const [managerOptions, setManagerOptions] = useState<EmployeeOption[]>([]);
+  const [approverOptions, setApproverOptions] = useState<ApproverOption[]>([]);
+  const [isApproverLoading, setIsApproverLoading] = useState(false);
+  const [serverListMeta, setServerListMeta] = useState({ total: 0, totalPages: 1 });
   const itemsPerPage = 10;
+
+  const { currentRole, isTestMode, testRole } = usePageAccess();
+  const viewer = getUser();
+  const effectiveNavigationRole = isTestMode && testRole ? testRole : currentRole;
+  const harmonizedHolidayRole =
+    normalizeRoleId(effectiveNavigationRole ?? '') ??
+    normalizeRoleId(viewer?.pageAccessRole ?? viewer?.role ?? '') ??
+    harmonizeRole(viewer?.pageAccessRole ?? viewer?.role ?? '');
+
+  // Officer JWT scope limits selectable officers to the signed-in employee.
+  const hasBankHolidayManagementAccess =
+    harmonizedHolidayRole === 'administrator' || harmonizedHolidayRole === 'manager';
+  const isOfficerBankHolidayScope = harmonizedHolidayRole === 'securityofficer';
+
+  const officerEmployeeIdForApi =
+    isOfficerBankHolidayScope &&
+    viewer?.employeeId != null &&
+    Number.isFinite(Number(viewer.employeeId))
+      ? Number(viewer.employeeId)
+      : undefined;
+
+  const scopedOfficerFetch = officerEmployeeIdForApi != null;
+
+  const canMutateBankHoliday = (holiday: BankHoliday) =>
+    hasBankHolidayManagementAccess || bankHolidayMatchesViewer(holiday, viewer);
+
+  const selectableOfficerOptions = useMemo(() => {
+    if (!isOfficerBankHolidayScope || viewer?.employeeId == null) return officerOptions;
+    return officerOptions.filter((o) => o.id === viewer.employeeId);
+  }, [officerOptions, isOfficerBankHolidayScope, viewer?.employeeId]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -404,8 +503,6 @@ export default function BankHolidayPage() {
         const employees = await employeeService.getActiveEmployees();
         const normalized = employees.map(toEmployeeOption);
         setOfficerOptions(normalized);
-        const managerCandidates = normalized.filter(isManagerOption);
-        setManagerOptions(managerCandidates.length ? managerCandidates : normalized);
       } catch (error) {
         console.error('Error fetching employees:', error);
         toast({
@@ -421,19 +518,80 @@ export default function BankHolidayPage() {
     loadEmployees();
   }, [toast]);
 
+  useEffect(() => {
+    if (!hasBankHolidayManagementAccess || isOfficerBankHolidayScope) {
+      setApproverOptions([]);
+      setIsApproverLoading(false);
+      return;
+    }
+
+    const loadApprovers = async () => {
+      try {
+        setIsApproverLoading(true);
+        const response = await userService.getUsers({
+          page: 1,
+          pageSize: 250
+        });
+
+        const allowed = (response?.data ?? [])
+          .filter((user) => {
+            const role = user.role?.toLowerCase();
+            return role === 'manager' || role === 'administrator';
+          })
+          .map((user) => {
+            const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+            return {
+              userId: user.id,
+              employeeId: typeof user.employeeId === 'number' ? user.employeeId : undefined,
+              label: fullName || user.username || user.email,
+              role: user.role
+            };
+          });
+
+        setApproverOptions(allowed);
+      } catch (error) {
+        console.error('Error loading approvers:', error);
+        setApproverOptions([]);
+        toast({
+          title: 'Error',
+          description: 'Unable to load authorising users.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsApproverLoading(false);
+      }
+    };
+
+    void loadApprovers();
+  }, [toast, hasBankHolidayManagementAccess, isOfficerBankHolidayScope]);
+
   // Fetch holidays
   const fetchHolidays = useCallback(async () => {
     try {
       setIsLoading(true);
+      const scopedOfficer = officerEmployeeIdForApi != null;
       const response = await bankHolidayService.getBankHolidays({
-        search: searchTerm,
-        page: currentPage,
-        limit: itemsPerPage,
-        archived: showArchived
+        search: scopedOfficer ? undefined : searchTerm,
+        page: scopedOfficer ? 1 : currentPage,
+        limit: scopedOfficer ? 500 : itemsPerPage,
+        archived: showArchived,
+        employeeId: officerEmployeeIdForApi,
       });
-      
-      setHolidays(response.data);
-      setTotalPages(response.totalPages || 1);
+
+      if (!scopedOfficer) {
+        setServerListMeta({
+          total: response.total ?? response.data.length,
+          totalPages: Math.max(1, response.totalPages ?? 1),
+        });
+      }
+
+      const sessionUser = getUser();
+      let rows = response.data;
+      if (scopedOfficer && sessionUser) {
+        rows = rows.filter((h) => bankHolidayMatchesViewer(h, sessionUser));
+      }
+
+      setHolidays(rows);
     } catch (error) {
       console.error('Error fetching bank holidays:', error);
       toast({
@@ -444,7 +602,12 @@ export default function BankHolidayPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchTerm, currentPage, itemsPerPage, showArchived, toast]);
+  }, [searchTerm, currentPage, itemsPerPage, showArchived, toast, officerEmployeeIdForApi]);
+
+  useEffect(() => {
+    if (!scopedOfficerFetch) return;
+    setServerListMeta({ total: 0, totalPages: 1 });
+  }, [scopedOfficerFetch]);
 
   // Initial fetch
   useEffect(() => {
@@ -473,6 +636,20 @@ export default function BankHolidayPage() {
 
   const onSubmit = useCallback(async (values: z.infer<typeof formSchema>) => {
     try {
+      const sessionUser = getUser();
+      if (
+        isOfficerBankHolidayScope &&
+        sessionUser?.employeeId != null &&
+        Number(values.officerId) !== Number(sessionUser.employeeId)
+      ) {
+        toast({
+          title: 'Access denied',
+          description: 'You can only create or edit bank holidays for yourself.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const payloadDate = values.holidayDate.toISOString();
 
       if (editingHoliday) {
@@ -516,9 +693,26 @@ export default function BankHolidayPage() {
         variant: "destructive"
       });
     }
-  }, [editingHoliday, fetchHolidays, form, toast, user?.employeeId]);
+  }, [
+    editingHoliday,
+    fetchHolidays,
+    form,
+    toast,
+    user?.employeeId,
+    isOfficerBankHolidayScope,
+  ]);
 
   const handleDelete = useCallback(async (id: string) => {
+    const target = holidays.find((h) => h.id === id);
+    const sessionUser = getUser();
+    if (target && !hasBankHolidayManagementAccess && !bankHolidayMatchesViewer(target, sessionUser)) {
+      toast({
+        title: 'Access denied',
+        description: 'You can only delete your own bank holiday requests.',
+        variant: 'destructive',
+      });
+      return;
+    }
     try {
       await bankHolidayService.deleteBankHoliday(id);
       await fetchHolidays();
@@ -534,7 +728,7 @@ export default function BankHolidayPage() {
         variant: "destructive"
       });
     }
-  }, [fetchHolidays, toast]);
+  }, [holidays, hasBankHolidayManagementAccess, fetchHolidays, toast]);
 
   const handleViewHoliday = useCallback((holiday: BankHoliday) => {
     setViewingHoliday(holiday);
@@ -542,86 +736,158 @@ export default function BankHolidayPage() {
   }, []);
 
   const handleEditHoliday = useCallback((holiday: BankHoliday) => {
+    const sessionUser = getUser();
+    if (!hasBankHolidayManagementAccess && !bankHolidayMatchesViewer(holiday, sessionUser)) {
+      toast({
+        title: 'Access denied',
+        description: 'You can only edit your own bank holiday requests.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setEditingHoliday(holiday);
     setIsDialogOpen(true);
-  }, []);
+  }, [hasBankHolidayManagementAccess, toast]);
 
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
   }, []);
 
-  // Add these handlers after the existing handlers
-  const handleArchive = useCallback(async (id: string) => {
-    try {
-      const updatedHoliday = await bankHolidayService.archiveBankHoliday(id);
-      setHolidays(prev => prev.map(h => 
-        h.id === id ? updatedHoliday : h
-      ));
-      toast({
-        title: "Success",
-        description: "Bank holiday archived successfully.",
-      });
-    } catch (error) {
-      console.error('Error archiving bank holiday:', error);
-      toast({
-        title: "Error",
-        description: "Failed to archive bank holiday. Please try again.",
-        variant: "destructive"
-      });
+  const scopeFilteredHolidays = useMemo(() => {
+    if (!isOfficerBankHolidayScope || !viewer) return holidays;
+    return holidays.filter((h) => bankHolidayMatchesViewer(h, viewer));
+  }, [holidays, isOfficerBankHolidayScope, viewer]);
+
+  const filteredHolidays = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return scopeFilteredHolidays;
+    return scopeFilteredHolidays.filter(
+      (h) =>
+        h.officerName.toLowerCase().includes(q) ||
+        (h.officerNumber && h.officerNumber.toLowerCase().includes(q))
+    );
+  }, [scopeFilteredHolidays, searchTerm]);
+
+  const displayTotalPages = scopedOfficerFetch
+    ? Math.max(1, Math.ceil(filteredHolidays.length / itemsPerPage))
+    : Math.max(1, serverListMeta.totalPages);
+
+  useEffect(() => {
+    if (currentPage > displayTotalPages) {
+      setCurrentPage(displayTotalPages);
     }
-  }, [toast]);
+  }, [currentPage, displayTotalPages]);
 
-  const handleUnarchive = useCallback(async (id: string) => {
-    try {
-      const updatedHoliday = await bankHolidayService.unarchiveBankHoliday(id);
-      setHolidays(prev => prev.map(h => 
-        h.id === id ? updatedHoliday : h
-      ));
-      toast({
-        title: "Success",
-        description: "Bank holiday unarchived successfully.",
-      });
-    } catch (error) {
-      console.error('Error unarchiving bank holiday:', error);
-      toast({
-        title: "Error",
-        description: "Failed to unarchive bank holiday. Please try again.",
-        variant: "destructive"
-      });
+  const paginatedHolidays = useMemo(() => {
+    if (!scopedOfficerFetch) {
+      return filteredHolidays;
     }
-  }, [toast]);
+    return filteredHolidays.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    );
+  }, [filteredHolidays, currentPage, itemsPerPage, scopedOfficerFetch]);
 
-  // Update the filtered holidays logic
-  const paginatedHolidays = useMemo(() => holidays, [holidays]);
-
-  // Stats counts
-  const pendingCount = useMemo(() => 
-    holidays.filter(h => h.status === "pending").length, 
-    [holidays]
+  const pendingCount = useMemo(
+    () => scopeFilteredHolidays.filter((h) => h.status === 'pending').length,
+    [scopeFilteredHolidays]
   );
 
-  const authorizedCount = useMemo(() => 
-    holidays.filter(h => h.status === "authorized").length, 
-    [holidays]
-  );
-  
-  const declinedCount = useMemo(() => 
-    holidays.filter(h => h.status === "declined").length, 
-    [holidays]
+  const authorizedCount = useMemo(
+    () => scopeFilteredHolidays.filter((h) => h.status === 'authorized').length,
+    [scopeFilteredHolidays]
   );
 
-  const totalCount = useMemo(() => 
-    holidays.length,
-    [holidays]
+  const declinedCount = useMemo(
+    () => scopeFilteredHolidays.filter((h) => h.status === 'declined').length,
+    [scopeFilteredHolidays]
+  );
+
+  const totalCount = scopeFilteredHolidays.length;
+
+  const handleArchive = useCallback(
+    async (id: string) => {
+      if (!hasBankHolidayManagementAccess) {
+        toast({
+          title: 'Access denied',
+          description: 'Only managers and administrators can archive bank holidays.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      try {
+        const updatedHoliday = await bankHolidayService.archiveBankHoliday(id);
+        setHolidays((prev) => prev.map((h) => (h.id === id ? updatedHoliday : h)));
+        toast({
+          title: 'Success',
+          description: 'Bank holiday archived successfully.',
+        });
+      } catch (error) {
+        console.error('Error archiving bank holiday:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to archive bank holiday. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    },
+    [hasBankHolidayManagementAccess, toast]
+  );
+
+  const handleUnarchive = useCallback(
+    async (id: string) => {
+      if (!hasBankHolidayManagementAccess) {
+        toast({
+          title: 'Access denied',
+          description: 'Only managers and administrators can unarchive bank holidays.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      try {
+        const updatedHoliday = await bankHolidayService.unarchiveBankHoliday(id);
+        setHolidays((prev) => prev.map((h) => (h.id === id ? updatedHoliday : h)));
+        toast({
+          title: 'Success',
+          description: 'Bank holiday unarchived successfully.',
+        });
+      } catch (error) {
+        console.error('Error unarchiving bank holiday:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to unarchive bank holiday. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    },
+    [hasBankHolidayManagementAccess, toast]
   );
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 space-y-3 sm:space-y-4 md:space-y-6 max-w-[1280px]">
+    <div className="min-h-screen bg-[#EFF4FF]">
+      <div className="container mx-auto max-w-screen-2xl px-2 sm:px-4 lg:px-8 py-3 sm:py-4 md:py-6 space-y-3 sm:space-y-4 md:space-y-6">
       {/* Page header with summary cards */}
       <div className="flex flex-col gap-3 sm:gap-4 md:gap-6">
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 md:gap-4">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Bank Holidays</h1>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between md:gap-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-purple-100 p-2.5">
+              <Calendar className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl md:text-3xl">Bank Holidays</h1>
+              <p className="text-xs text-slate-500 sm:text-sm">Manage holiday records, approvals, and archive lifecycle.</p>
+            </div>
+          </div>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open)
+            if (!open) {
+              setEditingHoliday(null)
+              form.reset({
+                officerId: user?.employeeId ?? undefined,
+                holidayDate: undefined
+              })
+            }
+          }}>
             <DialogTrigger asChild>
               <Button 
                 onClick={() => {
@@ -630,7 +896,10 @@ export default function BankHolidayPage() {
                 }}
                 className="w-full sm:w-auto px-2 sm:px-3 md:px-4 py-1.5 flex items-center justify-center gap-1 text-sm"
                 size="sm"
-                disabled={isEmployeeLoading || officerOptions.length === 0}
+                disabled={
+                  isEmployeeLoading ||
+                  selectableOfficerOptions.length === 0
+                }
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add Bank Holiday
@@ -662,12 +931,16 @@ export default function BankHolidayPage() {
                             field={field}
                             label="Officer Name"
                             placeholder={isEmployeeLoading ? "Loading officers..." : "Select an officer"}
-                            options={officerOptions}
+                            options={selectableOfficerOptions}
                             getValue={(option) => option.id.toString()}
                             getLabel={(option) => option.fullName}
-                            disabled={isEmployeeLoading || officerOptions.length === 0}
+                            disabled={
+                              isEmployeeLoading ||
+                              selectableOfficerOptions.length === 0 ||
+                              isOfficerBankHolidayScope
+                            }
                           />
-                          {!isEmployeeLoading && officerOptions.length === 0 && (
+                          {!isEmployeeLoading && selectableOfficerOptions.length === 0 && (
                             <p className="text-[11px] text-muted-foreground">No active officers available.</p>
                           )}
                         </div>
@@ -711,11 +984,11 @@ export default function BankHolidayPage() {
         </div>
 
         {/* Summary cards - Grid layout based on breakpoints */}
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-          <Card className="bg-primary text-primary-foreground shadow-sm">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:grid-cols-4">
+          <Card className="shadow-sm border-purple-700 bg-gradient-to-br from-purple-800 to-purple-900 text-white">
             <CardHeader className="p-2 sm:p-3 md:p-4 pb-0">
               <CardTitle className="text-xs sm:text-sm md:text-base">Total Bank Holidays</CardTitle>
-              <CardDescription className="text-[10px] sm:text-xs text-primary-foreground/70">All recorded holidays</CardDescription>
+              <CardDescription className="text-[10px] sm:text-xs text-white/70">All recorded holidays</CardDescription>
             </CardHeader>
             <CardContent className="p-2 sm:p-3 md:p-4 pt-1">
               <div className="text-xl sm:text-2xl md:text-3xl font-bold">{totalCount}</div>
@@ -751,22 +1024,21 @@ export default function BankHolidayPage() {
         </div>
       </div>
 
-      {/* Main content - 1 column on mobile, 7 columns on desktop */}
-      <div className="grid grid-cols-1 lg:grid-cols-7 gap-3 sm:gap-4 md:gap-6">
-        {/* Main content area - full width on mobile, 7 cols on desktop */}
-        <div className="lg:col-span-7">
+      {/* Main content */}
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 md:gap-6">
+        <div>
           {/* Filter and search section */}
-          <Card className="shadow-sm">
-            <CardHeader className="p-2 sm:p-3 md:p-4 pb-1.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
-                <CardTitle className="text-sm sm:text-base md:text-lg">Bank Holiday Records</CardTitle>
+          <Card className="overflow-hidden border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-200 bg-slate-50/40 p-2 pb-1.5 sm:p-3 md:p-4">
+              <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <CardTitle className="text-sm font-semibold text-slate-800 sm:text-base md:text-lg">Bank Holiday Records</CardTitle>
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                   <Select
                     value={showArchived ? "archived" : "active"}
                     onValueChange={(value) => setShowArchived(value === "archived")}
                     disabled={isLoading}
                   >
-                    <SelectTrigger className="w-full sm:w-[140px] h-8 sm:h-9 text-xs sm:text-sm">
+                    <SelectTrigger className="h-8 w-full border-slate-300 text-xs sm:h-9 sm:w-[140px] sm:text-sm">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -780,7 +1052,7 @@ export default function BankHolidayPage() {
                       placeholder="Search by officer name..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-8 h-8 sm:h-9 text-xs sm:text-sm"
+                      className="h-8 w-full border-slate-300 pl-8 text-xs sm:h-9 sm:text-sm"
                       disabled={isLoading}
                     />
                     <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
@@ -801,9 +1073,14 @@ export default function BankHolidayPage() {
                       <MemoizedHolidayMobileCard
                         key={holiday.id}
                         holiday={holiday}
+                        canEdit={canMutateBankHoliday(holiday)}
+                        canDelete={canMutateBankHoliday(holiday)}
+                        canArchive={hasBankHolidayManagementAccess}
                         onEdit={handleEditHoliday}
                         onView={handleViewHoliday}
                         onDelete={handleDelete}
+                        onArchive={handleArchive}
+                        onUnarchive={handleUnarchive}
                       />
                     ))}
                     {paginatedHolidays.length === 0 && (
@@ -816,10 +1093,12 @@ export default function BankHolidayPage() {
               </div>
 
               {/* Desktop view - table layout */}
-              <div className="hidden sm:block overflow-x-auto min-w-[320px]">
-                <div className="flex justify-between items-center px-3 py-2 bg-muted/10">
+              <div className="hidden min-w-[320px] overflow-x-auto sm:block">
+                <div className="flex items-center justify-between bg-slate-50/30 px-3 py-2">
                   <div className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    {paginatedHolidays.length} {paginatedHolidays.length === 1 ? 'record' : 'records'} found
+                    {scopedOfficerFetch
+                      ? `${filteredHolidays.length} ${filteredHolidays.length === 1 ? 'record' : 'records'} found`
+                      : `${paginatedHolidays.length} on this page · ${serverListMeta.total} total`}
                   </div>
                   <div className="flex gap-2">
                     {searchTerm && (
@@ -838,13 +1117,13 @@ export default function BankHolidayPage() {
                   </div>
                 </div>
                 <Table className="w-full">
-                  <TableHeader className="bg-muted/30">
+                  <TableHeader className="bg-slate-50/70">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="font-medium text-xs sm:text-sm p-2 sm:p-3 w-1/4">Officer</TableHead>
-                      <TableHead className="font-medium text-xs sm:text-sm p-2 sm:p-3 whitespace-nowrap w-1/4">Date</TableHead>
-                      <TableHead className="font-medium text-xs sm:text-sm p-2 sm:p-3 hidden sm:table-cell">Manager</TableHead>
-                      <TableHead className="font-medium text-xs sm:text-sm p-2 sm:p-3 w-1/4">Status</TableHead>
-                      <TableHead className="font-medium text-xs sm:text-sm p-2 sm:p-3 text-center w-[100px]">Actions</TableHead>
+                      <TableHead className="w-1/4 p-2 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:p-3 sm:text-sm">Officer</TableHead>
+                      <TableHead className="w-1/4 whitespace-nowrap p-2 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:p-3 sm:text-sm">Holiday Date</TableHead>
+                      <TableHead className="hidden p-2 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:table-cell sm:p-3 sm:text-sm">Authorising Manager</TableHead>
+                      <TableHead className="w-1/4 p-2 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:p-3 sm:text-sm">Status</TableHead>
+                      <TableHead className="w-[100px] p-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-600 sm:p-3 sm:text-sm">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -853,12 +1132,12 @@ export default function BankHolidayPage() {
                     ) : (
                       <>
                         {paginatedHolidays.map((holiday) => (
-                          <TableRow key={holiday.id} className="hover:bg-muted/10">
-                            <TableCell className="font-medium text-xs sm:text-sm p-2 sm:p-3 truncate max-w-[80px] sm:max-w-[120px]">
+                          <TableRow key={holiday.id} className="odd:bg-white even:bg-slate-50/30 hover:bg-purple-50/40">
+                            <TableCell className="max-w-[80px] truncate p-2 text-xs font-semibold text-slate-800 sm:max-w-[120px] sm:p-3 sm:text-sm">
                               {holiday.officerName}
                             </TableCell>
                             <TableCell className="text-xs sm:text-sm p-2 sm:p-3 whitespace-nowrap">
-                              {format(toDate(holiday.holidayDate), 'dd/MM/yy')}
+                              {formatDisplayDate(holiday.holidayDate)}
                             </TableCell>
                             <TableCell className="text-xs sm:text-sm p-2 sm:p-3 hidden sm:table-cell truncate max-w-[120px]">
                               {holiday.authorisedByName ?? '—'}
@@ -869,6 +1148,9 @@ export default function BankHolidayPage() {
                             <TableCell className="p-1 sm:p-2">
                               <MemoizedActionButtons
                                 holiday={holiday}
+                                canEdit={canMutateBankHoliday(holiday)}
+                                canDelete={canMutateBankHoliday(holiday)}
+                                canArchive={hasBankHolidayManagementAccess}
                                 onEdit={handleEditHoliday}
                                 onView={handleViewHoliday}
                                 onDelete={handleDelete}
@@ -890,10 +1172,10 @@ export default function BankHolidayPage() {
                   </TableBody>
                 </Table>
               </div>
-              {paginatedHolidays.length > 0 && (
-                <Pagination
+              {filteredHolidays.length > 0 && (
+                <BankHolidayPaginationBar
                   currentPage={currentPage}
-                  totalPages={totalPages}
+                  totalPages={displayTotalPages}
                   onPageChange={handlePageChange}
                 />
               )}
@@ -947,7 +1229,7 @@ export default function BankHolidayPage() {
               </Card>
 
               {/* Admin Approval/Denial Section */}
-              {viewingHoliday.status === 'pending' && (
+              {hasBankHolidayManagementAccess && viewingHoliday.status === 'pending' && (
                 <div className="border-t border-gray-200 pt-3 xs:pt-4 mt-3 xs:mt-4">
                   <h3 className="text-xs sm:text-sm font-medium text-gray-900 mb-2 xs:mb-3">Approval Decision</h3>
                   
@@ -994,91 +1276,101 @@ export default function BankHolidayPage() {
                         variant: "destructive"
                       });
                     }
-                  }} className="space-y-3">
-                    <div className="flex gap-2">
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          name="decision"
-                          value="authorized"
-                          id="approve"
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
-                          required
-                        />
-                        <label htmlFor="approve" className="ml-2 text-xs sm:text-sm text-gray-700">
-                          Approve
-                        </label>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          name="decision"
-                          value="declined"
-                          id="deny"
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
-                          required
-                        />
-                        <label htmlFor="deny" className="ml-2 text-xs sm:text-sm text-gray-700">
-                          Deny
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 p-2 sm:p-3 border rounded-lg bg-muted/20">
-                      <div>
-                        <label htmlFor="authorisedByEmployeeId" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                          Authorised By
-                        </label>
-                        <select
-                          id="authorisedByEmployeeId"
-                          name="authorisedByEmployeeId"
-                          className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          required
-                          defaultValue=""
-                          disabled={isEmployeeLoading || managerOptions.length === 0}
-                        >
-                          <option value="" disabled>Select authorising manager</option>
-                          {managerOptions.map((manager) => (
-                            <option key={manager.id} value={manager.id}>
-                              {manager.fullName}{manager.position ? ` - ${manager.position}` : ''}
-                            </option>
-                          ))}
-                        </select>
-                        {managerOptions.length === 0 && !isEmployeeLoading && (
-                          <p className="text-[11px] text-muted-foreground mt-1">No managers available. Please add a manager first.</p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label htmlFor="dateAuthorised" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                          Date Authorised
-                        </label>
-                        <div className="relative">
-                          <Input
-                            type="date"
-                            id="dateAuthorised"
-                            name="dateAuthorised"
-                            className="pl-8 text-sm h-9"
-                            defaultValue={format(new Date(), "yyyy-MM-dd")}
-                            required
-                          />
-                          <Calendar className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+                  }} className="space-y-4">
+                    <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/40 p-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <label className="text-xs sm:text-sm font-medium text-slate-700">Decision</label>
+                        <div className="flex gap-4">
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="decision"
+                              value="authorized"
+                              id="approve"
+                              className="h-4 w-4 border-gray-300 text-purple-600 focus:ring-purple-500"
+                              required
+                            />
+                            <span className="ml-2 text-xs sm:text-sm text-gray-700">Approve</span>
+                          </label>
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="decision"
+                              value="declined"
+                              id="deny"
+                              className="h-4 w-4 border-gray-300 text-purple-600 focus:ring-purple-500"
+                              required
+                            />
+                            <span className="ml-2 text-xs sm:text-sm text-gray-700">Deny</span>
+                          </label>
                         </div>
                       </div>
+
+                      <div>
+                        <label htmlFor="reason" className="mb-1 block text-xs sm:text-sm font-medium text-gray-700">
+                          Reason
+                        </label>
+                        <textarea
+                          id="reason"
+                          name="reason"
+                          rows={3}
+                          className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
+                          placeholder="Provide a reason for your decision..."
+                          required
+                        />
+                      </div>
                     </div>
 
-                    <div>
-                      <label htmlFor="reason" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                        Reason
-                      </label>
-                      <textarea
-                        id="reason"
-                        name="reason"
-                        rows={3}
-                        className="w-full text-xs sm:text-sm rounded-md border border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                        placeholder="Provide a reason for your decision..."
-                        required
-                      />
+                    <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+                      <h4 className="text-xs sm:text-sm font-medium text-slate-800">Authorisation Details</h4>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label htmlFor="authorisedByEmployeeId" className="mb-1 block text-xs sm:text-sm font-medium text-gray-700">
+                            Authorised By
+                          </label>
+                          <select
+                            id="authorisedByEmployeeId"
+                            name="authorisedByEmployeeId"
+                            className="h-9 w-full rounded-md border border-slate-300 bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            required
+                            defaultValue=""
+                            disabled={isApproverLoading || approverOptions.length === 0}
+                          >
+                            <option value="" disabled>Select manager or administrator</option>
+                            {approverOptions.map((approver) => (
+                              <option
+                                key={approver.userId}
+                                value={approver.employeeId ? String(approver.employeeId) : `unlinked-${approver.userId}`}
+                                disabled={!approver.employeeId}
+                              >
+                                {approver.label}{!approver.employeeId ? ' (no employee profile linked)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                          {approverOptions.length === 0 && !isApproverLoading && (
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              No manager/administrator users were found.
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label htmlFor="dateAuthorised" className="mb-1 block text-xs sm:text-sm font-medium text-gray-700">
+                            Date Authorised
+                          </label>
+                          <div className="relative">
+                            <Input
+                              type="date"
+                              id="dateAuthorised"
+                              name="dateAuthorised"
+                              className="h-9 border-slate-300 pl-8 text-sm"
+                              defaultValue={format(new Date(), "yyyy-MM-dd")}
+                              required
+                            />
+                            <Calendar className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex justify-end gap-2">
@@ -1103,6 +1395,12 @@ export default function BankHolidayPage() {
                 </div>
               )}
 
+              {(!hasBankHolidayManagementAccess && viewingHoliday.status === 'pending') && (
+                <div className="border-t border-gray-200 pt-3 text-xs text-muted-foreground">
+                  This request is pending approval. A manager or administrator will review it.
+                </div>
+              )}
+
               {viewingHoliday.status !== 'pending' && (
                 <>
                   {viewingHoliday.reason && (
@@ -1122,18 +1420,21 @@ export default function BankHolidayPage() {
                     >
                       Close
                     </Button>
-                    <Button 
-                      onClick={() => {
-                        setViewingHoliday(null);
-                        setIsViewDialogOpen(false);
-                        setEditingHoliday(viewingHoliday);
-                        setIsDialogOpen(true);
-                      }}
-                      className="w-full sm:w-auto text-xs sm:text-sm h-8 sm:h-9"
-                      size="sm"
-                    >
-                      Edit
-                    </Button>
+                    {canMutateBankHoliday(viewingHoliday) ? (
+                      <Button 
+                        onClick={() => {
+                          const toEdit = viewingHoliday;
+                          setIsViewDialogOpen(false);
+                          setViewingHoliday(null);
+                          setEditingHoliday(toEdit);
+                          setIsDialogOpen(true);
+                        }}
+                        className="w-full sm:w-auto text-xs sm:text-sm h-8 sm:h-9"
+                        size="sm"
+                      >
+                        Edit
+                      </Button>
+                    ) : null}
                   </DialogFooter>
                 </>
               )}
@@ -1141,6 +1442,7 @@ export default function BankHolidayPage() {
           )}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

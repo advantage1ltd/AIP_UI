@@ -1,15 +1,30 @@
+/**
+ * Dev-only session inspector (token/user snapshot). Not mounted in production routes.
+ * Enable with VITE_DEBUG_LOGS=true in development.
+ */
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { sessionStore } from '@/state/sessionStore'
+import type { User } from '@/types/user'
+
+type DebugSessionSnapshot = {
+	authToken: string | null
+	user: Pick<User, 'id' | 'role'> & {
+		customerId?: number
+		assignedCustomerIds?: number[]
+	} | null
+}
+
+const debugPanelEnabled = import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true'
 
 export const DebugPanel = () => {
 	const [isOpen, setIsOpen] = useState(false)
-	const [debugData, setDebugData] = useState<any>(null)
+	const [debugData, setDebugData] = useState<DebugSessionSnapshot | null>(null)
 
 	const refreshData = () => {
-		const authToken = localStorage.getItem('authToken')
+		const authToken = sessionStore.getToken()
 		const currentUser = sessionStore.getUser()
 
 		setDebugData({
@@ -17,8 +32,8 @@ export const DebugPanel = () => {
 			user: currentUser ? {
 				id: currentUser.id,
 				role: currentUser.role,
-				customerId: (currentUser as any).customerId,
-				assignedCustomerIds: (currentUser as any).assignedCustomerIds
+				customerId: currentUser.customerId,
+				assignedCustomerIds: currentUser.assignedCustomerIds,
 			} : null
 		})
 	}
@@ -28,6 +43,10 @@ export const DebugPanel = () => {
 			refreshData()
 		}
 	}, [isOpen])
+
+	if (!debugPanelEnabled) {
+		return null
+	}
 
 	if (!isOpen) {
 		return (

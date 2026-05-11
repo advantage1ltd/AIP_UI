@@ -1,3 +1,7 @@
+/**
+ * CRM pipeline dashboard and summary widgets.
+ * Flow: CRM aggregates → pipeline, contact, and deal summary cards with navigation shortcuts.
+ */
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -126,24 +130,6 @@ const convertToActivity = (activity: RecentActivity): Activity => {
 				</div>
 			)
 		}
-	}
-}
-
-// Helper functions
-const calculateStats = (contacts: CRMContact[], deals: any[], recentActivities: Activity[]): DashboardStats => {
-	const pipelineValue = deals.reduce((sum, deal) => sum + (deal.value || 0), 0)
-	const avgDealValue = deals.length > 0 ? pipelineValue / deals.length : 0
-	const closedDeals = deals.filter(d => d.stage === 'closed').length
-	const conversionRate = deals.length > 0 ? Math.round((closedDeals / deals.length) * 100) : 0
-
-	return {
-		totalContacts: contacts.length,
-		pipelineValue,
-		avgDealValue,
-		conversionRate,
-		contactGrowth: 12.4,
-		recentActivities,
-		upcomingEvents: []
 	}
 }
 
@@ -493,14 +479,6 @@ const sampleEvents: ScheduledEvent[] = [
 export default function CRMDashboard() {
 	const navigate = useNavigate()
 	const contacts = useSelector((state: RootState) => state.contacts.contacts)
-
-	// Mock deals data - in production, this would come from the Pipeline page
-	const [deals] = useState<any[]>([
-		{ id: '1', value: 20000, stage: 'lead' },
-		{ id: '2', value: 12000, stage: 'contact' },
-		{ id: '3', value: 35000, stage: 'negotiation' },
-		{ id: '4', value: 4000, stage: 'closed' }
-	])
 
 	const [scheduledEvents, setScheduledEvents] = useState<ScheduledEvent[]>([])
 	const [currentDate, setCurrentDate] = useState(new Date())

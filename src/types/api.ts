@@ -1,4 +1,4 @@
-import { Incident } from './incidents'
+import { Incident, IncidentStats } from './incidents'
 
 export interface ApiResponse<T> {
   data: T
@@ -22,6 +22,11 @@ export interface PaginatedResponse<T> extends ApiResponse<T> {
 
 export interface IncidentResponse extends ApiResponse<Incident> {}
 export interface IncidentsResponse extends PaginatedResponse<Incident[]> {}
+export interface IncidentStatsResponse extends ApiResponse<IncidentStats & {
+	totalAmountRecovered?: number
+	totalAmountLost?: number
+	totalStolenValue?: number
+}> {}
 
 // Query parameters for incidents
 export interface GetIncidentsParams {

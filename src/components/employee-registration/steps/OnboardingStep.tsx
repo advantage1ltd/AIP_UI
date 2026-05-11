@@ -9,6 +9,7 @@ interface OnboardingStepProps {
   onBack: () => void
 }
 
+// === Component ===
 export function OnboardingStep({ onSubmit, onBack }: OnboardingStepProps) {
   return (
     <div className="space-y-6">

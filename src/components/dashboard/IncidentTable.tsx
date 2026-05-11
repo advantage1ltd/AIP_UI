@@ -1,8 +1,59 @@
-import { useState, useMemo } from 'react'
+/**
+ * Recent incidents table on the dashboard.
+ * Flow: dashboard incident rows → client search/pagination → recovered vs loss display helpers.
+ */
+import { useState, useMemo, useEffect } from 'react'
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
+import { formatDateSafe } from '@/components/operations/incident-form/incidentFormConstants'
+
+const INCIDENT_TABLE_DATE_FORMAT = 'dd/MM/yyyy'
+const INCIDENT_TABLE_TIME_FORMAT = 'HH:mm'
+
+const IncidentDateTimeDisplay = ({
+	dateSource,
+	timeOfIncident,
+}: {
+	dateSource: string
+	timeOfIncident?: string
+}) => {
+	if (!dateSource) {
+		return <>N/A</>
+	}
+
+	const dateLabel = formatDateSafe(dateSource, INCIDENT_TABLE_DATE_FORMAT)
+	const timeSource = timeOfIncident?.trim()
+
+	if (timeSource) {
+		const normalizedTime = timeSource.length === 5 ? `${timeSource}:00` : timeSource
+		const combined = new Date(`${dateSource}T${normalizedTime}`)
+		const timeLabel = !Number.isNaN(combined.getTime())
+			? formatDateSafe(combined, INCIDENT_TABLE_TIME_FORMAT)
+			: timeSource
+
+		return (
+			<span>
+				{dateLabel}{' '}
+				<span className="font-semibold text-blue-600 dark:text-blue-400">{timeLabel}</span>
+			</span>
+		)
+	}
+
+	if (/T\d{2}:\d{2}/.test(dateSource)) {
+		return (
+			<span>
+				{dateLabel}{' '}
+				<span className="font-semibold text-blue-600 dark:text-blue-400">
+					{formatDateSafe(dateSource, INCIDENT_TABLE_TIME_FORMAT)}
+				</span>
+			</span>
+		)
+	}
+
+	return <>{dateLabel}</>
+}
 
 interface IncidentReport {
   id: string
@@ -11,23 +62,39 @@ interface IncidentReport {
   siteName?: string // Add siteName as alternative to store
   officerName: string
   date: string
+  timeOfIncident?: string
   amount: number
+  recoveredAmount?: number
+  lossAmount?: number
   incidentType: string
 }
 
 interface DataTableProps {
-  data: IncidentReport[]
+  data?: IncidentReport[]
+  incidents?: IncidentReport[]
+  title?: string
 }
 
 const ITEMS_PER_PAGE = 5
 
-export function IncidentTable({ data }: DataTableProps) {
+// === Component ===
+export function IncidentTable({ data, incidents }: DataTableProps) {
+  const tableData = useMemo(() => {
+    if (Array.isArray(data)) return data
+    if (Array.isArray(incidents)) return incidents
+    return []
+  }, [data, incidents])
+
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [sortConfig, setSortConfig] = useState<{
     key: keyof IncidentReport | null
     direction: 'asc' | 'desc'
   }>({ key: null, direction: 'asc' })
+  const hasRecoveryAndLossColumns = useMemo(
+    () => tableData.some(item => typeof item.recoveredAmount === 'number' || typeof item.lossAmount === 'number'),
+    [tableData]
+  )
 
   const sortData = (key: keyof IncidentReport) => {
     const direction = sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc'
@@ -37,17 +104,11 @@ export function IncidentTable({ data }: DataTableProps) {
   }
 
   const filteredAndSortedData = useMemo(() => {
-    let processed = [...data]
-
-    // Debug logging
-    console.log('🔍 IncidentTable - Data received:', data)
-    console.log('🔍 IncidentTable - Data length:', data?.length || 0)
-    console.log('🔍 IncidentTable - First item structure:', data?.[0])
+    let processed = [...tableData]
 
     // If data is empty, return empty array
-    if (!data || data.length === 0) {
-      console.log('❌ IncidentTable - No data provided')
-      return [];
+    if (tableData.length === 0) {
+      return []
     }
 
     // Filter
@@ -59,13 +120,13 @@ export function IncidentTable({ data }: DataTableProps) {
           item.store?.toLowerCase().includes(query) ||
           item.siteName?.toLowerCase().includes(query) ||
           item.officerName.toLowerCase().includes(query) ||
-          new Date(item.date).toLocaleDateString().toLowerCase().includes(query) ||
+          new Date(item.date).toLocaleString().toLowerCase().includes(query) ||
+          item.timeOfIncident?.toLowerCase().includes(query) ||
           item.amount.toString().includes(query) ||
+          (item.recoveredAmount ?? 0).toString().includes(query) ||
+          (item.lossAmount ?? 0).toString().includes(query) ||
           item.incidentType.toLowerCase().includes(query)
       )
-      console.log('🔍 IncidentTable - After filtering:', processed.length)
-      // Reset to first page when filtering
-      setCurrentPage(1)
     }
 
     // Sort
@@ -99,9 +160,8 @@ export function IncidentTable({ data }: DataTableProps) {
       })
     }
 
-    console.log('🔍 IncidentTable - Final processed data:', processed.length)
     return processed
-  }, [data, searchQuery, sortConfig])
+  }, [tableData, searchQuery, sortConfig])
 
   // Reset current page when search changes
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,10 +170,15 @@ export function IncidentTable({ data }: DataTableProps) {
   }
 
   // Pagination calculations
-  const totalPages = Math.ceil(filteredAndSortedData.length / ITEMS_PER_PAGE)
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedData.length / ITEMS_PER_PAGE))
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const endIndex = startIndex + ITEMS_PER_PAGE
   const currentPageData = filteredAndSortedData.slice(startIndex, endIndex)
+
+  // Keep current page in a valid range when data size changes.
+  useEffect(() => {
+    setCurrentPage((prevPage) => Math.min(Math.max(1, prevPage), totalPages))
+  }, [totalPages])
 
   const goToPage = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)))
@@ -128,8 +193,6 @@ export function IncidentTable({ data }: DataTableProps) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })}`
-
-  const formatDate = (date: string) => new Date(date).toLocaleDateString()
 
   return (
     <div>
@@ -152,11 +215,6 @@ export function IncidentTable({ data }: DataTableProps) {
 
       {/* Mobile Cards */}
       <div className="space-y-3 md:hidden">
-        {filteredAndSortedData.length === 0 && data.length > 0 && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-            Data available but filtered out: {data.length} records found
-          </div>
-        )}
         {currentPageData.length > 0 ? (
           currentPageData.map((report) => (
             <div key={report.id} className="rounded-lg border bg-white p-3 shadow-sm">
@@ -166,9 +224,25 @@ export function IncidentTable({ data }: DataTableProps) {
                   {report.store || report.siteName || '—'}
                 </div>
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="font-semibold text-emerald-600">{formatAmount(report.amount)}</span>
+                  {hasRecoveryAndLossColumns ? (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-semibold text-emerald-600">
+                        Rec {formatAmount(report.recoveredAmount ?? 0)}
+                      </span>
+                      <span className="font-semibold text-rose-600">
+                        Loss {formatAmount(report.lossAmount ?? 0)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="font-semibold text-emerald-600">{formatAmount(report.amount)}</span>
+                  )}
                   <span className="text-slate-400">•</span>
-                  <span className="text-slate-500">{formatDate(report.date)}</span>
+                  <span className="text-slate-500">
+                    <IncidentDateTimeDisplay
+                      dateSource={report.date}
+                      timeOfIncident={report.timeOfIncident}
+                    />
+                  </span>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
@@ -183,7 +257,7 @@ export function IncidentTable({ data }: DataTableProps) {
           ))
         ) : (
           <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-500">
-            No results found. Data length: {data.length}
+            No results found.
           </div>
         )}
       </div>
@@ -225,14 +299,25 @@ export function IncidentTable({ data }: DataTableProps) {
                   Incident Date {getSortIcon('date')}
                 </div>
               </th>
-              <th 
-                className="h-10 px-2 text-right align-middle font-semibold tracking-tight text-muted-foreground cursor-pointer hover:bg-muted/70 md:h-12 md:px-4"
-                onClick={() => sortData('amount')}
-              >
-                <div className="flex items-center justify-end gap-1">
-                  Total Amount {getSortIcon('amount')}
-                </div>
-              </th>
+              {hasRecoveryAndLossColumns ? (
+                <th 
+                  className="h-10 px-2 text-right align-middle font-semibold tracking-tight text-muted-foreground cursor-pointer hover:bg-muted/70 md:h-12 md:px-4"
+                  onClick={() => sortData('recoveredAmount')}
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Financials {getSortIcon('recoveredAmount')}
+                  </div>
+                </th>
+              ) : (
+                <th 
+                  className="h-10 px-2 text-right align-middle font-semibold tracking-tight text-muted-foreground cursor-pointer hover:bg-muted/70 md:h-12 md:px-4"
+                  onClick={() => sortData('amount')}
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Total Amount {getSortIcon('amount')}
+                  </div>
+                </th>
+              )}
               <th 
                 className="h-10 px-2 text-left align-middle font-semibold tracking-tight text-muted-foreground cursor-pointer hover:bg-muted/70 md:h-12 md:px-4"
                 onClick={() => sortData('incidentType')}
@@ -244,14 +329,6 @@ export function IncidentTable({ data }: DataTableProps) {
             </tr>
           </thead>
           <tbody className="tracking-normal">
-            {filteredAndSortedData.length === 0 && data.length > 0 && (
-              <tr>
-                <td colSpan={6} className="h-12 text-center text-sm text-amber-600">
-                  Data available but filtered out: {data.length} records found
-                </td>
-              </tr>
-            )}
-            
             {currentPageData.length > 0 ? (
               currentPageData.map((report) => (
                 <tr key={report.id} className="border-b transition-colors hover:bg-muted/50">
@@ -259,18 +336,34 @@ export function IncidentTable({ data }: DataTableProps) {
                   <td className="p-2 align-middle text-muted-foreground leading-relaxed md:p-4">{report.store || report.siteName}</td>
                   <td className="p-2 align-middle text-muted-foreground leading-relaxed md:p-4">{report.officerName}</td>
                   <td className="p-2 align-middle text-muted-foreground tabular-nums leading-relaxed md:p-4">
-                    {formatDate(report.date)}
+                    <IncidentDateTimeDisplay
+                      dateSource={report.date}
+                      timeOfIncident={report.timeOfIncident}
+                    />
                   </td>
-                  <td className="p-2 align-middle text-right font-medium tabular-nums leading-relaxed text-green-600 dark:text-green-400 md:p-4">
-                    {formatAmount(report.amount)}
-                  </td>
+                  {hasRecoveryAndLossColumns ? (
+                    <td className="p-2 align-middle text-right font-medium tabular-nums leading-relaxed md:p-4">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-emerald-600 dark:text-emerald-400">
+                          Rec {formatAmount(report.recoveredAmount ?? 0)}
+                        </span>
+                        <span className="text-rose-600 dark:text-rose-400">
+                          Loss {formatAmount(report.lossAmount ?? 0)}
+                        </span>
+                      </div>
+                    </td>
+                  ) : (
+                    <td className="p-2 align-middle text-right font-medium tabular-nums leading-relaxed text-green-600 dark:text-green-400 md:p-4">
+                      {formatAmount(report.amount)}
+                    </td>
+                  )}
                   <td className="p-2 align-middle text-muted-foreground leading-relaxed md:p-4">{report.incidentType}</td>
                 </tr>
               ))
             ) : (
               <tr>
                 <td colSpan={6} className="h-24 text-center text-sm text-muted-foreground">
-                  No results found. Data length: {data.length}
+                  No results found.
                 </td>
               </tr>
             )}
@@ -279,8 +372,8 @@ export function IncidentTable({ data }: DataTableProps) {
       </div>
 
       {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
+      {filteredAndSortedData.length > ITEMS_PER_PAGE && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-4">
           <div className="text-xs md:text-sm text-muted-foreground">
             Page {currentPage} of {totalPages}
           </div>
@@ -298,7 +391,7 @@ export function IncidentTable({ data }: DataTableProps) {
             </Button>
             
             {/* Page numbers */}
-            <div className="flex items-center gap-1">
+            <div className="hidden sm:flex items-center gap-1">
               {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                 let pageNumber: number;
                 
@@ -327,6 +420,9 @@ export function IncidentTable({ data }: DataTableProps) {
                 );
               })}
             </div>
+            <span className="sm:hidden text-xs text-muted-foreground min-w-[72px] text-center">
+              {currentPage} / {totalPages}
+            </span>
             
             <Button
               variant="outline"

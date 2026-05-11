@@ -1,3 +1,7 @@
+/**
+ * User create/edit form for UserDialog.
+ * Flow: role selection drives employee link vs customer assignments → DualListBox access → parent onSubmit.
+ */
 import React, { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,13 +14,13 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { DualListBox } from './DualListBox';
+import { EmployeeCombobox } from './EmployeeCombobox';
 import {
   CreateUserInput,
   UpdateUserInput,
   User,
   UserRole,
   CustomerUser,
-  AdvantageOneUser,
 } from '@/types/user';
 import { useAvailableCustomers } from '@/hooks/useAvailableCustomers';
 import { Users, Eye, EyeOff, Building2, Lock, FileText, Shield, Briefcase, ChevronRight, ChevronLeft, AlertTriangle, Loader2 } from 'lucide-react';
@@ -26,6 +30,8 @@ import { employeeService } from '@/services/employeeService';
 import { userService } from '@/services/userService';
 import { Employee } from '@/types/employee';
 import { toast } from 'sonner';
+import { roleDisplayName } from '@/utils/roles';
+import { logger } from '@/utils/logger';
 
 interface UserFormProps {
   initialData?: User;
@@ -33,24 +39,19 @@ interface UserFormProps {
   onCancel: () => void;
 }
 
-const USER_ROLES: UserRole[] = [
-  'advantageoneofficer',
-  'advantageonehoofficer',
-  'administrator',
-  'customersitemanager',
-  'customerhomanager',
-];
+const USER_ROLES: UserRole[] = ['administrator', 'manager', 'securityofficer', 'customer'];
+
+const isCustomerTenantRole = (role: UserRole): role is 'customer' => role === 'customer';
+
+/** Administrator, manager, security officer: employee link + optional multi-customer assignments. */
+const usesStaffEmployeeSection = (role: UserRole): boolean => !isCustomerTenantRole(role);
+
+/** Placeholder items so Radix Select stays controlled (value always matches a SelectItem). */
+const SELECT_UNSET_CUSTOMER = '__unset_customer__';
 
 // Helper to format role for display (PascalCase)
 const formatRoleForDisplay = (role: UserRole): string => {
-  const roleMap: Record<UserRole, string> = {
-    'administrator': 'Administrator',
-    'advantageoneofficer': 'AdvantageOneOfficer',
-    'advantageonehoofficer': 'AdvantageOneHOOfficer',
-    'customersitemanager': 'CustomerSiteManager',
-    'customerhomanager': 'CustomerHOManager'
-  };
-  return roleMap[role] || role;
+  return roleDisplayName(role);
 };
 
 type FormState = {
@@ -68,8 +69,8 @@ type FormState = {
   recordIsDeleted?: boolean;
   employeeId?: number;
 } & (
-  | { role: 'customersitemanager' | 'customerhomanager' }
-  | { role: 'advantageoneofficer' | 'advantageonehoofficer' | 'administrator'; assignedCustomerIds: number[] }
+  | { role: 'customer' }
+  | { role: Exclude<UserRole, 'customer'>; assignedCustomerIds: number[] }
 );
 
 export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => {
@@ -78,27 +79,27 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
   // Debug logging for initialData
   useEffect(() => {
     if (initialData) {
-      console.log('🔍 [UserForm] Initial data received:', {
+      logger.debug('🔍 [UserForm] Initial data received:', {
         id: initialData.id,
         username: initialData.username,
         employeeId: (initialData as any).employeeId,
         employeeName: (initialData as any).employeeName,
         role: initialData.role
       });
-      console.log('🔍 [UserForm] Full initialData object:', initialData);
-      console.log('🔍 [UserForm] EmployeeId from initialData:', (initialData as any).employeeId);
-      console.log('🔍 [UserForm] EmployeeName from initialData:', (initialData as any).employeeName);
+      logger.debug('🔍 [UserForm] Full initialData object:', initialData);
+      logger.debug('🔍 [UserForm] EmployeeId from initialData:', (initialData as any).employeeId);
+      logger.debug('🔍 [UserForm] EmployeeName from initialData:', (initialData as any).employeeName);
       
       // Debug customer assignments
       if ('assignedCustomerIds' in initialData) {
-        console.log('🔍 [UserForm] AssignedCustomerIds:', initialData.assignedCustomerIds);
-        console.log('🔍 [UserForm] AssignedCustomerIds type:', typeof initialData.assignedCustomerIds);
-        console.log('🔍 [UserForm] AssignedCustomerIds length:', Array.isArray(initialData.assignedCustomerIds) ? initialData.assignedCustomerIds.length : 'Not an array');
+        logger.debug('🔍 [UserForm] AssignedCustomerIds:', initialData.assignedCustomerIds);
+        logger.debug('🔍 [UserForm] AssignedCustomerIds type:', typeof initialData.assignedCustomerIds);
+        logger.debug('🔍 [UserForm] AssignedCustomerIds length:', Array.isArray(initialData.assignedCustomerIds) ? initialData.assignedCustomerIds.length : 'Not an array');
       }
       
       // Debug customerId for customer users
-      if (initialData.role === 'customersitemanager' || initialData.role === 'customerhomanager') {
-        console.log('🔍 [UserForm] CustomerId from initialData:', (initialData as CustomerUser)?.customerId);
+      if (initialData.role === 'customer') {
+        logger.debug('🔍 [UserForm] CustomerId from initialData:', (initialData as CustomerUser)?.customerId);
       }
     }
   }, [initialData]);
@@ -112,7 +113,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
         const parsed = JSON.parse(customerIds);
         return Array.isArray(parsed) ? parsed : [];
       } catch (error) {
-        console.error('Error parsing assignedCustomerIds:', error);
+        logger.error('Error parsing assignedCustomerIds:', error);
         return [];
       }
     }
@@ -126,8 +127,8 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
       username: initialData?.username || '',
       email: initialData?.email || '',
       password: '',
-      role: initialData?.role || USER_ROLES[0],
-      pageAccessRole: initialData?.pageAccessRole || USER_ROLES[0],
+      role: initialData?.role || USER_ROLES[2],
+      pageAccessRole: initialData?.pageAccessRole || USER_ROLES[2],
       signature: initialData?.signature || '',
       signatureCode: initialData?.signatureCode || '',
       jobTitle: initialData?.jobTitle || '',
@@ -136,31 +137,31 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
       employeeId: (initialData as any)?.employeeId ?? undefined,
     };
 
-    console.log('🔍 [UserForm] Form data initialization:', {
+    logger.debug('🔍 [UserForm] Form data initialization:', {
       initialDataEmployeeId: (initialData as any)?.employeeId,
       baseDataEmployeeId: baseData.employeeId,
       fullBaseData: baseData
     });
 
-    if (initialData?.role === 'customersitemanager' || initialData?.role === 'customerhomanager') {
+    if (initialData?.role === 'customer') {
       return {
         ...baseData,
-        role: initialData.role,
+        role: 'customer',
         customerId: (initialData as CustomerUser)?.customerId ?? undefined,
       } as FormState;
-    } else {
-      const assignedCustomerIds = initialData && 'assignedCustomerIds' in initialData 
-        ? parseAssignedCustomerIds(initialData.assignedCustomerIds)
-        : [];
-      
-      console.log('🔍 [UserForm] Parsed assignedCustomerIds:', assignedCustomerIds);
-      
-      return {
-        ...baseData,
-        role: (initialData?.role as 'advantageoneofficer' | 'advantageonehoofficer' | 'administrator') || 'advantageoneofficer',
-        assignedCustomerIds,
-      } as FormState;
     }
+
+    const assignedCustomerIds = initialData && 'assignedCustomerIds' in initialData
+      ? parseAssignedCustomerIds(initialData.assignedCustomerIds)
+      : [];
+
+    logger.debug('🔍 [UserForm] Parsed assignedCustomerIds:', assignedCustomerIds);
+
+    return {
+      ...baseData,
+      role: (initialData?.role ?? USER_ROLES[2]) as Exclude<UserRole, 'customer'>,
+      assignedCustomerIds,
+    } as FormState;
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -168,7 +169,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
   const [loadingEmployees, setLoadingEmployees] = useState(false);
 
   useEffect(() => {
-    const shouldLoad = formData.role !== 'customersitemanager' && formData.role !== 'customerhomanager';
+    const shouldLoad = usesStaffEmployeeSection(formData.role);
     if (!shouldLoad) {
       setEmployees([]);
       return;
@@ -182,16 +183,16 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
         if (initialData) {
           // When editing, get all active employees
           const allEmployees = await employeeService.getActiveEmployees();
-          console.log('🔍 [UserForm] Loaded all employees for editing:', allEmployees);
+          logger.debug('🔍 [UserForm] Loaded all employees for editing:', allEmployees);
           setEmployees(allEmployees);
         } else {
           // When creating, get only unlinked employees
           const unlinked = await userService.getUnlinkedEmployees();
-          console.log('🔍 [UserForm] Loaded unlinked employees for creating:', unlinked);
+          logger.debug('🔍 [UserForm] Loaded unlinked employees for creating:', unlinked);
           setEmployees(unlinked);
         }
       } catch (err) {
-        console.error('Error loading employees for UserForm:', err);
+        logger.error('Error loading employees for UserForm:', err);
         setEmployees([]);
       } finally {
         setLoadingEmployees(false);
@@ -328,62 +329,114 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
   const handleSelectChange = (name: string, value: string) => {
     if (name === 'role') {
       const role = value as UserRole;
-      const isCustomerRole = role === 'customersitemanager' || role === 'customerhomanager';
-      
-      if (isCustomerRole) {
-        setFormData({
-          ...formData,
+
+      setFormData((prev) => {
+        const nextTenant = isCustomerTenantRole(role);
+        const prevTenant = isCustomerTenantRole(prev.role);
+        const nextStaff = usesStaffEmployeeSection(role);
+        const prevStaff = usesStaffEmployeeSection(prev.role);
+
+        if (nextTenant) {
+          const next = {
+            ...prev,
+            role,
+            pageAccessRole: role,
+            employeeId: undefined,
+            assignedCustomerIds: undefined,
+          } as FormState & { assignedCustomerIds?: number[] };
+          delete next.assignedCustomerIds;
+          return {
+            ...next,
+            customerId: undefined,
+          } as FormState;
+        }
+
+        const assignedIds =
+          'assignedCustomerIds' in prev ? [...prev.assignedCustomerIds] : [];
+
+        if (prevTenant) {
+          return {
+            ...prev,
+            role,
+            pageAccessRole: role,
+            employeeId: undefined,
+            customerId: undefined,
+            assignedCustomerIds: [],
+          } as FormState;
+        }
+
+        if (!prevStaff && nextStaff) {
+          return {
+            ...prev,
+            role,
+            pageAccessRole: role,
+            employeeId: undefined,
+            assignedCustomerIds: [],
+          } as FormState;
+        }
+
+        return {
+          ...prev,
           role,
           pageAccessRole: role,
-          employeeId: undefined,
-          customerId: undefined,
-        } as FormState);
-      } else {
-        setFormData({
-          ...formData,
-          role,
-          pageAccessRole: role,
-          assignedCustomerIds: [],
-          employeeId: undefined,
-        } as FormState);
-      }
+          assignedCustomerIds: assignedIds,
+        } as FormState;
+      });
     } else if (name === 'customerId') {
       setFormData(prev => ({ ...prev, customerId: value ? parseInt(value) : undefined }));
     }
   };
 
-  const isCustomerRole = formData.role === 'customersitemanager' || formData.role === 'customerhomanager';
+  const isCustomerRole = formData.role === 'customer';
+
+  const staffEmployeeSection = usesStaffEmployeeSection(formData.role);
+
+  const roleSelectValue = USER_ROLES.includes(formData.role as UserRole)
+    ? formData.role
+    : USER_ROLES[2];
+
+  const customerSelectValue = useMemo(() => {
+    if (isLoading) return 'loading';
+    if (availableCustomers.length === 0) return 'no-customers';
+    if (
+      formData.customerId != null &&
+      availableCustomers.some((c) => c.id === formData.customerId)
+    ) {
+      return String(formData.customerId);
+    }
+    return SELECT_UNSET_CUSTOMER;
+  }, [isLoading, availableCustomers, formData.customerId]);
 
   // Debug logging for customerId changes
   useEffect(() => {
     if (isCustomerRole) {
-      console.log('🔍 [UserForm] CustomerId in formData:', formData.customerId);
-      console.log('🔍 [UserForm] Available customers count:', availableCustomers.length);
+      logger.debug('🔍 [UserForm] CustomerId in formData:', formData.customerId);
+      logger.debug('🔍 [UserForm] Available customers count:', availableCustomers.length);
       if (formData.customerId) {
         const selectedCustomer = availableCustomers.find(c => c.id === formData.customerId);
-        console.log('🔍 [UserForm] Selected customer:', selectedCustomer?.name || 'Not found');
+        logger.debug('🔍 [UserForm] Selected customer:', selectedCustomer?.name || 'Not found');
       }
     }
   }, [formData.customerId, isCustomerRole, availableCustomers]);
 
   // Debug logging for employee dropdown
   useEffect(() => {
-    if (!isCustomerRole) {
-      console.log('🔍 [UserForm] Employee dropdown debug:', {
+    if (staffEmployeeSection) {
+      logger.debug('🔍 [UserForm] Employee dropdown debug:', {
         formDataEmployeeId: formData.employeeId,
-        dropdownValue: formData.employeeId ? String(formData.employeeId) : '',
         employeesCount: employees.length,
         employees: employees.map(emp => ({ id: emp.id, name: `${emp.firstName} ${emp.surname}` })),
         hasMatchingEmployee: employees.some(emp => emp.id === formData.employeeId)
       });
     }
-  }, [formData.employeeId, employees, isCustomerRole]);
+  }, [formData.employeeId, employees, staffEmployeeSection]);
 
+  // Staff roles require employee linkage; customer role uses tenant customer selection instead.
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate employee requirement for non-customer users
-    if (!isCustomerRole && !formData.employeeId) {
+    // Validate employee requirement for staff-linked roles
+    if (staffEmployeeSection && !formData.employeeId) {
       toast.error('Employee selection is required for non-customer users');
       return;
     }
@@ -394,7 +447,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
       return;
     }
     
-    console.log('🔄 [UserForm] Form submission started', {
+    logger.debug('🔄 [UserForm] Form submission started', {
       isEdit: !!initialData,
       userId: initialData?.id,
       formData: {
@@ -426,9 +479,9 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
           (updateData as any).customerId = null;
         }
         
-        console.log('🔄 [UserForm] Submitting update data', updateData);
-        console.log('🔄 [UserForm] CustomerId in update data:', (updateData as any).customerId);
-        console.log('🔄 [UserForm] Is customer role:', isCustomerRole);
+        logger.debug('🔄 [UserForm] Submitting update data', updateData);
+        logger.debug('🔄 [UserForm] CustomerId in update data:', (updateData as any).customerId);
+        logger.debug('🔄 [UserForm] Is customer role:', isCustomerRole);
         onSubmit(updateData);
       } else {
         const createData = {
@@ -436,13 +489,13 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
           confirmPassword: formData.password || '',
         } as CreateUserInput & { employeeId?: number; customerId?: number };
         
-        console.log('🔄 [UserForm] Submitting create data', createData);
+        logger.debug('🔄 [UserForm] Submitting create data', createData);
         onSubmit(createData);
       }
       
-      console.log('✅ [UserForm] Form submission completed successfully');
+      logger.debug('✅ [UserForm] Form submission completed successfully');
     } catch (error) {
-      console.error('❌ [UserForm] Form submission failed:', error);
+      logger.error('❌ [UserForm] Form submission failed:', error);
     }
   };
 
@@ -527,7 +580,7 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
           <div>
             <Label htmlFor="role">Role</Label>
             <Select
-              value={formData.role}
+              value={roleSelectValue}
               onValueChange={(value) => handleSelectChange('role', value)}
             >
               <SelectTrigger>
@@ -543,51 +596,30 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
             </Select>
           </div>
 
-                     {/* Employee Selection for non-customer roles */}
-           {!isCustomerRole && (
+                     {/* Employee Selection for staff-linked roles */}
+           {staffEmployeeSection && (
              <div className="md:col-span-2">
                <Label htmlFor="employeeId" className={!formData.employeeId ? 'text-red-600' : ''}>
                  Select Employee *
                </Label>
-               <Select
-                 value={formData.employeeId ? String(formData.employeeId) : ''}
-                 onValueChange={(value) => setFormData(prev => ({ ...prev, employeeId: value ? parseInt(value) : undefined }))}
-                 required
-               >
-                 <SelectTrigger className={!formData.employeeId ? 'border-red-500' : ''}>
-                   <SelectValue placeholder={loadingEmployees ? 'Loading employees...' : 'Select an employee'} />
-                 </SelectTrigger>
-                 <SelectContent>
-                   {loadingEmployees ? (
-                     <SelectItem value="loading" disabled>
-                       <div className="flex items-center gap-2">
-                         <Loader2 className="h-4 w-4 animate-spin" />
-                         Loading employees...
-                       </div>
-                     </SelectItem>
-                   ) : employees.length === 0 ? (
-                     <SelectItem value="no-employees" disabled>
-                       <div className="flex items-center gap-2">
-                         <AlertTriangle className="h-4 w-4" />
-                         No employees available
-                       </div>
-                     </SelectItem>
-                   ) : (
-                     employees.map(emp => (
-                       <SelectItem key={emp.id} value={String(emp.id)}>
-                         {emp.firstName} {emp.surname}
-                       </SelectItem>
-                     ))
-                   )}
-                 </SelectContent>
-               </Select>
+               <EmployeeCombobox
+                 id="employeeId"
+                 employees={employees}
+                 loading={loadingEmployees}
+                 value={formData.employeeId}
+                 fallbackLabel={(initialData as { employeeName?: string })?.employeeName}
+                 onChange={(employeeId) =>
+                   setFormData((prev) => ({ ...prev, employeeId }))
+                 }
+                 invalid={!formData.employeeId}
+               />
              </div>
            )}
         </CardContent>
       </Card>
 
-      {/* Customer Assignment Section - Only for Advantage One roles */}
-      {!isCustomerRole && (
+      {/* Customer Assignment Section - staff-linked roles */}
+      {staffEmployeeSection && (
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -642,8 +674,15 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
                 Customer *
               </Label>
               <Select
-                value={formData.customerId ? String(formData.customerId) : ''}
-                onValueChange={(value) => handleSelectChange('customerId', value)}
+                value={customerSelectValue}
+                onValueChange={(value) => {
+                  if (value === 'loading' || value === 'no-customers') return;
+                  if (value === SELECT_UNSET_CUSTOMER) {
+                    setFormData((prev) => ({ ...prev, customerId: undefined }));
+                    return;
+                  }
+                  handleSelectChange('customerId', value);
+                }}
                 required
               >
                 <SelectTrigger className={!formData.customerId ? 'border-red-500' : ''}>
@@ -665,11 +704,16 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
                       </div>
                     </SelectItem>
                   ) : (
-                    availableCustomers.map((customer) => (
-                      <SelectItem key={customer.id} value={String(customer.id)}>
-                        {customer.name}
+                    <>
+                      <SelectItem value={SELECT_UNSET_CUSTOMER} disabled>
+                        Select customer
                       </SelectItem>
-                    ))
+                      {availableCustomers.map((customer) => (
+                        <SelectItem key={customer.id} value={String(customer.id)}>
+                          {customer.name}
+                        </SelectItem>
+                      ))}
+                    </>
                   )}
                 </SelectContent>
               </Select>
@@ -709,11 +753,11 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
           Cancel
         </Button>
-        <Button type="submit">
+        <Button type="submit" className="w-full sm:w-auto">
           {initialData ? 'Update' : 'Create'} User
         </Button>
       </div>

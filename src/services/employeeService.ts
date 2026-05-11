@@ -1,4 +1,9 @@
+/**
+ * Employee registration and roster API (`/Employee` routes via EMPLOYEE_ENDPOINTS).
+ * Flow: UI Employee model → employeeMapper → EMPLOYEE_ENDPOINTS create/update/list.
+ */
 import { isAxiosError } from 'axios'
+import { logger } from '@/utils/logger'
 import { api, EMPLOYEE_ENDPOINTS, ApiResponse, handleApiError } from '@/config/api'
 import { Employee } from '@/types/employee'
 import { mapToBackendRequest, mapFromBackendResponse, mapFromBackendResponseArray, mapFromListResponseArray, mapToBackendUpdateRequest } from '@/utils/employeeMapper'
@@ -15,7 +20,6 @@ export interface EmployeeRegistrationRequest {
   EmploymentType: string
   
   // Optional fields
-  AipAccessLevel?: string
   Region?: string
   Email?: string
   ContactNumber?: string
@@ -77,7 +81,6 @@ export interface EmployeeDetailResponse {
   position: string
   employeeStatus?: string
   employmentType?: string
-  aipAccessLevel?: string
   region?: string
   email?: string
   contactNumber?: string
@@ -139,23 +142,23 @@ class EmployeeService {
    * Register a new employee
    */
   async registerEmployee(data: EmployeeRegistrationRequest): Promise<EmployeeRegistrationResponse> {
-    console.log('🚀 [EmployeeService] Starting employee registration...')
-    console.log('📤 [EmployeeService] Request data:', JSON.stringify(data, null, 2))
-    console.log('🌐 [EmployeeService] Endpoint:', EMPLOYEE_ENDPOINTS.REGISTER)
+    logger.debug('🚀 [EmployeeService] Starting employee registration...')
+    logger.debug('📤 [EmployeeService] Request data:', JSON.stringify(data, null, 2))
+    logger.debug('🌐 [EmployeeService] Endpoint:', EMPLOYEE_ENDPOINTS.REGISTER)
     
     try {
-      console.log('📡 [EmployeeService] Making API request...')
+      logger.debug('📡 [EmployeeService] Making API request...')
       const response = await api.post<ApiResponse<EmployeeRegistrationResponse>>(
         EMPLOYEE_ENDPOINTS.REGISTER,
         data
       )
-      console.log('✅ [EmployeeService] API response received:', response.data)
-      console.log('📥 [EmployeeService] Response data:', response.data.data)
+      logger.debug('✅ [EmployeeService] API response received:', response.data)
+      logger.debug('📥 [EmployeeService] Response data:', response.data.data)
       return response.data.data
     } catch (error: unknown) {
-      console.error('❌ [EmployeeService] Registration failed:', error)
+      logger.error('❌ [EmployeeService] Registration failed:', error)
       if (isAxiosError(error)) {
-        console.error('❌ [EmployeeService] Axios error details:', {
+        logger.error('❌ [EmployeeService] Axios error details:', {
           message: error.message,
           status: error.response?.status,
           responseData: error.response?.data,
@@ -169,20 +172,20 @@ class EmployeeService {
    * Register a new employee using frontend Employee interface
    */
   async registerEmployeeFromFrontend(employee: Partial<Employee>): Promise<EmployeeRegistrationResponse> {
-    console.log('🚀 [EmployeeService] Starting employee registration from frontend data...')
-    console.log('📤 [EmployeeService] Frontend data:', employee)
+    logger.debug('🚀 [EmployeeService] Starting employee registration from frontend data...')
+    logger.debug('📤 [EmployeeService] Frontend data:', employee)
     
     // Check for required fields before mapping
     const requiredFields = ['employeeNumber', 'title', 'firstName', 'surname', 'startDate', 'position', 'employeeStatus', 'employmentType']
     const missingFields = requiredFields.filter(field => !employee[field as keyof Employee])
     
     if (missingFields.length > 0) {
-      console.error('❌ [EmployeeService] Missing required fields:', missingFields)
+      logger.error('❌ [EmployeeService] Missing required fields:', missingFields)
       throw new Error(`Missing required fields: ${missingFields.join(', ')}`)
     }
     
     const backendRequest = mapToBackendRequest(employee)
-    console.log('🔄 [EmployeeService] Mapped to backend request:', backendRequest)
+    logger.debug('🔄 [EmployeeService] Mapped to backend request:', backendRequest)
     
     return this.registerEmployee(backendRequest)
   }
@@ -214,7 +217,7 @@ class EmployeeService {
         pageSize: response.data.data.pageSize
       }
     } catch (error) {
-      console.error('❌ [EmployeeService] Failed to fetch employees:', error)
+      logger.error('❌ [EmployeeService] Failed to fetch employees:', error)
       throw new Error(handleApiError(error))
     }
   }
@@ -249,7 +252,7 @@ class EmployeeService {
       )
       return mapFromListResponseArray(response.data.data)
     } catch (error) {
-      console.error('❌ [EmployeeService] Failed to fetch active employees:', error)
+      logger.error('❌ [EmployeeService] Failed to fetch active employees:', error)
       throw new Error(handleApiError(error))
     }
   }
@@ -282,7 +285,7 @@ class EmployeeService {
   async updateEmployee(id: number, data: Partial<Employee>): Promise<EmployeeDetailResponse> {
     try {
       const updateRequest = mapToBackendUpdateRequest(data)
-      console.log('🔄 [EmployeeService] Update request data:', updateRequest)
+      logger.debug('🔄 [EmployeeService] Update request data:', updateRequest)
       
       const response = await api.put<ApiResponse<EmployeeDetailResponse>>(
         EMPLOYEE_ENDPOINTS.UPDATE(id.toString()),
@@ -290,7 +293,7 @@ class EmployeeService {
       )
       return response.data.data
     } catch (error) {
-      console.error('❌ [EmployeeService] Update failed:', error)
+      logger.error('❌ [EmployeeService] Update failed:', error)
       throw new Error(handleApiError(error))
     }
   }
@@ -302,7 +305,7 @@ class EmployeeService {
     try {
       await api.delete(EMPLOYEE_ENDPOINTS.DELETE(id.toString()))
     } catch (error) {
-      console.error('❌ [EmployeeService] Delete failed:', error)
+      logger.error('❌ [EmployeeService] Delete failed:', error)
       throw new Error(handleApiError(error))
     }
   }

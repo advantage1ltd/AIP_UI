@@ -1,3 +1,7 @@
+/**
+ * Customer crime intelligence charts and filters.
+ * Flow: URL-driven filters → crimeIntelligenceService aggregates → drill-down cards and charts.
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, RefreshCcw, Target, TrendingUp, AlertTriangle, Activity, BarChart3, Clock, MapPin, Package, Shield, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -27,7 +31,7 @@ import { CrimeInsightListItem, CrimeInsightTimeBucket, CrimeIntelligenceResponse
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { DatePicker } from '@/components/ui/date-picker'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
@@ -55,11 +59,27 @@ const gradientColors = [
 
 const heroMetricIcons = [Activity, BarChart3, Shield, Target]
 
-const defaultRangeDays = 90
+const panelCardClass = 'rounded-xl border border-slate-200 bg-white shadow-sm'
+const panelHeaderClass = 'border-b border-slate-100 bg-slate-50/70 px-4 py-3'
+const sectionTitleClass = 'text-sm font-semibold text-slate-800 md:text-base'
 
 const getIsoDate = (date?: Date | null) => {
 	if (!date) return undefined
 	return date.toISOString().split('T')[0]
+}
+
+const toDateInputValue = (date?: Date) => {
+	if (!date) return ''
+	const year = date.getFullYear()
+	const month = `${date.getMonth() + 1}`.padStart(2, '0')
+	const day = `${date.getDate()}`.padStart(2, '0')
+	return `${year}-${month}-${day}`
+}
+
+const fromDateInputValue = (value: string): Date | undefined => {
+	if (!value) return undefined
+	const parsed = new Date(`${value}T00:00:00`)
+	return Number.isNaN(parsed.getTime()) ? undefined : parsed
 }
 
 const buildAnalystNotes = (insights: CrimeIntelligenceResponse): string[] => {
@@ -89,6 +109,32 @@ const buildAnalystNotes = (insights: CrimeIntelligenceResponse): string[] => {
 	return notes
 }
 
+const formatCompactCurrency = (value: number) => {
+	if (!Number.isFinite(value)) return '£0'
+	return new Intl.NumberFormat('en-GB', {
+		style: 'currency',
+		currency: 'GBP',
+		notation: 'compact',
+		maximumFractionDigits: 1
+	}).format(value)
+}
+
+const normalizeHeroMetricValue = (title: string, rawValue: string) => {
+	const normalizedTitle = title.trim().toLowerCase()
+	const valueText = String(rawValue ?? '').trim()
+
+	if (!valueText) return '—'
+
+	if (normalizedTitle.includes('value')) {
+		const numeric = Number(valueText.replace(/[^0-9.-]/g, ''))
+		if (Number.isFinite(numeric)) {
+			return formatCompactCurrency(numeric)
+		}
+	}
+
+	return valueText
+}
+
 export default function CustomerCrimeIntelligence() {
 	const navigate = useNavigate()
 	const [searchParams] = useSearchParams()
@@ -101,12 +147,8 @@ export default function CustomerCrimeIntelligence() {
 	const [regions, setRegions] = useState<RegionOption[]>([])
 	const [selectedSiteId, setSelectedSiteId] = useState<string>('all')
 	const [selectedRegionId, setSelectedRegionId] = useState<string>('all')
-	const [startDate, setStartDate] = useState<Date | undefined>(() => {
-		const date = new Date()
-		date.setDate(date.getDate() - defaultRangeDays)
-		return date
-	})
-	const [endDate, setEndDate] = useState<Date | undefined>(new Date())
+	const [startDate, setStartDate] = useState<Date | undefined>(undefined)
+	const [endDate, setEndDate] = useState<Date | undefined>(undefined)
 
 	const [insights, setInsights] = useState<CrimeIntelligenceResponse | null>(null)
 	const [loadingInsights, setLoadingInsights] = useState(false)
@@ -270,35 +312,41 @@ export default function CustomerCrimeIntelligence() {
 
 		if (!insights.heroMetrics.length) return null
 
-		const gradientClasses = [
-			'from-indigo-500 via-purple-500 to-pink-500',
-			'from-orange-500 via-red-500 to-pink-500',
-			'from-emerald-500 via-teal-500 to-cyan-500',
-			'from-blue-500 via-indigo-500 to-purple-500'
-		]
-
 		return (
 			<div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
 				{insights.heroMetrics.map((metric, idx) => {
 					const Icon = heroMetricIcons[idx % heroMetricIcons.length]
-					const gradientClass = gradientClasses[idx % gradientClasses.length]
+					const metricTitle = metric.title.trim().toLowerCase()
+					const isRecoveryMetric = metricTitle.includes('recovery')
+					const isLossMetric = metricTitle.includes('loss')
+					const toneClass = isRecoveryMetric
+						? 'text-emerald-700 bg-emerald-50 border-emerald-100'
+						: isLossMetric
+							? 'text-rose-700 bg-rose-50 border-rose-100'
+							: 'text-indigo-700 bg-indigo-50 border-indigo-100'
+					const metricValueClass = isRecoveryMetric
+						? 'text-emerald-700'
+						: isLossMetric
+							? 'text-rose-700'
+							: 'text-slate-900'
+					const normalizedValue = normalizeHeroMetricValue(metric.title, metric.value)
+					const isHotspotMetric = metric.title.toLowerCase().includes('hotspot')
 					return (
 						<Card 
 							key={metric.title} 
-							className="relative overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-white to-slate-50 group"
+							className={panelCardClass}
 						>
-							<div className={`absolute inset-0 bg-gradient-to-br ${gradientClass} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
-							<CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6 relative z-10">
+							<CardHeader className="pb-2 sm:pb-3 p-4 sm:p-5">
 								<div className="flex items-center justify-between mb-2">
-									<div className={`p-1.5 sm:p-2 rounded-lg bg-gradient-to-br ${gradientClass} bg-opacity-10`}>
-										<Icon className={`h-4 w-4 sm:h-5 sm:w-5 bg-gradient-to-br ${gradientClass} bg-clip-text text-transparent`} />
+									<div className={`rounded-md border p-2 ${toneClass}`}>
+										<Icon className="h-4 w-4 sm:h-5 sm:w-5" />
 									</div>
 								</div>
-								<CardTitle className="text-xs font-medium text-slate-600 uppercase tracking-wider">{metric.title}</CardTitle>
+								<CardTitle className="text-xs font-medium uppercase tracking-wider text-slate-500">{metric.title}</CardTitle>
 							</CardHeader>
-							<CardContent className="space-y-2 p-4 sm:p-6 pt-0 relative z-10">
-								<p className={`text-3xl sm:text-4xl font-bold bg-gradient-to-br ${gradientClass} bg-clip-text text-transparent`}>
-									{metric.value}
+							<CardContent className="space-y-2 p-4 sm:p-5 pt-0">
+								<p className={`font-bold break-words ${metricValueClass} ${isHotspotMetric ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'}`}>
+									{normalizedValue}
 								</p>
 								{metric.subtext && (
 									<p className="text-xs text-slate-500 font-medium">{metric.subtext}</p>
@@ -349,10 +397,10 @@ export default function CustomerCrimeIntelligence() {
 		}
 		
 		return (
-			<Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-white to-slate-50 overflow-hidden w-full max-w-full">
-				<CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-4 md:p-6">
+			<Card className={`${panelCardClass} overflow-hidden w-full max-w-full`}>
+				<CardHeader className={panelHeaderClass}>
 					<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-						<CardTitle className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+						<CardTitle className={`${sectionTitleClass} flex items-center gap-2`}>
 							<BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 flex-shrink-0" />
 							<span className="truncate">{title}</span>
 						</CardTitle>
@@ -368,7 +416,7 @@ export default function CustomerCrimeIntelligence() {
 						)}
 					</div>
 				</CardHeader>
-				<CardContent className="p-3 sm:p-4 md:p-6">
+				<CardContent className="p-3 sm:p-4 md:p-5">
 					{loadingInsights ? (
 						<Skeleton className="h-[250px] sm:h-[280px] w-full rounded-lg" />
 					) : paginatedData.length ? (
@@ -479,14 +527,14 @@ export default function CustomerCrimeIntelligence() {
 	}
 
 	const renderPieChart = (title: string, data: CrimeInsightListItem[]) => (
-		<Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-white to-slate-50 overflow-hidden w-full max-w-full">
-			<CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-4 md:p-6">
-				<CardTitle className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+		<Card className={`${panelCardClass} overflow-hidden w-full max-w-full`}>
+			<CardHeader className={panelHeaderClass}>
+				<CardTitle className={`${sectionTitleClass} flex items-center gap-2`}>
 					<Target className="h-4 w-4 sm:h-5 sm:w-5 text-pink-600 flex-shrink-0" />
 					<span className="truncate">{title}</span>
 				</CardTitle>
 			</CardHeader>
-			<CardContent className="p-3 sm:p-4 md:p-6">
+			<CardContent className="p-3 sm:p-4 md:p-5">
 				{loadingInsights ? (
 					<Skeleton className="h-[250px] sm:h-[300px] w-full rounded-lg" />
 				) : data.length ? (
@@ -575,14 +623,14 @@ export default function CustomerCrimeIntelligence() {
 		const gradient = gradientColors[2] // Green gradient for time chart
 		
 		return (
-			<Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-white to-slate-50 overflow-hidden w-full max-w-full">
-				<CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-4 md:p-6">
-					<CardTitle className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+			<Card className={`${panelCardClass} overflow-hidden w-full max-w-full`}>
+				<CardHeader className={panelHeaderClass}>
+					<CardTitle className={`${sectionTitleClass} flex items-center gap-2`}>
 						<Clock className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 flex-shrink-0" />
 						<span className="truncate">{title}</span>
 					</CardTitle>
 				</CardHeader>
-				<CardContent className="p-3 sm:p-4 md:p-6">
+				<CardContent className="p-3 sm:p-4 md:p-5">
 					{loadingInsights ? (
 						<Skeleton className="h-[250px] sm:h-[280px] w-full rounded-lg" />
 					) : data.length ? (
@@ -645,14 +693,14 @@ export default function CustomerCrimeIntelligence() {
 	}
 
 	const renderProductsTable = () => (
-		<Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-white to-slate-50 overflow-hidden w-full max-w-full">
-			<CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-4 md:p-6">
-				<CardTitle className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+		<Card className={`${panelCardClass} overflow-hidden w-full max-w-full`}>
+			<CardHeader className={panelHeaderClass}>
+				<CardTitle className={`${sectionTitleClass} flex items-center gap-2`}>
 					<Package className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 flex-shrink-0" />
 					<span className="truncate">Most Stolen Products</span>
 				</CardTitle>
 			</CardHeader>
-			<CardContent className="p-3 sm:p-4 md:p-6">
+			<CardContent className="p-3 sm:p-4 md:p-5">
 				{loadingInsights ? (
 					<Skeleton className="h-[200px] w-full rounded-lg" />
 				) : insights?.topProducts?.length ? (
@@ -702,12 +750,11 @@ export default function CustomerCrimeIntelligence() {
 	)
 
 	const renderHotProduct = () => (
-		<Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 overflow-hidden relative w-full max-w-full">
-			<div className="absolute inset-0 bg-gradient-to-br from-amber-400/10 via-orange-400/10 to-red-400/10" />
-			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 relative z-10 bg-gradient-to-r from-amber-100/50 to-orange-100/50 border-b border-amber-200/50 p-4 md:p-6">
-				<CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-amber-900">
-					<div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg flex-shrink-0">
-						<Target className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+		<Card className={`${panelCardClass} overflow-hidden relative w-full max-w-full`}>
+			<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 border-b border-slate-100 bg-slate-50/70 p-4 md:p-6">
+				<CardTitle className={`${sectionTitleClass} flex items-center gap-2 text-slate-800`}>
+					<div className="rounded-md border border-amber-100 bg-amber-50 p-2 flex-shrink-0">
+						<Target className="h-4 w-4 sm:h-5 sm:w-5 text-amber-700" />
 					</div>
 					<span className="truncate">Hot Product Spotlight</span>
 				</CardTitle>
@@ -717,7 +764,7 @@ export default function CustomerCrimeIntelligence() {
 					</Badge>
 				)}
 			</CardHeader>
-			<CardContent className="p-4 sm:p-6 relative z-10">
+			<CardContent className="p-4 sm:p-5">
 				{loadingInsights ? (
 					<div className="space-y-3">
 						<Skeleton className="h-5 w-2/3 rounded" />
@@ -727,12 +774,12 @@ export default function CustomerCrimeIntelligence() {
 				) : insights?.hotProduct ? (
 					<div className="space-y-3 sm:space-y-4">
 						<div>
-							<p className="text-lg sm:text-2xl font-bold text-amber-900 mb-2 break-words">{insights.hotProduct.productName}</p>
+							<p className="mb-2 break-words text-lg font-bold text-slate-900 sm:text-2xl">{insights.hotProduct.productName}</p>
 							<div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm">
-								<span className="px-2 sm:px-3 py-1 rounded-full bg-white/80 text-amber-900 font-semibold shadow-sm whitespace-nowrap">
+								<span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 sm:px-3">
 									{insights.hotProduct.quantity.toLocaleString()} units
 								</span>
-								<span className="px-2 sm:px-3 py-1 rounded-full bg-white/80 text-red-700 font-bold shadow-sm whitespace-nowrap">
+								<span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700 sm:px-3">
 									£{insights.hotProduct.totalValue.toLocaleString()}
 								</span>
 							</div>
@@ -805,8 +852,8 @@ export default function CustomerCrimeIntelligence() {
 	}
 
 	return (
-		<div className="min-h-screen bg-[#EFF4FF] overflow-x-hidden">
-			<div className="container mx-auto py-3 sm:py-4 md:py-6 lg:py-8 px-3 sm:px-4 md:px-6 lg:px-8 space-y-3 sm:space-y-4 md:space-y-6 lg:space-y-8 max-w-full">
+		<div className="min-h-screen overflow-x-hidden bg-slate-50">
+			<div className="container mx-auto max-w-[90rem] space-y-5 px-3 py-4 sm:px-4 sm:py-5 md:space-y-6 md:px-6 lg:space-y-8 lg:px-8 lg:py-8">
 				<div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
 					<div className="space-y-1.5 sm:space-y-2 flex-1 min-w-0 pr-0 md:pr-4">
 						<div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
@@ -822,7 +869,7 @@ export default function CustomerCrimeIntelligence() {
 								Customer Insight
 							</Badge>
 						</div>
-						<h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 bg-clip-text text-transparent break-words leading-tight pr-0">
+						<h1 className="pr-0 text-lg font-bold leading-tight text-slate-900 break-words sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl">
 							{customer?.name} - Crime Intelligence
 						</h1>
 						<p className="text-xs sm:text-sm md:text-base text-slate-600 font-medium leading-relaxed break-words">
@@ -841,9 +888,9 @@ export default function CustomerCrimeIntelligence() {
 					</Button>
 				</div>
 
-				<Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm w-full max-w-full transition-all duration-300">
-					<CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 p-3 sm:p-4 md:p-6">
-						<CardTitle className="text-sm sm:text-base md:text-lg font-bold text-slate-800 flex items-center gap-2">
+				<Card className={`${panelCardClass} w-full max-w-full`}>
+					<CardHeader className={panelHeaderClass}>
+						<CardTitle className={`${sectionTitleClass} flex items-center gap-2`}>
 							<Activity className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-indigo-600 flex-shrink-0" />
 							<span>Filters</span>
 						</CardTitle>
@@ -851,11 +898,21 @@ export default function CustomerCrimeIntelligence() {
 					<CardContent className="p-3 sm:p-4 md:p-6 grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
 						<div className="space-y-1.5 sm:space-y-2">
 							<p className="text-xs sm:text-sm font-medium text-slate-600">Start Date</p>
-							<DatePicker date={startDate} setDate={setStartDate} />
+							<Input
+								type='date'
+								value={toDateInputValue(startDate)}
+								onChange={(event) => setStartDate(fromDateInputValue(event.target.value))}
+								className='h-10 text-xs sm:text-sm'
+							/>
 						</div>
 						<div className="space-y-1.5 sm:space-y-2">
 							<p className="text-xs sm:text-sm font-medium text-slate-600">End Date</p>
-							<DatePicker date={endDate} setDate={setEndDate} />
+							<Input
+								type='date'
+								value={toDateInputValue(endDate)}
+								onChange={(event) => setEndDate(fromDateInputValue(event.target.value))}
+								className='h-10 text-xs sm:text-sm'
+							/>
 						</div>
 						<div className="space-y-1.5 sm:space-y-2">
 							<p className="text-xs sm:text-sm font-medium text-slate-600">Region</p>
@@ -892,31 +949,54 @@ export default function CustomerCrimeIntelligence() {
 					</CardContent>
 				</Card>
 
-			{renderHeroMetrics()}
+			<section className="space-y-3">
+				<div>
+					<h2 className="text-sm font-semibold text-slate-900 sm:text-base">Executive Summary</h2>
+					<p className="text-xs text-slate-500 sm:text-sm">Key incident KPIs for the selected period and scope.</p>
+				</div>
+				{renderHeroMetrics()}
+			</section>
 
-			<div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+			<section className="space-y-3">
+				<div>
+					<h2 className="text-sm font-semibold text-slate-900 sm:text-base">Distribution Analysis</h2>
+					<p className="text-xs text-slate-500 sm:text-sm">Understand concentration by location and incident type.</p>
+				</div>
+				<div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
 				{renderBarChart('Hot Stores', insights?.topStores || [], 'No store-level crime data available.', 0, storesPage, setStoresPage)}
 				{renderPieChart('Incident Mix', insights?.topIncidentTypes || [])}
-			</div>
+				</div>
+			</section>
 
-			<div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+			<section className="space-y-3">
+				<div>
+					<h2 className="text-sm font-semibold text-slate-900 sm:text-base">Pattern Analysis</h2>
+					<p className="text-xs text-slate-500 sm:text-sm">Track regional exposure and time-based activity trends.</p>
+				</div>
+				<div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
 				{renderTimeChart('Time-of-Day Activity', insights?.timeBuckets || [])}
 				{renderBarChart('Regional Exposure', insights?.topRegions || [], 'No regional breakdown available.', 3, regionsPage, setRegionsPage)}
-			</div>
+				</div>
+			</section>
 
+			<section className="space-y-3">
+				<div>
+					<h2 className="text-sm font-semibold text-slate-900 sm:text-base">Product Risk & Recommendations</h2>
+					<p className="text-xs text-slate-500 sm:text-sm">Prioritize actions with product-level and analyst insight context.</p>
+				</div>
 			<div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
 				<div className="lg:col-span-2 space-y-4 sm:space-y-6">
 					{renderProductsTable()}
-					<Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-white to-slate-50 overflow-hidden w-full max-w-full">
-						<CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-3 sm:p-4 md:p-6">
-							<CardTitle className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-								<div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex-shrink-0">
+					<Card className={`${panelCardClass} overflow-hidden w-full max-w-full`}>
+						<CardHeader className={panelHeaderClass}>
+							<CardTitle className={`${sectionTitleClass} flex items-center gap-2`}>
+								<div className="rounded-md border border-indigo-100 bg-indigo-50 p-2 flex-shrink-0">
 									<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
 								</div>
 								<span className="truncate">Analyst Notes</span>
 							</CardTitle>
 						</CardHeader>
-						<CardContent className="p-4 sm:p-6">
+						<CardContent className="p-4 sm:p-5">
 							{loadingInsights ? (
 								<div className="space-y-3">
 									<Skeleton className="h-4 w-full rounded" />
@@ -928,7 +1008,7 @@ export default function CustomerCrimeIntelligence() {
 									{analystNotes.map((note, idx) => (
 										<li 
 											key={`note-${idx}`}
-											className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 rounded-lg bg-gradient-to-r from-indigo-50/50 to-purple-50/50 border-l-4 border-indigo-500 hover:shadow-md transition-all duration-200"
+										className="flex items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 sm:gap-3 sm:p-4"
 										>
 											<div className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold mt-0.5">
 												{idx + 1}
@@ -943,6 +1023,7 @@ export default function CustomerCrimeIntelligence() {
 				</div>
 				{renderHotProduct()}
 			</div>
+			</section>
 
 			{insights?.generatedAt && (
 				<div className="flex justify-end">

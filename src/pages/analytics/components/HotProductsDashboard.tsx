@@ -1,8 +1,6 @@
 /**
- * Hot Products Dashboard Module
- * 
- * Displays barcode frequency charts, value lost per product,
- * and store-level heatmaps for stolen items.
+ * Hot Products Dashboard: stolen product frequency and store heatmaps from analytics hub data.
+ * Flow: summary totals → product charts → searchable store heatmap with risk filters.
  */
 
 import { useMemo, useState, useEffect } from 'react'

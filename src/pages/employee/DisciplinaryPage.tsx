@@ -1,4 +1,10 @@
+/**
+ * Disciplinary case register for managers and officers.
+ * Flow: filtered React Query list → create/edit dialog → view and delete with role-gated mutations.
+ */
 import React, { useState, useCallback, useMemo } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { harmonizeRole } from '@/utils/roles'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -9,7 +15,6 @@ import {
   Search,
   Pencil,
   Trash2,
-  CalendarIcon,
   AlertTriangle,
   FileText,
   CheckCircle2,
@@ -62,12 +67,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Calendar } from '@/components/ui/calendar'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+import { NativeDateInput } from '@/components/ui/native-date-input'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -143,10 +143,15 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, gradient, subti
   </Card>
 )
 
-// ========== Main Component ==========
 const DisciplinaryPage: React.FC = () => {
+  const { user } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
+
+  const canManageDisciplinary = useMemo(() => {
+    const r = harmonizeRole(user?.pageAccessRole ?? user?.role)
+    return r === 'administrator' || r === 'manager'
+  }, [user?.pageAccessRole, user?.role])
 
   // State
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false)
@@ -199,11 +204,13 @@ const DisciplinaryPage: React.FC = () => {
   const { data: employees = [] } = useQuery({
     queryKey: ['disciplinaryRecords', 'employees'],
     queryFn: () => disciplinaryRecordService.getEmployees(),
+    enabled: canManageDisciplinary,
   })
 
   const { data: supervisors = [] } = useQuery({
     queryKey: ['disciplinaryRecords', 'supervisors'],
     queryFn: () => disciplinaryRecordService.getSupervisors(),
+    enabled: canManageDisciplinary,
   })
 
   // Mutations
@@ -328,7 +335,8 @@ const DisciplinaryPage: React.FC = () => {
   const records = recordsData?.items || []
   const totalCount = recordsData?.totalCount || 0
   const totalPages = recordsData?.totalPages || 1
-  const isLoading = createMutation.isPending || updateMutation.isPending
+  const isLoading =
+    canManageDisciplinary && (createMutation.isPending || updateMutation.isPending)
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#EFF4FF' }}>
@@ -343,17 +351,21 @@ const DisciplinaryPage: React.FC = () => {
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Disciplinary Records</h1>
                 <p className="text-sm sm:text-base text-gray-500 mt-1">
-                  Manage and track disciplinary actions for security officers
+                  {canManageDisciplinary
+                    ? 'Manage and track disciplinary actions for security officers'
+                    : 'Your disciplinary records linked to your officer profile (view only)'}
                 </p>
               </div>
             </div>
-            <Button
-              onClick={() => setIsFormDialogOpen(true)}
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add New Record
-            </Button>
+            {canManageDisciplinary && (
+              <Button
+                onClick={() => setIsFormDialogOpen(true)}
+                className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add New Record
+              </Button>
+            )}
           </div>
         </div>
 
@@ -471,14 +483,18 @@ const DisciplinaryPage: React.FC = () => {
                         <Eye className="h-4 w-4" />
                         <span className="sr-only">View record</span>
                       </Button>
-                      <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => handleEdit(record)}>
-                        <Pencil className="h-4 w-4" />
-                        <span className="sr-only">Edit record</span>
-                      </Button>
-                      <Button variant="outline" size="sm" className="h-8 w-8 p-0 text-red-600 hover:text-red-700" onClick={() => handleDelete(record.id)}>
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Delete record</span>
-                      </Button>
+                      {canManageDisciplinary && (
+                        <>
+                          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => handleEdit(record)}>
+                            <Pencil className="h-4 w-4" />
+                            <span className="sr-only">Edit record</span>
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-8 w-8 p-0 text-red-600 hover:text-red-700" onClick={() => handleDelete(record.id)}>
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Delete record</span>
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -514,14 +530,20 @@ const DisciplinaryPage: React.FC = () => {
                           <div className="p-4 bg-gray-100 rounded-full">
                             <FileText className="h-8 w-8 text-gray-400" />
                           </div>
-                          <p className="text-gray-500">No disciplinary records found.</p>
-                          <Button
-                            onClick={() => setIsFormDialogOpen(true)}
-                            className="bg-blue-600 hover:bg-blue-700"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add First Record
-                          </Button>
+                          <p className="text-gray-500">
+                            {canManageDisciplinary
+                              ? 'No disciplinary records found.'
+                              : 'No disciplinary records on file for your profile.'}
+                          </p>
+                          {canManageDisciplinary && (
+                            <Button
+                              onClick={() => setIsFormDialogOpen(true)}
+                              className="bg-blue-600 hover:bg-blue-700"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add First Record
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -556,22 +578,26 @@ const DisciplinaryPage: React.FC = () => {
                             >
                               <Eye className="h-6 w-6" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-11 w-11 hover:bg-amber-50 hover:text-amber-600"
-                              onClick={() => handleEdit(record)}
-                            >
-                              <Pencil className="h-6 w-6" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-11 w-11 hover:bg-red-50 hover:text-red-600"
-                              onClick={() => handleDelete(record.id)}
-                            >
-                              <Trash2 className="h-6 w-6" />
-                            </Button>
+                            {canManageDisciplinary && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-11 w-11 hover:bg-amber-50 hover:text-amber-600"
+                                  onClick={() => handleEdit(record)}
+                                >
+                                  <Pencil className="h-6 w-6" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-11 w-11 hover:bg-red-50 hover:text-red-600"
+                                  onClick={() => handleDelete(record.id)}
+                                >
+                                  <Trash2 className="h-6 w-6" />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -696,30 +722,18 @@ const DisciplinaryPage: React.FC = () => {
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel>Incident Date *</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal bg-gray-50",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value ? format(field.value, "PP") : "Pick a date"}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <FormControl>
+                          <NativeDateInput
+                            ref={field.ref}
+                            name={field.name}
+                            value={field.value}
+                            onDateChange={field.onChange}
+                            onBlur={field.onBlur}
+                            disabled={field.disabled}
+                            className="bg-gray-50"
+                            aria-label="Incident date"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -836,30 +850,18 @@ const DisciplinaryPage: React.FC = () => {
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel>Follow-up Date</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal bg-gray-50",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value ? format(field.value, "PP") : "Pick a date"}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value || undefined}
-                              onSelect={field.onChange}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <FormControl>
+                          <NativeDateInput
+                            ref={field.ref}
+                            name={field.name}
+                            value={field.value}
+                            onDateChange={field.onChange}
+                            onBlur={field.onBlur}
+                            disabled={field.disabled}
+                            className="bg-gray-50"
+                            aria-label="Follow-up date"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

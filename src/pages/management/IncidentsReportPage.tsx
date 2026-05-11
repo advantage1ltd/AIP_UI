@@ -1,3 +1,7 @@
+/**
+ * Management incidents report: filters and exports incidentService data.
+ * Flow: management filters → incident list and stats → export and detail dialogs.
+ */
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,11 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { NativeDateInput } from "@/components/ui/native-date-input";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { CalendarIcon, PlusCircle, Search, Eye, Pencil, Trash2, Store, AlertCircle, PoundSterling, Clock, User, UserCircle, MapPin, Plus, FileText, ShoppingBagIcon, PlusIcon, TrashIcon, QrCode, Loader2, ScanIcon } from "lucide-react";
+import { PlusCircle, Search, Eye, Pencil, Trash2, Store, AlertCircle, PoundSterling, Clock, User, UserCircle, MapPin, Plus, FileText, ShoppingBagIcon, PlusIcon, TrashIcon, QrCode, Loader2, ScanIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -78,153 +81,7 @@ interface StolenItem {
 type IncidentType = "Theft" | "Vandalism" | "Customer Accident" | "Suspicious Activity" | "Other";
 
 const IncidentsReportPage: React.FC = () => {
-  // Sample data for incidents
-  const [incidents, setIncidents] = useState<Incident[]>([
-    {
-      id: "1",
-      date: new Date(2024, 1, 15), // 2/15/2024
-      time: { hour: "10", minute: "30" },
-      customer: { name: "John Doe" },
-      siteName: "London Store",
-      officer: { name: "John Smith", role: "Security Officer" },
-      dutyManager: "Sarah Johnson",
-      incidentType: "Theft",
-      description: "Shoplifting incident involving high-value electronics",
-      additionalComments: "Individual took multiple items",
-      policeInvolved: true,
-      valueRecovered: 599.99,
-      offenderDetails: {
-        name: "Jane Doe",
-        sex: "female",
-        dateOfBirth: new Date(1990, 5, 15),
-        address: "123 Main St, London",
-        town: "London",
-        postCode: "SW1A 1AA"
-      },
-      categories: {
-        selfScanTills: false,
-        threatsAndIntimidation: false,
-        banFromStore: false,
-        scanAndGo: false,
-        abusiveBehaviour: false,
-        policeFailedToAttend: false,
-        violentBehaviorPhysical: false,
-        spitting: false
-      },
-      stolenItems: [{ category: "electronics", name: "Laptop", productName: "Laptop", value: 599.99, quantity: 1, total: 599.99 }]
-    },
-    {
-      id: "2",
-      date: new Date(2024, 1, 14), // 2/14/2024
-      time: { hour: "14", minute: "00" },
-      customer: { name: "Jane Smith" },
-      siteName: "Manchester Store",
-      officer: { name: "Michael Brown", role: "Security Manager" },
-      dutyManager: "Sarah Johnson",
-      incidentType: "Vandalism",
-      description: "Graffiti found on the back wall of the store",
-      additionalComments: "Graffiti was removed immediately",
-      policeInvolved: false,
-      valueRecovered: 0,
-      offenderDetails: undefined,
-      categories: {
-        selfScanTills: false,
-        threatsAndIntimidation: false,
-        banFromStore: false,
-        scanAndGo: false,
-        abusiveBehaviour: false,
-        policeFailedToAttend: false,
-        violentBehaviorPhysical: false,
-        spitting: false
-      },
-      stolenItems: []
-    },
-    {
-      id: "3",
-      date: new Date(2024, 1, 13), // 2/13/2024
-      time: { hour: "10", minute: "00" },
-      customer: { name: "Bob Johnson" },
-      siteName: "Birmingham Store",
-      officer: { name: "Sarah Johnson", role: "Supervisor" },
-      dutyManager: "Sarah Johnson",
-      incidentType: "Customer Accident",
-      description: "Slip and fall incident in the produce section",
-      additionalComments: "Customer was assisted by store staff",
-      policeInvolved: false,
-      valueRecovered: 0,
-      offenderDetails: undefined,
-      categories: {
-        selfScanTills: false,
-        threatsAndIntimidation: false,
-        banFromStore: false,
-        scanAndGo: false,
-        abusiveBehaviour: false,
-        policeFailedToAttend: false,
-        violentBehaviorPhysical: true,
-        spitting: false
-      },
-      stolenItems: []
-    },
-    {
-      id: "4",
-      date: new Date(2024, 1, 12), // 2/12/2024
-      time: { hour: "15", minute: "30" },
-      customer: { name: "Alice Johnson" },
-      siteName: "Leeds Store",
-      officer: { name: "Michael Brown", role: "Security Officer" },
-      dutyManager: "Sarah Johnson",
-      incidentType: "Theft",
-      description: "Multiple items concealed in bag",
-      additionalComments: "Customer was caught on CCTV",
-      policeInvolved: true,
-      valueRecovered: 245.50,
-      offenderDetails: {
-        name: "Bob Johnson",
-        sex: "male",
-        dateOfBirth: new Date(1985, 10, 20),
-        address: "456 Elm St, Leeds",
-        town: "Leeds",
-        postCode: "LS1 1AB"
-      },
-      categories: {
-        selfScanTills: false,
-        threatsAndIntimidation: false,
-        banFromStore: false,
-        scanAndGo: false,
-        abusiveBehaviour: false,
-        policeFailedToAttend: false,
-        violentBehaviorPhysical: false,
-        spitting: false
-      },
-      stolenItems: [{ category: "electronics", name: "Mobile Phone", productName: "Mobile Phone", value: 245.50, quantity: 1, total: 245.50 }]
-    },
-    {
-      id: "5",
-      date: new Date(2024, 1, 11), // 2/11/2024
-      time: { hour: "11", minute: "00" },
-      customer: { name: "Eve Smith" },
-      siteName: "Glasgow Store",
-      officer: { name: "Sarah Johnson", role: "Security Officer" },
-      dutyManager: "Sarah Johnson",
-      incidentType: "Suspicious Activity",
-      description: "Individual taking photos of security camera locations",
-      additionalComments: "Caught on CCTV",
-      policeInvolved: true,
-      valueRecovered: 0,
-      offenderDetails: undefined,
-      categories: {
-        selfScanTills: false,
-        threatsAndIntimidation: false,
-        banFromStore: false,
-        scanAndGo: false,
-        abusiveBehaviour: false,
-        policeFailedToAttend: false,
-        violentBehaviorPhysical: false,
-        spitting: false
-      },
-      stolenItems: []
-    }
-  ]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
 
   // State for search
   const [searchQuery, setSearchQuery] = useState("");
@@ -1106,31 +963,14 @@ const IncidentsReportPage: React.FC = () => {
 
                         <div className="space-y-2">
                           <Label>Date of Birth</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal",
-                                  !selectedIncident.offenderDetails.dateOfBirth && "text-muted-foreground"
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {selectedIncident.offenderDetails.dateOfBirth ? 
-                                  format(selectedIncident.offenderDetails.dateOfBirth, "PPP") : 
-                                  <span>Pick a date</span>
-                                }
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={selectedIncident.offenderDetails.dateOfBirth}
-                                onSelect={(date) => setOffenderDetails({ ...selectedIncident.offenderDetails, dateOfBirth: date })}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <NativeDateInput
+                            value={selectedIncident.offenderDetails.dateOfBirth}
+                            onDateChange={(d) =>
+                              setOffenderDetails({ ...selectedIncident.offenderDetails, dateOfBirth: d })
+                            }
+                            className="bg-background"
+                            aria-label="Offender date of birth"
+                          />
                         </div>
 
                         <div className="space-y-2">
@@ -1442,28 +1282,12 @@ const IncidentsReportPage: React.FC = () => {
                 <div className="space-y-4">
                   <div>
                     <Label className="text-sm font-medium">Date of Incident</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !incidentDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {incidentDate ? format(incidentDate, "PPP") : <span>Pick a date</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={incidentDate}
-                          onSelect={setIncidentDate}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <NativeDateInput
+                      value={incidentDate}
+                      onDateChange={setIncidentDate}
+                      className="mt-1.5 bg-background"
+                      aria-label="Date of incident"
+                    />
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2">
@@ -1637,31 +1461,12 @@ const IncidentsReportPage: React.FC = () => {
 
                   <div className="space-y-2">
                     <Label>Date of Birth</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !offenderDetails.dateOfBirth && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {offenderDetails.dateOfBirth ? 
-                            format(offenderDetails.dateOfBirth, "PPP") : 
-                            <span>Pick a date</span>
-                          }
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={offenderDetails.dateOfBirth}
-                          onSelect={(date) => setOffenderDetails({ ...offenderDetails, dateOfBirth: date })}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <NativeDateInput
+                      value={offenderDetails.dateOfBirth}
+                      onDateChange={(d) => setOffenderDetails({ ...offenderDetails, dateOfBirth: d })}
+                      className="bg-background"
+                      aria-label="Offender date of birth"
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -2005,28 +1810,12 @@ const IncidentsReportPage: React.FC = () => {
                 <div className="space-y-4">
                   <div>
                     <Label className="text-sm font-medium">Date of Incident</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                    variant="outline"
-                    className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !incidentDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {incidentDate ? format(incidentDate, "PPP") : <span>Pick a date</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={incidentDate}
-                          onSelect={setIncidentDate}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <NativeDateInput
+                      value={incidentDate}
+                      onDateChange={setIncidentDate}
+                      className="mt-1.5 bg-background"
+                      aria-label="Date of incident"
+                    />
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2">
@@ -2200,31 +1989,12 @@ const IncidentsReportPage: React.FC = () => {
 
                   <div className="space-y-2">
                     <Label>Date of Birth</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !offenderDetails.dateOfBirth && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {offenderDetails.dateOfBirth ? 
-                            format(offenderDetails.dateOfBirth, "PPP") : 
-                            <span>Pick a date</span>
-                          }
-                  </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={offenderDetails.dateOfBirth}
-                          onSelect={(date) => setOffenderDetails({ ...offenderDetails, dateOfBirth: date })}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <NativeDateInput
+                      value={offenderDetails.dateOfBirth}
+                      onDateChange={(d) => setOffenderDetails({ ...offenderDetails, dateOfBirth: d })}
+                      className="bg-background"
+                      aria-label="Offender date of birth"
+                    />
                 </div>
 
                   <div className="space-y-2">

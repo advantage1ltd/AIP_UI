@@ -17,6 +17,7 @@ interface CompanyDetailsSectionProps {
   form: UseFormReturn<any>
 }
 
+// === Component ===
 export function CompanyDetailsSection({ form }: CompanyDetailsSectionProps) {
   return (
     <div className="space-y-4">

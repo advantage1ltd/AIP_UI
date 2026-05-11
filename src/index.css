@@ -44,10 +44,10 @@
     --sidebar-border: 246 13% 91%;
     --sidebar-ring: 246 91.2% 59.8%;
 
-    /* Header colors - #F9F9F9 */
-    --header-bg: 0 0% 97.6%;
+    /* Header colors - enterprise neutral tone */
+    --header-bg: 220 33% 98%;
     --header-text: 222.2 84% 4.9%;
-    --header-border: 220 13% 91%;
+    --header-border: 220 22% 88%;
   }
 
   .dark {
@@ -88,26 +88,12 @@
     --sidebar-border: 246 3.7% 15.9%;
     --sidebar-ring: 246 91.2% 59.8%;
 
-    /* Header colors - dark mode */
-    --header-bg: 222.2 84% 4.9%;
+    /* Header colors - dark enterprise tone */
+    --header-bg: 223 36% 12%;
     --header-text: 210 40% 98%;
-    --header-border: 217.2 32.6% 17.5%;
+    --header-border: 222 24% 22%;
   }
 
-  input[type="text"],
-  input[type="date"],
-  input[type="email"],
-  input[type="number"],
-  input[type="password"],
-  input[type="tel"],
-  select,
-  textarea {
-    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm;
-  }
-
-  button {
-    @apply inline-flex justify-center rounded-md border border-transparent px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2;
-  }
 }
 
 @layer base {
@@ -117,5 +103,62 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /*
+   * Dark-mode fallback for legacy hard-coded gray/slate text utilities.
+   * This keeps older pages readable until each view is fully tokenized.
+   */
+  .dark .text-gray-500,
+  .dark .text-gray-600,
+  .dark .text-slate-500,
+  .dark .text-slate-600 {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .dark .text-gray-700,
+  .dark .text-gray-800,
+  .dark .text-slate-700,
+  .dark .text-slate-800 {
+    color: hsl(var(--foreground) / 0.9);
+  }
+
+  .dark .text-gray-900,
+  .dark .text-slate-900 {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .bg-white {
+    background-color: hsl(var(--card));
+  }
+
+  .dark .bg-gray-50,
+  .dark .bg-slate-50 {
+    background-color: hsl(var(--muted));
+  }
+
+  .dark .bg-gray-100,
+  .dark .bg-slate-100 {
+    background-color: hsl(var(--secondary));
+  }
+
+  .dark .border-gray-100,
+  .dark .border-gray-200,
+  .dark .border-gray-300,
+  .dark .border-slate-200,
+  .dark .border-slate-300 {
+    border-color: hsl(var(--border));
+  }
+
+  .dark .hover\:bg-gray-50:hover,
+  .dark .hover\:bg-slate-50:hover {
+    background-color: hsl(var(--muted));
+  }
+
+  .dark .hover\:bg-gray-100:hover,
+  .dark .hover\:bg-slate-100:hover {
+    background-color: hsl(var(--secondary));
   }
 }

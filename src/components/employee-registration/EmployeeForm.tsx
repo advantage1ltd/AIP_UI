@@ -1,3 +1,7 @@
+/**
+ * Employee registration wizard form; persists via employeeService and employeeMapper.
+ * Flow: lookup bootstrap → multi-card sections → optional parent onSubmit or direct create/update mapping.
+ */
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -23,129 +27,15 @@ import * as z from "zod"
 import { useState, useEffect } from "react"
 import type { AxiosError } from "axios"
 import { Employee } from "@/types/employee"
-import { UserRole } from "@/types/user"
 import { lookupTableService, LookupTableItem } from "@/services/lookupTableService"
 import { employeeService, EmployeeRegistrationRequest } from "@/services/employeeService"
-import { mapToBackendUpdateRequest } from "@/utils/employeeMapper"
+import { mapToBackendUpdateRequest, generateEmployeeNumber } from "@/utils/employeeMapper"
 import { compressImageFileToDataUrl, validateImageFile } from "@/utils/image"
 import { Upload, User, FileText, Shield, MapPin, Briefcase, CreditCard, Camera, Calendar, Mail } from "lucide-react"
 
-const formSchema = z.object({
-  // Basic Information - Backend Required Fields
-  employeeNumber: z.string().min(1, "Employee number is required"),
-  title: z.string().min(1, "Title is required"),
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  surname: z.string().min(2, "Last name must be at least 2 characters"),
-  startDate: z.string().min(1, "Start date is required").refine((date) => {
-    if (!date) return false
-    const selectedDate = new Date(date)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0) // Reset time to start of day
-    return selectedDate <= today
-  }, {
-    message: "Start date cannot be in the future"
-  }),
-  position: z.string().min(1, "Position is required"),
-  employeeStatus: z.string().min(1, "Employee status is required"),
-  employmentType: z.string().min(1, "Employment type is required"),
-  
-  // Optional Basic Information
-  aipAccessLevel: z.string().optional(),
-  
-  // Contact Information
-  email: z.string().email("Invalid email format").optional(),
-  contactNumber: z.string().optional(),
-  
-  // Address Information
-  houseName: z.string().optional(),
-  numberAndStreet: z.string().optional(),
-  town: z.string().optional(),
-  county: z.string().optional(),
-  postCode: z.string().optional(),
-  region: z.string().optional(),
-  
-  // SIA Information - Conditional based on AIP Access Level
-  siaLicenceType: z.string().optional(),
-  siaLicenceExpiry: z.string().optional().refine((date) => {
-    if (!date) return true // Optional field
-    const selectedDate = new Date(date)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0) // Reset time to start of day
-    return selectedDate >= today
-  }, {
-    message: "SIA licence expiry date cannot be in the past"
-  }),
-  
-  // Personal Information
-  nationality: z.string().optional(),
-  rightToWorkCondition: z.string().optional(),
-  
-  // Driving License Information
-  drivingLicenceType: z.string().optional(),
-  dateDLChecked: z.string().optional(),
-  drivingLicenceCopyTaken: z.boolean().optional(),
-  sixMonthlyCheck: z.boolean().optional(),
-  
-  // Checks and References
-  graydonCheckAuthorised: z.boolean().optional(),
-  graydonCheckDetails: z.string().optional(),
-  initialOralReferencesComplete: z.boolean().optional(),
-  initialOralReferencesDate: z.string().optional(),
-  writtenRefsComplete: z.boolean().optional(),
-  writtenRefsCompleteDate: z.string().optional(),
-  quickStarterFormCompleted: z.boolean().optional(),
-  
-  // Employment Documentation
-  workingTimeDirective: z.string().optional(),
-  workingTimeDirectiveComplete: z.boolean().optional(),
-  contractOfEmploymentSigned: z.boolean().optional(),
-  photoTaken: z.boolean().optional(),
-  photoFile: z.string().optional(),
-  idCardIssued: z.boolean().optional(),
-  equipmentIssued: z.boolean().optional(),
-  uniformIssued: z.boolean().optional(),
-  nextOfKinDetailsComplete: z.boolean().optional(),
-  
-  // Training and Induction
-  peopleHoursPin: z.string().optional(),
-  fullRotasIssued: z.string().optional().refine((date) => {
-    if (!date) return true // Optional field
-    const selectedDate = new Date(date)
-    return !isNaN(selectedDate.getTime())
-  }, {
-    message: "Please enter a valid date"
-  }),
-  inductionAndTrainingBooked: z.string().optional().refine((date) => {
-    if (!date) return true // Optional field
-    const selectedDate = new Date(date)
-    return !isNaN(selectedDate.getTime())
-  }, {
-    message: "Please enter a valid date"
-  }),
-  location: z.string().optional(),
-  trainer: z.string().optional(),
-  
-  status: z.enum(["active", "inactive"]).optional(),
-}).refine((data) => {
-  // SIA fields are required only for Advantageoneofficer and AdvantageoneHOofficer (case-insensitive)
-  const requiresSIA = data.aipAccessLevel?.toLowerCase() === 'advantageoneofficer' || data.aipAccessLevel?.toLowerCase() === 'advantageonehoofficer'
-  
-  if (requiresSIA) {
-    if (!data.siaLicenceType || data.siaLicenceType.trim() === '') {
-      return false
-    }
-    if (!data.siaLicenceExpiry || data.siaLicenceExpiry.trim() === '') {
-      return false
-    }
-  }
-  
-  return true
-}, {
-  message: "SIA Licence Type and Expiry are required for Advantageoneofficer and AdvantageoneHOofficer roles",
-  path: ["siaLicenceType"] // This will show the error on the siaLicenceType field
-})
+import { employeeFormSchema, type EmployeeFormValues } from './employeeFormSchema'
 
-type FormData = z.infer<typeof formSchema>
+type FormData = EmployeeFormValues
 
 interface EmployeeFormProps {
   onSubmit?: (data: FormData) => Promise<void>
@@ -156,6 +46,7 @@ interface EmployeeFormProps {
 
 // All dropdown data is now loaded dynamically from lookup tables
 
+// === Component ===
 export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: EmployeeFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -166,12 +57,10 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
   const [regions, setRegions] = useState<LookupTableItem[]>([])
   const [isLoadingCounties, setIsLoadingCounties] = useState(false)
   const [isLoadingRegions, setIsLoadingRegions] = useState(false)
-  const [userRoles, setUserRoles] = useState<LookupTableItem[]>([])
   const [positions, setPositions] = useState<LookupTableItem[]>([])
   const [siaLicenceTypes, setSiaLicenceTypes] = useState<LookupTableItem[]>([])
   const [drivingLicenceTypes, setDrivingLicenceTypes] = useState<LookupTableItem[]>([])
   const [rightToWorkConditions, setRightToWorkConditions] = useState<LookupTableItem[]>([])
-  const [isLoadingUserRoles, setIsLoadingUserRoles] = useState(false)
   const [isLoadingPositions, setIsLoadingPositions] = useState(false)
   const [isLoadingSiaLicenceTypes, setIsLoadingSiaLicenceTypes] = useState(false)
   const [isLoadingDrivingLicenceTypes, setIsLoadingDrivingLicenceTypes] = useState(false)
@@ -181,9 +70,8 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
   const [isLoadingWorkingTimeDirectives, setIsLoadingWorkingTimeDirectives] = useState(false)
 
   const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(employeeFormSchema),
     defaultValues: {
-      aipAccessLevel: initialData?.aipAccessLevel || "",
       title: initialData?.title || "",
       firstName: initialData?.firstName || "",
       surname: initialData?.surname || "",
@@ -233,9 +121,12 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
     },
   })
 
-  // Watch AIP Access Level to conditionally show SIA fields
-  const aipAccessLevel = form.watch('aipAccessLevel')
-  const requiresSIA = aipAccessLevel?.toLowerCase() === 'advantageoneofficer' || aipAccessLevel?.toLowerCase() === 'advantageonehoofficer'
+  const ensureAutoEmployeeNumber = () => {
+    if (initialData?.id) return
+    const currentEmployeeNumber = form.getValues('employeeNumber')
+    if (currentEmployeeNumber && currentEmployeeNumber.trim().length > 0) return
+    form.setValue('employeeNumber', generateEmployeeNumber(), { shouldValidate: true, shouldDirty: false })
+  }
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -266,7 +157,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
     }
   }
 
-     // Load lookup data and employee data on component mount
+  // Load lookup tables first so edit mode can align stored values with dropdown options.
   useEffect(() => {
     const loadData = async () => {
       // Load all lookup table data first
@@ -274,7 +165,6 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
         'Trainers',
         'UK_Counties', 
         'UK_Regions',
-        'User_Roles',
         'Positions',
         'SIA_Licence_Types',
         'Driving_Licence_Types',
@@ -282,7 +172,6 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
         'Working_Time_Directive'
       ]
 
-      console.log('Loading lookup table data in parallel...')
       setIsLoadingLookupData(true)
       
       try {
@@ -292,14 +181,11 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
         setTrainers(lookupData['Trainers'] || [])
         setCounties(lookupData['UK_Counties'] || [])
         setRegions(lookupData['UK_Regions'] || [])
-        setUserRoles(lookupData['User_Roles'] || [])
         setPositions(lookupData['Positions'] || [])
         setSiaLicenceTypes(lookupData['SIA_Licence_Types'] || [])
         setDrivingLicenceTypes(lookupData['Driving_Licence_Types'] || [])
         setRightToWorkConditions(lookupData['Right_To_Work_Conditions'] || [])
         setWorkingTimeDirectives(lookupData['Working_Time_Directive'] || [])
-        
-        console.log('All lookup table data loaded successfully')
         
         // Now load employee data if editing (after lookup data is loaded)
         if (initialData?.id) {
@@ -318,7 +204,6 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
             
             // Update form with loaded data, ensuring dropdown values match lookup data
             form.reset({
-              aipAccessLevel: findLookupValue(employeeData.aipAccessLevel, lookupData['User_Roles'] || []),
               title: employeeData.title || "",
               firstName: employeeData.firstName || "",
               surname: employeeData.surname || "",
@@ -391,15 +276,14 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
       form.reset()
       form.clearErrors()
       setPhotoPreview(null)
+      ensureAutoEmployeeNumber()
     }
   }, [initialData, form])
 
   // Force form reset when employee ID changes (for switching between employees)
   useEffect(() => {
-    console.log('🔄 [EmployeeForm] Employee ID changed:', initialData?.id)
     if (initialData?.id) {
       // Reset form immediately when switching to a different employee
-      console.log('🔄 [EmployeeForm] Resetting form for employee ID:', initialData.id)
       form.reset()
       form.clearErrors()
       setPhotoPreview(null)
@@ -416,18 +300,11 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
     }
   }, [form])
 
+  // Submission: optional parent callback or employeeService create/update via employeeMapper.
   const handleSubmit = async (data: FormData) => {
-    console.log('🚀 [EmployeeForm] Starting form submission...')
-    console.log('📝 [EmployeeForm] Form data received:', data)
-    console.log('🆔 [EmployeeForm] Current employee ID:', initialData?.id)
-    
     // Validate required fields before submission
     const requiredFields = ['employeeNumber', 'title', 'firstName', 'surname', 'startDate', 'position', 'employeeStatus', 'employmentType']
     const missingFields = requiredFields.filter(field => !data[field as keyof FormData])
-    
-    console.log('🔍 [EmployeeForm] Form validation - Required fields:', requiredFields)
-    console.log('🔍 [EmployeeForm] Form validation - Missing fields:', missingFields)
-    console.log('🔍 [EmployeeForm] Form validation - Employee number:', data.employeeNumber)
     
     if (missingFields.length > 0) {
       console.error('❌ [EmployeeForm] Missing required fields:', missingFields)
@@ -441,17 +318,11 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
     
     try {
       if (onSubmit) {
-        console.log('🔄 [EmployeeForm] Using custom onSubmit')
         // Use custom onSubmit if provided
         await onSubmit(data)
       } else {
-        console.log('🔄 [EmployeeForm] Using real API service')
         // Use real API service with frontend data format
-        console.log('📤 [EmployeeForm] Using frontend data format for API call')
-        console.log('📤 [EmployeeForm] Form data being sent:', JSON.stringify(data, null, 2))
-
         if (initialData?.id) {
-          console.log('🔄 [EmployeeForm] Updating existing employee with ID:', initialData.id)
           // Update existing employee - convert form data to Employee format
           const employeeData: Partial<Employee> = {
             ...data,
@@ -463,10 +334,8 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
             fullRotasIssued: data.fullRotasIssued ? new Date(data.fullRotasIssued) : undefined,
             inductionAndTrainingBooked: data.inductionAndTrainingBooked ? new Date(data.inductionAndTrainingBooked) : undefined,
           }
-          const result = await employeeService.updateEmployee(Number(initialData.id), employeeData)
-          console.log('✅ [EmployeeForm] Employee update successful:', result)
+          await employeeService.updateEmployee(Number(initialData.id), employeeData)
         } else {
-          console.log('🆕 [EmployeeForm] Creating new employee')
           // Create new employee - convert form data to Employee format
           const employeeData: Partial<Employee> = {
             ...data,
@@ -478,13 +347,10 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
             fullRotasIssued: data.fullRotasIssued ? new Date(data.fullRotasIssued) : undefined,
             inductionAndTrainingBooked: data.inductionAndTrainingBooked ? new Date(data.inductionAndTrainingBooked) : undefined,
           }
-          const result = await employeeService.registerEmployeeFromFrontend(employeeData)
-          console.log('✅ [EmployeeForm] Employee creation successful:', result)
+          await employeeService.registerEmployeeFromFrontend(employeeData)
         }
       }
-      
-      console.log('✅ [EmployeeForm] Form submission completed successfully')
-      
+
       // Reset form state to clear any cached data and validation errors
       form.reset()
       form.clearErrors()
@@ -500,11 +366,6 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
       onCancel()
     } catch (error) {
       console.error('❌ [EmployeeForm] Error submitting employee form:', error)
-      console.error('❌ [EmployeeForm] Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        error: error
-      })
       
       // Extract specific error message from backend response
       let errorMessage = 'An error occurred while saving the employee'
@@ -523,7 +384,6 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
       
       setSubmitError(errorMessage)
     } finally {
-      console.log('🏁 [EmployeeForm] Form submission process finished')
       setIsSubmitting(false)
     }
   }
@@ -541,31 +401,6 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="aipAccessLevel"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>AIP Access Level</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={isLoadingLookupData ? "Loading..." : "Select access level"} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {userRoles.map((role) => (
-                        <SelectItem key={role.lookupId} value={role.value}>
-                          {role.value}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
               name="title"
@@ -633,7 +468,12 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                 <FormItem>
                   <FormLabel>Employee Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="EMP001" {...field} />
+                    <Input
+                      placeholder="Auto-generated"
+                      {...field}
+                      disabled
+                      readOnly
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -922,38 +762,26 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
           </CardContent>
         </Card>
 
-        {/* SIA Information Section - Only show for Advantageoneofficer and AdvantageoneHOofficer */}
-        {requiresSIA && (
-          <>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> SIA information is required for Advantageoneofficer and AdvantageoneHOofficer roles.
-              </p>
-            </div>
-          </>
-        )}
-        {!requiresSIA && aipAccessLevel && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
-            <p className="text-sm text-gray-600">
-              <strong>Note:</strong> SIA information is not required for the selected role ({aipAccessLevel}).
+        {/* SIA Information — HR record only; app roles are assigned in User Setup */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              SIA Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Optional. Record SIA licence details when applicable. Who can sign in and what they see in AIP is configured under{' '}
+              <strong>Administration → User Setup</strong>, not here.
             </p>
-          </div>
-        )}
-        {requiresSIA && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                SIA Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="siaLicenceType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>SIA Licence Type *</FormLabel>
+                    <FormLabel>SIA Licence Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -978,7 +806,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                 name="siaLicenceExpiry"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>SIA Licence Expiry *</FormLabel>
+                    <FormLabel>SIA Licence Expiry</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
                     </FormControl>
@@ -986,9 +814,9 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                   </FormItem>
                 )}
               />
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Driving License Information Section */}
         <Card>

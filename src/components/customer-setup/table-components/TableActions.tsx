@@ -11,6 +11,7 @@ interface TableActionsProps {
   newButtonText: string
 }
 
+// === Component ===
 export function TableActions({ 
   title,
   searchQuery, 

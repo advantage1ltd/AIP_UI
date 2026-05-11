@@ -1,3 +1,7 @@
+/**
+ * Shared survey form sections for satisfaction flows.
+ * Flow: customer/region/site context → rating scale fields → follow-up actions passed to parent onSubmit.
+ */
 import React, { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,14 +25,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { RATING_SCALE, CustomerSurvey } from './types';
-import { Minus, Plus, Map, Building, User, Award, Star, Smile, UserCheck, Shield, Users, Clock, Zap, ClipboardList } from 'lucide-react';
+import { Minus, Plus, Map, Building, User, Award, Star, Smile, UserCheck, Shield, Users, Clock, Zap, ClipboardList, Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon } from 'lucide-react';
-import { Calendar } from "@/components/ui/calendar";
+import { NativeDateInput, parseDateInputValue } from "@/components/ui/native-date-input";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 
 type RatingFields = {
   uniformAndAppearance: number;
@@ -520,35 +521,17 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
                       </div>
                     </FormLabel>
                     <FormControl>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !formData.date && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {formData.date ? format(new Date(formData.date), "PPP") : <span>Pick a date</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={formData.date ? new Date(formData.date) : undefined}
-                            onSelect={(date) => {
-                              if (date instanceof Date) {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  date: format(date, 'yyyy-MM-dd')
-                                }));
-                              }
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <NativeDateInput
+                        value={formData.date ? parseDateInputValue(formData.date) : undefined}
+                        onDateChange={(d) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            date: d ? format(d, 'yyyy-MM-dd') : ''
+                          }))
+                        }}
+                        className="h-8 md:h-9 text-xs md:text-sm bg-background"
+                        aria-label="Survey date"
+                      />
                     </FormControl>
                     <FormMessage className="text-[10px]" />
                   </FormItem>

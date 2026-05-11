@@ -1,4 +1,9 @@
+/**
+ * Polls action-calendar open task count for the signed-in user (header badge).
+ * Flow: auth-aware polling with cooldowns on auth/backend failures.
+ */
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { logger } from '@/utils/logger'
 import { isAxiosError } from 'axios'
 import { useAuth } from '@/contexts/AuthContext'
 import { isBackendUnavailableError } from '@/config/api'
@@ -76,18 +81,24 @@ export const useUserTaskCount = () => {
 			setIsLoading(true)
 			setError(null)
 
-			const response = await actionCalendarService.getTasks({
-				assignee: user.id,
-				page: 1,
-				pageSize: 1000 // Get all tasks to count them
-			})
-
-			if (response.success && response.data) {
-				// Count only non-completed tasks
-				const nonCompletedTasks = response.data.filter(
-					task => task.taskStatus !== 'completed'
+			const statuses: Array<'pending' | 'in-progress' | 'blocked'> = ['pending', 'in-progress', 'blocked']
+			const responses = await Promise.all(
+				statuses.map(status =>
+					actionCalendarService.getTasks({
+						assignee: user.id,
+						status,
+						page: 1,
+						pageSize: 1,
+					})
 				)
-				setTaskCount(nonCompletedTasks.length)
+			)
+
+			if (responses.every(response => response.success)) {
+				const total = responses.reduce(
+					(sum, response) => sum + (response.pagination?.totalCount ?? response.data?.length ?? 0),
+					0
+				)
+				setTaskCount(total)
 				authErrorCooldownUntilRef.current = 0
 				backendOfflineCooldownUntilRef.current = 0
 			} else {
@@ -99,9 +110,9 @@ export const useUserTaskCount = () => {
 			const backendUnavailable = isBackendUnavailableError(err)
 
 			if (!authErrorDetected && !backendUnavailable) {
-				console.error('Error fetching user task count:', err)
+				logger.error('Error fetching user task count:', err)
 			} else if (backendUnavailable && debugLogsEnabled) {
-				console.warn('⚠️ [TaskCount] Backend unavailable, temporarily pausing task count polling')
+				logger.warn('⚠️ [TaskCount] Backend unavailable, temporarily pausing task count polling')
 			}
 			setTaskCount(0)
 			setError(backendUnavailable ? null : (err instanceof Error ? err.message : 'Failed to fetch tasks'))

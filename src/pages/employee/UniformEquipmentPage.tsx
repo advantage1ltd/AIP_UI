@@ -1,3 +1,7 @@
+/**
+ * Uniform and equipment issuance tracking.
+ * Flow: employee-scoped inventory list → issue/return dialogs → stock and assignment updates.
+ */
 import React, { useState, useCallback, useMemo } from 'react'
 import { format } from 'date-fns'
 import { useForm } from 'react-hook-form'
@@ -5,13 +9,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
+import { harmonizeRole } from '@/utils/roles'
 
 // UI Components
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Calendar } from '@/components/ui/calendar'
+import { NativeDateInput } from '@/components/ui/native-date-input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Card,
@@ -37,11 +42,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import {
   Form,
   FormControl,
   FormField,
@@ -57,7 +57,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/components/ui/use-toast'
-import { cn } from '@/lib/utils'
 
 // Icons
 import {
@@ -65,7 +64,6 @@ import {
   Search,
   Pencil,
   Trash2,
-  CalendarIcon,
   ShirtIcon,
   Package,
   Clock,
@@ -103,6 +101,9 @@ import {
 
 // Constants
 const ITEMS_PER_PAGE = 10
+
+/** Officers only see request workflow rows that are still actionable or approved (not rejected/cancelled history here). */
+const OFFICER_VISIBLE_REQUEST_STATUSES: UniformEquipmentRequest['status'][] = ['Pending', 'Approved']
 
 // ========== Form Schemas ==========
 
@@ -150,14 +151,25 @@ const UniformEquipmentPage: React.FC = () => {
   const { user } = useAuth()
   const queryClient = useQueryClient()
 
-  // Determine user role
-  const isAdmin = useMemo(() => {
-    const role = user?.role?.toLowerCase() || ''
-    return role === 'administrator' || role === 'advantageonehoofficer'
-  }, [user])
+  const effectiveRole = useMemo(
+    () => harmonizeRole(user?.pageAccessRole ?? user?.role ?? ''),
+    [user?.pageAccessRole, user?.role]
+  )
+
+  const isAdmin = useMemo(
+    () => effectiveRole === 'administrator' || effectiveRole === 'manager',
+    [effectiveRole]
+  )
+
+  const isOfficer = effectiveRole === 'securityofficer'
 
   // State
   const [activeTab, setActiveTab] = useState(isAdmin ? 'issued' : 'my-requests')
+
+  React.useEffect(() => {
+    if (!user) return
+    setActiveTab(isAdmin ? 'issued' : 'my-requests')
+  }, [user?.id, isAdmin])
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   
@@ -478,6 +490,26 @@ const UniformEquipmentPage: React.FC = () => {
     }
   }, [employees, issuedForm])
 
+  const officerVisibleRequests = useMemo(() => {
+    const items = myRequestsData?.items ?? []
+    if (!isOfficer) return items
+    return items.filter((r) => OFFICER_VISIBLE_REQUEST_STATUSES.includes(r.status))
+  }, [myRequestsData?.items, isOfficer])
+
+  const officerVisibleIssued = useMemo(() => {
+    const items = myIssuedData?.items ?? []
+    if (!isOfficer) return items
+    return items.filter((i) => i.requestId != null && i.requestId > 0)
+  }, [myIssuedData?.items, isOfficer])
+
+  React.useEffect(() => {
+    if (isAdmin) return
+    setIsIssuedDialogOpen(false)
+    setEditingIssued(null)
+    setIsReviewDialogOpen(false)
+    setReviewingRequest(null)
+  }, [isAdmin])
+
   const closeRequestDialog = useCallback(() => {
     setIsRequestDialogOpen(false)
     requestForm.reset()
@@ -511,7 +543,11 @@ const UniformEquipmentPage: React.FC = () => {
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Uniform & Equipment</h1>
                 <p className="text-gray-500 text-sm">
-                  {isAdmin ? 'Manage equipment requests and track issued items' : 'Request equipment and view your issued items'}
+                  {isAdmin
+                    ? 'Manage equipment requests and track issued items'
+                    : isOfficer
+                      ? 'Submit requests and view pending or approved requests and equipment issued for those requests'
+                      : 'Request equipment and view your issued items'}
                 </p>
               </div>
             </div>
@@ -677,21 +713,29 @@ const UniformEquipmentPage: React.FC = () => {
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
                   </div>
-                ) : myRequestsData?.items.length === 0 ? (
+                ) : (myRequestsData?.items.length === 0 || (isOfficer && officerVisibleRequests.length === 0)) ? (
                   <div className="text-center py-12">
                     <div className="h-16 w-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
                       <Send className="h-8 w-8 text-gray-400" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Requests Yet</h3>
-                    <p className="text-gray-500 mb-4">You haven't submitted any equipment requests.</p>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      {isOfficer && (myRequestsData?.items.length ?? 0) > 0 && officerVisibleRequests.length === 0
+                        ? 'No pending or approved requests'
+                        : 'No Requests Yet'}
+                    </h3>
+                    <p className="text-gray-500 mb-4">
+                      {isOfficer && (myRequestsData?.items.length ?? 0) > 0 && officerVisibleRequests.length === 0
+                        ? 'Rejected or closed requests are hidden here. Submit a new request if you need something else.'
+                        : "You haven't submitted any equipment requests."}
+                    </p>
                     <Button onClick={() => setIsRequestDialogOpen(true)} className="gap-2">
                       <Plus className="h-4 w-4" />
-                      Submit Your First Request
+                      {(myRequestsData?.items.length ?? 0) === 0 ? 'Submit Your First Request' : 'New request'}
                     </Button>
                   </div>
                 ) : (
                   <RequestsTable
-                    requests={myRequestsData?.items || []}
+                    requests={isOfficer ? officerVisibleRequests : (myRequestsData?.items || [])}
                     isAdmin={false}
                     onView={handleViewRequest}
                     onCancel={handleCancelRequest}
@@ -705,17 +749,21 @@ const UniformEquipmentPage: React.FC = () => {
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
                   </div>
-                ) : myIssuedData?.items.length === 0 ? (
+                ) : officerVisibleIssued.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="h-16 w-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
                       <Package className="h-8 w-8 text-gray-400" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Equipment Assigned</h3>
-                    <p className="text-gray-500">You don't have any equipment assigned to you yet.</p>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No equipment from your requests yet</h3>
+                    <p className="text-gray-500">
+                      {isOfficer
+                        ? 'Only items issued against one of your approved requests appear here. Staff issue equipment after approval—you cannot issue items yourself.'
+                        : "You don't have any equipment assigned to you yet."}
+                    </p>
                   </div>
                 ) : (
                   <IssuedTable
-                    items={myIssuedData?.items || []}
+                    items={officerVisibleIssued}
                     isAdmin={false}
                   />
                 )}
@@ -916,8 +964,14 @@ const UniformEquipmentPage: React.FC = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Issue Equipment Dialog (Admin) */}
-        <Dialog open={isIssuedDialogOpen} onOpenChange={setIsIssuedDialogOpen}>
+        {/* Issue Equipment Dialog (Admin / Manager only) */}
+        <Dialog
+          open={isAdmin && isIssuedDialogOpen}
+          onOpenChange={(open) => {
+            if (!isAdmin) return
+            setIsIssuedDialogOpen(open)
+          }}
+        >
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -1054,30 +1108,17 @@ const UniformEquipmentPage: React.FC = () => {
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel>Date Issued</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value ? format(field.value, "PPP") : "Pick a date"}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <FormControl>
+                          <NativeDateInput
+                            ref={field.ref}
+                            name={field.name}
+                            value={field.value}
+                            onDateChange={field.onChange}
+                            onBlur={field.onBlur}
+                            disabled={field.disabled}
+                            aria-label="Date issued"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1090,30 +1131,17 @@ const UniformEquipmentPage: React.FC = () => {
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
                           <FormLabel>Date Returned</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  className={cn(
-                                    "w-full pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                  )}
-                                >
-                                  {field.value ? format(field.value, "PPP") : "Not returned"}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value || undefined}
-                                onSelect={field.onChange}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <FormControl>
+                            <NativeDateInput
+                              ref={field.ref}
+                              name={field.name}
+                              value={field.value}
+                              onDateChange={field.onChange}
+                              onBlur={field.onBlur}
+                              disabled={field.disabled}
+                              aria-label="Date returned"
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1158,8 +1186,14 @@ const UniformEquipmentPage: React.FC = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Review Request Dialog (Admin) */}
-        <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+        {/* Review Request Dialog (Admin / Manager only) */}
+        <Dialog
+          open={isAdmin && isReviewDialogOpen}
+          onOpenChange={(open) => {
+            if (!isAdmin) return
+            setIsReviewDialogOpen(open)
+          }}
+        >
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Review Request</DialogTitle>

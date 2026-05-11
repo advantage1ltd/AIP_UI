@@ -14,6 +14,7 @@ interface EmployeeRegistrationFormProps {
   onCancel: () => void
 }
 
+// === Component ===
 export function EmployeeRegistrationForm({ mode, employee, onCancel }: EmployeeRegistrationFormProps) {
   const [currentStep, setCurrentStep] = useState<'personal' | 'address' | 'position' | 'licensing' | 'onboarding'>('personal')
   const { toast } = useToast()

@@ -1,25 +1,22 @@
+/**
+ * Session helpers for logout, token/user accessors, and fetch auth headers.
+ * Flow: sessionStore read/write → optional window events for auth-aware UI refresh.
+ */
 import { sessionStore } from '@/state/sessionStore'
+import { logger } from '@/utils/logger'
 import { User } from '@/types/user'
-
-const TOKEN_KEY = 'authToken'
 
 export const logout = (): void => {
 	try {
-		localStorage.removeItem(TOKEN_KEY)
-		sessionStore.setUser(null)
+		sessionStore.clearAll()
 		window.dispatchEvent(new Event('session-cleared'))
 	} catch (error) {
-		console.error('Logout error:', error)
+		logger.error('Logout error:', error)
 	}
 }
 
 export const getToken = (): string | null => {
-	try {
-		return localStorage.getItem(TOKEN_KEY)
-	} catch (error) {
-		console.error('Error getting token:', error)
-		return null
-	}
+	return sessionStore.getToken()
 }
 
 export const getUser = (): User | null => {

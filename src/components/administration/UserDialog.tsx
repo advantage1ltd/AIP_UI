@@ -1,3 +1,7 @@
+/**
+ * User create/edit dialog wrapper.
+ * Flow: remount UserForm per user id → submit delegates to UserSetup mutations.
+ */
 import React from 'react'
 import {
   Dialog,
@@ -24,7 +28,7 @@ export const UserDialog = ({
 }: UserDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100%-1.5rem)] sm:w-auto max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
             {user ? 'Edit User' : 'Create New User'}
@@ -34,6 +38,7 @@ export const UserDialog = ({
             </DialogDescription>
         </DialogHeader>
         <UserForm
+          key={user?.id ?? '__create__'}
           initialData={user}
           onSubmit={onSubmit}
           onCancel={() => onOpenChange(false)}

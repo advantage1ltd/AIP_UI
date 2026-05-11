@@ -1,8 +1,6 @@
 /**
- * Repeat Offender Analysis Module
- * 
- * Displays most active offenders, cross-store movement patterns,
- * and offender network map visualization.
+ * Repeat Offender Analysis: offenders, movements, and store network from analytics hub data.
+ * Flow: most-active table → cross-store movement cards → SVG network map with empty states.
  */
 
 import { useMemo, useState } from 'react'
@@ -33,6 +31,7 @@ import {
 	AlertTriangle,
 	TrendingUp,
 } from 'lucide-react'
+import { AnalyticsSectionEmptyState } from './AnalyticsSectionEmptyState'
 
 interface RepeatOffenderAnalysisProps {
 	data: RepeatOffenderData
@@ -65,6 +64,11 @@ export const RepeatOffenderAnalysis = ({
 		if (!selectedOffenderId) return null
 		return data.crossStoreMovements.find((m) => m.offenderId === selectedOffenderId) || null
 	}, [selectedOffenderId, data.crossStoreMovements])
+
+	const networkNodesById = useMemo(
+		() => new Map(data.networkMap.nodes.map((node) => [node.id, node])),
+		[data.networkMap.nodes]
+	)
 
 	if (loading) {
 		return (
@@ -122,11 +126,18 @@ export const RepeatOffenderAnalysis = ({
 							</Card>
 						</div>
 
+						{data.mostActive.length === 0 ? (
+							<AnalyticsSectionEmptyState
+								title="No repeat offenders in this range"
+								description="Offenders appear here when incidents include offender names in the selected filters."
+							/>
+						) : (
+						<>
 						<div className="border rounded-lg">
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Offender ID</TableHead>
+										<TableHead>Offender Name</TableHead>
 										<TableHead>Incidents</TableHead>
 										<TableHead>Stores Targeted</TableHead>
 										<TableHead>Total Value</TableHead>
@@ -138,8 +149,8 @@ export const RepeatOffenderAnalysis = ({
 								<TableBody>
 									{data.mostActive.map((offender) => (
 										<TableRow key={offender.offenderId}>
-											<TableCell className="font-medium font-mono">
-												{offender.offenderId}
+											<TableCell className="font-medium">
+												{offender.name}
 											</TableCell>
 											<TableCell>
 												<Badge variant="outline">{offender.incidentCount}</Badge>
@@ -268,16 +279,25 @@ export const RepeatOffenderAnalysis = ({
 								</CardContent>
 							</Card>
 						)}
+						</>
+						)}
 					</TabsContent>
 
 					<TabsContent value="movements" className="space-y-6 mt-6">
+						{data.crossStoreMovements.length === 0 ? (
+							<AnalyticsSectionEmptyState
+								title="No cross-store movement patterns"
+								description="Movement patterns appear when the same offender is linked to incidents at more than one store."
+							/>
+						) : (
+						<>
 						{data.crossStoreMovements.map((movement) => (
 							<Card key={movement.offenderId}>
 								<CardHeader>
 									<div className="flex items-center justify-between">
 										<div>
 											<CardTitle className="text-base">{movement.offenderName}</CardTitle>
-											<CardDescription>{movement.offenderId}</CardDescription>
+											<CardDescription>{movement.offenderName}</CardDescription>
 										</div>
 										<Badge variant="outline">
 											{movement.totalStores} stores
@@ -312,6 +332,8 @@ export const RepeatOffenderAnalysis = ({
 								</CardContent>
 							</Card>
 						))}
+						</>
+						)}
 					</TabsContent>
 
 					<TabsContent value="network" className="space-y-6 mt-6">
@@ -322,36 +344,56 @@ export const RepeatOffenderAnalysis = ({
 									Offender Network Visualization
 								</CardTitle>
 								<CardDescription>
-									Visual representation of connections between offenders and stores
+									Connections between offenders and stores based on linked incidents
 								</CardDescription>
 							</CardHeader>
 							<CardContent>
-								<div className="relative border rounded-lg bg-gray-50 min-h-[500px] flex items-center justify-center">
-									<div className="text-center space-y-2">
-										<Network className="h-12 w-12 mx-auto text-gray-400" />
-										<p className="text-gray-500">
-											Network map visualization
-										</p>
-										<p className="text-sm text-gray-400">
-											{data.networkMap.nodes.length} nodes, {data.networkMap.links.length} connections
-										</p>
-										<div className="mt-4 space-y-2">
-											<div className="flex items-center justify-center gap-4">
-												<div className="flex items-center gap-2">
-													<div className="w-3 h-3 rounded-full bg-blue-500" />
-													<span className="text-sm">Offenders</span>
-												</div>
-												<div className="flex items-center gap-2">
-													<div className="w-3 h-3 rounded-full bg-green-500" />
-													<span className="text-sm">Stores</span>
-												</div>
-											</div>
-											<p className="text-xs text-gray-400 mt-4">
-												Interactive network visualization will be implemented with a graph library
-											</p>
-										</div>
+								{data.networkMap.nodes.length === 0 ? (
+									<AnalyticsSectionEmptyState
+										title="No network connections to display"
+										description="Offender and store links appear when incidents include offender names and store activity in the selected range."
+									/>
+								) : (
+									<div className="relative overflow-hidden rounded-lg border bg-slate-50">
+										<svg viewBox="-220 -220 440 440" className="h-[500px] w-full">
+											{data.networkMap.links.map((link) => {
+												const source = networkNodesById.get(link.source)
+												const target = networkNodesById.get(link.target)
+												if (!source || !target) return null
+												return (
+													<line
+														key={`${link.source}-${link.target}`}
+														x1={source.x}
+														y1={source.y}
+														x2={target.x}
+														y2={target.y}
+														stroke="#94a3b8"
+														strokeWidth={Math.max(1, link.strength * 4)}
+														strokeOpacity={0.7}
+													/>
+												)
+											})}
+											{data.networkMap.nodes.map((node) => (
+												<g key={node.id}>
+													<circle
+														cx={node.x}
+														cy={node.y}
+														r={node.type === 'offender' ? 10 : 8}
+														fill={node.type === 'offender' ? '#3b82f6' : '#10b981'}
+													/>
+													<text
+														x={node.x}
+														y={node.y + 20}
+														textAnchor="middle"
+														className="fill-slate-700 text-[10px]"
+													>
+														{node.name.length > 18 ? `${node.name.slice(0, 18)}...` : node.name}
+													</text>
+												</g>
+											))}
+										</svg>
 									</div>
-								</div>
+								)}
 								<div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
 									<Card>
 										<CardContent className="p-4">

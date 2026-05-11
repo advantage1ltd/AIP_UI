@@ -1,8 +1,6 @@
 /**
- * Crime Trend Explorer Module
- * 
- * Displays day of week, time of day, and incident type analytics
- * with interactive drill-downs to store level.
+ * Crime Trend Explorer: temporal and type breakdowns from analytics hub data.
+ * Flow: day/time/type charts → store drill-down with selection-driven detail panels.
  */
 
 import { useState, useMemo } from 'react'

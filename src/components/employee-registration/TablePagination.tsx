@@ -10,6 +10,7 @@ interface TablePaginationProps {
   startIndex?: number
 }
 
+// === Component ===
 export function TablePagination({ 
   currentPage, 
   totalPages, 

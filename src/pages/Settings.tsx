@@ -1,3 +1,7 @@
+/**
+ * Application settings including page-access toggles.
+ * Flow: load pageAccess settings → per-role toggles → save through pageAccessApi.
+ */
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
@@ -21,43 +25,31 @@ import { settingsService } from '@/services/settingsService'
 import { PageAccess } from '@/api/pageAccess'
 import { LoadingSpinner } from "@/components/ui/loading-state"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { roleDisplayName } from '@/utils/roles'
+import {
+  SETTINGS_PAGE_ACCESS_ROLES,
+  PAGE_ACCESS_ROLE_DESCRIPTIONS,
+  roleDisplayName,
+  type UserRole,
+} from '@/utils/roles'
+import { logger } from '@/utils/logger'
 
 // Define types for our page access configuration
 type Page = PageAccess;
 
-interface UserRole {
-  id: string
+interface SettingsRoleRow {
+  id: UserRole
   name: string
   description: string
 }
 
+const settingsRoles: SettingsRoleRow[] = SETTINGS_PAGE_ACCESS_ROLES.map((id) => ({
+  id,
+  name: roleDisplayName(id),
+  description: PAGE_ACCESS_ROLE_DESCRIPTIONS[id],
+}))
+
 const Settings = () => {
   const queryClient = useQueryClient();
-  
-  // Define user roles (stored in lowercase to match backend)
-  const userRoles: UserRole[] = [
-    { 
-      id: 'securityofficer', 
-      name: 'Security Officer', 
-      description: 'Security officers working on site operations' 
-    },
-    { 
-      id: 'manager', 
-      name: 'Manager', 
-      description: 'Management users with cross-functional oversight' 
-    },
-    { 
-      id: 'administrator', 
-      name: 'Administrator', 
-      description: 'System administrators with full access' 
-    },
-    { 
-      id: 'customer', 
-      name: 'Customer', 
-      description: 'Customer users with client-facing access' 
-    }
-  ];
 
   const { 
     availablePages, 
@@ -78,7 +70,7 @@ const Settings = () => {
   const [adminAccessModified, setAdminAccessModified] = useState(false);
 
   // State for the selected role in the mobile view
-  const [selectedRoleForMobile, setSelectedRoleForMobile] = useState<string>(userRoles[0]?.id || ''); // Default to first role
+  const [selectedRoleForMobile, setSelectedRoleForMobile] = useState<string>(SETTINGS_PAGE_ACCESS_ROLES[0]);
 
   // State for loading and error handling
   const [isLoading, setIsLoading] = useState(true);
@@ -106,7 +98,7 @@ const Settings = () => {
       if (import.meta.env.DEV) {
 				const officerPages = settings.pageAccessByRole['securityofficer'] || [];
         const crmPages = officerPages.filter(id => id.startsWith('crm-'));
-        console.log(`🔄 [Settings] Syncing from API - Officer has ${crmPages.length} CRM pages:`, crmPages);
+        logger.debug('[Settings] Syncing from API - Officer CRM pages', { count: crmPages.length, crmPages });
       }
       
       lastSyncedSettingsRef.current = settingsKey;
@@ -145,10 +137,9 @@ const Settings = () => {
         const customerReportingPages = officerPages.filter(id => 
           id === 'management-customer-reporting' || id === 'customer-reporting' || id.includes('customer-reporting')
         );
-        console.log(`💾 [Settings] Save successful - Officer pages:`, {
+        logger.debug('[Settings] Save successful - Officer pages', {
           total: officerPages.length,
           customerReporting: customerReportingPages,
-          allPages: officerPages
         });
       }
       
@@ -192,15 +183,9 @@ const Settings = () => {
         }
       }
 
-      // Log detailed error information
-      console.error('❌ [Settings] Failed to save settings:', error);
-      console.error('❌ [Settings] Error details:', {
-        message: errorPayload?.message,
-        response: errorPayload?.response?.data,
+      logger.error('[Settings] Failed to save settings', {
         status: errorPayload?.response?.status,
-        statusText: errorPayload?.response?.statusText,
-        url: errorPayload?.config?.url,
-        requestData: errorPayload?.config?.data
+        message: errorPayload?.response?.data?.message ?? errorPayload?.message,
       });
       
       // Extract error message from response
@@ -252,7 +237,11 @@ const Settings = () => {
 
   const officerCustomerReportingEnabled = useMemo(() => {
     const officerPages = pageAccessByRole['securityofficer'] || [];
-    return officerPages.includes('management-customer-reporting');
+    return officerPages.some(
+      (id) =>
+        id === 'management-customer-reporting' ||
+        String(id).toLowerCase().includes('customer-reporting'),
+    );
   }, [pageAccessByRole]);
 
   if (queryLoading) {
@@ -361,11 +350,6 @@ const Settings = () => {
     'Settings'
   ];
 
-  // Split roles into two groups for the mobile/small tablet view
-  const rolesPerRowMobile = 3; // Show 3 roles per row on mobile
-  const mobileRoleGroup1 = userRoles.slice(0, rolesPerRowMobile);
-  const mobileRoleGroup2 = userRoles.slice(rolesPerRowMobile);
-
   const updateRoleAccess = (roleId: string, updater: (pages: Set<string>) => void) => {
     setPageAccessByRole(prev => {
       const next = { ...prev };
@@ -400,22 +384,23 @@ const Settings = () => {
   // Handle save changes
   // Handler for officer customer reporting toggle
   const handleOfficerReportingToggle = (enabled: boolean) => {
-    updateRoleAccess('securityofficer', (pages) => {
-      if (enabled) {
-        pages.add('management-customer-reporting');
-      } else {
-        pages.delete('management-customer-reporting');
-      }
-    });
-    toast({
-      title: "Setting updated",
-      description: `Officer Customer Reporting access has been ${enabled ? 'enabled' : 'disabled'}.`,
-    });
+    const officerPages = new Set(pageAccessByRole['securityofficer'] ?? []);
+    if (enabled) {
+      officerPages.add('management-customer-reporting');
+    } else {
+      officerPages.delete('management-customer-reporting');
+    }
+    const updated = {
+      ...pageAccessByRole,
+      securityofficer: Array.from(officerPages),
+    };
+    setPageAccessByRole(updated);
+    saveSettings({ pageAccessByRole: updated });
   };
 
   const handleSave = () => {
-    console.log('💾 [Settings] Save button clicked');
-    console.log('💾 [Settings] Current pageAccessByRole:', pageAccessByRole);
+    logger.debug('[Settings] Save button clicked');
+    logger.debug('[Settings] Current pageAccessByRole keys', Object.keys(pageAccessByRole));
     
     // Verify we have pages to save
     const totalPages = Object.values(pageAccessByRole).reduce((sum, pages) => sum + pages.length, 0);
@@ -428,7 +413,7 @@ const Settings = () => {
       return;
     }
     
-    console.log('💾 [Settings] Calling saveSettings mutation...');
+    logger.debug('[Settings] Calling saveSettings mutation');
     saveSettings({ pageAccessByRole });
   };
 
@@ -453,7 +438,7 @@ const Settings = () => {
   };
 
   // Find the full object for the selected mobile role
-  const selectedMobileRoleObject = userRoles.find(role => role.id === selectedRoleForMobile);
+  const selectedMobileRoleObject = settingsRoles.find(role => role.id === selectedRoleForMobile);
 
   return (
     <div className="w-full px-2 sm:px-3 md:px-4 lg:px-6 2xl:px-8 py-2 sm:py-3 md:py-4 lg:py-6 space-y-2 sm:space-y-3 md:space-y-4">
@@ -464,11 +449,11 @@ const Settings = () => {
           <AlertTitle className="flex flex-wrap items-center gap-2">
             Admin Test Mode
             <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-700 border-blue-300">
-              {userRoles.find(r => r.id === testRole)?.name || testRole}
+              {settingsRoles.find(r => r.id === testRole)?.name || testRole}
             </Badge>
           </AlertTitle>
           <AlertDescription>
-            You are in test mode viewing the application as {userRoles.find(r => r.id === testRole)?.name || testRole}.
+            You are in test mode viewing the application as {settingsRoles.find(r => r.id === testRole)?.name || testRole}.
             You still have access to this settings page as an administrator.
           </AlertDescription>
         </Alert>
@@ -548,12 +533,13 @@ const Settings = () => {
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Customer Reporting Access</p>
                   <p className="text-xs text-muted-foreground">
-                    Allow AdvantageOne officers to access the Customer Reporting page
+                    Allow security officers to access the Customer Reporting page
                   </p>
                 </div>
                 <Switch
                   checked={officerCustomerReportingEnabled}
                   onCheckedChange={handleOfficerReportingToggle}
+                  disabled={isSaving}
                   className="data-[state=checked]:bg-primary"
                 />
               </div>
@@ -579,7 +565,7 @@ const Settings = () => {
                   <SelectValue placeholder="Select a role to configure" />
                 </SelectTrigger>
                 <SelectContent>
-                  {userRoles.map((role) => (
+                  {settingsRoles.map((role) => (
                     <SelectItem key={role.id} value={role.id} className="text-xs sm:text-sm">
                       {role.name}
                     </SelectItem>
@@ -602,7 +588,7 @@ const Settings = () => {
                 <thead className="bg-muted/50 sticky top-0 z-10">
                   <tr>
                     <th className="text-left py-2.5 px-3 sm:py-3 sm:px-4 font-medium text-xs sm:text-sm w-[28%]">Page</th>
-                    {userRoles.map((role) => (
+                    {settingsRoles.map((role) => (
                       <th key={role.id} className="text-center py-2.5 px-2 sm:py-3 sm:px-3 font-medium text-xs whitespace-nowrap">
                         <TooltipProvider>
                           <Tooltip>
@@ -625,7 +611,7 @@ const Settings = () => {
                   if (pagesInSubcategory.length === 0) return null;
                   return (<React.Fragment key={subcategory + '-lg'}>
                     <tr className="bg-muted/30 border-t">
-                      <td colSpan={userRoles.length + 1} className="py-2 px-4 font-semibold text-sm">
+                      <td colSpan={settingsRoles.length + 1} className="py-2 px-4 font-semibold text-sm">
                         {subcategory}
                       </td>
                     </tr>
@@ -637,7 +623,7 @@ const Settings = () => {
                             <div className="text-xs text-muted-foreground mt-0.5">{page.path}</div>
                           </div>
                         </td>
-                        {userRoles.map(role => (
+                        {settingsRoles.map(role => (
                           <td key={`${page.id}-${role.id}-lg`} className="text-center py-3 px-2">
                             <div className="flex justify-center">
                               <Switch

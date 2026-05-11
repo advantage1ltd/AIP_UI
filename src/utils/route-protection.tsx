@@ -1,3 +1,6 @@
+/**
+ * Legacy route guard hook (role/path checks). Prefer ProtectedRoute + PageAccessContext for new routes.
+ */
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,8 +18,8 @@ const defaultRouteConfig: RouteConfig[] = [
   { path: '/login', requireAuth: false },
   { path: '/dashboard', requireAuth: true },
   { path: '/admin/*', roles: ['administrator'], requireAuth: true },
-  { path: '/customer/*', roles: ['customerhomanager', 'customersitemanager'], requireAuth: true },
-  { path: '/officer/*', roles: ['advantageoneofficer', 'advantageonehoofficer'], requireAuth: true },
+  { path: '/customer/*', roles: ['customer'], requireAuth: true },
+  { path: '/officer/*', roles: ['securityofficer', 'manager'], requireAuth: true },
 ];
 
 export function useRouteProtection(customConfig: RouteConfig[] = []) {

@@ -57,17 +57,6 @@ export const CUSTOMER_PAGES: Record<string, CustomerPage> = {
     category: 'security',
     icon: 'Shield'
   },
-  'mystery-shopper': {
-    id: 'customer-mystery-shopper-report',
-    title: 'Mystery Shopper Evaluations',
-    description: 'Track and manage mystery shopper performance evaluations',
-    enabled: true,
-    requiredForTypes: [], // No required pages - customers needs vary
-    path: '/customer/mystery-shopper-report',
-    readOnly: false,
-    category: 'activity',
-    icon: 'UserCheck'
-  },
   'site-visit-reports': {
     id: 'customer-site-visit-reports',
     title: 'Site Visit Reports',

@@ -1,3 +1,7 @@
+/**
+ * CRM contacts list and contact form.
+ * Flow: searchable contact table → create/edit dialog → crmEmailService and contact persistence.
+ */
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import React from 'react'
 import { Plus, Search, Users, Building, CheckCircle2, FileText, X, Trash2, MessageSquare } from 'lucide-react'
@@ -10,6 +14,8 @@ import { CRMContact } from '@/types/crmContact'
 import { toast as hotToast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { crmContactService } from '@/services/crmContactService'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { logger } from '@/utils/logger'
 import {
 	Dialog,
 	DialogContent,
@@ -52,58 +58,6 @@ type StatCard = {
 	bgColor: string
 	hoverColor: string
 }
-
-// Sample data - replace with actual data fetching
-const SAMPLE_CRM_CONTACTS: CRMContact[] = [
-	{
-		id: '1',
-		fullName: 'Rachel Friend',
-		influence: 'decision maker',
-		contact1Mobile: 'tbc',
-		contact2Landline: '0121 249 2500',
-		linkedIn: '',
-		bdmContactOwner: 'Jas Jassi',
-		leadStatus: 'Closed',
-		jobTitle: 'Head of Indirect Procurement',
-		email: 'rachel.friend@dana.com',
-		connectedOnLinkedIn: 'No',
-		createDate: '2025-10-16',
-		businessName: 'DANA UK Axle',
-		addressFirstLine: 'Birch Road',
-		addressSecondLine: '',
-		postCode: 'B6 7JR',
-		town: 'Birmingham',
-		region: 'West Midlands',
-		website: 'www.dana.com',
-		sizeOfBusinessEmployees: 0,
-		sizeOfBusinessTurnover: 0,
-		industrySector: 'Other',
-		services: ['Manned Security > Gatehouse Officers', 'Monitoring > CCTV Monitoring'],
-		multipleOpportunities: 'CCTV & Gatehouse',
-		currentRisksConcerns: '',
-		contractStatus: 'Pending',
-		nextSteps: 'SEND INTRO EMAIL',
-		includedOnNewsletter: 'No',
-		notes: 'Rachel Friend is the INDIRECT PROCURMENT MANAGER responsible for all security procurement Lynne Worwood - lynne.worwood@dana.com (HR Business partner',
-		scopeOfWorks: 'Gatehouse and CCTV',
-		incumbentSupplier: 'Magenta',
-		lengthOfContract: 2,
-		dateOfNextReview: '2025-12-04',
-		managerReview: '',
-		lastActivityDate: '2025-10-16',
-		nextAppointmentDate: '2025-12-04',
-		communicationLogs: [
-			{
-				id: 'comm-1',
-				callDate: '2025-10-16',
-				commsType: 'Call',
-				personSpokenTo: 'Lynne Worwood (HR Business Partner)',
-				notes: 'spoken to Lynne Worwood the HR business partner for Dana she explained that they are in a 2 year contract with Magenta and have an SLA in place. Asked me to send an email through and all emails are kept for 3 months prior to archive',
-				createdAt: '2025-10-16T00:00:00Z'
-			}
-		]
-	}
-]
 
 const StatCardComponent = React.memo(
 	({
@@ -232,16 +186,20 @@ export default function CRMContacts() {
 	const [groupBy, setGroupBy] = useState<GroupByOption>(null)
 	const [isLoading, setIsLoading] = useState(true)
 	const [isSaving, setIsSaving] = useState(false)
+	const debouncedSearchQuery = useDebouncedValue(searchQuery, 350)
 
-	// Load contacts from API on mount
+	// Load contacts from API using server-side search/filtering.
 	useEffect(() => {
 		const loadContacts = async () => {
 			try {
 				setIsLoading(true)
-				const data = await crmContactService.getAll()
+				const data = await crmContactService.search(
+					debouncedSearchQuery || undefined,
+					filters.status || undefined
+				)
 				setContacts(data)
 			} catch (error) {
-				console.error('Error loading contacts:', error)
+				logger.error('Error loading contacts:', error)
 				hotToast.error('Failed to load contacts. Please refresh the page.', {
 					position: 'top-right',
 					autoClose: 5000,
@@ -251,14 +209,13 @@ export default function CRMContacts() {
 					draggable: true,
 					theme: 'light'
 				})
-				// Fallback to sample data if API fails
-				setContacts(SAMPLE_CRM_CONTACTS)
+				setContacts([])
 			} finally {
 				setIsLoading(false)
 			}
 		}
 		loadContacts()
-	}, [])
+	}, [debouncedSearchQuery, filters.status])
 
 	const handleAddContact = useCallback(async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault()
@@ -423,26 +380,7 @@ export default function CRMContacts() {
 		setFilters(newFilters)
 	}, [])
 
-	const filteredContacts = useMemo(() => {
-		let result = contacts
-
-		if (filters.status) {
-			result = result.filter(contact => contact.leadStatus === filters.status)
-		}
-
-		if (searchQuery) {
-			const query = searchQuery.toLowerCase()
-			result = result.filter(
-				contact =>
-					contact.fullName.toLowerCase().includes(query) ||
-					contact.businessName.toLowerCase().includes(query) ||
-					contact.email.toLowerCase().includes(query) ||
-					contact.jobTitle.toLowerCase().includes(query)
-			)
-		}
-
-		return result
-	}, [contacts, filters.status, searchQuery])
+	const filteredContacts = useMemo(() => contacts, [contacts])
 
 	const groupedContacts = useMemo(() => {
 		if (!groupBy) return null

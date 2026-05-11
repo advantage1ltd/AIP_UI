@@ -7,6 +7,7 @@ interface PositionStepProps {
   onBack: () => void
 }
 
+// === Component ===
 export function PositionStep({ onNext, onBack }: PositionStepProps) {
   return (
     <div className="space-y-6">

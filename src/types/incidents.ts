@@ -1,3 +1,6 @@
+/** Incident report DTOs, enums, and list/stats shapes for operations and customer views. */
+
+// === Incident classification ===
 export enum IncidentType {
   THEFT = 'Theft',
   THEFT_PREVENTION = 'Theft Prevention',
@@ -55,6 +58,10 @@ export interface StolenItem {
   cost: number;
   quantity: number;
   totalAmount: number;
+  isRecovered?: boolean;
+  recoveredQuantity?: number;
+  valueSaved?: number;
+  valueLost?: number;
 }
 
 export interface Incident {
@@ -97,6 +104,9 @@ export interface Incident {
 
   // Financial information
   totalValueRecovered?: number;
+  totalValueLost?: number;
+  recoveredValue?: number;
+  lossValue?: number;
   value?: number; // Legacy field for graph compatibility
   valueRecovered?: number; // Legacy field for graph compatibility
   quantityRecovered?: number;

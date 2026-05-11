@@ -1,4 +1,9 @@
-import { BASE_API_URL } from '@/config/api'
+/**
+ * Lookup table cache API (`/LookupTable`) for form dropdowns and reference data.
+ * Flow: category batch request → in-memory grouping → form select options.
+ */
+import { api } from '@/config/api'
+import { logger } from '@/utils/logger'
 
 export interface LookupTableItem {
   lookupId: number
@@ -16,14 +21,11 @@ export interface LookupTableResponse {
   data: LookupTableItem[]
 }
 
-const BASE_URL = `${BASE_API_URL}/LookupTable`
+const BASE_URL = '/LookupTable'
 
 // Cache for lookup table data
 const cache = new Map<string, { data: LookupTableItem[], timestamp: number }>()
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
-
-// Helper function to get auth token
-const getAuthToken = () => localStorage.getItem('authToken')
 
 // Helper function to check if cache is valid
 const isCacheValid = (timestamp: number) => {
@@ -34,25 +36,10 @@ export const lookupTableService = {
   // Get all lookup tables
   getAll: async (): Promise<LookupTableItem[]> => {
     try {
-      const token = getAuthToken()
-      
-      const response = await fetch(BASE_URL, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        }
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
-      }
-
-      const result: LookupTableResponse = await response.json()
-      return result.data
+      const response = await api.get<LookupTableResponse>(BASE_URL)
+      return response.data.data
     } catch (error) {
-      console.error('Error fetching lookup tables:', error)
+      logger.error('Error fetching lookup tables:', error)
       throw error
     }
   },
@@ -62,34 +49,20 @@ export const lookupTableService = {
     // Check cache first
     const cached = cache.get(category)
     if (cached && isCacheValid(cached.timestamp)) {
-      console.log(`Using cached data for category: ${category}`)
+      logger.debug(`Using cached data for category: ${category}`)
       return cached.data
     }
 
     try {
-      const token = getAuthToken()
-      
-      const response = await fetch(`${BASE_URL}/category/${encodeURIComponent(category)}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        }
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
-      }
-
-      const result: LookupTableResponse = await response.json()
+      const response = await api.get<LookupTableResponse>(`${BASE_URL}/category/${encodeURIComponent(category)}`)
+      const result = response.data
       
       // Cache the result
       cache.set(category, { data: result.data, timestamp: Date.now() })
       
       return result.data
     } catch (error) {
-      console.error(`Error fetching lookup tables for category ${category}:`, error)
+      logger.error(`Error fetching lookup tables for category ${category}:`, error)
       throw error
     }
   },
@@ -104,7 +77,7 @@ export const lookupTableService = {
       const cached = cache.get(category)
       if (cached && isCacheValid(cached.timestamp)) {
         results[category] = cached.data
-        console.log(`Using cached data for category: ${category}`)
+        logger.debug(`Using cached data for category: ${category}`)
       } else {
         uncachedCategories.push(category)
       }
@@ -112,14 +85,14 @@ export const lookupTableService = {
 
     // Load uncached categories in parallel
     if (uncachedCategories.length > 0) {
-      console.log(`Loading uncached categories in parallel: ${uncachedCategories.join(', ')}`)
+      logger.debug(`Loading uncached categories in parallel: ${uncachedCategories.join(', ')}`)
       
       const promises = uncachedCategories.map(async (category) => {
         try {
           const data = await lookupTableService.getByCategory(category)
           return { category, data }
         } catch (error) {
-          console.error(`Failed to load category ${category}:`, error)
+          logger.error(`Failed to load category ${category}:`, error)
           return { category, data: [] }
         }
       })
@@ -138,25 +111,10 @@ export const lookupTableService = {
   // Get all categories
   getCategories: async (): Promise<string[]> => {
     try {
-      const token = getAuthToken()
-      
-      const response = await fetch(`${BASE_URL}/categories`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        }
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
-      }
-
-      const result = await response.json()
-      return result.data
+      const response = await api.get<{ data: string[] }>(`${BASE_URL}/categories`)
+      return response.data.data
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      logger.error('Error fetching categories:', error)
       throw error
     }
   },
@@ -169,12 +127,12 @@ export const lookupTableService = {
   // Clear cache
   clearCache: () => {
     cache.clear()
-    console.log('Lookup table cache cleared')
+    logger.debug('Lookup table cache cleared')
   },
 
   // Clear specific category from cache
   clearCategoryCache: (category: string) => {
     cache.delete(category)
-    console.log(`Cache cleared for category: ${category}`)
+    logger.debug(`Cache cleared for category: ${category}`)
   }
 }

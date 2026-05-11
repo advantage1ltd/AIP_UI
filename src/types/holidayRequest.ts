@@ -1,3 +1,4 @@
+/** Holiday request list, filters, and create/update DTOs. */
 export interface HolidayRequest {
   id: string;
   officerId: string;
@@ -43,4 +44,6 @@ export interface HolidayRequestFilters {
   search?: string;
   status?: 'pending' | 'approved' | 'denied';
   archived?: boolean;
+  /** When set, backend should return only requests for this employee (officer). */
+  employeeId?: number;
 } 

@@ -1,159 +1,270 @@
-import { Incident } from '@/types/incidents'
-import { GetIncidentsParams, IncidentResponse, IncidentsResponse, UpsertIncidentRequest } from '@/types/api'
+/**
+ * Typed incident list/detail client (`/incidents`) returning ApiResponse envelopes.
+ * Prefer incidentService.ts for operations screens; keep this module for legacy envelope consumers until consolidated.
+ * Flow: list/stats query params → `api` client → envelope unwrap → React Query hooks and report tables.
+ */
+import { Incident, StolenItem } from '@/types/incidents'
+import {
+	GetIncidentsParams,
+	IncidentResponse,
+	IncidentsResponse,
+	IncidentStatsResponse,
+	UpsertIncidentRequest,
+} from '@/types/api'
 import { getCurrentCustomerId } from '@/lib/utils'
-import { BASE_API_URL } from '@/config/api'
+import { api, handleApiError } from '@/config/api'
 
-const API_URL = BASE_API_URL
-
-// Helper function to get headers with customer ID and auth token
-const getHeaders = (additionalHeaders?: Record<string, string>): HeadersInit => {
-  const customerId = getCurrentCustomerId()
-  const token = localStorage.getItem('authToken')
-  
-  const baseHeaders: HeadersInit = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    ...additionalHeaders,
-  }
-  
-  // Add authentication token
-  if (token) {
-    baseHeaders['Authorization'] = `Bearer ${token}`
-  }
-  
-  // Add customer ID header if available
-  if (customerId) {
-    baseHeaders['X-Customer-Id'] = customerId.toString()
-  }
-  
-  return baseHeaders
+const toFiniteNumberOrUndefined = (value: unknown): number | undefined => {
+	const parsed = typeof value === 'number' ? value : Number(value)
+	return Number.isFinite(parsed) ? parsed : undefined
 }
 
+/** Aligns stolen-line financial fields across camelCase and PascalCase API payloads. */
+const normalizeStolenItemFromApi = (item: StolenItem): StolenItem => {
+	const extended = item as StolenItem & Record<string, unknown>
+	const totalAmount =
+		toFiniteNumberOrUndefined(item.totalAmount) ??
+		toFiniteNumberOrUndefined(extended.TotalAmount) ??
+		toFiniteNumberOrUndefined(extended.totalValue) ??
+		0
+	const recoveredQuantity =
+		toFiniteNumberOrUndefined(item.recoveredQuantity) ??
+		toFiniteNumberOrUndefined(extended.RecoveredQuantity) ??
+		0
+	const valueSaved =
+		toFiniteNumberOrUndefined(item.valueSaved) ??
+		toFiniteNumberOrUndefined(extended.ValueSaved) ??
+		toFiniteNumberOrUndefined(extended.valueRecovered) ??
+		0
+	const valueLost =
+		toFiniteNumberOrUndefined(item.valueLost) ??
+		toFiniteNumberOrUndefined(extended.ValueLost) ??
+		toFiniteNumberOrUndefined(extended.lossValue) ??
+		0
+
+	return {
+		...item,
+		totalAmount,
+		recoveredQuantity,
+		valueSaved,
+		valueLost,
+	}
+}
+
+/** Normalizes incident totals, datetime fields, and nested stolen items from GET responses. */
+const normalizeIncidentFromApi = (incident: Incident): Incident => {
+	const extended = incident as Incident & Record<string, unknown>
+	const totalValueRecovered =
+		toFiniteNumberOrUndefined(incident.totalValueRecovered) ??
+		toFiniteNumberOrUndefined(extended.TotalValueRecovered) ??
+		toFiniteNumberOrUndefined(incident.valueRecovered) ??
+		toFiniteNumberOrUndefined(extended.ValueRecovered) ??
+		toFiniteNumberOrUndefined(incident.recoveredValue) ??
+		toFiniteNumberOrUndefined(extended.RecoveredValue) ??
+		toFiniteNumberOrUndefined(incident.amount) ??
+		toFiniteNumberOrUndefined(incident.value)
+	const totalValueLost =
+		toFiniteNumberOrUndefined(incident.totalValueLost) ??
+		toFiniteNumberOrUndefined(extended.TotalValueLost) ??
+		toFiniteNumberOrUndefined(incident.lossValue) ??
+		toFiniteNumberOrUndefined(extended.LossValue)
+	const valueRecovered = totalValueRecovered
+	const lossValue = totalValueLost
+	const dateOfIncident =
+		incident.dateOfIncident ??
+		(typeof extended.dateOfIncident === 'string' ? extended.dateOfIncident : undefined) ??
+		incident.date
+	const timeOfIncident =
+		incident.timeOfIncident ??
+		(typeof extended.timeOfIncident === 'string' ? extended.timeOfIncident : undefined)
+	const stolenItems = Array.isArray(incident.stolenItems)
+		? incident.stolenItems.map(normalizeStolenItemFromApi)
+		: incident.stolenItems
+
+	return {
+		...incident,
+		dateOfIncident,
+		date: incident.date ?? dateOfIncident,
+		timeOfIncident,
+		totalValueRecovered,
+		valueRecovered,
+		recoveredValue: valueRecovered,
+		totalValueLost,
+		lossValue,
+		stolenItems,
+	}
+}
+
+/** Mirrors financial and stolen-item fields for POST/PUT bodies the backend accepts. */
+const normalizeIncidentForApi = (incident: Omit<Incident, 'id' | 'dateInputted'>) => {
+	const totalValueRecovered = toFiniteNumberOrUndefined(
+		(incident as Incident & { totalValueRecovered?: unknown }).totalValueRecovered
+	)
+	const valueRecovered = toFiniteNumberOrUndefined(
+		(incident as Incident & { valueRecovered?: unknown }).valueRecovered
+	) ?? totalValueRecovered
+	const totalValueLost = toFiniteNumberOrUndefined(
+		(incident as Incident & { totalValueLost?: unknown }).totalValueLost
+	)
+	const lossValue = toFiniteNumberOrUndefined(
+		(incident as Incident & { lossValue?: unknown }).lossValue
+	) ?? totalValueLost
+
+	const normalizedStolenItems = Array.isArray(incident.stolenItems)
+		? incident.stolenItems.map(item => {
+			const totalAmount = toFiniteNumberOrUndefined(
+				(item as typeof item & { totalAmount?: unknown }).totalAmount
+			)
+			const recoveredQuantity = toFiniteNumberOrUndefined(
+				(item as typeof item & { recoveredQuantity?: unknown }).recoveredQuantity
+			)
+			const valueSaved = toFiniteNumberOrUndefined(
+				(item as typeof item & { valueSaved?: unknown }).valueSaved
+			)
+			const valueLost = toFiniteNumberOrUndefined(
+				(item as typeof item & { valueLost?: unknown }).valueLost
+			)
+
+			return {
+				...item,
+				totalAmount,
+				recoveredQuantity,
+				valueSaved,
+				valueLost,
+				TotalAmount: totalAmount,
+				TotalValue: totalAmount,
+				RecoveredQuantity: recoveredQuantity,
+				RecoveredValue: valueSaved,
+				RecoveredAmount: valueSaved,
+				ValueSaved: valueSaved,
+				ValueRecovered: valueSaved,
+				ValueLost: valueLost,
+				LossValue: valueLost,
+			}
+		})
+		: incident.stolenItems
+
+	return {
+		...incident,
+		totalValueRecovered,
+		valueRecovered,
+		totalValueLost,
+		lossValue,
+		TotalValueRecovered: totalValueRecovered,
+		ValueRecovered: valueRecovered,
+		TotalValueLost: totalValueLost,
+		LossValue: lossValue,
+		stolenItems: normalizedStolenItems,
+	}
+}
+
+const customerHeaders = (): Record<string, string> => {
+	const customerId = getCurrentCustomerId()
+	const headers: Record<string, string> = {}
+	if (customerId) {
+		headers['X-Customer-Id'] = customerId.toString()
+	}
+	return headers
+}
+
+/** Typed `/incidents` client; responses are normalized before they reach React Query caches. */
 export const incidentsApi = {
-  // Get paginated incidents
-  getIncidents: async (params?: GetIncidentsParams): Promise<IncidentsResponse> => {
-    const searchParams = new URLSearchParams()
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value) searchParams.append(key, value.toString())
-      })
-    }
-    
-    const response = await fetch(`${API_URL}/incidents?${searchParams.toString()}`, {
-      headers: getHeaders()
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      let errorMessage = 'Failed to fetch incidents'
-      try {
-        const errorData = JSON.parse(errorText)
-        errorMessage = errorData.message || errorMessage
-      } catch {
-        errorMessage = errorText || errorMessage
-      }
-      throw new Error(errorMessage)
-    }
-    
-    return response.json()
-  },
+	/** Paged list; supports region, store, and date filters used by Operations and analytics paging. */
+	getIncidents: async (params?: GetIncidentsParams): Promise<IncidentsResponse> => {
+		try {
+			const searchParams = new URLSearchParams()
+			if (params) {
+				Object.entries(params).forEach(([key, value]) => {
+					if (value) searchParams.append(key, value.toString())
+				})
+			}
+			const query = searchParams.toString()
+			const url = query ? `/incidents?${query}` : '/incidents'
+			const { data } = await api.get<IncidentsResponse>(url, { headers: customerHeaders() })
+			return {
+				...data,
+				data: Array.isArray(data.data) ? data.data.map(normalizeIncidentFromApi) : data.data,
+			}
+		} catch (error) {
+			throw new Error(handleApiError(error))
+		}
+	},
 
-  // Get single incident
-  getIncident: async (id: string): Promise<IncidentResponse> => {
-    const response = await fetch(`${API_URL}/incidents/${id}`, {
-      headers: getHeaders()
-    })
-    
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error(`Incident with ID ${id} not found`)
-      }
-      const errorText = await response.text()
-      let errorMessage = 'Failed to fetch incident'
-      try {
-        const errorData = JSON.parse(errorText)
-        errorMessage = errorData.message || errorMessage
-      } catch {
-        errorMessage = errorText || errorMessage
-      }
-      throw new Error(errorMessage)
-    }
-    
-    return response.json()
-  },
+	getIncident: async (id: string): Promise<IncidentResponse> => {
+		try {
+			const { data } = await api.get<IncidentResponse>(`/incidents/${id}`, {
+				headers: customerHeaders(),
+			})
+			return {
+				...data,
+				data: data.data ? normalizeIncidentFromApi(data.data) : data.data,
+			}
+		} catch (error) {
+			throw new Error(handleApiError(error))
+		}
+	},
 
-  // Create new incident
-  createIncident: async (incident: Omit<Incident, 'id' | 'dateInputted'>): Promise<IncidentResponse> => {
-    const response = await fetch(`${API_URL}/incidents`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify({ incident } as UpsertIncidentRequest),
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      let errorMessage = 'Failed to create incident'
-      try {
-        const errorData = JSON.parse(errorText)
-        errorMessage = errorData.message || errorMessage
-      } catch {
-        errorMessage = errorText || errorMessage
-      }
-      throw new Error(errorMessage)
-    }
-    
-    return response.json()
-  },
+	createIncident: async (incident: Omit<Incident, 'id' | 'dateInputted'>): Promise<IncidentResponse> => {
+		try {
+			const normalizedIncident = normalizeIncidentForApi(incident)
+			const { data } = await api.post<IncidentResponse>(
+				'/incidents',
+				{ incident: normalizedIncident } as UpsertIncidentRequest,
+				{ headers: customerHeaders() }
+			)
+			return {
+				...data,
+				data: data.data ? normalizeIncidentFromApi(data.data) : data.data,
+			}
+		} catch (error) {
+			throw new Error(handleApiError(error))
+		}
+	},
 
-  // Update incident
-  updateIncident: async (id: string, incident: Omit<Incident, 'id' | 'dateInputted'>): Promise<IncidentResponse> => {
-    const response = await fetch(`${API_URL}/incidents/${id}`, {
-      method: 'PUT',
-      headers: getHeaders(),
-      body: JSON.stringify({ incident } as UpsertIncidentRequest),
-    })
-    
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error(`Incident with ID ${id} not found`)
-      }
-      const errorText = await response.text()
-      let errorMessage = 'Failed to update incident'
-      try {
-        const errorData = JSON.parse(errorText)
-        errorMessage = errorData.message || errorMessage
-        console.error('Backend error response:', errorData)
-      } catch {
-        errorMessage = errorText || errorMessage
-        console.error('Backend error text:', errorText)
-      }
-      console.error('Update incident failed:', { status: response.status, statusText: response.statusText, errorMessage })
-      throw new Error(errorMessage)
-    }
-    
-    return response.json()
-  },
+	updateIncident: async (
+		id: string,
+		incident: Omit<Incident, 'id' | 'dateInputted'>
+	): Promise<IncidentResponse> => {
+		try {
+			const normalizedIncident = normalizeIncidentForApi(incident)
+			const { data } = await api.put<IncidentResponse>(
+				`/incidents/${id}`,
+				{ incident: normalizedIncident } as UpsertIncidentRequest,
+				{ headers: customerHeaders() }
+			)
+			return {
+				...data,
+				data: data.data ? normalizeIncidentFromApi(data.data) : data.data,
+			}
+		} catch (error) {
+			throw new Error(handleApiError(error))
+		}
+	},
 
-  // Delete incident
-  deleteIncident: async (id: string): Promise<void> => {
-    const response = await fetch(`${API_URL}/incidents/${id}`, {
-      method: 'DELETE',
-      headers: getHeaders()
-    })
-    
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error(`Incident with ID ${id} not found`)
-      }
-      const errorText = await response.text()
-      let errorMessage = 'Failed to delete incident'
-      try {
-        const errorData = JSON.parse(errorText)
-        errorMessage = errorData.message || errorMessage
-      } catch {
-        errorMessage = errorText || errorMessage
-      }
-      throw new Error(errorMessage)
-    }
-  },
-} 
+	deleteIncident: async (id: string): Promise<void> => {
+		try {
+			await api.delete(`/incidents/${id}`, { headers: customerHeaders() })
+		} catch (error) {
+			throw new Error(handleApiError(error))
+		}
+	},
+
+	getIncidentStats: async (params?: GetIncidentsParams): Promise<IncidentStatsResponse> => {
+		try {
+			const searchParams = new URLSearchParams()
+			if (params) {
+				Object.entries(params).forEach(([key, value]) => {
+					if (value !== undefined && value !== null && value !== '') {
+						searchParams.append(key, value.toString())
+					}
+				})
+			}
+			const query = searchParams.toString()
+			const url = query ? `/incidents/stats?${query}` : '/incidents/stats'
+			const { data } = await api.get<IncidentStatsResponse>(url, { headers: customerHeaders() })
+			return data
+		} catch (error) {
+			throw new Error(handleApiError(error))
+		}
+	},
+}

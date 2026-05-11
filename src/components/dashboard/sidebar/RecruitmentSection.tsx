@@ -2,6 +2,7 @@ import { Link } from "react-router-dom"
 import { FileText, UserPlus, UserMinus } from "lucide-react"
 import { SidebarMenuButton } from "@/components/ui/sidebar"
 
+// === Component ===
 export function RecruitmentSection() {
   return (
     <div className="pl-4 space-y-2">

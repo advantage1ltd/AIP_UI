@@ -8,6 +8,7 @@ interface TableActionsProps {
   onNewEmployee: () => void
 }
 
+// === Component ===
 export function TableActions({ searchQuery, onSearchChange, onNewEmployee }: TableActionsProps) {
   return (
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

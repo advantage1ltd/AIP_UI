@@ -84,6 +84,7 @@ export interface HotProductsData {
 	topProducts: ProductFrequencyData[]
 	storeHeatmap: StoreProductHeatmapData[]
 	totalValueLost: number
+	totalValueRecovered: number
 	period: {
 		start: string
 		end: string

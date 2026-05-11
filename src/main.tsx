@@ -1,3 +1,7 @@
+/**
+ * Application entry: mounts React on #root and provides the Redux store.
+ * Routing, auth, and React Query are configured in App.tsx and routes.tsx.
+ */
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'

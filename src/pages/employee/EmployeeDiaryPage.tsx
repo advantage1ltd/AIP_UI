@@ -1,12 +1,16 @@
+/**
+ * Employee diary activities and ActivityForm.
+ * Flow: activity filters → ActivityForm create/edit → diary timeline grouped by category.
+ */
 import { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, Briefcase, CalendarDays, CreditCard, FileText, HardHat, Loader2, RefreshCw, ShieldAlert, Sparkles, User } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { AlertCircle, Briefcase, CalendarDays, CreditCard, FileText, HardHat, Loader2, RefreshCw, Search, ShieldAlert, Sparkles, User, Users } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert } from '@/components/ui/alert'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
@@ -16,6 +20,7 @@ import { employeeService } from '@/services/employeeService'
 import { employeeDiaryService } from '@/services/employeeDiaryService'
 import type { Employee } from '@/types/employee'
 import type { EmployeeDiary } from '@/types/employeeDiary'
+import { harmonizeRole } from '@/utils/roles'
 
 type UserWithLegacyEmployeeId = { employeeId?: number; EmployeeId?: number | string; role?: string }
 
@@ -47,22 +52,56 @@ const getEmployeeLabel = (employee: Employee) => {
 }
 
 const EmployeeDiaryPage = () => {
-	const { user } = useAuth()
-	const isAdmin = user?.role === 'administrator'
+	const { user, refreshUser } = useAuth()
+
+	const identityRole = useMemo(() => harmonizeRole(user?.role), [user?.role])
+	/** Use Identity primary role only — Page Access can mark HO staff as “manager” for menu columns while login remains Security Officer. */
+	const canPickEmployee = identityRole === 'administrator' || identityRole === 'manager'
+
 	const linkedEmployeeId = useMemo<number | null>(() => {
 		if (!user) return null
 		const legacy = user as unknown as UserWithLegacyEmployeeId
 		const raw = legacy.employeeId ?? legacy.EmployeeId
-		if (typeof raw === 'number' && Number.isFinite(raw)) return raw
-		if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) return Number(raw)
+		if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return raw
+		if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) {
+			const n = Number(raw)
+			return n > 0 ? n : null
+		}
 		return null
 	}, [user])
+
+	const needsOfficerEmployeeBootstrap = useMemo(
+		() => !canPickEmployee && Boolean(user?.id) && linkedEmployeeId === null,
+		[canPickEmployee, user?.id, linkedEmployeeId],
+	)
+
+	const [officerBootstrapDone, setOfficerBootstrapDone] = useState(() => !needsOfficerEmployeeBootstrap)
+
+	useEffect(() => {
+		if (!needsOfficerEmployeeBootstrap) {
+			setOfficerBootstrapDone(true)
+			return
+		}
+		setOfficerBootstrapDone(false)
+		let cancelled = false
+		void (async () => {
+			await refreshUser()
+			if (!cancelled) setOfficerBootstrapDone(true)
+		})()
+		return () => {
+			cancelled = true
+		}
+	}, [needsOfficerEmployeeBootstrap, refreshUser])
 
 	const [employees, setEmployees] = useState<Employee[]>([])
 	const [employeesLoading, setEmployeesLoading] = useState(false)
 	const [employeesError, setEmployeesError] = useState<string | null>(null)
 
 	const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null)
+	const [employeeFilter, setEmployeeFilter] = useState('')
+	const [diaryRefreshToken, setDiaryRefreshToken] = useState(0)
+	const [activeTab, setActiveTab] = useState('holidays')
+	const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
 
 	const [diary, setDiary] = useState<EmployeeDiary | null>(null)
 	const [diaryLoading, setDiaryLoading] = useState(false)
@@ -71,27 +110,38 @@ const EmployeeDiaryPage = () => {
 	useEffect(() => {
 		let isMounted = true
 		const loadEmployees = async () => {
+			if (!canPickEmployee && !officerBootstrapDone) return
+
 			setEmployeesLoading(true)
 			setEmployeesError(null)
 			try {
-				if (!isAdmin) {
-					if (!linkedEmployeeId) {
+				if (!canPickEmployee) {
+					if (linkedEmployeeId === null) {
 						if (!isMounted) return
 						setEmployees([])
-						setEmployeesError('Your account is not linked to an employee record.')
+						setSelectedEmployeeId(null)
+						setEmployeesError(
+							'Your account is not linked to an employee record. Ask an administrator to link your login to your officer profile.',
+						)
 						return
 					}
 
-					const employee = await employeeService.getEmployeeByIdAsFrontendInterface(linkedEmployeeId)
-					if (!isMounted) return
-					setEmployees([employee])
-					setSelectedEmployeeId(employee.id)
+					// Allow diary load even if employee profile endpoint is blocked/unavailable for officer.
+					setSelectedEmployeeId(linkedEmployeeId)
+					try {
+						const employee = await employeeService.getEmployeeByIdAsFrontendInterface(linkedEmployeeId)
+						if (!isMounted) return
+						setEmployees([employee])
+					} catch (profileErr) {
+						console.warn('⚠️ [EmployeeDiary] Could not load employee profile details, continuing with diary fetch:', profileErr)
+					}
 					return
 				}
 
 				const result = await employeeService.getEmployeesAsFrontendInterface({ page: 1, pageSize: 200 })
 				if (!isMounted) return
 				setEmployees(result.employees)
+				setSelectedEmployeeId(null)
 			} catch (err) {
 				console.error('❌ [EmployeeDiary] Failed to load employees:', err)
 				if (!isMounted) return
@@ -106,7 +156,7 @@ const EmployeeDiaryPage = () => {
 		return () => {
 			isMounted = false
 		}
-	}, [isAdmin, linkedEmployeeId])
+	}, [canPickEmployee, officerBootstrapDone, linkedEmployeeId])
 
 	useEffect(() => {
 		if (!selectedEmployeeId) {
@@ -123,6 +173,7 @@ const EmployeeDiaryPage = () => {
 				const result = await employeeDiaryService.getEmployeeDiary(selectedEmployeeId)
 				if (!isMounted) return
 				setDiary(result)
+				setLastUpdatedAt(new Date())
 			} catch (err) {
 				console.error('❌ [EmployeeDiary] Failed to load diary:', err)
 				if (!isMounted) return
@@ -139,7 +190,13 @@ const EmployeeDiaryPage = () => {
 		return () => {
 			isMounted = false
 		}
-	}, [selectedEmployeeId])
+	}, [selectedEmployeeId, diaryRefreshToken])
+
+	const filteredEmployees = useMemo(() => {
+		const q = employeeFilter.trim().toLowerCase()
+		if (!q) return employees
+		return employees.filter(e => getEmployeeLabel(e).toLowerCase().includes(q))
+	}, [employees, employeeFilter])
 
 	const selectedEmployee = useMemo(() => {
 		if (!selectedEmployeeId) return null
@@ -163,6 +220,31 @@ const EmployeeDiaryPage = () => {
 	}, [diary])
 
 	const pendingTotal = pending.holiday.length + pending.expenses.length + pending.equipmentRequests.length
+	const hasAnyDiaryData = useMemo(() => {
+		if (!diary) return false
+		return (
+			diary.holidays.length > 0 ||
+			diary.incidents.length > 0 ||
+			diary.expenses.length > 0 ||
+			diary.equipment.requests.length > 0 ||
+			diary.equipment.issued.length > 0 ||
+			diary.training.tests.length > 0
+		)
+	}, [diary])
+
+	const handleRefreshDiary = () => {
+		if (!selectedEmployeeId) return
+		setDiaryRefreshToken(n => n + 1)
+	}
+
+	const pendingLeadCopy = !canPickEmployee
+		? 'You have'
+		: 'This employee has'
+
+	useEffect(() => {
+		if (!diary) return
+		setActiveTab(pendingTotal > 0 ? 'pending' : 'holidays')
+	}, [diary, pendingTotal, selectedEmployeeId])
 
 	return (
 		<div className="h-full overflow-x-hidden bg-gradient-to-b from-muted/30 to-background">
@@ -179,21 +261,32 @@ const EmployeeDiaryPage = () => {
 									</BreadcrumbItem>
 								</BreadcrumbList>
 							</Breadcrumb>
-							<div className="flex items-center gap-2">
-								<h1 className="text-xl md:text-2xl font-semibold tracking-tight">Employee Diary</h1>
-								<Badge variant="secondary" className="hidden sm:inline-flex">Aggregated</Badge>
+							<div className="flex flex-wrap items-center gap-2">
+								<h1 className="text-xl md:text-2xl font-semibold tracking-tight">
+									{canPickEmployee ? 'Employee diary' : 'My diary'}
+								</h1>
+								<Badge variant="secondary" className="hidden sm:inline-flex">
+									{canPickEmployee ? 'Team view' : 'Your record'}
+								</Badge>
 							</div>
 							<p className="text-sm text-muted-foreground">
-								A unified view of holidays, incidents, expenses, licenses, equipment and training.
+								{canPickEmployee
+									? 'Choose an officer to see holidays, incidents, expenses, licences, equipment and training in one place.'
+									: 'Your holidays, incidents, expenses, licences, equipment and training — scoped to your officer profile.'}
 							</p>
 						</div>
 
 						<div className="flex w-full items-center gap-2 md:w-auto">
+							{lastUpdatedAt && (
+								<p className="hidden text-xs text-muted-foreground md:block">
+									Updated {lastUpdatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+								</p>
+							)}
 							<Button
 								variant="outline"
-								onClick={() => selectedEmployeeId && setSelectedEmployeeId(selectedEmployeeId)}
+								onClick={handleRefreshDiary}
 								disabled={!selectedEmployeeId || diaryLoading}
-								aria-label="Refresh employee diary"
+								aria-label="Refresh diary"
 								className="w-full md:w-auto"
 							>
 								{diaryLoading ? (
@@ -214,61 +307,124 @@ const EmployeeDiaryPage = () => {
 			</div>
 
 			<div className="p-4 md:p-6 space-y-6">
-				<Card className="overflow-hidden border-border/60 bg-card/70 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-					<CardHeader className="border-b bg-muted/20">
-						<CardTitle className="flex items-center gap-2">
-							<User className="h-5 w-5 text-muted-foreground" />
-							Select employee
-						</CardTitle>
-						<CardDescription>Admins can switch employees; officers only see their own diary.</CardDescription>
-					</CardHeader>
-					<CardContent className="p-4 md:p-6">
-						<div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-							<div className="w-full md:max-w-lg space-y-2">
-								{employeesLoading ? (
-									<div className="space-y-2">
-										<Skeleton className="h-10 w-full" />
-										<Skeleton className="h-4 w-2/3" />
-									</div>
-								) : (
-									<>
+				{canPickEmployee ? (
+					<Card className="overflow-hidden border-border/60 bg-card/70 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+						<CardHeader className="border-b bg-muted/20">
+							<CardTitle className="flex items-center gap-2 text-base md:text-lg">
+								<Users className="h-5 w-5 text-muted-foreground shrink-0" />
+								View diary for an employee
+							</CardTitle>
+							<CardDescription>
+								Search the list, then select who you want to review. Officers always see only their own diary — no picker.
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="p-4 md:p-6 space-y-4">
+							{employeesLoading ? (
+								<div className="space-y-2">
+									<Skeleton className="h-10 w-full" />
+									<Skeleton className="h-10 w-full max-w-lg" />
+									<Skeleton className="h-4 w-2/3" />
+								</div>
+							) : (
+								<div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+									<div className="w-full lg:max-w-xl space-y-3">
+										<div className="relative">
+											<Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+											<Input
+												value={employeeFilter}
+												onChange={e => setEmployeeFilter(e.target.value)}
+												placeholder="Filter by name or employee number…"
+												className="pl-9"
+												disabled={employees.length === 0}
+												aria-label="Filter employees"
+											/>
+										</div>
 										<Select
 											value={selectedEmployeeId ? String(selectedEmployeeId) : ''}
-											onValueChange={(value) => setSelectedEmployeeId(value ? Number(value) : null)}
-											disabled={!isAdmin}
+											onValueChange={value => setSelectedEmployeeId(value ? Number(value) : null)}
+											disabled={employees.length === 0}
 										>
-											<SelectTrigger className={cn('w-full', !isAdmin && 'opacity-100')}>
-												<SelectValue placeholder={isAdmin ? 'Select an employee' : 'Your employee diary'} />
+											<SelectTrigger className="w-full">
+												<SelectValue placeholder="Select an employee" />
 											</SelectTrigger>
 											<SelectContent>
-												{employees.map(employee => (
-													<SelectItem key={employee.id} value={String(employee.id)}>
-														{getEmployeeLabel(employee)}
-													</SelectItem>
-												))}
+												{filteredEmployees.length === 0 ? (
+													<div className="px-2 py-6 text-center text-sm text-muted-foreground">
+														No employees match your filter.
+													</div>
+												) : (
+													filteredEmployees.map(employee => (
+														<SelectItem key={employee.id} value={String(employee.id)}>
+															{getEmployeeLabel(employee)}
+														</SelectItem>
+													))
+												)}
 											</SelectContent>
 										</Select>
 										{employeesError && (
-											<p className="text-sm text-red-600">{employeesError}</p>
+											<p className="text-sm text-destructive">{employeesError}</p>
 										)}
-									</>
-								)}
-							</div>
-
-							{selectedEmployeeId && (
-								<div className="flex items-center gap-2 text-sm text-muted-foreground">
-									<Sparkles className="h-4 w-4" />
-									<span>Tip: check the Pending tab for approvals</span>
+									</div>
+									{selectedEmployeeId ? (
+										<div className="flex items-center gap-2 text-sm text-muted-foreground lg:pb-1">
+											<Sparkles className="h-4 w-4 shrink-0" />
+											<span>Tip: check the Pending tab for items awaiting approval.</span>
+										</div>
+									) : (
+										<p className="text-sm text-muted-foreground lg:pb-1">
+											{employees.length > 0
+												? `${employees.length} employee${employees.length === 1 ? '' : 's'} loaded — pick one to continue.`
+												: 'No employees returned from the server.'}
+										</p>
+									)}
 								</div>
 							)}
+						</CardContent>
+					</Card>
+				) : (
+					<div className="rounded-xl border border-border/60 bg-card/80 px-4 py-3 md:px-5 md:py-4 shadow-sm">
+						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+							<div className="flex items-start gap-3">
+								<div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
+									<User className="h-5 w-5" aria-hidden />
+								</div>
+								<div className="space-y-1 min-w-0">
+									<p className="text-sm font-medium text-foreground">Your officer diary</p>
+									{employeesLoading ? (
+										<Skeleton className="h-4 w-56" />
+									) : !officerBootstrapDone ? (
+										<p className="text-sm text-muted-foreground">Syncing your officer profile…</p>
+									) : employeesError ? (
+										<p className="text-sm text-destructive">{employeesError}</p>
+									) : diary?.employee ? (
+										<p className="text-sm text-muted-foreground truncate">
+											<span className="font-medium text-foreground">{diary.employee.fullName}</span>
+											{' · '}
+											{diary.employee.employeeNumber}
+											{diary.employee.position ? ` · ${diary.employee.position}` : ''}
+										</p>
+									) : selectedEmployeeId ? (
+										<p className="text-sm text-muted-foreground">Loading your profile…</p>
+									) : (
+										<p className="text-sm text-muted-foreground">
+											Link your account to an employee record to see diary entries here.
+										</p>
+									)}
+								</div>
+							</div>
+							{selectedEmployeeId && !employeesError && (
+								<Badge variant="outline" className="w-fit shrink-0 border-emerald-200 bg-emerald-50 text-emerald-900">
+									Signed-in officer only
+								</Badge>
+							)}
 						</div>
-					</CardContent>
-				</Card>
+					</div>
+				)}
 
-				{!selectedEmployeeId && (
-					<Card>
+				{canPickEmployee && !selectedEmployeeId && !employeesLoading && (
+					<Card className="border-dashed">
 						<CardContent className="p-6 text-sm text-muted-foreground">
-							Select an employee to view diary details.
+							Select an employee above to load their diary.
 						</CardContent>
 					</Card>
 				)}
@@ -296,9 +452,17 @@ const EmployeeDiaryPage = () => {
 					<Alert variant="destructive" className="py-3">
 						<div className="flex items-start gap-2">
 							<AlertCircle className="h-4 w-4 mt-0.5" />
-							<div>
+							<div className="space-y-2">
 								<p className="text-sm font-medium">Unable to load employee diary</p>
 								<p className="text-sm">{diaryError}</p>
+								<Button
+									variant="outline"
+									size="sm"
+									className="h-8"
+									onClick={handleRefreshDiary}
+								>
+									Try again
+								</Button>
 							</div>
 						</div>
 					</Alert>
@@ -306,12 +470,23 @@ const EmployeeDiaryPage = () => {
 
 				{diary && (
 					<>
+						{!diaryLoading && !diaryError && !hasAnyDiaryData && (
+							<Card className="border-dashed">
+								<CardContent className="p-6">
+									<p className="text-sm font-medium text-foreground">No diary records yet</p>
+									<p className="mt-1 text-sm text-muted-foreground">
+										No holidays, incidents, expenses, equipment, or training entries were found for this profile.
+									</p>
+								</CardContent>
+							</Card>
+						)}
 						{pendingTotal > 0 && (
 							<Card className="border-amber-200">
 								<CardHeader>
 									<CardTitle className="text-base">Pending approvals</CardTitle>
 									<CardDescription>
-										You have <span className="font-medium text-foreground">{pendingTotal}</span> pending item(s) across holidays, expenses, and equipment requests.
+										{pendingLeadCopy}{' '}
+										<span className="font-medium text-foreground">{pendingTotal}</span> pending item(s) across holidays, expenses, and equipment requests.
 									</CardDescription>
 								</CardHeader>
 								<CardContent className="text-sm">
@@ -399,14 +574,27 @@ const EmployeeDiaryPage = () => {
 							</Card>
 						</div>
 
-						<Card>
-							<CardHeader>
-								<CardTitle>{diary.employee.fullName || selectedEmployee?.fullName || getEmployeeLabel(selectedEmployee || employees[0])}</CardTitle>
+						<Card className={!canPickEmployee ? 'border-border/70 shadow-sm' : undefined}>
+							<CardHeader className={!canPickEmployee ? 'space-y-1 pb-3' : undefined}>
+								<CardTitle className={!canPickEmployee ? 'text-base' : undefined}>
+									{canPickEmployee
+										? diary.employee.fullName || selectedEmployee?.fullName || getEmployeeLabel(selectedEmployee || employees[0])
+										: 'Contact details'}
+								</CardTitle>
 								<CardDescription>
-									{diary.employee.position} • {diary.employee.employeeStatus} • {diary.employee.employeeNumber}
+									{canPickEmployee ? (
+										<>
+											{diary.employee.position} • {diary.employee.employeeStatus} • {diary.employee.employeeNumber}
+										</>
+									) : (
+										<>
+											{diary.employee.fullName} · {diary.employee.employeeNumber}
+											{diary.employee.position ? ` · ${diary.employee.position}` : ''}
+										</>
+									)}
 								</CardDescription>
 							</CardHeader>
-							<CardContent className="text-sm text-muted-foreground">
+							<CardContent className={!canPickEmployee ? 'pt-0 text-sm text-muted-foreground' : 'text-sm text-muted-foreground'}>
 								<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 									<div><span className="font-medium text-foreground">Email:</span> {diary.employee.email || '—'}</div>
 									<div><span className="font-medium text-foreground">Phone:</span> {diary.employee.contactNumber || '—'}</div>
@@ -415,7 +603,7 @@ const EmployeeDiaryPage = () => {
 							</CardContent>
 						</Card>
 
-						<Tabs defaultValue={pendingTotal > 0 ? 'pending' : 'holidays'} className="w-full">
+						<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 							<TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-7">
 								<TabsTrigger value="pending" className="w-full px-2 py-2 text-xs sm:text-sm">
 									Pending
@@ -425,12 +613,27 @@ const EmployeeDiaryPage = () => {
 										</span>
 									)}
 								</TabsTrigger>
-								<TabsTrigger value="holidays" className="w-full px-2 py-2 text-xs sm:text-sm">Holidays</TabsTrigger>
-								<TabsTrigger value="incidents" className="w-full px-2 py-2 text-xs sm:text-sm">Incidents</TabsTrigger>
-								<TabsTrigger value="expenses" className="w-full px-2 py-2 text-xs sm:text-sm">Expenses</TabsTrigger>
+								<TabsTrigger value="holidays" className="w-full px-2 py-2 text-xs sm:text-sm">
+									Holidays
+									<span className="ml-1 text-[10px] opacity-70">({diary.holidays.length})</span>
+								</TabsTrigger>
+								<TabsTrigger value="incidents" className="w-full px-2 py-2 text-xs sm:text-sm">
+									Incidents
+									<span className="ml-1 text-[10px] opacity-70">({diary.incidents.length})</span>
+								</TabsTrigger>
+								<TabsTrigger value="expenses" className="w-full px-2 py-2 text-xs sm:text-sm">
+									Expenses
+									<span className="ml-1 text-[10px] opacity-70">({diary.expenses.length})</span>
+								</TabsTrigger>
 								<TabsTrigger value="license" className="w-full px-2 py-2 text-xs sm:text-sm">License</TabsTrigger>
-								<TabsTrigger value="equipment" className="w-full px-2 py-2 text-xs sm:text-sm">Equipment</TabsTrigger>
-								<TabsTrigger value="training" className="w-full px-2 py-2 text-xs sm:text-sm">Training</TabsTrigger>
+								<TabsTrigger value="equipment" className="w-full px-2 py-2 text-xs sm:text-sm">
+									Equipment
+									<span className="ml-1 text-[10px] opacity-70">({diary.equipment.requests.length + diary.equipment.issued.length})</span>
+								</TabsTrigger>
+								<TabsTrigger value="training" className="w-full px-2 py-2 text-xs sm:text-sm">
+									Training
+									<span className="ml-1 text-[10px] opacity-70">({diary.training.tests.length})</span>
+								</TabsTrigger>
 							</TabsList>
 
 							<TabsContent value="pending" className="mt-4">

@@ -1,3 +1,7 @@
+/**
+ * Customer page assignment checklist for customer setup.
+ * Flow: category-grouped CUSTOMER_PAGES toggles → parent persists enabled customer modules.
+ */
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -51,6 +55,7 @@ const iconMap = {
   FileText
 }
 
+// === Component ===
 export function CustomerPageAssignment({
   customerType,
   currentAssignments,

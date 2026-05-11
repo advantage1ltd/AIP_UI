@@ -1,3 +1,7 @@
+/**
+ * Reusable incidents table with client-side search and column sort.
+ * Flow: parent supplies rows → local filter/sort → edit/delete callbacks.
+ */
 import { format } from "date-fns"
 import { useState, useMemo } from "react"
 import {

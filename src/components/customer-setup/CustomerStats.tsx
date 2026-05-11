@@ -1,3 +1,7 @@
+/**
+ * Customer setup summary statistics cards.
+ * Flow: customer/region/site props → derived counts and highlights for setup dashboard.
+ */
 import { Card, CardContent } from "@/components/ui/card"
 import { Building2, MapPin, Users, Star, TrendingUp, Shield } from "lucide-react"
 import { useMemo, useState, useEffect } from "react"
@@ -11,6 +15,7 @@ interface CustomerStatsProps {
   updateTrigger?: number // Add this to force re-renders
 }
 
+// === Component ===
 export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerStatsProps) {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [regions, setRegions] = useState<Region[]>([])
@@ -158,7 +163,7 @@ export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerSta
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 mb-6">
         {[...Array(4)].map((_, index) => (
           <Card key={index} className="h-full border-0 shadow-lg overflow-hidden">
             <div className="h-full bg-gradient-to-r from-gray-600 to-gray-800 text-white">
@@ -182,7 +187,7 @@ export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerSta
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 mb-6">
       {stats.map((stat, index) => {
         const IconComponent = stat.icon
         return (

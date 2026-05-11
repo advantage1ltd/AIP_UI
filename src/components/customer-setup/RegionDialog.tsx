@@ -1,3 +1,7 @@
+/**
+ * Region create/edit dialog for customer setup.
+ * Flow: customer-bound form reset → regionService create or update → parent onSuccess refresh.
+ */
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -31,6 +35,7 @@ interface RegionDialogProps {
   onSuccess?: () => void
 }
 
+// === Component ===
 export function RegionDialog({ open, onOpenChange, region, selectedCustomerId, onSuccess }: RegionDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [customers, setCustomers] = useState<any[]>([])

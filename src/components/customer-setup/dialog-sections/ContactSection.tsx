@@ -7,6 +7,7 @@ interface ContactSectionProps {
   form: UseFormReturn<any>
 }
 
+// === Component ===
 export function ContactSection({ form }: ContactSectionProps) {
   return (
     <div className="space-y-4">

@@ -1,3 +1,7 @@
+/**
+ * Customer daily activity results table.
+ * Flow: debounced filters → paged dailyActivityService list → parent edit/view/new callbacks.
+ */
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -6,10 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { CalendarIcon, Edit, Trash2, Search, Filter, Eye, Plus, X, Download, RefreshCw } from 'lucide-react';
+import { Edit, Trash2, Search, Filter, Eye, Plus, X, Download, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { dailyActivityService } from '@/services/dailyActivityService';
@@ -65,7 +68,7 @@ export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, cust
     }));
   }, [customerId, siteId]);
 
-  // Load initial data
+  // Pagination and parent refreshTrigger reload the report list; filters debounce before fetch.
   useEffect(() => {
     loadData();
   }, [currentPage, refreshTrigger]);
@@ -350,28 +353,12 @@ export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, cust
               {/* Date Filter */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Report Date</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal bg-white",
-                        !selectedDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={handleDateSelect}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <NativeDateInput
+                  value={selectedDate}
+                  onDateChange={handleDateSelect}
+                  className="bg-white"
+                  aria-label="Filter by report date"
+                />
               </div>
             </div>
           </CardContent>

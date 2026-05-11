@@ -1,3 +1,7 @@
+/**
+ * Customer daily activity capture form.
+ * Flow: site context → nested activity/incident sections → dailyActivityService create or update.
+ */
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -8,12 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
 import { dailyActivityService } from '@/services/dailyActivityService';
 import { siteService } from '@/services/siteService';
 import type { 
@@ -296,6 +298,7 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess, custo
     setActivities(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Admin submissions resolve customer from selected site; customer users stay scoped to their tenant.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -478,28 +481,12 @@ export const DailyActivityForm = ({ open, onOpenChange, report, onSuccess, custo
 
                   <div>
                     <Label>Date Of Report</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !formData.reportDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {formData.reportDate ? format(formData.reportDate, "dd/MM/yyyy") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={formData.reportDate}
-                          onSelect={(date) => date && setFormData(prev => ({ ...prev, reportDate: date }))}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <NativeDateInput
+                      value={formData.reportDate}
+                      onDateChange={(d) => d && setFormData(prev => ({ ...prev, reportDate: d }))}
+                      className="mt-1"
+                      aria-label="Report date"
+                    />
                   </div>
 
 

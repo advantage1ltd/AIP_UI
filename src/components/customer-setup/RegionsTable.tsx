@@ -1,3 +1,7 @@
+/**
+ * Customer regions table and actions.
+ * Flow: regionService fetch per customer → search/pagination → edit callback or delete confirm.
+ */
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,6 +28,7 @@ interface RegionsTableProps {
   updateTrigger?: number
 }
 
+// === Component ===
 export function RegionsTable({ customerId, onEdit, onDataChange, updateTrigger }: RegionsTableProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)

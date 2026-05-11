@@ -1,3 +1,7 @@
+/**
+ * Task progress update sheet for assignees.
+ * Flow: status history load → new status/note entry → parent refresh after save.
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { Task, TaskStatusUpdate } from '@/pages/ActionCalendar'
@@ -22,7 +26,7 @@ interface TaskProgressSheetProps {
 	onRefresh: () => void
 	onSubmitProgress: (taskId: string, payload: { status: Task['status']; comment?: string }) => Promise<void> | void
 	canUpdate: boolean
-	isAdmin: boolean
+	canManageTasks: boolean
 }
 
 export const TaskProgressSheet = ({
@@ -35,7 +39,7 @@ export const TaskProgressSheet = ({
 	onRefresh,
 	onSubmitProgress,
 	canUpdate,
-	isAdmin
+	canManageTasks
 }: TaskProgressSheetProps) => {
 	const [status, setStatus] = useState<Task['status']>('pending')
 	const [comment, setComment] = useState('')
@@ -229,9 +233,9 @@ export const TaskProgressSheet = ({
 									</>
 								)}
 							</Button>
-							{isAdmin && (
+							{canManageTasks && (
 								<p className="text-[11px] text-muted-foreground">
-									Admins can update progress on behalf of the assignee. Notifications automatically keep both parties informed.
+									Managers and administrators can record progress on any task. Assignees are notified when updates are submitted.
 								</p>
 							)}
 						</div>

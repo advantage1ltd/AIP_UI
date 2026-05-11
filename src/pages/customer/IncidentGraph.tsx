@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+/**
+ * Customer incident graph and type breakdown.
+ * Flow: search params and site filters → incidentGraphService → chart and table breakdowns.
+ */
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { DatePicker } from '@/components/ui/date-picker'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList, Cell } from 'recharts'
 import { Button } from '@/components/ui/button'
@@ -12,6 +16,7 @@ import { Loader2 } from "lucide-react"
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, format, subDays } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { findCustomerById } from '@/hooks/useAvailableCustomers'
 import { 
 	incidentGraphService, 
 	IncidentGraphData, 
@@ -19,7 +24,6 @@ import {
 	IncidentGraphFilters,
 	RegionOption 
 } from '@/services/incidentGraphService'
-import { BASE_API_URL } from '@/config/api'
 
 // Define types for the data
 interface FilteredData {
@@ -28,10 +32,24 @@ interface FilteredData {
 	quantity: number
 }
 
-// Add incident type interface and data after the mockIncidentData array
+// Incident type metadata (codes / labels) for charts
 interface IncidentTypeDataWithColor extends IncidentTypeData {
 	originalCode: string
 	fullName: string
+}
+
+const toDateInputValue = (date?: Date) => {
+	if (!date) return ''
+	const year = date.getFullYear()
+	const month = `${date.getMonth() + 1}`.padStart(2, '0')
+	const day = `${date.getDate()}`.padStart(2, '0')
+	return `${year}-${month}-${day}`
+}
+
+const fromDateInputValue = (value: string): Date | undefined => {
+	if (!value) return undefined
+	const parsed = new Date(`${value}T00:00:00`)
+	return Number.isNaN(parsed.getTime()) ? undefined : parsed
 }
 
 // Update color palette for better 3D effect with more vibrant colors
@@ -81,10 +99,15 @@ const defaultRegionOptions = [
 ]
 
 // Add type for graph type
-type GraphType = 'value' | 'quantity' | 'type'
+type GraphType = 'value' | 'loss' | 'quantity' | 'type'
 
 interface IncidentGraphProps {
 	customerId?: string
+}
+
+const toValidCustomerId = (value: unknown): number | null => {
+	const parsed = Number(value)
+	return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
 const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
@@ -95,15 +118,14 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 	// Get customer ID from URL parameter, prop, or user's customerId
 	const urlCustomerId = searchParams.get('customerId')
 	const userCustomerId = user && ('customerId' in user) ? (user as any).customerId : undefined
-	const currentCustomerId = customerId 
-		? parseInt(customerId) 
-		: urlCustomerId 
-			? parseInt(urlCustomerId) 
-			: userCustomerId || 21 // Default to customer 21
+	const currentCustomerId = useMemo(
+		() => toValidCustomerId(customerId) ?? toValidCustomerId(urlCustomerId) ?? toValidCustomerId(userCustomerId),
+		[customerId, urlCustomerId, userCustomerId]
+	)
 
 	// State management
-  const [startDate, setStartDate] = useState<Date>()
-  const [endDate, setEndDate] = useState<Date>()
+  const [startDate, setStartDate] = useState<Date>(() => startOfYear(new Date()))
+  const [endDate, setEndDate] = useState<Date>(() => new Date())
   const [selectedRegionId, setSelectedRegionId] = useState('all')
   const [graphType, setGraphType] = useState<GraphType>('value')
   const [officerType, setOfficerType] = useState('all')
@@ -114,8 +136,8 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 	const [incidentTypeData, setIncidentTypeData] = useState<IncidentTypeData[]>([])
 	const [availableRegions, setAvailableRegions] = useState<RegionOption[]>([])
 	const [customerName, setCustomerName] = useState<string>('')
-  const [totalSaved, setTotalSaved] = useState(0)
   const [filteredTotal, setFilteredTotal] = useState(0)
+	const latestCustomerIdRef = useRef<number | null>(currentCustomerId)
 
 	// Loading and error states
 	const [loading, setLoading] = useState(false)
@@ -126,14 +148,17 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 	const [storesPerPage, setStoresPerPage] = useState(20)
 
 	// Memoize filters
-	const filters = useMemo((): IncidentGraphFilters => ({
-		customerId: currentCustomerId,
-		startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
-		endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
-		regionId: selectedRegionId === 'all' ? undefined : selectedRegionId,
-		officerType: officerType,
-		graphType: graphType
-	}), [currentCustomerId, startDate, endDate, selectedRegionId, officerType, graphType])
+	const filters = useMemo((): IncidentGraphFilters | null => {
+		if (!currentCustomerId) return null
+		return {
+			customerId: currentCustomerId,
+			startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
+			endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
+			regionId: selectedRegionId === 'all' ? undefined : selectedRegionId,
+			officerType: officerType,
+			graphType: graphType
+		}
+	}, [currentCustomerId, startDate, endDate, selectedRegionId, officerType, graphType])
 
 	const selectedRegionLabel = useMemo(() => {
 		if (selectedRegionId === 'all') {
@@ -144,10 +169,11 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 
 	// Fetch data from API
 	const fetchData = useCallback(async () => {
-		console.log('🔍 [IncidentGraph] fetchData called with:', { currentCustomerId, filters })
-		
-		if (!currentCustomerId) {
-			console.warn('🔍 [IncidentGraph] No customer ID available')
+		if (!currentCustomerId || !filters) {
+			setGraphData([])
+			setIncidentTypeData([])
+			setFilteredTotal(0)
+			setError('Select a customer to view incident analytics.')
 			return
 		}
 
@@ -155,8 +181,6 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 		setError(null)
 
 		try {
-			console.log('🔍 [IncidentGraph] Making API calls...')
-			
 			// Fetch graph data and incident types in parallel
 			const [graphResponse, typesResponse] = await Promise.all([
 				incidentGraphService.fetchGraphData(filters),
@@ -171,13 +195,8 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 					: Promise.resolve(null)
 			])
 
-			console.log('🔍 [IncidentGraph] Graph response:', graphResponse)
-			console.log('🔍 [IncidentGraph] Types response:', typesResponse)
-
 			if (graphResponse.success) {
-				console.log('🔍 [IncidentGraph] Setting graph data:', graphResponse.data.incidents)
 				setGraphData(graphResponse.data.incidents)
-				setTotalSaved(graphResponse.data.totals.totalValue)
 				
 				// Set filtered total based on graph type
 				if (graphType === 'quantity') {
@@ -195,7 +214,6 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 			}
 
 			if (typesResponse?.success) {
-				console.log('🔍 [IncidentGraph] Setting types data:', typesResponse.data)
 				setIncidentTypeData(typesResponse.data)
 				// Calculate total incidents for type view
 				const totalIncidents = typesResponse.data.reduce((sum, item) => sum + item.count, 0)
@@ -235,27 +253,24 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 		if (!currentCustomerId) return
 
 		try {
-			const response = await fetch(`${BASE_API_URL}/customers/${currentCustomerId}`, {
-				headers: {
-					'Content-Type': 'application/json',
-					'X-Customer-Id': currentCustomerId.toString()
-				}
-			})
-			
-			if (response.ok) {
-				const result = await response.json()
-				if (result.success) {
-					setCustomerName(result.data.name)
-				}
+			const customer = await findCustomerById(currentCustomerId)
+			if (customer && latestCustomerIdRef.current === currentCustomerId) {
+				setCustomerName(customer.name)
 			}
 		} catch (err) {
 			console.error('Error fetching customer name:', err)
 		}
 	}, [currentCustomerId])
 
-	// Initialize component
 	useEffect(() => {
-		// Set responsive storesPerPage based on screen size
+		latestCustomerIdRef.current = currentCustomerId
+		setCustomerName('')
+		setSelectedRegionId('all')
+		setCurrentPage(1)
+	}, [currentCustomerId])
+
+	// Initialize responsive page size once.
+	useEffect(() => {
 		const handleResize = () => {
 			if (window.innerWidth < 640) { // Mobile
 				setStoresPerPage(5)
@@ -268,19 +283,22 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 		
 		handleResize()
 		window.addEventListener('resize', handleResize)
-		
-		// Set default time range to year to date
-		const now = new Date()
-		const yearStart = startOfYear(now)
-		setStartDate(yearStart)
-		setEndDate(now)
-		fetchRegions()
-		fetchCustomerName()
-		
+
 		return () => {
 			window.removeEventListener('resize', handleResize)
 		}
+	}, [])
+
+	// Refresh customer metadata whenever selected customer changes.
+	useEffect(() => {
+		fetchRegions()
+		fetchCustomerName()
 	}, [fetchRegions, fetchCustomerName])
+
+	// Keep pagination stable when filters change.
+	useEffect(() => {
+		setCurrentPage(1)
+	}, [graphType, officerType, timeFilter, selectedRegionId, currentCustomerId])
 
 	// Fetch data when filters change
 	useEffect(() => {
@@ -302,16 +320,14 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 					// Transform graph data for value/quantity views
 		result = graphData.map(item => ({
 			location: item.location || item.siteName || 'Unknown Location',
-			value: graphType === 'value' 
-				? (item.valueRecovered || item.totalValueRecovered || item.value || 0)
-				: (item.value || 0), // For value graph type, use value from API
+			value: item.value || 0,
 			quantity: item.quantity || item.quantityRecovered || 0 // For quantity graph type, use quantity from API
 		}))
 		}
 
 		// Sort data
 		const sortedData = result.sort((a, b) => 
-			graphType === 'value' || graphType === 'type' 
+			graphType === 'value' || graphType === 'loss' || graphType === 'type' 
 				? (b.value - a.value)
 				: (b.quantity - a.quantity)
 		)
@@ -379,6 +395,8 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 			return `Total Incidents by ${officerTypeText} (${selectedRegionLabel}) - ${periodText}`
 		} else if (graphType === 'quantity') {
 			return `Total Items Recovered by ${officerTypeText} (${selectedRegionLabel}) - ${periodText}`
+		} else if (graphType === 'loss') {
+			return `Total Value Lost by ${officerTypeText} (${selectedRegionLabel}) - ${periodText}`
 		}
 		return `Total Value Recovered by ${officerTypeText} (${selectedRegionLabel}) - ${periodText}`
 	}
@@ -449,16 +467,10 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 				fullLocation: item.location // Keep the full location for tooltips
 			}))
 			barName = graphType === 'quantity' ? 'Items Recovered' :
+					  graphType === 'loss' ? 'Value Lost' :
 					  officerType === 'uniform' ? 'Uniform Officer' :
 					  officerType === 'detective' ? 'Store Detective' :
 					  'Total Value'
-		}
-
-		// Debug logging for quantity issues
-		if (graphType === 'quantity') {
-			console.log('🔍 [IncidentGraph] Chart data for quantity:', chartData)
-			console.log('🔍 [IncidentGraph] Paginated data:', paginatedData)
-			console.log('🔍 [IncidentGraph] Graph data from API:', graphData)
 		}
 
 		const getBarFill = (entry: any, index: number) => {
@@ -469,7 +481,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 		}
 
 		const formatValue = (value: number) => {
-			if (graphType === 'value') {
+			if (graphType === 'value' || graphType === 'loss') {
 				// Format currency values more compactly on mobile
 				if (window.innerWidth < 640) {
 					if (value >= 1000) {
@@ -610,8 +622,9 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 										<YAxis 
 											label={{ 
 												value: graphType === 'type' ? 'Number of Incidents' : 
-													   graphType === 'value' ? 'Amount Recovered (£)' : 
-													   'Number of Items',
+													   graphType === 'quantity' ? 'Number of Items' :
+													   graphType === 'loss' ? 'Amount Lost (£)' :
+													   'Amount Recovered (£)',
 												angle: -90,
 												position: 'insideLeft',
 												offset: window.innerWidth < 640 ? -25 : 
@@ -670,7 +683,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 										/>
 										
 										<Bar 
-											dataKey={graphType === 'type' ? 'count' : graphType === 'value' ? 'value' : 'quantity'}
+											dataKey={graphType === 'type' ? 'count' : graphType === 'quantity' ? 'quantity' : 'value'}
 											name={barName}
 											radius={[0, 0, 0, 0]}
 											style={{
@@ -775,7 +788,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 											}}
 										>
 											<LabelList 
-												dataKey={graphType === 'type' ? 'count' : graphType === 'value' ? 'value' : 'quantity'}
+												dataKey={graphType === 'type' ? 'count' : graphType === 'quantity' ? 'quantity' : 'value'}
 												position="top"
 												offset={window.innerWidth < 640 ? 5 : 
 														window.innerWidth < 1024 ? 8 : 12}
@@ -833,37 +846,37 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 	}
 
 	return (
-		<div className="min-h-screen bg-[#EFF4FF]">
+		<div className="min-h-screen bg-[#070D21]">
 			<div className="container mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8">
-				<div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 p-3 sm:p-4 md:p-8 backdrop-blur-sm border border-white/10">
+				<div className="relative overflow-hidden rounded-2xl border border-indigo-900/70 bg-gradient-to-r from-[#1B2348] via-[#1F254F] to-[#2A2958] p-3 sm:p-4 md:p-8 shadow-[0_18px_45px_rgba(8,12,34,0.45)]">
 					<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 sm:gap-4">
 						<div>
-							<h1 className="text-xl sm:text-2xl md:text-4xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+							<h1 className="text-xl sm:text-2xl md:text-4xl font-bold text-indigo-100">
 								Incident Analytics Dashboard
 							</h1>
-							<p className="text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base md:text-lg">
+							<p className="text-indigo-200/80 mt-1 sm:mt-2 text-sm sm:text-base md:text-lg">
 								Track and analyze security incidents across locations
 							</p>
 							{customerName && (
 								<div className="flex items-center gap-2 mt-2 sm:mt-3">
-									<div className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 px-3 py-1 rounded-full border border-indigo-500/30">
-										<span className="text-indigo-300 text-sm sm:text-base font-medium">
-											Customer: {customerName}
+									<div className="rounded-full border border-indigo-500/40 bg-indigo-500/20 px-3 py-1">
+										<span className="text-indigo-100 text-sm sm:text-base font-medium">
+											{customerName}
 										</span>
 									</div>
-									<div className="bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 px-3 py-1 rounded-full border border-emerald-500/30">
-										<span className="text-emerald-300 text-sm sm:text-base font-medium">
+									<div className="rounded-full border border-emerald-500/40 bg-emerald-500/20 px-3 py-1">
+										<span className="text-emerald-200 text-sm sm:text-base font-medium">
 											ID: {currentCustomerId}
 										</span>
 									</div>
 								</div>
 							)}
 						</div>
-						<div className="bg-slate-800/80 p-3 sm:p-4 md:p-6 rounded-xl border border-white/10 w-full lg:w-auto">
-							<h2 className="text-base sm:text-lg md:text-xl font-semibold text-slate-200">
+						<div className="w-full rounded-xl border border-indigo-900/70 bg-[#17203E] p-3 sm:p-4 md:p-6 lg:w-[44%]">
+							<h2 className="text-base sm:text-lg md:text-xl font-semibold text-indigo-100">
 								{getTotalSavedTitle()}
 							</h2>
-							<p className="text-xl sm:text-2xl md:text-4xl font-bold bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent mt-1 sm:mt-2">
+							<p className="mt-1 sm:mt-2 text-xl sm:text-2xl md:text-4xl font-bold text-emerald-300">
 								{graphType === 'type' 
 									? `${filteredTotal} Incidents` 
 									: graphType === 'quantity' 
@@ -876,26 +889,26 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 				</div>
 
 				{/* Filters Card */}
-				<Card className="relative overflow-hidden bg-slate-900/90 border-slate-800">
+				<Card className="relative overflow-hidden border-indigo-900/80 bg-[#0A1230]">
 					<CardHeader className="py-2 px-3 sm:px-4">
-						<CardTitle className="text-base sm:text-lg md:text-xl font-semibold text-slate-200">
+						<CardTitle className="text-base sm:text-lg md:text-xl font-semibold text-indigo-100">
 							Filters & Controls
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="pt-0 px-3 sm:px-4 md:px-6">
 						<div className="grid gap-3 sm:gap-4 md:gap-6">
-							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4 md:gap-6">
-								<div className="sm:col-span-1 lg:col-span-4 space-y-2 sm:space-y-3">
+							<div className="grid grid-cols-1 gap-3 sm:gap-4 md:gap-6 lg:grid-cols-12">
+								<div className="space-y-2 sm:space-y-3 lg:col-span-4">
 									<div>
-										<Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Region</Label>
+										<Label className="mb-1 block text-xs font-medium text-indigo-100 sm:mb-2 sm:text-sm">Region</Label>
 										<Select value={selectedRegionId} onValueChange={(value) => {
 											setSelectedRegionId(value)
 											setCurrentPage(1)
 										}}>
-											<SelectTrigger className="bg-slate-800 border-slate-700 text-slate-200 h-8 sm:h-10 text-xs sm:text-sm">
+											<SelectTrigger className="h-8 border-slate-300 bg-white text-xs text-slate-900 sm:h-10 sm:text-sm">
 												<SelectValue placeholder="Select region" />
 											</SelectTrigger>
-											<SelectContent className="bg-slate-800 border-slate-700 text-xs sm:text-sm">
+											<SelectContent className="border-slate-300 bg-white text-xs text-slate-900 sm:text-sm">
 												{regionOptions.map((option) => (
 													<SelectItem key={option.value} value={option.value}>
 														{option.label}
@@ -905,94 +918,100 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 										</Select>
 									</div>
 									<div>
-										<Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Graph Type</Label>
+										<Label className="mb-1 block text-xs font-medium text-indigo-100 sm:mb-2 sm:text-sm">Graph Type</Label>
 										<RadioGroup
 											value={graphType}
 											onValueChange={(value: GraphType) => setGraphType(value)}
-											className="flex flex-wrap gap-2 sm:gap-3"
+											className="grid grid-cols-1 gap-1 sm:grid-cols-2 sm:gap-x-4 sm:gap-y-2"
 										>
 											<div className="flex items-center space-x-1 sm:space-x-2">
-												<RadioGroupItem value="value" id="value" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
-												<Label htmlFor="value" className="text-xs sm:text-sm text-slate-300">Value Recovered</Label>
+												<RadioGroupItem value="value" id="value" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="value" className="text-xs text-indigo-100 sm:text-sm">Value Recovered</Label>
 											</div>
 											<div className="flex items-center space-x-1 sm:space-x-2">
-												<RadioGroupItem value="quantity" id="quantity" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
-												<Label htmlFor="quantity" className="text-xs sm:text-sm text-slate-300">Items Recovered</Label>
+												<RadioGroupItem value="loss" id="loss" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="loss" className="text-xs text-indigo-100 sm:text-sm">Value Lost</Label>
 											</div>
 											<div className="flex items-center space-x-1 sm:space-x-2">
-												<RadioGroupItem value="type" id="type" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
-												<Label htmlFor="type" className="text-xs sm:text-sm text-slate-300">Action Types</Label>
+												<RadioGroupItem value="quantity" id="quantity" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="quantity" className="text-xs text-indigo-100 sm:text-sm">Items Recovered</Label>
+											</div>
+											<div className="flex items-center space-x-1 sm:space-x-2">
+												<RadioGroupItem value="type" id="type" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="type" className="text-xs text-indigo-100 sm:text-sm">Action Types</Label>
 											</div>
 										</RadioGroup>
 									</div>
 								</div>
-								<div className="sm:col-span-1 lg:col-span-5 space-y-2 sm:space-y-3">
+								<div className="space-y-2 sm:space-y-3 lg:col-span-5">
 									<div>
-										<Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Time Period</Label>
+										<Label className="mb-1 block text-xs font-medium text-indigo-100 sm:mb-2 sm:text-sm">Time Period</Label>
 										<RadioGroup
 											value={timeFilter}
 											onValueChange={handleTimeFilterChange}
 											className="grid grid-cols-2 gap-x-2 sm:gap-x-4 gap-y-1 sm:gap-y-2"
 										>
 											<div className="flex items-center space-x-1 sm:space-x-2">
-												<RadioGroupItem value="ytd" id="ytd" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
-												<Label htmlFor="ytd" className="text-xs sm:text-sm text-slate-300">Year to Date</Label>
+												<RadioGroupItem value="ytd" id="ytd" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="ytd" className="text-xs text-indigo-100 sm:text-sm">Year to Date</Label>
 											</div>
 											<div className="flex items-center space-x-1 sm:space-x-2">
-												<RadioGroupItem value="month" id="month" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
-												<Label htmlFor="month" className="text-xs sm:text-sm text-slate-300">Current Month</Label>
+												<RadioGroupItem value="month" id="month" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="month" className="text-xs text-indigo-100 sm:text-sm">Current Month</Label>
 											</div>
 											<div className="flex items-center space-x-1 sm:space-x-2">
-												<RadioGroupItem value="week" id="week" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
-												<Label htmlFor="week" className="text-xs sm:text-sm text-slate-300">Current Week</Label>
+												<RadioGroupItem value="week" id="week" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="week" className="text-xs text-indigo-100 sm:text-sm">Current Week</Label>
 											</div>
 											<div className="flex items-center space-x-1 sm:space-x-2">
-												<RadioGroupItem value="today" id="today" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
-												<Label htmlFor="today" className="text-xs sm:text-sm text-slate-300">Today</Label>
+												<RadioGroupItem value="today" id="today" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="today" className="text-xs text-indigo-100 sm:text-sm">Today</Label>
 											</div>
 											<div className="flex items-center space-x-1 sm:space-x-2">
-												<RadioGroupItem value="last30" id="last30" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
-												<Label htmlFor="last30" className="text-xs sm:text-sm text-slate-300">Last 30 Days</Label>
+												<RadioGroupItem value="last30" id="last30" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="last30" className="text-xs text-indigo-100 sm:text-sm">Last 30 Days</Label>
 											</div>
 										</RadioGroup>
 									</div>
-									{(startDate || endDate) && (
-										<div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-											<DatePicker
-												date={startDate}
-												setDate={setStartDate}
-											/>
-											<DatePicker
-												date={endDate}
-												setDate={setEndDate}
-											/>
-										</div>
-									)}
+									<div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+										<Input
+											type='date'
+											value={toDateInputValue(startDate)}
+											onChange={(event) => setStartDate(fromDateInputValue(event.target.value))}
+											className='h-8 border-slate-300 bg-white text-xs text-slate-900 sm:h-10 sm:text-sm'
+										/>
+										<Input
+											type='date'
+											value={toDateInputValue(endDate)}
+											onChange={(event) => setEndDate(fromDateInputValue(event.target.value))}
+											className='h-8 border-slate-300 bg-white text-xs text-slate-900 sm:h-10 sm:text-sm'
+										/>
+									</div>
 								</div>
-								<div className="sm:col-span-2 lg:col-span-3 space-y-2 sm:space-y-3">
+								<div className="space-y-2 sm:space-y-3 lg:col-span-3">
 									<div>
-										<Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Officer Role</Label>
+										<Label className="mb-1 block text-xs font-medium text-indigo-100 sm:mb-2 sm:text-sm">Officer Role</Label>
 										<RadioGroup
 											value={officerType}
 											onValueChange={setOfficerType}
 											className="flex flex-col gap-1 sm:gap-2"
 										>
 											<div className="flex items-center space-x-1 sm:space-x-2">
-												<RadioGroupItem value="all" id="all" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
-												<Label htmlFor="all" className="text-xs sm:text-sm text-slate-300">All Officers</Label>
+												<RadioGroupItem value="all" id="all" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="all" className="text-xs text-indigo-100 sm:text-sm">All Officers</Label>
 											</div>
 											<div className="flex items-center space-x-1 sm:space-x-2">
-												<RadioGroupItem value="uniform" id="uniform" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
-												<Label htmlFor="uniform" className="text-xs sm:text-sm text-slate-300">Uniform Officers</Label>
+												<RadioGroupItem value="uniform" id="uniform" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="uniform" className="text-xs text-indigo-100 sm:text-sm">Uniform Officers</Label>
 											</div>
 											<div className="flex items-center space-x-1 sm:space-x-2">
-												<RadioGroupItem value="detective" id="detective" className="h-3 w-3 sm:h-4 sm:w-4 border-slate-700 text-indigo-500" />
-												<Label htmlFor="detective" className="text-xs sm:text-sm text-slate-300">Store Detectives</Label>
+												<RadioGroupItem value="detective" id="detective" className="h-3 w-3 border-slate-500 text-indigo-500 sm:h-4 sm:w-4" />
+												<Label htmlFor="detective" className="text-xs text-indigo-100 sm:text-sm">Store Detectives</Label>
 											</div>
 										</RadioGroup>
 									</div>
 									<div>
-										<Label className="text-xs sm:text-sm font-medium text-slate-300 mb-1 sm:mb-2 block">Items per Page</Label>
+										<Label className="mb-1 block text-xs font-medium text-indigo-100 sm:mb-2 sm:text-sm">Items per Page</Label>
 										<Select 
 											value={storesPerPage.toString()} 
 											onValueChange={(value) => {
@@ -1000,10 +1019,10 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 												setCurrentPage(1)
 											}}
 										>
-											<SelectTrigger className="bg-slate-800 border-slate-700 text-slate-200 h-8 sm:h-10 text-xs sm:text-sm">
+											<SelectTrigger className="h-8 border-slate-300 bg-white text-xs text-slate-900 sm:h-10 sm:text-sm">
 												<SelectValue />
 											</SelectTrigger>
-											<SelectContent className="bg-slate-800 border-slate-700 text-xs sm:text-sm">
+											<SelectContent className="border-slate-300 bg-white text-xs text-slate-900 sm:text-sm">
 												<SelectItem value="5">5 items</SelectItem>
 												<SelectItem value="10">10 items</SelectItem>
 												<SelectItem value="20">20 items</SelectItem>

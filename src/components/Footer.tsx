@@ -1,9 +1,13 @@
+/**
+ * Application footer shell content.
+ * Flow: static legal/support links rendered inside Layout.
+ */
 import React from 'react';
 import { Link } from 'react-router-dom';
 
 export const Footer = () => {
   return (
-    <footer className="w-full bg-[#334155] lg:bg-[#1A1A1A] text-white mb-0">
+    <footer className="w-full bg-[#080D1F] text-white mb-0">
       <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-16 py-8 md:py-10">
         {/* Responsive layout using flex */}
         <div className="flex flex-wrap pl-2 sm:pl-4">

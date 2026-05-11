@@ -1,3 +1,7 @@
+/**
+ * Customer daily activity chart views.
+ * Flow: activity metrics query → chart tabs for trends and comparisons.
+ */
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -454,22 +458,23 @@ const DailyActivityReportGraphs: React.FC = () => {
 
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-6">
-      {/* Header Section */}
-      <div className="text-center mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-2">
-          Daily Activity Report Graphs
-        </h1>
-        <p className="text-slate-600 dark:text-slate-400">
-          Visualize daily activity report data across sites and categories
-        </p>
-      </div>
+    <div className="min-h-screen bg-[#EFF4FF]">
+      <div className="container mx-auto max-w-screen-2xl px-4 py-4 lg:px-8 lg:py-8 space-y-6">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-1">
+            DAR Graphs
+          </h1>
+          <p className="text-slate-600">
+            Visualize daily activity report data across sites and categories.
+          </p>
+        </div>
 
-      {/* Filter Options Section */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-        <h2 className="text-lg font-semibold mb-4">Filter Options</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="border-slate-200 bg-white shadow-sm">
+          <CardHeader className="border-b border-slate-200 bg-slate-50/60">
+            <CardTitle className="text-base md:text-lg">Filter Options</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {/* Date Range */}
           <div>
             <label className="block text-sm font-medium mb-2 flex items-center">
@@ -486,6 +491,7 @@ const DailyActivityReportGraphs: React.FC = () => {
                 date={endDate}
                 setDate={setEndDate}
                 placeholder="End Date"
+                minDate={startDate}
               />
             </div>
           </div>
@@ -529,15 +535,15 @@ const DailyActivityReportGraphs: React.FC = () => {
           )}
         </div>
 
-        <Button onClick={handleSearch} className="w-full md:w-auto" disabled={isLoading}>
+            <Button onClick={handleSearch} className="w-full md:w-auto" disabled={isLoading}>
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
           Apply Filters
         </Button>
-      </div>
+          </CardContent>
+        </Card>
 
-      {/* Tab Navigation */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
-        <div className="border-b border-slate-200 dark:border-slate-700">
+        <Card className="border-slate-200 bg-white shadow-sm overflow-hidden">
+          <CardHeader className="border-b border-slate-200 bg-slate-50/60 p-0">
           <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
             {filterOptions.map((option) => (
               <button
@@ -545,32 +551,31 @@ const DailyActivityReportGraphs: React.FC = () => {
                 onClick={() => setSelectedFilter(option)}
                 className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                   selectedFilter === option
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                 }`}
               >
                 {option}
               </button>
             ))}
           </nav>
-        </div>
+          </CardHeader>
 
-        {/* Chart Content */}
-        <div className="p-6">
+          <CardContent className="p-6">
           <SafeComponent>
             {renderChart()}
           </SafeComponent>
-        </div>
+          </CardContent>
 
-        {/* Footer Info */}
-        {analyticsData && (
-          <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900 rounded-b-lg border-t border-slate-200 dark:border-slate-700">
-            <div className="flex justify-between items-center text-sm text-slate-600 dark:text-slate-400">
+          {analyticsData && (
+            <div className="px-6 py-4 bg-slate-50 rounded-b-lg border-t border-slate-200">
+              <div className="flex justify-between items-center text-sm text-slate-600">
               <span>Data shown for period: {analyticsData.dateRange.from} to {analyticsData.dateRange.to}</span>
               <span>{customerRegion}</span>
             </div>
-          </div>
-        )}
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   );

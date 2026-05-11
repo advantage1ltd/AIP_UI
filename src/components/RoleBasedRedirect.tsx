@@ -1,3 +1,7 @@
+/**
+ * Redirects authenticated users by role to their home route.
+ * Flow: read session role → navigate to role default dashboard path.
+ */
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePageAccess } from '@/contexts/PageAccessContext'
@@ -14,11 +18,11 @@ const RoleBasedRedirect = () => {
     if (currentRole && user) {
       let redirectPath = '/dashboard' // default
       
-      if (user.role === 'administrator' || user.role === 'advantageonehoofficer') {
+      if (user.role === 'administrator' || user.role === 'manager') {
         redirectPath = '/dashboard'
-      } else if (user.role === 'advantageoneofficer') {
+      } else if (user.role === 'securityofficer') {
         redirectPath = '/dashboard'
-      } else if (user.role?.startsWith('customer')) {
+      } else if (user.role === 'customer') {
         redirectPath = '/dashboard'
       }
       

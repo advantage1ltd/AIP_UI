@@ -1,3 +1,7 @@
+/**
+ * Customer administration data table.
+ * Flow: client search/pagination → CustomerDialog create/edit → customerService save/delete with event-driven refresh.
+ */
 import { useState, useEffect, useCallback } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
@@ -16,6 +20,7 @@ interface CustomersTableProps {
   onDataChange?: () => void
 }
 
+// === Component ===
 export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataChange }: CustomersTableProps) {
   const { toast } = useToast()
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -193,6 +198,7 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
   const [allCustomers, setAllCustomers] = useState<Customer[]>([])
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true)
 
+  // Local client pagination/search; reload after save/delete and customer window events.
   useEffect(() => {
     const fetchCustomers = async () => {
       try {

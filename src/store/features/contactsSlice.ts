@@ -1,3 +1,4 @@
+/** CRM contacts slice (seed data; CRM pages also call API services). */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { Contact } from '@/types/contacts'
 

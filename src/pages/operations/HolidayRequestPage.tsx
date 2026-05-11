@@ -1,3 +1,7 @@
+/**
+ * Holiday request operations page; uses holidayRequestService.
+ * Flow: role-scoped list → create/view/update dialogs → manager authorisation and archive/delete actions.
+ */
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { format, addDays, differenceInDays, differenceInBusinessDays } from 'date-fns';
 import {
@@ -37,6 +41,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from '@/utils/logger';
 import { employeeService } from '@/services/employeeService';
 import { userService } from '@/services/userService';
 import type { Employee } from '@/types/employee';
@@ -68,8 +73,22 @@ import {
   PaginationPrevious 
 } from "@/components/ui/pagination";
 import { holidayRequestService } from "@/services/holidayRequestService";
+import { getUser } from '@/services/auth';
 import type { HolidayRequest, CreateHolidayRequestDTO, UpdateHolidayRequestDTO } from "@/types/holidayRequest";
 import { usePageAccess } from '@/contexts/PageAccessContext'
+import { harmonizeRole, normalizeRoleId } from '@/utils/roles'
+
+const holidayRequestMatchesViewer = (
+	request: HolidayRequest,
+	viewer: ReturnType<typeof getUser>
+): boolean => {
+	if (!viewer) return false
+	if (viewer.employeeId != null && String(viewer.employeeId) === String(request.officerId)) return true
+	const label = `${viewer.firstName ?? ''} ${viewer.lastName ?? ''}`.trim().toLowerCase()
+	if (!label) return false
+	const on = request.officerName.trim().toLowerCase()
+	return on === label || on.includes(label)
+}
 
 const getStatusBadgeClass = (status: 'pending' | 'approved' | 'denied') => {
   switch (status) {
@@ -102,6 +121,11 @@ const parseDateInput = (value: string) => {
   parsed.setHours(0, 0, 0, 0);
   return parsed;
 };
+
+/** Holiday API expects ApplicationUser Id (GUID). Legacy rows may store a display name instead. */
+const ASP_NET_USER_ID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 
 const formSchema = z.object({
   officerId: z.string().min(1, "Officer is required"),
@@ -172,6 +196,7 @@ const formSchema = z.object({
   path: ["returnToWorkDate"]
 });
 
+// === Component ===
 export default function HolidayRequestPage() {
   const [requests, setRequests] = useState<HolidayRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -182,8 +207,6 @@ export default function HolidayRequestPage() {
   const [viewingRequest, setViewingRequest] = useState<HolidayRequest | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalRecords, setTotalRecords] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -191,11 +214,31 @@ export default function HolidayRequestPage() {
   const [managerOptions, setManagerOptions] = useState<Array<{ id: string; label: string }>>([]);
   const [isLoadingManagers, setIsLoadingManagers] = useState(false);
   const [selectedAuthorisingManagerId, setSelectedAuthorisingManagerId] = useState("");
-  const { currentRole } = usePageAccess();
+  const { currentRole, isTestMode, testRole } = usePageAccess();
   const itemsPerPage = 10;
   const { toast } = useToast();
 
-  const isAdminRole = currentRole && ['administrator', 'admin'].includes(currentRole.toLowerCase());
+  const viewer = getUser();
+  const effectiveNavigationRole = isTestMode && testRole ? testRole : currentRole;
+  const harmonizedHolidayRole =
+    normalizeRoleId(effectiveNavigationRole ?? '') ??
+    normalizeRoleId(viewer?.pageAccessRole ?? viewer?.role ?? '') ??
+    harmonizeRole(viewer?.pageAccessRole ?? viewer?.role ?? '');
+
+  // Officers only see their own requests; managers/admins load approver options and broader lists.
+  const hasHolidayManagementAccess =
+    harmonizedHolidayRole === 'administrator' || harmonizedHolidayRole === 'manager';
+  const isOfficerHolidayScope = harmonizedHolidayRole === 'securityofficer';
+
+  const officerEmployeeIdForApi =
+    isOfficerHolidayScope &&
+    viewer?.employeeId != null &&
+    Number.isFinite(Number(viewer.employeeId))
+      ? Number(viewer.employeeId)
+      : undefined;
+
+  const canMutateHolidayRequest = (request: HolidayRequest) =>
+    hasHolidayManagementAccess || holidayRequestMatchesViewer(request, viewer);
 
   const resolveManagerByAuthorisedBy = useCallback((authorisedBy?: string | null) => {
     if (!authorisedBy) {
@@ -204,10 +247,20 @@ export default function HolidayRequestPage() {
 
     const normalizedValue = authorisedBy.trim().toLowerCase()
     return managerOptions.find((manager) => (
-      manager.id.toLowerCase() === normalizedValue ||
-      manager.label.trim().toLowerCase() === normalizedValue
+      String(manager.id).toLowerCase() === normalizedValue ||
+      (manager.label ?? '').trim().toLowerCase() === normalizedValue
     ))
   }, [managerOptions])
+
+  /** Map stored AuthorisedBy (user Id or legacy display name) to a user Id safe for PUT /holiday-requests. */
+  const resolveAuthorisedByUserId = useCallback((raw?: string | null): string | undefined => {
+    const trimmed = raw?.trim()
+    if (!trimmed) return undefined
+    const fromManagers = resolveManagerByAuthorisedBy(trimmed)
+    if (fromManagers) return fromManagers.id
+    if (ASP_NET_USER_ID_REGEX.test(trimmed)) return trimmed
+    return undefined
+  }, [resolveManagerByAuthorisedBy])
 
   // Fetch employees
   const fetchEmployees = async () => {
@@ -216,7 +269,7 @@ export default function HolidayRequestPage() {
       const response = await employeeService.getActiveEmployees();
       setEmployees(response);
     } catch (error) {
-      console.error('Error fetching employees:', error);
+      logger.error('Error fetching employees:', error);
       toast({
         title: "Error",
         description: "Failed to load employees. Please try again.",
@@ -232,8 +285,14 @@ export default function HolidayRequestPage() {
     fetchEmployees();
   }, []);
 
-  // Fetch manager users for approval flow
+  // Fetch manager users for approval flow (admin/manager only — never for security officers / HO officer JWT)
   useEffect(() => {
+    if (!hasHolidayManagementAccess || isOfficerHolidayScope) {
+      setManagerOptions([]);
+      setIsLoadingManagers(false);
+      return;
+    }
+
     const fetchManagers = async () => {
       try {
         setIsLoadingManagers(true);
@@ -242,7 +301,7 @@ export default function HolidayRequestPage() {
           pageSize: 250,
         });
 
-        const managers = response.data
+        const managers = (response?.data ?? [])
           .filter((user) => {
             const role = user.role?.toLowerCase();
             return role === 'manager' || role === 'administrator';
@@ -260,7 +319,7 @@ export default function HolidayRequestPage() {
 
         setManagerOptions(managers);
       } catch (error) {
-        console.error('Error fetching managers:', error);
+        logger.error('Error fetching managers:', error);
         setManagerOptions([]);
         toast({
           title: "Error",
@@ -273,7 +332,7 @@ export default function HolidayRequestPage() {
     };
 
     void fetchManagers();
-  }, [toast]);
+  }, [toast, hasHolidayManagementAccess, isOfficerHolidayScope]);
 
   useEffect(() => {
     if (!viewingRequest) return;
@@ -284,21 +343,27 @@ export default function HolidayRequestPage() {
   }, [managerOptions, resolveManagerByAuthorisedBy, viewingRequest]);
 
   // Fetch holiday requests
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
     try {
       setIsLoading(true);
+      const scopedOfficer = officerEmployeeIdForApi != null;
       const response = await holidayRequestService.getHolidayRequests({
-        page: currentPage,
-        limit: itemsPerPage,
-        search: searchTerm,
-        archived: showArchived
+        page: scopedOfficer ? 1 : currentPage,
+        limit: scopedOfficer ? 500 : itemsPerPage,
+        search: scopedOfficer ? undefined : searchTerm,
+        archived: showArchived,
+        employeeId: officerEmployeeIdForApi,
       });
-      
-      setRequests(response.data);
-      setTotalRecords(response.total);
-      setTotalPages(Math.ceil(response.total / itemsPerPage));
+
+      const u = getUser();
+      let rows = response.data;
+      if (scopedOfficer && u) {
+        rows = rows.filter((r) => holidayRequestMatchesViewer(r, u));
+      }
+
+      setRequests(rows);
     } catch (error) {
-      console.error('Error fetching holiday requests:', error);
+      logger.error('Error fetching holiday requests:', error);
       toast({
         title: "Error",
         description: "Failed to load holiday requests. Please try again.",
@@ -307,12 +372,11 @@ export default function HolidayRequestPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, searchTerm, showArchived, officerEmployeeIdForApi, itemsPerPage, toast]);
 
-  // Initial fetch and refetch on filters change
   useEffect(() => {
-    fetchRequests();
-  }, [currentPage, searchTerm, showArchived]);
+    void fetchRequests();
+  }, [fetchRequests]);
 
   // Mobile check
   useEffect(() => {
@@ -325,20 +389,34 @@ export default function HolidayRequestPage() {
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
 
-  const filteredRequests = useMemo(() => {
+  const archiveFilteredRequests = useMemo(() => {
     return requests.filter((request) => {
-      const officerName = request.officerName.toLowerCase();
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = officerName.includes(searchLower);
-      
-      // Show archived requests only when showArchived is true
-      if (showArchived) {
-        return matchesSearch && request.archived;
-      } else {
-        return matchesSearch && !request.archived;
+      if (isOfficerHolidayScope && viewer && !holidayRequestMatchesViewer(request, viewer)) {
+        return false;
       }
+      if (showArchived) {
+        return request.archived;
+      }
+      return !request.archived;
     });
-  }, [requests, searchTerm, showArchived]);
+  }, [requests, showArchived, isOfficerHolidayScope, viewer?.id, viewer?.employeeId]);
+
+  const filteredRequests = useMemo(() => {
+    const searchLower = searchTerm.trim().toLowerCase();
+    return archiveFilteredRequests.filter((request) => {
+      if (searchLower === '') return true;
+      const officerName = request.officerName.toLowerCase();
+      return officerName.includes(searchLower);
+    });
+  }, [archiveFilteredRequests, searchTerm]);
+
+  const displayTotalPages = Math.max(1, Math.ceil(filteredRequests.length / itemsPerPage));
+
+  useEffect(() => {
+    if (currentPage > displayTotalPages) {
+      setCurrentPage(displayTotalPages);
+    }
+  }, [currentPage, displayTotalPages]);
 
   const paginatedRequests = useMemo(() => {
     return filteredRequests.slice(
@@ -348,9 +426,14 @@ export default function HolidayRequestPage() {
   }, [filteredRequests, currentPage, itemsPerPage]);
   
   const handlePageChange = (page: number) => {
-    if (page < 1 || page > totalPages) return;
+    if (page < 1 || page > displayTotalPages) return;
     setCurrentPage(page);
   };
+
+  const selectableEmployees = useMemo(() => {
+    if (!isOfficerHolidayScope || viewer?.employeeId == null) return employees;
+    return employees.filter((e) => String(e.id) === String(viewer.employeeId));
+  }, [employees, isOfficerHolidayScope, viewer?.employeeId]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -398,18 +481,30 @@ export default function HolidayRequestPage() {
         startDate: new Date(editingRequest.startDate),
         endDate: new Date(editingRequest.endDate),
         returnToWorkDate: new Date(editingRequest.returnToWorkDate),
-        authorisedBy: editingRequest.authorisedBy || undefined,
+        authorisedBy: resolveAuthorisedByUserId(editingRequest.authorisedBy) ?? '',
         dateAuthorised: editingRequest.dateAuthorised,
         status: editingRequest.status,
         comment: editingRequest.comment,
       });
     }
-  }, [editingRequest, form]);
+  }, [editingRequest, form, resolveAuthorisedByUserId]);
 
-  // Create Holiday Request
+  useEffect(() => {
+    if (!editingRequest || managerOptions.length === 0) return
+    const id = resolveAuthorisedByUserId(editingRequest.authorisedBy)
+    if (!id) return
+    const current = form.getValues('authorisedBy')
+    if (current !== id) {
+      form.setValue('authorisedBy', id, { shouldDirty: false })
+    }
+  }, [editingRequest, managerOptions, resolveAuthorisedByUserId, form])
+
   const handleCreateRequest = () => {
     setEditingRequest(null);
     form.reset();
+    if (isOfficerHolidayScope && viewer?.employeeId != null) {
+      form.setValue('officerId', String(viewer.employeeId));
+    }
     setIsDialogOpen(true);
   };
 
@@ -423,13 +518,22 @@ export default function HolidayRequestPage() {
 
   // Update Holiday Request
   const handleUpdateRequest = (request: HolidayRequest) => {
+    const sessionUser = getUser();
+    if (!hasHolidayManagementAccess && !holidayRequestMatchesViewer(request, sessionUser)) {
+      toast({
+        title: 'Access denied',
+        description: 'You can only edit your own holiday requests.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setEditingRequest(request);
     form.reset({
       officerId: request.officerId,
       startDate: new Date(request.startDate),
       endDate: new Date(request.endDate),
       returnToWorkDate: new Date(request.returnToWorkDate),
-      authorisedBy: request.authorisedBy || undefined,
+      authorisedBy: resolveAuthorisedByUserId(request.authorisedBy) ?? '',
       dateAuthorised: request.dateAuthorised,
       status: request.status,
       comment: request.comment,
@@ -452,7 +556,7 @@ export default function HolidayRequestPage() {
         description: "Holiday request archived successfully.",
       });
     } catch (error) {
-      console.error('Error archiving holiday request:', error);
+      logger.error('Error archiving holiday request:', error);
       toast({
         title: "Error",
         description: "Failed to archive holiday request. Please try again.",
@@ -476,7 +580,7 @@ export default function HolidayRequestPage() {
         description: "Holiday request unarchived successfully.",
       });
     } catch (error) {
-      console.error('Error unarchiving holiday request:', error);
+      logger.error('Error unarchiving holiday request:', error);
       toast({
         title: "Error",
         description: "Failed to unarchive holiday request. Please try again.",
@@ -491,6 +595,16 @@ export default function HolidayRequestPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDeleteClick = (id: string) => {
+    const target = requests.find((r) => r.id === id);
+    const sessionUser = getUser();
+    if (target && !hasHolidayManagementAccess && !holidayRequestMatchesViewer(target, sessionUser)) {
+      toast({
+        title: 'Access denied',
+        description: 'You can only delete your own holiday requests.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setDeleteRequestId(id);
     setIsDeleteDialogOpen(true);
   };
@@ -506,7 +620,7 @@ export default function HolidayRequestPage() {
           description: "Holiday request deleted successfully.",
         });
       } catch (error) {
-        console.error('Error deleting holiday request:', error);
+        logger.error('Error deleting holiday request:', error);
         toast({
           title: "Error",
           description: "Failed to delete holiday request. Please try again.",
@@ -534,7 +648,7 @@ export default function HolidayRequestPage() {
           returnToWorkDate: values.returnToWorkDate,
           comment: values.comment,
           status: values.status,
-          authorisedBy: values.authorisedBy,
+          authorisedBy: resolveAuthorisedByUserId(values.authorisedBy),
           dateAuthorised: values.dateAuthorised,
         };
         
@@ -570,26 +684,13 @@ export default function HolidayRequestPage() {
       setIsDialogOpen(false);
       setEditingRequest(null);
       form.reset();
-    } catch (error: any) {
-      const errorDetails = {
-        error,
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        url: error.config?.url,
-        requestData: error.config?.data
-      };
-      
-      console.error('❌ [HolidayRequestPage] Error submitting holiday request:', errorDetails);
-      console.error('❌ [HolidayRequestPage] Full error:', error);
-      
-      // Log response data separately for better visibility
-      if (error.response?.data) {
-        console.error('❌ [HolidayRequestPage] Error response data:', JSON.stringify(error.response.data, null, 2));
-      }
-      
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to save holiday request. Please try again.';
+    } catch (error: unknown) {
+      const err = error as { message?: string; response?: { data?: { message?: string }; status?: number }; config?: { url?: string } }
+      logger.error('[HolidayRequestPage] submit failed', {
+        status: err.response?.status,
+        message: err.response?.data?.message ?? err.message,
+      });
+      const errorMessage = err.response?.data?.message ?? err.message ?? 'Failed to save holiday request. Please try again.';
       toast({
         title: "Error",
         description: errorMessage,
@@ -634,7 +735,7 @@ export default function HolidayRequestPage() {
                 <CalendarIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 xl:h-5 xl:w-5 text-purple-300" />
               </CardHeader>
               <CardContent className="p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pt-0 md:pt-1 xl:pt-2">
-                <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">{requests.length}</div>
+                <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">{archiveFilteredRequests.length}</div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-br from-green-800 to-green-900 border-green-700 shadow-md">
@@ -644,7 +745,7 @@ export default function HolidayRequestPage() {
               </CardHeader>
               <CardContent className="p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pt-0 md:pt-1 xl:pt-2">
                 <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">
-                  {requests.filter(r => r.status === "approved").length}
+                  {archiveFilteredRequests.filter(r => r.status === "approved").length}
                 </div>
               </CardContent>
             </Card>
@@ -655,7 +756,7 @@ export default function HolidayRequestPage() {
               </CardHeader>
               <CardContent className="p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pt-0 md:pt-1 xl:pt-2">
                 <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">
-                  {requests.filter(r => r.status === "pending").length}
+                  {archiveFilteredRequests.filter(r => r.status === "pending").length}
                 </div>
               </CardContent>
             </Card>
@@ -666,7 +767,7 @@ export default function HolidayRequestPage() {
               </CardHeader>
               <CardContent className="p-1.5 sm:p-2 md:p-3 xl:p-5 2xl:p-6 pt-0 md:pt-1 xl:pt-2">
                 <div className="text-sm sm:text-base lg:text-lg xl:text-2xl 2xl:text-3xl font-bold text-white">
-                  {requests.filter(r => r.status === "denied").length}
+                  {archiveFilteredRequests.filter(r => r.status === "denied").length}
                 </div>
               </CardContent>
             </Card>
@@ -678,7 +779,7 @@ export default function HolidayRequestPage() {
           <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-4">
               <h3 className="text-sm font-semibold text-slate-800 sm:text-base xl:text-lg">Holiday Request Records</h3>
-              {isAdminRole && (
+              {(hasHolidayManagementAccess || isOfficerHolidayScope) && (
                 <Button
                   type="button"
                   variant="outline"
@@ -780,14 +881,11 @@ export default function HolidayRequestPage() {
                           <Eye className="h-3.5 w-3.5" />
                           <span className="sr-only">View</span>
                         </Button>
-                        {!request.archived && (
+                        {!request.archived && canMutateHolidayRequest(request) && (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              setEditingRequest(request);
-                              setIsDialogOpen(true);
-                            }}
+                            onClick={() => handleUpdateRequest(request)}
                             className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700 border-blue-200"
                             title="Edit Request"
                             disabled={isLoading}
@@ -796,7 +894,7 @@ export default function HolidayRequestPage() {
                             <span className="sr-only">Edit</span>
                           </Button>
                         )}
-                        {isAdminRole && !request.archived && (request.status === 'approved' || request.status === 'denied') && (
+                        {hasHolidayManagementAccess && !request.archived && (request.status === 'approved' || request.status === 'denied') && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -809,7 +907,7 @@ export default function HolidayRequestPage() {
                             <span className="sr-only">Archive</span>
                           </Button>
                         )}
-                        {isAdminRole && request.archived && (
+                        {hasHolidayManagementAccess && request.archived && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -822,6 +920,7 @@ export default function HolidayRequestPage() {
                             <span className="sr-only">Unarchive</span>
                           </Button>
                         )}
+                        {canMutateHolidayRequest(request) && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -833,6 +932,7 @@ export default function HolidayRequestPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                           <span className="sr-only">Delete</span>
                         </Button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -925,14 +1025,11 @@ export default function HolidayRequestPage() {
                                 <Eye className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 xl:h-5 xl:w-5" />
                                 <span className="sr-only">View</span>
                               </Button>
-                              {!request.archived && (
+                              {!request.archived && canMutateHolidayRequest(request) && (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => {
-                                    setEditingRequest(request);
-                                    setIsDialogOpen(true);
-                                  }}
+                                  onClick={() => handleUpdateRequest(request)}
                                   className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 xl:h-10 xl:w-10 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
                                   title="Edit Request"
                                   disabled={isLoading}
@@ -941,7 +1038,7 @@ export default function HolidayRequestPage() {
                                   <span className="sr-only">Edit</span>
                                 </Button>
                               )}
-                              {isAdminRole && !request.archived && (request.status === 'approved' || request.status === 'denied') && (
+                              {hasHolidayManagementAccess && !request.archived && (request.status === 'approved' || request.status === 'denied') && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -954,7 +1051,7 @@ export default function HolidayRequestPage() {
                                   <span className="sr-only">Archive</span>
                                 </Button>
                               )}
-                              {isAdminRole && request.archived && (
+                              {hasHolidayManagementAccess && request.archived && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -967,6 +1064,7 @@ export default function HolidayRequestPage() {
                                   <span className="sr-only">Unarchive</span>
                                 </Button>
                               )}
+                              {canMutateHolidayRequest(request) && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -978,6 +1076,7 @@ export default function HolidayRequestPage() {
                                 <Trash2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 xl:h-5 xl:w-5" />
                                 <span className="sr-only">Delete</span>
                               </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1014,21 +1113,21 @@ export default function HolidayRequestPage() {
                       {/* Mobile Pagination Counter */}
                       <PaginationItem className="sm:hidden">
                         <span className="h-7 px-2 flex items-center justify-center text-[10px] xl:text-sm font-medium text-gray-600">
-                          {currentPage} / {totalPages || 1}
+                          {currentPage} / {displayTotalPages || 1}
                         </span>
                       </PaginationItem>
                       
                       {/* Desktop Pagination Numbers */}
                       {(() => {
                         const paginationItems = [];
-                        const totalButtons = Math.min(totalPages, 5);
+                        const totalButtons = Math.min(displayTotalPages, 5);
                         
                         let startPage = 1;
-                        if (totalPages > 5) {
+                        if (displayTotalPages > 5) {
                           if (currentPage <= 3) {
                             startPage = 1;
-                          } else if (currentPage >= totalPages - 2) {
-                            startPage = totalPages - 4;
+                          } else if (currentPage >= displayTotalPages - 2) {
+                            startPage = displayTotalPages - 4;
                           } else {
                             startPage = currentPage - 2;
                           }
@@ -1056,8 +1155,8 @@ export default function HolidayRequestPage() {
                       <PaginationItem>
                         <PaginationNext 
                           onClick={() => handlePageChange(currentPage + 1)}
-                          className={`${currentPage === totalPages || totalPages === 0 ? 'pointer-events-none opacity-50' : ''} h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-auto xl:h-12 xl:w-auto flex items-center justify-center text-[10px] sm:text-xs xl:text-base`}
-                          aria-disabled={currentPage === totalPages || totalPages === 0}
+                          className={`${currentPage === displayTotalPages || displayTotalPages === 0 ? 'pointer-events-none opacity-50' : ''} h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-auto xl:h-12 xl:w-auto flex items-center justify-center text-[10px] sm:text-xs xl:text-base`}
+                          aria-disabled={currentPage === displayTotalPages || displayTotalPages === 0}
                         >
                           <span className="sr-only">Go to next page</span>
                         </PaginationNext>
@@ -1090,7 +1189,7 @@ export default function HolidayRequestPage() {
                 onSubmit, 
                 // Error handler
                 (errors) => {
-                  console.log("Form validation errors:", errors);
+                  logger.debug('[HolidayRequestPage] form validation', Object.keys(errors))
                   toast({
                     title: "Form validation failed",
                     description: "Please check the form for errors and try again.",
@@ -1107,14 +1206,21 @@ export default function HolidayRequestPage() {
                 render={({ field }) => (
                   <FormItem className="space-y-1.5 sm:space-y-2">
                     <FormLabel className="text-xs sm:text-sm font-medium text-gray-700">Officer Name</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingEmployees}>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={
+                        isLoadingEmployees ||
+                        (isOfficerHolidayScope && selectableEmployees.length <= 1)
+                      }
+                    >
                       <FormControl>
                         <SelectTrigger className="h-8 xs:h-9 sm:h-10 text-xs sm:text-sm">
                           <SelectValue placeholder={isLoadingEmployees ? "Loading employees..." : "Select an employee"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {employees.map((employee) => (
+                        {selectableEmployees.map((employee) => (
                           <SelectItem key={employee.id.toString()} value={employee.id.toString()} className="text-xs sm:text-sm">
                             {employee.fullName || `${employee.firstName} ${employee.surname}`}
                           </SelectItem>
@@ -1433,7 +1539,7 @@ export default function HolidayRequestPage() {
               </div>
               
               {/* Admin Approval/Denial Section */}
-              {isAdminRole && viewingRequest?.status === 'pending' && (
+              {hasHolidayManagementAccess && viewingRequest?.status === 'pending' && (
                 <div className="border-t border-gray-200 pt-3 xs:pt-4 mt-3 xs:mt-4">
                   <h3 className="text-xs sm:text-sm font-medium text-gray-900 mb-2 xs:mb-3">Approval Decision</h3>
                   
@@ -1445,8 +1551,8 @@ export default function HolidayRequestPage() {
                     const reason = formData.get('reason') as string;
                     const daysLeftYTD = formData.get('daysLeftYTD') ? Number(formData.get('daysLeftYTD')) : undefined;
                     const selectedManager = managerOptions.find((manager) => manager.id === selectedAuthorisingManagerId);
-                    const authorisingManagerId = selectedManager?.id?.trim() || '';
-                    const authorisingManagerLabel = selectedManager?.label?.trim() || '';
+                    const authorisingManagerId = String(selectedManager?.id ?? '').trim();
+                    const authorisingManagerLabel = (selectedManager?.label ?? '').trim();
                     if (decision && reason && viewingRequest && authorisingManagerId) {
                       try {
                         setIsSubmitting(true);
@@ -1476,9 +1582,9 @@ export default function HolidayRequestPage() {
                           try {
                             // In production, this would call the backend email service
                             // For now, we'll log it (backend should handle email sending)
-                            console.log(`[Email Notification] Holiday request ${decision} for ${employee.fullName || employee.firstName} ${employee.surname} (${employee.email})`);
-                            console.log(`Subject: Holiday Request ${decision === 'approved' ? 'Approved' : 'Denied'}`);
-                            console.log(`Details:`, {
+                            logger.debug(`[Email Notification] Holiday request ${decision} for ${employee.fullName || employee.firstName} ${employee.surname} (${employee.email})`);
+                            logger.debug(`Subject: Holiday Request ${decision === 'approved' ? 'Approved' : 'Denied'}`);
+                            logger.debug(`Details:`, {
                               employee: employee.fullName || `${employee.firstName} ${employee.surname}`,
                               email: employee.email,
                               startDate: format(viewingRequest.startDate, 'PPP'),
@@ -1488,10 +1594,9 @@ export default function HolidayRequestPage() {
                               reason: reason,
                               authorisedBy: authorisingManagerLabel || updatedRequest.authorisedBy || 'System'
                             });
-                            // TODO: Call backend email service endpoint when available
-                            // await holidayRequestService.sendHolidayRequestNotification(viewingRequest.id, decision);
+                            // Email notification is not implemented on the API; status updates persist via holidayRequestService only.
                           } catch (emailError) {
-                            console.error('Error sending email notification:', emailError);
+                            logger.error('Error sending email notification:', emailError);
                             // Don't fail the request if email fails
                           }
                         }
@@ -1501,15 +1606,13 @@ export default function HolidayRequestPage() {
                           title: "Success",
                           description: `Holiday request ${decision} successfully.${employee?.email ? ' Email notification sent.' : ''}`,
                         });
-                      } catch (error: any) {
-                        console.error('❌ [HolidayRequestPage] Error updating holiday request:', {
-                          error,
-                          message: error.message,
-                          response: error.response?.data,
-                          status: error.response?.status,
-                          statusText: error.response?.statusText
+                      } catch (error: unknown) {
+                        const e = error as { message?: string; response?: { data?: { message?: string }; status?: number } }
+                        logger.error('[HolidayRequestPage] Error updating holiday request', {
+                          status: e.response?.status,
+                          message: e.response?.data?.message ?? e.message,
                         });
-                        const errorMessage = error.response?.data?.message || error.message || 'Failed to update holiday request. Please try again.';
+                        const errorMessage = e.response?.data?.message ?? e.message ?? 'Failed to update holiday request. Please try again.';
                         toast({
                           title: "Error",
                           description: errorMessage,
@@ -1641,7 +1744,7 @@ export default function HolidayRequestPage() {
               {viewingRequest.status !== 'pending' && (
                 <DialogFooter className="gap-2 xs:gap-3 pt-2 flex-col sm:flex-row">
                   <div className="flex gap-2 xs:gap-3 w-full sm:w-auto">
-                    {isAdminRole && !viewingRequest.archived && (
+                    {hasHolidayManagementAccess && !viewingRequest.archived && (
                       <Button
                         type="button"
                         variant="outline"
@@ -1662,7 +1765,7 @@ export default function HolidayRequestPage() {
                         Archive
                       </Button>
                     )}
-                    {isAdminRole && viewingRequest.archived && (
+                    {hasHolidayManagementAccess && viewingRequest.archived && (
                       <Button
                         type="button"
                         variant="outline"

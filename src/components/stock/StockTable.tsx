@@ -1,3 +1,7 @@
+/**
+ * Stock items table for administration.
+ * Flow: parent pagination → row actions → issue/add quantity dialogs via stockService.
+ */
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { StockItem } from "@/types/stock"

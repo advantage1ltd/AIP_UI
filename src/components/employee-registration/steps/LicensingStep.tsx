@@ -8,6 +8,7 @@ interface LicensingStepProps {
   onBack: () => void
 }
 
+// === Component ===
 export function LicensingStep({ onNext, onBack }: LicensingStepProps) {
   return (
     <div className="space-y-6">

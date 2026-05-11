@@ -1,3 +1,7 @@
+/**
+ * CRM leads list and conversion actions.
+ * Flow: lead filters → create/edit lead → convert to contact or deal.
+ */
 import { useState, useMemo, useCallback } from "react"
 import React from 'react'
 import { Plus, ChevronDown, Users, Building, CheckCircle2, Search } from "lucide-react"
@@ -50,32 +54,6 @@ type LeadFilterProps = {
   onFilterChange: (filters: Filters) => void
   className?: string // Make className optional
 }
-
-// Sample data - replace with actual data fetching
-const SAMPLE_LEADS: Lead[] = [
-  {
-    id: "1",
-    name: "Steven Scott",
-    status: "New Lead",
-    company: "Microsoft",
-    title: "Team leader",
-    email: "steven@microsoft.com",
-    phone: "+1 203 795 3265",
-    lastInteraction: "Nov 8, 2024",
-    notes: "Initial contact made through LinkedIn"
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    status: "Qualified",
-    company: "Apple",
-    title: "Security Manager",
-    email: "sarah.j@apple.com",
-    phone: "+1 408 555 0123",
-    lastInteraction: "Nov 10, 2024",
-    notes: "Interested in our monitoring services"
-  }
-]
 
 // Components
 const StatCardComponent = React.memo(({ stat, isLast, totalStats }: { 
@@ -222,7 +200,7 @@ const SearchControls = React.memo(({
 export default function Leads() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
-  const [leads, setLeads] = useState<Lead[]>(SAMPLE_LEADS)
+  const [leads, setLeads] = useState<Lead[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [filters, setFilters] = useState<Filters>({})
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false)

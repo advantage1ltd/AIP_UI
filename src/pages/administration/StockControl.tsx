@@ -1,3 +1,7 @@
+/**
+ * Stock control administration screen.
+ * Flow: stock search and filters → StockTable adjustments → low-stock alerts.
+ */
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,6 +14,7 @@ import { StockTable } from "@/components/stock/StockTable"
 import { StockItemForm } from "@/components/stock/StockItemForm"
 import { StockStats } from "@/components/stock/StockStats"
 import { stockService } from "@/services/stockService"
+import { logger } from '@/utils/logger'
 
 const ITEMS_PER_PAGE = 10
 
@@ -40,9 +45,9 @@ const StockControl = () => {
     try {
       const data = await stockService.list()
       setStockItems(data)
-      console.log('✅ [StockControl] Successfully fetched stock items:', data.length)
+      logger.debug('✅ [StockControl] Successfully fetched stock items:', data.length)
     } catch (error) {
-      console.error('❌ [StockControl] Error fetching stock items:', error)
+      logger.error('❌ [StockControl] Error fetching stock items:', error)
       toast({
         title: "Error",
         description: (error as Error).message || "Failed to load stock items",
@@ -95,7 +100,11 @@ const StockControl = () => {
     return sortedItems.slice(startIndex, startIndex + ITEMS_PER_PAGE)
   }, [sortedItems, currentPage])
 
-  const totalPages = Math.ceil(sortedItems.length / ITEMS_PER_PAGE)
+  const totalPages = Math.max(1, Math.ceil(sortedItems.length / ITEMS_PER_PAGE))
+
+  useEffect(() => {
+    setCurrentPage((prevPage) => Math.min(Math.max(1, prevPage), totalPages))
+  }, [totalPages])
 
   const handleSort = (key: keyof StockItem) => {
     setSortConfig(current => ({
@@ -105,7 +114,7 @@ const StockControl = () => {
   }
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page)
+    setCurrentPage(Math.min(Math.max(1, page), totalPages))
   }
 
   const handleAddItem = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -197,9 +206,9 @@ const StockControl = () => {
   }
 
   return (
-    <div className="w-full max-w-[100vw] overflow-x-hidden px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
-        <h1 className="text-2xl sm:text-3xl font-bold text-[#303D51]">Stock Control</h1>
+    <div className="w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-slate-50 via-background to-indigo-50/20 dark:from-slate-950 dark:to-indigo-950/20 px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-slate-800/80 dark:bg-slate-900/85 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Stock Control</h1>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button 
             variant="outline"
@@ -231,14 +240,14 @@ const StockControl = () => {
 
       <StockStats items={stockItems} />
 
-      <Card className="shadow-lg overflow-hidden">
+      <Card className="overflow-hidden border-border/70 bg-card/95 shadow-sm">
         <CardHeader className="p-4 sm:p-6">
           <CardTitle>Inventory List</CardTitle>
         </CardHeader>
         <CardContent className="p-2 sm:p-4 md:p-6">
           <div className="flex gap-2 sm:gap-4 mb-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search items..."
                 value={searchQuery}
@@ -292,12 +301,12 @@ const StockControl = () => {
             ) : (
               <div className="space-y-2">
                 {lowStockItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div key={item.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg">
                     <div>
                       <h4 className="font-medium">{item.name}</h4>
                       <p className="text-sm text-gray-600">{item.category}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-left sm:text-right">
                       <p className={`font-medium ${
                         item.quantity === 0 ? 'text-red-600' : 'text-orange-600'
                       }`}>

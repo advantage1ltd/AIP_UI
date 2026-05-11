@@ -11,6 +11,7 @@ interface CustomerTableRowProps {
   onEdit: (customer: Customer) => void
 }
 
+// === Component ===
 export function CustomerTableRow({ customer, isSelected, onSelect, onEdit }: CustomerTableRowProps) {
   return (
     <TableRow 

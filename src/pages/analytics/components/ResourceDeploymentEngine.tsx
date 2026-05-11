@@ -1,8 +1,6 @@
 /**
- * Resource Deployment Engine Module
- * 
- * Displays best time/day recommendations for officer deployment,
- * officer type suggestions (uniform / store detectives), LPM recommendations, and store risk rankings.
+ * Resource Deployment Engine: staffing recommendations from analytics hub data.
+ * Flow: best-time slots → store risk rankings → strategy summary with empty states when incident volume is low.
  */
 
 import { useMemo } from 'react'
@@ -27,13 +25,13 @@ import type { DeploymentRecommendation } from '@/types/analytics'
 import {
 	Shield,
 	Clock,
-	MapPin,
 	TrendingUp,
 	TrendingDown,
 	Minus,
 	AlertTriangle,
 	Users,
 } from 'lucide-react'
+import { AnalyticsSectionEmptyState } from './AnalyticsSectionEmptyState'
 
 interface ResourceDeploymentEngineProps {
 	data: DeploymentRecommendation
@@ -107,6 +105,16 @@ export const ResourceDeploymentEngine = ({
 		return grouped
 	}, [data.bestTimes])
 
+	const sortedTimeRecommendations = useMemo(
+		() =>
+			[...data.bestTimes].sort(
+				(a, b) =>
+					b.expectedIncidents - a.expectedIncidents ||
+					a.priority.localeCompare(b.priority)
+			),
+		[data.bestTimes]
+	)
+
 	if (loading) {
 		return (
 			<Card>
@@ -154,6 +162,13 @@ export const ResourceDeploymentEngine = ({
 					</TabsList>
 
 					<TabsContent value="recommendations" className="space-y-4">
+						{sortedTimeRecommendations.length === 0 ? (
+							<AnalyticsSectionEmptyState
+								title="No deployment windows yet"
+								description="Add incidents with dates and times in the selected range to generate day and hour recommendations."
+							/>
+						) : (
+							<>
 						{/* Critical Priority */}
 						{criticalRecommendations.length > 0 && (
 							<div>
@@ -275,9 +290,90 @@ export const ResourceDeploymentEngine = ({
 								</div>
 							</div>
 						)}
+
+						<div>
+							<h3 className="mb-3 font-semibold flex items-center gap-2 text-slate-800">
+								<Clock className="h-4 w-4" />
+								All Time Recommendations
+							</h3>
+							<div className="border rounded-lg">
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Day</TableHead>
+											<TableHead>Time</TableHead>
+											<TableHead>Priority</TableHead>
+											<TableHead>Officer Type</TableHead>
+											<TableHead>Recommended</TableHead>
+											<TableHead>Expected Incidents</TableHead>
+											<TableHead>Reason</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{sortedTimeRecommendations.map((rec, index) => (
+											<TableRow key={`${rec.day}-${rec.hour}-${index}`}>
+												<TableCell className="font-medium">{rec.day}</TableCell>
+												<TableCell>{rec.hourLabel}</TableCell>
+												<TableCell>
+													<Badge
+														variant="outline"
+														style={{
+															borderColor: getPriorityColor(rec.priority),
+															color: getPriorityColor(rec.priority),
+														}}
+													>
+														{rec.priority}
+													</Badge>
+												</TableCell>
+												<TableCell>
+													<div className="flex gap-2 flex-wrap">
+														<Badge
+															variant="outline"
+															style={{
+																borderColor: OFFICER_TYPE_COLORS[rec.officerType],
+																color: OFFICER_TYPE_COLORS[rec.officerType],
+															}}
+														>
+															{rec.officerType}
+														</Badge>
+														{rec.recommendedLPM && (
+															<Badge
+																variant="outline"
+																style={{
+																	borderColor: LPM_COLOR,
+																	color: LPM_COLOR,
+																}}
+															>
+																LPM
+															</Badge>
+														)}
+													</div>
+												</TableCell>
+												<TableCell>
+													<div className="flex items-center gap-1">
+														<Users className="h-4 w-4" />
+														{rec.recommendedOfficers}
+													</div>
+												</TableCell>
+												<TableCell>{rec.expectedIncidents}</TableCell>
+												<TableCell className="text-sm text-gray-600">{rec.reason}</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							</div>
+						</div>
+							</>
+						)}
 					</TabsContent>
 
 					<TabsContent value="risk-ranking" className="space-y-6 mt-6">
+						{data.storeRankings.length === 0 ? (
+							<AnalyticsSectionEmptyState
+								title="No store risk ranking available"
+								description="Incident activity in the selected range will populate store risk scores and recommended coverage hours."
+							/>
+						) : (
 						<div className="border rounded-lg">
 							<Table>
 								<TableHeader>
@@ -367,9 +463,17 @@ export const ResourceDeploymentEngine = ({
 								</TableBody>
 							</Table>
 						</div>
+						)}
 					</TabsContent>
 
 					<TabsContent value="by-day" className="space-y-6 mt-6">
+						{Object.keys(recommendationsByDay).length === 0 ? (
+							<AnalyticsSectionEmptyState
+								title="No day-based recommendations yet"
+								description="When incidents are recorded across the week, recommendations will be grouped here by day."
+							/>
+						) : (
+						<>
 						{Object.entries(recommendationsByDay).map(([day, recommendations]) => (
 							<Card key={day}>
 								<CardHeader>
@@ -429,6 +533,8 @@ export const ResourceDeploymentEngine = ({
 								</CardContent>
 							</Card>
 						))}
+						</>
+						)}
 					</TabsContent>
 				</Tabs>
 			</CardContent>

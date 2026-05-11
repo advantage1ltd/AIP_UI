@@ -1,8 +1,6 @@
 /**
- * Crime Linking Panel Module
- * 
- * Displays incident clusters linked to same offender/features
- * and chains of incidents showing patterns.
+ * Crime Linking Panel: incident clusters and offender chains from analytics hub data.
+ * Flow: sortable cluster/chain tabs → expandable incident rows with empty states when linking is sparse.
  */
 
 import { useState, useMemo } from 'react'
@@ -35,6 +33,7 @@ import {
 	Eye,
 	EyeOff,
 } from 'lucide-react'
+import { AnalyticsSectionEmptyState } from './AnalyticsSectionEmptyState'
 
 interface CrimeLinkingPanelProps {
 	data: CrimeLinkingData
@@ -128,6 +127,13 @@ export const CrimeLinkingPanel = ({
 					</TabsList>
 
 					<TabsContent value="clusters" className="space-y-4">
+						{sortedClusters.length === 0 ? (
+							<AnalyticsSectionEmptyState
+								title="No incident clusters found"
+								description="Clusters appear when at least two incidents share the same offender and type, or the same type and store in the selected range."
+							/>
+						) : (
+						<>
 						{sortedClusters.map((cluster) => {
 							const isExpanded = expandedClusters.has(cluster.clusterId)
 
@@ -231,9 +237,18 @@ export const CrimeLinkingPanel = ({
 								</Card>
 							)
 						})}
+						</>
+						)}
 					</TabsContent>
 
 					<TabsContent value="chains" className="space-y-6 mt-6">
+						{sortedChains.length === 0 ? (
+							<AnalyticsSectionEmptyState
+								title="No offender chains found"
+								description="Chains appear when the same named offender is linked to two or more incidents in the selected range."
+							/>
+						) : (
+						<>
 						{sortedChains.map((chain) => {
 							const isExpanded = expandedChains.has(chain.chainId)
 
@@ -343,6 +358,8 @@ export const CrimeLinkingPanel = ({
 								</Card>
 							)
 						})}
+						</>
+						)}
 					</TabsContent>
 				</Tabs>
 			</CardContent>

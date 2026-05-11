@@ -1,7 +1,14 @@
+/**
+ * Page access settings client for `/PageAccess` (role → page id mappings).
+ * Normalizes legacy role keys and numeric database ids to stable `pageId` strings used by routing and guards.
+ * Falls back to in-app catalog defaults when the API is unavailable or omits inactive pages.
+ * Flow: fetch settings → harmonize roles and page ids → merge with navigation catalog for guards and admin UI.
+ */
 import { CUSTOMER_PAGES } from '@/config/customerPages';
 import { ApiResponse, api, isBackendUnavailableError } from '@/config/api';
 import { PAGE_DEFINITIONS, type PageDefinition } from '@/config/navigation/pageDefinitions';
-import { normalizeRoleId } from '@/utils/roles';
+import { harmonizeRole, mergePageAccessByCanonicalRoles, type UserRole } from '@/utils/roles';
+import { logger } from '@/utils/logger'
 
 export interface PageAccess {
 	id: string;
@@ -41,6 +48,26 @@ interface BackendSyncPagesResult {
 	message: string;
 }
 
+/** CamelCase (`ApiResponse`) and PascalCase (.NET) envelopes. */
+type FlexibleEnvelope<T> = {
+	data?: T;
+	Data?: T;
+	success?: boolean;
+	Success?: boolean;
+	message?: string;
+	Message?: string;
+};
+
+const unpackEnvelope = <T,>(
+	raw: FlexibleEnvelope<T> | undefined
+): { payload: T | undefined; ok: boolean; message?: string } => {
+	if (!raw) return { payload: undefined, ok: false };
+	const payload = raw.data ?? raw.Data;
+	const ok = raw.success ?? raw.Success ?? false;
+	const message = raw.message ?? raw.Message;
+	return { payload, ok, message };
+};
+
 const ensureLeadingSlash = (path: string): string => {
 	if (!path) {
 		return '/';
@@ -58,11 +85,8 @@ const normalizePage = (page: BackendPageAccessDto): PageAccess => ({
 	dbId: page.id
 });
 
-// Normalize role names to lowercase (backend stores roles in lowercase)
-const normalizeRoleKey = (roleKey: string): string => {
-	const normalized = normalizeRoleId(roleKey);
-	return normalized ?? roleKey.toLowerCase();
-};
+// Map any persisted role key (legacy included) to a canonical bucket key.
+const normalizeRoleKey = (roleKey: string): UserRole => harmonizeRole(roleKey);
 
 const normalizeSettings = (dto: BackendPageAccessSettingsDto): PageAccessSettings => {
 	// First, normalize all pages to create a mapping from dbId to pageId
@@ -116,16 +140,16 @@ const normalizeSettings = (dto: BackendPageAccessSettingsDto): PageAccessSetting
 			// Log conversion for debugging (only in dev mode)
 			if (import.meta.env.DEV && pageIds.length > 0) {
 				const hasNumericIds = pageIds.some(id => !isNaN(Number(id)) && isFinite(Number(id)));
-				if (hasNumericIds && roleKey.toLowerCase().includes('advantageoneofficer')) {
-					console.group(`🔄 [PageAccess API] Converted ${roleKey} page IDs`);
-					console.log('📊 Conversion Summary:', {
+				if (hasNumericIds && normalizedKey === 'securityofficer') {
+					logger.debug(`[PageAccess API] Converted ${roleKey} page IDs`);
+					logger.debug('📊 Conversion Summary:', {
 						total: pageIds.length,
 						hasNumericIds,
 						hasCustomerIncidentReport: convertedPageIds.includes('customer-incident-report')
 					});
-					console.log('📋 All Original IDs:', pageIds);
-					console.log('📋 All Converted IDs:', convertedPageIds);
-					console.log('🔍 Conversion Examples (first 10):', 
+					logger.debug('📋 All Original IDs:', pageIds);
+					logger.debug('📋 All Converted IDs:', convertedPageIds);
+					logger.debug('🔍 Conversion Examples (first 10):', 
 						pageIds.slice(0, 10).map((original, idx) => ({
 							original,
 							converted: convertedPageIds[idx],
@@ -138,23 +162,21 @@ const normalizeSettings = (dto: BackendPageAccessSettingsDto): PageAccessSetting
 					customerPages.forEach(pageId => {
 						const index = convertedPageIds.indexOf(pageId);
 						const originalValue = index >= 0 ? pageIds[index] : 'NOT FOUND';
-						console.log(`🔍 ${pageId}:`, {
+						logger.debug(`🔍 ${pageId}:`, {
 							found: index >= 0,
 							index,
 							originalValue,
 							convertedValue: index >= 0 ? convertedPageIds[index] : 'N/A'
 						});
 					});
-					
-					console.groupEnd();
 				}
 			}
 		}
 	}
 	
 	return {
-		pageAccessByRole: normalizedPageAccessByRole,
-		availablePages: normalizedPages
+		pageAccessByRole: mergePageAccessByCanonicalRoles(normalizedPageAccessByRole),
+		availablePages: mergeAvailablePagesWithFallbackDefinitions(normalizedPages)
 	};
 };
 
@@ -212,6 +234,24 @@ const buildDefaultPages = (): PageAccess[] => {
 	return Array.from(pageMap.values());
 };
 
+/**
+ * API settings only return active PageAccess rows. If a page id is granted in role mappings but missing from that list,
+ * hasAccess() denies the route because it cannot resolve path ↔ id. Merge catalog defaults for any missing ids.
+ */
+const mergeAvailablePagesWithFallbackDefinitions = (apiPages: PageAccess[]): PageAccess[] => {
+	const defaults = buildDefaultPages()
+	const seenIds = new Set(apiPages.map((p) => p.id.toLowerCase()))
+	const merged = [...apiPages]
+	for (const def of defaults) {
+		const key = def.id.toLowerCase()
+		if (!seenIds.has(key)) {
+			merged.push(def)
+			seenIds.add(key)
+		}
+	}
+	return merged
+}
+
 const buildDefaultSettings = (): PageAccessSettings => {
 	const availablePages = buildDefaultPages();
 	return {
@@ -223,7 +263,7 @@ const buildDefaultSettings = (): PageAccessSettings => {
 				'incident-report', 'site-visit', 'holiday-requests',
 				'bank-holiday', 'customer-satisfaction', 'safe-duress-words',
 				'officer-support', 'officer-expenses', 'uniform-equipment', 'disciplinary',
-				'diary', 'management-customer-reporting', 'manager-support',
+				'diary', 'manager-support',
 				'officer-performance', 'contract-renewal', 'password-register', 'asset-register',
 				'vetting', 'cbt', 'take-test', 'crm-dashboard', 'crm-contacts',
 				'crm-pipeline',
@@ -254,33 +294,37 @@ const buildDefaultSettings = (): PageAccessSettings => {
 	};
 };
 
+/** Admin page-access settings: load, save role mappings, and sync the page catalog with the backend. */
 export const pageAccessApi = {
 	saveSettings: async (pageAccessByRole: Record<string, string[]>, availablePages: PageAccess[] = []): Promise<PageAccessSettings> => {
 		try {
 			// Keep using PageIds (not Titles) for reliability and consistency
 			// PageIds are unique identifiers that won't change, while Titles might vary
 			// The backend accepts both, but PageIds are more reliable
-			
+			const mergedByRole = mergePageAccessByCanonicalRoles(pageAccessByRole);
+
 			// Log what we're sending
-			const roleCount = Object.keys(pageAccessByRole).length;
-			const totalPages = Object.values(pageAccessByRole).reduce((sum, pages) => sum + pages.length, 0);
-			console.log(`💾 [PageAccess API] Saving settings: ${roleCount} roles, ${totalPages} total page assignments (using PageIds)`);
+			const roleCount = Object.keys(mergedByRole).length;
+			const totalPages = Object.values(mergedByRole).reduce((sum, pages) => sum + pages.length, 0);
+			logger.debug(`💾 [PageAccess API] Saving settings: ${roleCount} roles, ${totalPages} total page assignments (using PageIds)`);
 			
 			// Log sample of what's being sent for debugging
 			if (import.meta.env.DEV) {
-				const sampleRole = Object.keys(pageAccessByRole)[0];
-				if (sampleRole && pageAccessByRole[sampleRole]) {
-					console.log(`💾 [PageAccess API] Sample - ${sampleRole}: ${pageAccessByRole[sampleRole].slice(0, 5).join(', ')}${pageAccessByRole[sampleRole].length > 5 ? '...' : ''}`);
+				const sampleRole = Object.keys(mergedByRole)[0];
+				if (sampleRole && mergedByRole[sampleRole as UserRole]) {
+					const samplePages = mergedByRole[sampleRole as UserRole];
+					logger.debug(`💾 [PageAccess API] Sample - ${sampleRole}: ${samplePages.slice(0, 5).join(', ')}${samplePages.length > 5 ? '...' : ''}`);
 				}
 				
 				// Log full payload for Customer Reporting debugging
-				if (pageAccessByRole['advantageoneofficer']) {
-					const hasCustomerReporting = pageAccessByRole['advantageoneofficer'].some(id => 
+				const officerPages = mergedByRole.securityofficer;
+				if (officerPages?.length) {
+					const hasCustomerReporting = officerPages.some(id => 
 						id === 'management-customer-reporting' || id.includes('customer-reporting')
 					);
 					if (hasCustomerReporting) {
-						console.log(`🔍 [PageAccess API] advantageoneofficer has Customer Reporting in payload:`, 
-							pageAccessByRole['advantageoneofficer'].filter(id => 
+						logger.debug(`🔍 [PageAccess API] securityofficer has Customer Reporting in payload:`, 
+							officerPages.filter(id => 
 								id === 'management-customer-reporting' || id.includes('customer-reporting')
 							)
 						);
@@ -288,18 +332,16 @@ export const pageAccessApi = {
 				}
 			}
 			
-			console.log(`💾 [PageAccess API] Making PUT request to /PageAccess/settings`);
+			logger.debug(`💾 [PageAccess API] Making PUT request to /PageAccess/settings`);
 			const response = await api.put<ApiResponse<BackendPageAccessSettingsDto>>(
 				'/PageAccess/settings',
-				{ pageAccessByRole }
+				{ pageAccessByRole: mergedByRole }
 			);
 			
-			// Backend returns ApiResponseDto with capital Data, Success, Message
-			const apiResponse = response.data;
-			const responseData = apiResponse?.Data || apiResponse?.data;
-			const isSuccess = apiResponse?.Success ?? apiResponse?.success ?? false;
+			const apiResponse = response.data as FlexibleEnvelope<BackendPageAccessSettingsDto>;
+			const { payload: responseData, ok: isSuccess } = unpackEnvelope(apiResponse);
 			
-			console.log(`💾 [PageAccess API] Received response:`, {
+			logger.debug(`💾 [PageAccess API] Received response:`, {
 				status: response.status,
 				hasData: !!responseData,
 				success: isSuccess
@@ -308,22 +350,19 @@ export const pageAccessApi = {
 			if (responseData && isSuccess) {
 				const savedRoleCount = Object.keys(responseData.pageAccessByRole).length;
 				const savedTotalPages = Object.values(responseData.pageAccessByRole).reduce((sum, pages) => sum + pages.length, 0);
-				console.log(`✅ [PageAccess API] Settings saved successfully: ${savedRoleCount} roles, ${savedTotalPages} total page assignments`);
+				logger.debug(`✅ [PageAccess API] Settings saved successfully: ${savedRoleCount} roles, ${savedTotalPages} total page assignments`);
 				return normalizeSettings(responseData);
 			}
 			
-			console.warn('⚠️ [PageAccess API] Save response missing data field');
+			logger.debug('⚠️ [PageAccess API] Save response missing data field');
 		} catch (error: unknown) {
 			const errorPayload = error as {
 				message?: string;
 				response?: { data?: unknown; status?: number; statusText?: string };
 			};
-			console.error('❌ [PageAccess API] Failed to save settings', error);
-			console.error('❌ [PageAccess API] Error details:', {
-				message: errorPayload?.message,
-				response: errorPayload?.response?.data,
+			logger.error('[PageAccess API] Failed to save settings', {
 				status: errorPayload?.response?.status,
-				statusText: errorPayload?.response?.statusText
+				message: errorPayload?.message,
 			});
 			throw error;
 		}
@@ -334,17 +373,15 @@ export const pageAccessApi = {
 		try {
 			const response = await api.get<ApiResponse<BackendPageAccessSettingsDto>>('/PageAccess/settings');
 			
-			// Backend returns ApiResponseDto with capital Data, Success, Message
-			const apiResponse = response.data;
-			const responseData = apiResponse?.Data || apiResponse?.data;
-			const isSuccess = apiResponse?.Success ?? apiResponse?.success ?? false;
+			const apiResponse = response.data as FlexibleEnvelope<BackendPageAccessSettingsDto>;
+			const { payload: responseData, ok: isSuccess, message: envelopeMessage } = unpackEnvelope(apiResponse);
 			
 			if (isSuccess && responseData) {
 				const normalized = normalizeSettings(responseData);
 				
 				// Log if we're getting defaults from backend (check for default customer pages in officer role)
 				if (import.meta.env.DEV) {
-					const officerPages = normalized.pageAccessByRole['advantageoneofficer'] || [];
+					const officerPages = normalized.pageAccessByRole['securityofficer'] || [];
 					const hasDefaultCustomerPages = [
 						'customer-incident-report',
 						'customer-incident-graph',
@@ -353,7 +390,7 @@ export const pageAccessApi = {
 					].some(pageId => officerPages.includes(pageId));
 					
 					if (hasDefaultCustomerPages) {
-						console.warn('⚠️ [PageAccess API] Backend returned settings with default customer pages for officers. This may indicate defaults are being used instead of database settings.');
+						logger.debug('⚠️ [PageAccess API] Backend returned settings with default customer pages for officers. This may indicate defaults are being used instead of database settings.');
 					}
 				}
 				
@@ -361,20 +398,20 @@ export const pageAccessApi = {
 			}
 			
 			// If response is not successful, log and fall back
-			console.error('⚠️ [PageAccess API] Invalid response structure, falling back to defaults');
-			console.error('⚠️ [PageAccess API] Response:', {
+			logger.error('⚠️ [PageAccess API] Invalid response structure, falling back to defaults');
+			logger.error('⚠️ [PageAccess API] Response:', {
 				success: isSuccess,
 				hasData: !!responseData,
-				message: apiResponse?.Message || apiResponse?.message
+				message: envelopeMessage
 			});
 			throw new Error('Page access settings response was invalid');
 		} catch (error) {
 			if (isBackendUnavailableError(error)) {
 				if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true') {
-					console.warn('⚠️ [PageAccess API] Backend unavailable, using fallback defaults');
+					logger.debug('⚠️ [PageAccess API] Backend unavailable, using fallback defaults');
 				}
 			} else {
-				console.error('❌ [PageAccess API] Request failed, using defaults:', {
+				logger.error('❌ [PageAccess API] Request failed, using defaults:', {
 					message: error instanceof Error ? error.message : String(error),
 					type: error instanceof Error ? error.constructor.name : typeof error,
 					note: 'Page access settings request failed'
@@ -405,18 +442,17 @@ export const pageAccessApi = {
 				syncRequest
 			);
 
-			// Backend returns ApiResponseDto with capital Data, Success, Message
-			const apiResponse = response.data;
-			const responseData = apiResponse?.Data || apiResponse?.data;
+			const apiResponse = response.data as FlexibleEnvelope<BackendSyncPagesResult>;
+			const { payload: responseData } = unpackEnvelope(apiResponse);
 			
 			if (responseData) {
-				console.log('✅ [PageAccess API] Pages synced successfully:', responseData);
+				logger.debug('✅ [PageAccess API] Pages synced successfully:', responseData);
 				return responseData;
 			}
 
 			throw new Error('Invalid response from sync endpoint');
 		} catch (error) {
-			console.error('❌ [PageAccess API] Failed to sync pages:', error);
+			logger.error('❌ [PageAccess API] Failed to sync pages:', error);
 			throw error;
 		}
 	}

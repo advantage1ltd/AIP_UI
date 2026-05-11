@@ -228,20 +228,12 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
 		sortOrder: 20,
 	},
 	{
-		pageId: 'mystery-shopper',
-		title: 'Mystery Shopper',
-		path: '/operations/mystery-shopper',
-		category: 'Operations',
-		description: 'Mystery shopper reports',
-		sortOrder: 21,
-	},
-	{
 		pageId: 'site-visit',
 		title: 'Site Visit',
 		path: '/operations/site-visit',
 		category: 'Operations',
 		description: 'Site visit reports',
-		sortOrder: 22,
+		sortOrder: 21,
 	},
 	{
 		pageId: 'holiday-requests',
@@ -249,7 +241,7 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
 		path: '/operations/holiday-requests',
 		category: 'Operations',
 		description: 'Holiday request management',
-		sortOrder: 23,
+		sortOrder: 22,
 	},
 	{
 		pageId: 'bank-holiday',
@@ -257,7 +249,7 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
 		path: '/operations/bank-holiday',
 		category: 'Operations',
 		description: 'Bank holiday management',
-		sortOrder: 24,
+		sortOrder: 23,
 	},
 	{
 		pageId: 'customer-satisfaction',
@@ -265,7 +257,7 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
 		path: '/operations/customer-satisfaction',
 		category: 'Operations',
 		description: 'Customer satisfaction reports',
-		sortOrder: 25,
+		sortOrder: 24,
 	},
 	{
 		pageId: 'safe-duress-words',
@@ -273,7 +265,7 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
 		path: '/operations/safe-duress-words',
 		category: 'Operations',
 		description: 'Safe and duress words management',
-		sortOrder: 27,
+		sortOrder: 25,
 	},
 	{
 		pageId: 'officer-support',
@@ -281,7 +273,7 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
 		path: '/operations/officer-support',
 		category: 'Operations',
 		description: 'Officer support',
-		sortOrder: 28,
+		sortOrder: 26,
 	},
 	{
 		pageId: 'officer-expenses',
@@ -289,7 +281,7 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
 		path: '/operations/officer-expenses',
 		category: 'Operations',
 		description: 'Officer expenses management',
-		sortOrder: 29,
+		sortOrder: 27,
 	},
 
 	// Employee

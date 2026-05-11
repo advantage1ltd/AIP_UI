@@ -1,4 +1,9 @@
+/**
+ * Holiday request workflow API (`/holiday-requests`).
+ * Flow: filter query → list/detail → create/update with AuthorisedBy user id normalization.
+ */
 import { api } from '@/config/api';
+import { logger } from '@/utils/logger';
 import type { 
   HolidayRequest, 
   HolidayRequestsResponse, 
@@ -9,6 +14,16 @@ import type {
 
 const BASE_URL = '/holiday-requests';
 
+/** ApplicationUser.Id sent as AuthorisedBy (ASP.NET Identity GUID string). */
+const ASP_NET_USER_ID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const sanitiseAuthorisedByUserId = (raw?: string | null): string | undefined => {
+  const trimmed = raw?.trim()
+  if (!trimmed || !ASP_NET_USER_ID_REGEX.test(trimmed)) return undefined
+  return trimmed
+};
+
 export const holidayRequestService = {
   // Get all holiday requests with pagination and filters
   getHolidayRequests: async (filters: HolidayRequestFilters): Promise<HolidayRequestsResponse> => {
@@ -18,13 +33,17 @@ export const holidayRequestService = {
     if (filters.search) queryParams.append('search', filters.search);
     if (filters.status) queryParams.append('status', filters.status);
     if (typeof filters.archived === 'boolean') queryParams.append('archived', filters.archived.toString());
+    if (filters.employeeId != null && Number.isFinite(filters.employeeId)) {
+      queryParams.append('employeeId', String(filters.employeeId));
+    }
 
     try {
       const response = await api.get(`${BASE_URL}?${queryParams.toString()}`);
       const responseData = response.data;
       
-      // Log the response for debugging
-      console.log('📦 [HolidayRequestService] Response data:', responseData);
+      logger.debug('[HolidayRequestService] list response shape', {
+        hasData: Array.isArray(responseData?.data ?? responseData?.Data),
+      });
       
       // Map backend response to frontend DTOs
       return {
@@ -58,13 +77,11 @@ export const holidayRequestService = {
         page: responseData.page || responseData.Page || 1,
         limit: responseData.limit || responseData.Limit || 10
       };
-    } catch (error: any) {
-      console.error('❌ [HolidayRequestService] Error fetching holiday requests:', {
-        error,
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        url: error.config?.url
+    } catch (error: unknown) {
+      const e = error as { message?: string; response?: { data?: unknown; status?: number }; config?: { url?: string } }
+      logger.error('[HolidayRequestService] fetch list failed', {
+        status: e.response?.status,
+        message: e.message,
       });
       throw error;
     }
@@ -105,9 +122,9 @@ export const holidayRequestService = {
       comment: data.comment || ''
     };
     
-    // Only include authorisedBy if provided (optional for creation)
-    if (data.authorisedBy) {
-      backendData.authorisedBy = data.authorisedBy;
+    const authorisedUserId = sanitiseAuthorisedByUserId(data.authorisedBy)
+    if (authorisedUserId) {
+      backendData.authorisedBy = authorisedUserId;
     }
     const response = await api.post(BASE_URL, backendData);
     // Map backend response to frontend DTO
@@ -138,7 +155,8 @@ export const holidayRequestService = {
       if (data.startDate) backendData.startDate = data.startDate.toISOString();
       if (data.endDate) backendData.endDate = data.endDate.toISOString();
       if (data.returnToWorkDate) backendData.returnToWorkDate = data.returnToWorkDate.toISOString();
-      if (data.authorisedBy) backendData.authorisedBy = data.authorisedBy;
+      const authorisedUserId = sanitiseAuthorisedByUserId(data.authorisedBy)
+      if (authorisedUserId) backendData.authorisedBy = authorisedUserId;
       if (data.status) backendData.status = data.status;
       // Handle dateAuthorised - only send if it's not null
       if (data.dateAuthorised !== null && data.dateAuthorised !== undefined) {
@@ -148,7 +166,7 @@ export const holidayRequestService = {
       if (data.reason !== undefined) backendData.reason = data.reason;
       if (data.daysLeftYTD !== undefined && data.daysLeftYTD !== null) backendData.daysLeftYTD = data.daysLeftYTD;
 
-      console.log('📤 [HolidayRequestService] Updating holiday request:', { id, backendData });
+      logger.debug('[HolidayRequestService] update', { id, keys: Object.keys(backendData) });
 
       const response = await api.put(`${BASE_URL}/${id}`, backendData);
       // Map backend response to frontend DTO
@@ -170,25 +188,13 @@ export const holidayRequestService = {
       daysLeftYTD: responseData.daysLeftYTD ?? responseData.DaysLeftYTD ?? undefined,
       archived: responseData.archived || false
     };
-    } catch (error: any) {
-      const errorDetails = {
+    } catch (error: unknown) {
+      const e = error as { message?: string; response?: { data?: { message?: string }; status?: number } }
+      logger.error('[HolidayRequestService] update failed', {
         id,
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        url: error.config?.url,
-        requestData: error.config?.data,
-        responseData: error.response?.data,
-      }
-      
-      console.error('❌ [HolidayRequestService] Error updating holiday request:', errorDetails)
-      console.error('❌ [HolidayRequestService] Full error:', error)
-      
-      // Log response data separately for better visibility
-      if (error.response?.data) {
-        console.error('❌ [HolidayRequestService] Error response data:', JSON.stringify(error.response.data, null, 2))
-      }
-      
+        status: e.response?.status,
+        message: e.response?.data?.message ?? e.message,
+      });
       throw error;
     }
   },

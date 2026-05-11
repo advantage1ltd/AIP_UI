@@ -1,3 +1,7 @@
+/**
+ * Customer setup dialog with regions and sites.
+ * Flow: tabbed company details → optional region/site tabs after save → parent onSave persists customer.
+ */
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -18,8 +22,8 @@ import { SiteDialog } from "./SiteDialog"
 import { RegionsTable } from "./RegionsTable"
 import { SitesTable } from "./SitesTable"
 import { customerService } from "@/services/customerService"
-import { DUMMY_REGIONS } from "@/data/mockRegions"
-import { DUMMY_SITES } from "@/data/mockSites"
+import { regionService } from "@/services/regionService"
+import { siteService } from "@/services/siteService"
 
 const customerTypes: { value: CustomerType; label: string }[] = [
   { value: "retail", label: "Retail" },
@@ -62,6 +66,7 @@ interface CustomerDialogProps {
   onSave: (customer: Customer) => void
 }
 
+// === Component ===
 export function CustomerDialog({ open, onOpenChange, customer, onSave }: CustomerDialogProps) {
   const { toast } = useToast()
   const [regions, setRegions] = useState<Region[]>([])
@@ -76,38 +81,37 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
   // Load regions and sites when customer changes
   useEffect(() => {
     const loadCustomerData = async () => {
-      if (customer?.id) {
-        console.log('🔧 [CustomerDialog] Loading regions and sites for customer:', customer.id)
-        
-        // Reset arrays when customer changes
+      if (!customer?.id) {
         setRegions([])
         setSites([])
-        
-        // For now, use mock data filtered by customer ID
-        // TODO: Replace with actual API calls when backend is ready
-        const customerIdNum = parseInt(customer.id) || 0
-        if (customerIdNum > 0) {
-          // Filter mock data by customer ID
-          const customerRegions = DUMMY_REGIONS.filter(region => region.fkCustomerID === customerIdNum)
-          const customerSites = DUMMY_SITES.filter(site => site.fkCustomerID === customerIdNum)
-          
-          setRegions(customerRegions)
-          setSites(customerSites)
-          console.log('🔧 [CustomerDialog] Loaded mock data:', { regions: customerRegions.length, sites: customerSites.length })
-        }
-        
-        // TODO: Replace with actual API calls:
-        // const regionsResult = await regionsService.getRegionsByCustomer(customer.id)
-        // const sitesResult = await sitesService.getSitesByCustomer(customer.id)
-        // setRegions(regionsResult.data || [])
-        // setSites(sitesResult.data || [])
-      } else {
-        setRegions([])
-        setSites([])
+        return
       }
+
+      const customerIdNum = parseInt(String(customer.id), 10) || 0
+      if (customerIdNum <= 0) {
+        setRegions([])
+        setSites([])
+        return
+      }
+
+      console.log('🔧 [CustomerDialog] Loading regions and sites for customer:', customer.id)
+      setRegions([])
+      setSites([])
+
+      const [regionsResult, sitesResult] = await Promise.all([
+        regionService.getRegionsByCustomer(customerIdNum),
+        siteService.getSitesByCustomer(customerIdNum),
+      ])
+
+      setRegions(regionsResult.success ? regionsResult.data : [])
+      setSites(sitesResult.success ? sitesResult.data : [])
+      console.log('🔧 [CustomerDialog] Loaded API data:', {
+        regions: regionsResult.success ? regionsResult.data.length : 0,
+        sites: sitesResult.success ? sitesResult.data.length : 0,
+      })
     }
 
-    loadCustomerData()
+    void loadCustomerData()
   }, [customer])
 
   const form = useForm<z.infer<typeof customerSchema>>({
@@ -245,14 +249,12 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
 
   const handleRegionSuccess = () => {
     // Refresh regions list
-    console.log('🔧 [CustomerDialog] Region updated, refreshing list')
-    // TODO: Reload regions from API
+    // RegionsTable refetches via parent refresh when the dialog closes.
   }
 
   const handleSiteSuccess = () => {
     // Refresh sites list
-    console.log('🔧 [CustomerDialog] Site updated, refreshing list')
-    // TODO: Reload sites from API
+    // SitesTable refetches via parent refresh when the dialog closes.
   }
 
   const handleEditRegion = (region: Region) => {

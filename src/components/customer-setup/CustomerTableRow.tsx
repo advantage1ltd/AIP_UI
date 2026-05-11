@@ -11,6 +11,7 @@ interface CustomerTableRowProps {
   onDelete: (customer: Customer) => void
 }
 
+// === Component ===
 export function CustomerTableRow({ 
   customer, 
   isSelected, 

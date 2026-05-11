@@ -31,6 +31,13 @@ export default tseslint.config(
       "react-refresh/only-export-components": "off",
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-unused-expressions": "off",
+      "no-console": ["warn", { allow: ["debug", "info", "warn", "error"] }],
+    },
+  },
+  {
+    files: ["src/utils/logger.ts"],
+    rules: {
+      "no-console": "off",
     },
   }
 );

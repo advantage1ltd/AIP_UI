@@ -1,3 +1,7 @@
+/**
+ * Site create/edit dialog for customer setup.
+ * Flow: load regions for selected customer → reset form for create/edit → siteService create or update.
+ */
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -9,14 +13,13 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { UK_COUNTIES } from "@/lib/constants"
-import { DUMMY_CUSTOMERS } from "@/data/customers"
-import { DUMMY_REGIONS } from "@/data/mockRegions"
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { siteService } from "@/services/siteService"
 import { regionService } from "@/services/regionService"
+import { customerService } from "@/services/customerService"
 import { useAuth } from "@/contexts/AuthContext"
-import type { Site, Region } from "@/types/customer"
+import type { Site, Region, Customer } from "@/types/customer"
 
 // UK postcode validation regex
 const UK_POSTCODE_REGEX = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i
@@ -55,6 +58,7 @@ interface SiteDialogProps {
   onSuccess?: () => void
 }
 
+// === Component ===
 export function SiteDialog({ open, onOpenChange, site, selectedCustomerId, onSuccess }: SiteDialogProps) {
   const [availableRegions, setAvailableRegions] = useState<Region[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -75,13 +79,8 @@ export function SiteDialog({ open, onOpenChange, site, selectedCustomerId, onSuc
         setAvailableRegions(result.data)
       }
     } catch (error) {
-      console.log('🔧 [SiteDialog] Service failed, using fallback data')
-      // Fallback to static data if service fails
-      const filteredRegions = selectedCustomerId
-        ? DUMMY_REGIONS.filter(region => region.fkCustomerID === selectedCustomerId)
-        : DUMMY_REGIONS
-      console.log('🔧 [SiteDialog] Found regions from fallback:', filteredRegions.length)
-      setAvailableRegions(filteredRegions as Region[])
+      console.warn('🔧 [SiteDialog] Failed to load regions:', error)
+      setAvailableRegions([])
     } finally {
       setIsLoadingRegions(false)
     }
@@ -140,6 +139,18 @@ export function SiteDialog({ open, onOpenChange, site, selectedCustomerId, onSuc
     }
   }, [open, selectedCustomerId, site?.fkCustomerID])
 
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    void (async () => {
+      const list = await customerService.getAllCustomers()
+      if (!cancelled) setCustomersList(list)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open])
+
   // Reset form when dialog opens/closes or site changes
   useEffect(() => {
     if (open) {
@@ -193,6 +204,7 @@ export function SiteDialog({ open, onOpenChange, site, selectedCustomerId, onSuc
     }
   }, [open, site, selectedCustomerId, form])
 
+  // Create vs update through siteService after region options are scoped to the customer.
   const handleSubmit = async (data: SiteFormData) => {
     setIsLoading(true)
     
@@ -327,8 +339,8 @@ export function SiteDialog({ open, onOpenChange, site, selectedCustomerId, onSuc
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {DUMMY_CUSTOMERS.map((customer) => (
-                              <SelectItem key={customer.id} value={customer.id.toString()}>
+                            {customersList.map((customer) => (
+                              <SelectItem key={customer.id} value={String(customer.id)}>
                                 {customer.companyName}
                               </SelectItem>
                             ))}

@@ -1,3 +1,7 @@
+/**
+ * CRM deals pipeline board.
+ * Flow: stage columns → deal create/edit → pipeline stage moves and totals.
+ */
 import { useState, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { Plus, Search, Filter, PoundSterling, AlertTriangle, CheckCircle } from "lucide-react"
@@ -139,9 +143,8 @@ export default function Deals() {
     }
   }
 
-  const handleViewDeal = (deal: Deal) => {
-    // TODO: Implement view deal details
-    console.log("View deal:", deal)
+  const handleViewDeal = (_deal: Deal) => {
+    // Deal detail view is not implemented; list actions update pipeline data only.
   }
 
   const formatCurrency = (value: number) => {

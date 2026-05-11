@@ -1,3 +1,7 @@
+/**
+ * Customer sites table and actions.
+ * Flow: siteService fetch per customer → client search/pagination → edit callback or soft delete confirm.
+ */
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +29,7 @@ interface SitesTableProps {
   updateTrigger?: number
 }
 
+// === Component ===
 export function SitesTable({ customerId, onEdit, onDataChange, updateTrigger }: SitesTableProps) {
   const [sites, setSites] = useState<Site[]>([])
   const [searchQuery, setSearchQuery] = useState("")

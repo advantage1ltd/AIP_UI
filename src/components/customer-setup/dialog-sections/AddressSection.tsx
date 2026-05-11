@@ -8,6 +8,7 @@ interface AddressSectionProps {
   form: UseFormReturn<any>
 }
 
+// === Component ===
 export function AddressSection({ form }: AddressSectionProps) {
   return (
     <div className="space-y-4">

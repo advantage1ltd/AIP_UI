@@ -1,0 +1,39 @@
+name: Frontend Quality Gate
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck:critical
+
+      - name: Lint
+        run: npm run lint:critical
+
+      - name: Test
+        run: npm run test:ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Dependency vulnerability scan
+        run: npm audit --audit-level=high
+

@@ -1,5 +1,6 @@
 import { TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
+// === Component ===
 export function CustomerTableHeader() {
   return (
     <TableHeader>

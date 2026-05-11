@@ -1,4 +1,9 @@
+/**
+ * CRM schedule-event email client; `/CRM/send-event-notification` is not implemented on the API yet.
+ * Flow: schedule payload → guarded api post → toast-friendly success/error handling.
+ */
 import { api } from '@/config/api'
+import { logger } from '@/utils/logger'
 
 export interface ScheduleEventEmailRequest {
 	eventTitle: string
@@ -25,14 +30,14 @@ class CRMEmailService {
 		try {
 			// In production, this would call the backend API
 			// For now, we'll simulate the API call
-			console.log('[CRM Email Service] Sending schedule event notification:', {
+			logger.debug('[CRM Email Service] schedule event notification (client stub):', {
 				from: 'sales@advantage1.co.uk',
 				to: request.recipientEmail,
 				subject: `Scheduled ${request.eventType}: ${request.eventTitle}`,
 				event: request
 			})
 
-			// TODO: Replace with actual API call when backend is ready
+			// When the API ships, post to `${this.baseUrl}/send-event-notification`.
 			// const response = await api.post(`${this.baseUrl}/send-event-notification`, {
 			//   from: 'sales@advantage1.co.uk',
 			//   ...request
@@ -47,7 +52,7 @@ class CRMEmailService {
 				message: `Email notification sent to ${request.recipientEmail}`
 			}
 		} catch (error) {
-			console.error('[CRM Email Service] Error sending email:', error)
+			logger.error('[CRM Email Service] Error sending email:', error)
 			throw new Error('Failed to send email notification')
 		}
 	}

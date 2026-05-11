@@ -1,3 +1,6 @@
+/**
+ * Officer performance widget on the dashboard.
+ */
 import { useState } from 'react'
 import { Badge } from '../ui/badge'
 import { Progress } from '../ui/progress'
@@ -20,6 +23,7 @@ interface OfficerPerformanceProps {
 
 type ViewMode = 'top-performers' | 'needs-improvement' | 'non-reporters'
 
+// === Component ===
 export function OfficerPerformance({ data }: OfficerPerformanceProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('top-performers')
 
@@ -145,9 +149,9 @@ export function OfficerPerformance({ data }: OfficerPerformanceProps) {
 
       <div className="text-xs text-muted-foreground md:text-sm p-2 md:p-4">
         {viewMode === 'top-performers' ? (
-          <p>Showing top performing officers (value saved > £999) sorted by value saved</p>
+          <p>Showing top performing officers (value saved &gt; £999) sorted by value saved</p>
         ) : viewMode === 'needs-improvement' ? (
-          <p>Showing officers needing improvement (value saved ≤ £999) sorted by value saved</p>
+          <p>Showing officers needing improvement (value saved &le; £999) sorted by value saved</p>
         ) : (
           <p>Showing non-reporters (0 incidents, £0 value saved) sorted alphabetically</p>
         )}

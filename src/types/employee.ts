@@ -1,3 +1,6 @@
+/** Employee registration and roster models (maps to Employee API via employeeMapper). */
+
+// === Core employee record ===
 export interface Employee {
   // Primary Key
   id: number
@@ -13,7 +16,6 @@ export interface Employee {
   employmentType: string
   
   // Optional Fields
-  aipAccessLevel?: string
   region?: string
   email?: string
   contactNumber?: string

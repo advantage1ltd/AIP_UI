@@ -1,3 +1,7 @@
+/**
+ * Central route table: public auth routes, authenticated Layout routes, and lazy customer bundles.
+ * PageAccessProvider wraps all routes; ProtectedRoute enforces auth and optional page-access paths.
+ */
 import React, { lazy, useEffect, useRef } from 'react';
 import { createBrowserRouter, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -11,8 +15,10 @@ import ActionCalendar from '@/pages/ActionCalendar';
 import { UserRole } from '@/types/user';
 import { PageAccessProvider } from '@/contexts/PageAccessContext';
 import { CustomerSelectionUrlSync } from '@/components/customer/CustomerSelectionUrlSync';
+import { logger } from '@/utils/logger';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
-// Component to normalize paths and fix double slashes
+// === Route helpers (path normalize, scroll, navigation debug) ===
 const PathNormalizer = () => {
 	const location = useLocation();
 	const navigate = useNavigate();
@@ -25,7 +31,7 @@ const PathNormalizer = () => {
 			// This ensures we always have exactly one / at the start
 			const normalized = pathname.replace(/\/+/g, '/');
 			if (normalized !== pathname) {
-				console.warn('🔧 [PathNormalizer] Fixing double slash in path:', pathname, '->', normalized);
+				logger.debug('[PathNormalizer] Fixing double slash', { pathname, normalized });
 				// Use replace: true to avoid adding to history and prevent navigation loops
 				const newPath = normalized + (location.search || '') + (location.hash || '');
 				navigate(newPath, { replace: true });
@@ -60,21 +66,13 @@ const NavigationTracker = () => {
 			? previousLocationRef.current.pathname + previousLocationRef.current.search 
 			: null;
 
-		// Only log if path actually changed
 		if (previousPath !== currentPath) {
 			const timestamp = Date.now();
-			
-			console.group('🔄 [Navigation] Route Change Detected');
-			console.log('📍 Navigation Details:', {
+			logger.debug('[Navigation]', {
 				from: previousPath || '(initial load)',
 				to: currentPath,
 				timestamp: new Date(timestamp).toISOString(),
-				pathname: location.pathname,
-				search: location.search,
-				hash: location.hash || '(none)'
 			});
-			
-			// Track navigation history (keep last 10)
 			if (previousPath) {
 				navigationHistoryRef.current.push({
 					from: previousPath,
@@ -85,24 +83,18 @@ const NavigationTracker = () => {
 					navigationHistoryRef.current.shift();
 				}
 			}
-			
-			// Log navigation chain for redirect loops
 			if (navigationHistoryRef.current.length >= 3) {
 				const recent = navigationHistoryRef.current.slice(-3);
 				const isLoop = recent.every((nav, idx) => 
 					idx === 0 || nav.from === recent[idx - 1].to
 				);
 				if (isLoop && recent[0].from === recent[recent.length - 1].to) {
-					console.error('🔄 [Navigation] ⚠️ POTENTIAL REDIRECT LOOP DETECTED!', {
+					logger.debug('[Navigation] possible redirect loop', {
 						chain: recent.map(n => n.to),
-						timestamps: recent.map(n => new Date(n.timestamp).toISOString())
 					});
 				}
 			}
-			
-			console.log('📚 Recent Navigation History:', navigationHistoryRef.current.slice(-5));
-			console.groupEnd();
-			
+			logger.debug('[Navigation] recent', navigationHistoryRef.current.slice(-5));
 			previousLocationRef.current = {
 				pathname: location.pathname,
 				search: location.search
@@ -113,14 +105,19 @@ const NavigationTracker = () => {
 	return null;
 };
 
-// Import all the necessary pages
+const withRouteBoundary = (children: React.ReactNode) => (
+	<ErrorBoundary>
+		{children}
+	</ErrorBoundary>
+)
+
+// === Page imports (eager) — administration & operations ===
 import UserSetup from '@/pages/administration/UserSetup';
 import EmployeeRegistration from '@/pages/administration/EmployeeRegistration';
 import CustomerSetup from '@/pages/administration/CustomerSetup';
 import CustomerPageSettings from '@/pages/administration/CustomerPageSettings';
 import StockControl from '@/pages/administration/StockControl';
 import IncidentReportPage from '@/pages/operations/IncidentReportPage';
-import MysteryShopperPage from '@/pages/operations/MysteryShopperPage';
 import SiteVisitPage from '@/pages/operations/SiteVisitPage';
 import HolidayRequestPage from '@/pages/operations/HolidayRequestPage';
 import BankHolidayPage from '@/pages/operations/BankHolidayPage';
@@ -137,32 +134,30 @@ import DataAnalyticsHub from '@/pages/analytics/DataAnalyticsHub';
 import Settings from '@/pages/Settings';
 import Profile from '@/pages/Profile';
 
-// Import CRM pages
+// === CRM ===
 import CRMDashboard from '@/pages/crm/CRMDashboard';
-import Contacts from '@/pages/crm/Contacts';
 import CRMContacts from '@/pages/crm/CRMContacts';
 import Deals from '@/pages/crm/Deals';
 import Pipeline from '@/pages/crm/Pipeline';
 import Tasks from '@/pages/crm/Tasks';
 
-// Import compliance pages
+// === Compliance ===
 import ContractRenewalPage from '@/pages/compliance/ContractRenewalPage';
 import PasswordRegisterPage from '@/pages/compliance/PasswordRegisterPage';
 import AssetRegisterPage from '@/pages/compliance/AssetRegisterPage';
 
-// Import recruitment pages
+// === Recruitment ===
 import Vetting from '@/pages/recruitment/Vetting';
 import CBT from '@/pages/recruitment/CBT';
 import TakeTest from '@/pages/recruitment/TakeTest';
 import TestSession from '@/pages/recruitment/TestSession';
 
-// Import customer pages with lazy loading
+// === Customer tenant pages (lazy) ===
 const DailyActivityReportPage = lazy(() => import('./pages/customer/CustomerDailyActivityReport'));
 const IncidentGraphPage = lazy(() => import('./pages/customer/IncidentGraph').then(module => ({ default: module.default })));
 const CustomerIncidentReportPage = lazy(() => import('./pages/customer/CustomerIncidentReport'));
 const CustomerSatisfactionReport = lazy(() => import('./pages/customer/CustomerSatisfactionReport'));
 const DailyActivityReportGraphs = lazy(() => import('./pages/customer/DailyActivityReportGraphs'));
-const CustomerMysteryShopperReport = lazy(() => import('./pages/customer/CustomerMysteryShopperReport'));
 const CustomerSiteVisitReport = lazy(() => import('./pages/customer/CustomerSiteVisitReport'));
 const CustomerDailyOccurrenceBook = lazy(() => import('./pages/customer/CustomerDailyOccurrenceBook'));
 const CustomerOfficerSupportPage = lazy(() => import('./pages/customer/CustomerOfficerSupportPage'));
@@ -220,7 +215,7 @@ const router = createBrowserRouter([
             path: 'action-calendar',
             element: (
               <ProtectedRoute>
-                <ActionCalendar />
+                {withRouteBoundary(<ActionCalendar />)}
               </ProtectedRoute>
             ),
           },
@@ -244,7 +239,7 @@ const router = createBrowserRouter([
           {
             path: 'administration/user-setup',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
                 <UserSetup />
               </ProtectedRoute>
             ),
@@ -252,15 +247,15 @@ const router = createBrowserRouter([
           {
             path: 'administration/employee-registration',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
-                <EmployeeRegistration />
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
+                {withRouteBoundary(<EmployeeRegistration />)}
               </ProtectedRoute>
             ),
           },
           {
             path: 'administration/customer-setup',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
                 <CustomerSetup />
               </ProtectedRoute>
             ),
@@ -276,7 +271,7 @@ const router = createBrowserRouter([
           {
             path: 'administration/stock-control',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
                 <StockControl />
               </ProtectedRoute>
             ),
@@ -286,22 +281,14 @@ const router = createBrowserRouter([
             path: 'operations/incident-report',
             element: (
               <ProtectedRoute>
-                <IncidentReportPage />
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: 'operations/mystery-shopper',
-            element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
-                <MysteryShopperPage />
+                {withRouteBoundary(<IncidentReportPage />)}
               </ProtectedRoute>
             ),
           },
           {
             path: 'operations/site-visit',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
                 <SiteVisitPage />
               </ProtectedRoute>
             ),
@@ -317,7 +304,7 @@ const router = createBrowserRouter([
           {
             path: 'operations/bank-holiday',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer', 'advantageoneofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager', 'securityofficer'] as UserRole[]}>
                 <BankHolidayPage />
               </ProtectedRoute>
             ),
@@ -325,7 +312,7 @@ const router = createBrowserRouter([
           {
             path: 'operations/customer-satisfaction',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
                 <CustomerSatisfactionPage />
               </ProtectedRoute>
             ),
@@ -366,7 +353,7 @@ const router = createBrowserRouter([
           {
             path: 'employee/disciplinary',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager', 'securityofficer'] as UserRole[]}>
                 <DisciplinaryPage />
               </ProtectedRoute>
             ),
@@ -383,7 +370,7 @@ const router = createBrowserRouter([
           {
             path: 'management/customer-reporting',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer', 'advantageoneofficer', 'customerhomanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager', 'securityofficer', 'customer'] as UserRole[]}>
                 <CustomerReportingPage />
               </ProtectedRoute>
             ),
@@ -391,7 +378,7 @@ const router = createBrowserRouter([
           {
             path: 'management/manager-support',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer', 'customerhomanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager', 'customer'] as UserRole[]}>
                 <ManagerSupportPage />
               </ProtectedRoute>
             ),
@@ -399,7 +386,7 @@ const router = createBrowserRouter([
           {
             path: 'management/officer-performance',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer', 'customerhomanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager', 'customer'] as UserRole[]}>
                 <OfficerPerformance />
               </ProtectedRoute>
             ),
@@ -408,7 +395,7 @@ const router = createBrowserRouter([
             path: 'analytics/data-analytics-hub',
             element: (
               <ProtectedRoute 
-                allowedRoles={['administrator', 'advantageonehoofficer', 'customerhomanager'] as UserRole[]}
+                allowedRoles={['administrator', 'manager', 'customer'] as UserRole[]}
                 accessPath="/analytics/data-analytics-hub"
                 enforcePageAccess={false}
               >
@@ -420,7 +407,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/satisfaction-report',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageoneofficer', 'customerhomanager', 'customersitemanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'securityofficer', 'customer'] as UserRole[]}>
                 <CustomerSatisfactionReport />
               </ProtectedRoute>
             ),
@@ -428,7 +415,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/be-safe-be-secure',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageoneofficer', 'customerhomanager', 'customersitemanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'securityofficer', 'customer'] as UserRole[]}>
                 <DailyActivityReportGraphs />
               </ProtectedRoute>
             ),
@@ -436,7 +423,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/daily-activity-report',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageoneofficer', 'customerhomanager', 'customersitemanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'securityofficer', 'customer'] as UserRole[]}>
                 <DailyActivityReportPage />
               </ProtectedRoute>
             ),
@@ -444,7 +431,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/incident-graph',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageoneofficer', 'customerhomanager', 'customersitemanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'securityofficer', 'customer'] as UserRole[]}>
                 <IncidentGraphPage />
               </ProtectedRoute>
             ),
@@ -452,7 +439,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/incident-report',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageoneofficer', 'customerhomanager', 'customersitemanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'securityofficer', 'customer'] as UserRole[]}>
                 <CustomerIncidentReportPage />
               </ProtectedRoute>
             ),
@@ -460,23 +447,15 @@ const router = createBrowserRouter([
           {
             path: 'customer/crime-intelligence',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageoneofficer', 'customerhomanager', 'customersitemanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'securityofficer', 'customer'] as UserRole[]}>
                 <CustomerCrimeIntelligencePage />
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: 'customer/mystery-shopper-report',
-            element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
-                <CustomerMysteryShopperReport />
               </ProtectedRoute>
             ),
           },
           {
             path: 'customer/site-visit-reports',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
                 <CustomerSiteVisitReport />
               </ProtectedRoute>
             ),
@@ -484,7 +463,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/daily-occurrence-book',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageoneofficer', 'customerhomanager', 'customersitemanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'securityofficer', 'customer'] as UserRole[]}>
                 <CustomerDailyOccurrenceBook />
               </ProtectedRoute>
             ),
@@ -493,7 +472,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/views-config',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageoneofficer', 'customerhomanager', 'customersitemanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'securityofficer', 'customer'] as UserRole[]}>
                 <CustomerViewsConfig />
               </ProtectedRoute>
             ),
@@ -501,7 +480,7 @@ const router = createBrowserRouter([
           {
             path: 'customer/officer-support',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageoneofficer', 'customerhomanager', 'customersitemanager'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'securityofficer', 'customer'] as UserRole[]}>
                 <CustomerOfficerSupportPage />
               </ProtectedRoute>
             ),
@@ -526,7 +505,7 @@ const router = createBrowserRouter([
             path: 'crm/contacts',
             element: (
               <ProtectedRoute>
-                <CRMContacts />
+                {withRouteBoundary(<CRMContacts />)}
               </ProtectedRoute>
             ),
           },
@@ -535,14 +514,6 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute>
                 <CRMContacts />
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: 'crm/contacts',
-            element: (
-              <ProtectedRoute>
-                <Contacts />
               </ProtectedRoute>
             ),
           },
@@ -574,7 +545,7 @@ const router = createBrowserRouter([
           {
             path: 'compliance/contract-renewal',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
                 <ContractRenewalPage />
               </ProtectedRoute>
             ),
@@ -582,7 +553,7 @@ const router = createBrowserRouter([
           {
             path: 'compliance/password-register',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
                 <PasswordRegisterPage />
               </ProtectedRoute>
             ),
@@ -590,7 +561,7 @@ const router = createBrowserRouter([
           {
             path: 'compliance/asset-register',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
                 <AssetRegisterPage />
               </ProtectedRoute>
             ),
@@ -599,7 +570,7 @@ const router = createBrowserRouter([
           {
             path: 'recruitment/vetting',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
                 <Vetting />
               </ProtectedRoute>
             ),
@@ -607,7 +578,7 @@ const router = createBrowserRouter([
           {
             path: 'recruitment/cbt',
             element: (
-              <ProtectedRoute allowedRoles={['administrator', 'advantageonehoofficer'] as UserRole[]}>
+              <ProtectedRoute allowedRoles={['administrator', 'manager'] as UserRole[]}>
                 <CBT />
               </ProtectedRoute>
             ),

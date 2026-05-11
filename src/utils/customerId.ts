@@ -1,4 +1,6 @@
 import { User } from '@/types/user'
+import { isCustomerRole as checkIsCustomerTenant } from '@/utils/roles'
+import { logger } from '@/utils/logger'
 
 /**
  * Extracts customerId from user object
@@ -7,31 +9,23 @@ import { User } from '@/types/user'
  */
 export const extractCustomerId = (user: User | null): number | null => {
 	if (!user) {
-		console.warn('⚠️ [extractCustomerId] User is null');
+		logger.debug('[extractCustomerId] User is null');
 		return null;
 	}
 
-	// Check if user is a customer role
 	const userRole = (user.role || (user as any).Role || '').toLowerCase();
-	const isCustomerRole = userRole === 'customersitemanager' || userRole === 'customerhomanager';
-	
-	// Only extract customerId for customer roles
-	if (!isCustomerRole) {
+	if (!checkIsCustomerTenant(userRole)) {
 		return null;
 	}
 
-	// Trust the API response: check customerId (camelCase) first (normalized from API)
-	// Then check CustomerId (PascalCase) as fallback (direct from API)
+	if (!('customerId' in user)) {
+		return null;
+	}
+
 	const customerId = user.customerId ?? (user as any).CustomerId ?? null;
 
 	if (!customerId || customerId === 0) {
-		console.error('❌ [extractCustomerId] No valid customerId found for customer user:', {
-			role: userRole,
-			customerId: user.customerId,
-			CustomerId: (user as any).CustomerId,
-			userId: user.id,
-			userKeys: Object.keys(user)
-		});
+		logger.debug('[extractCustomerId] Missing customerId for customer role');
 		return null;
 	}
 
@@ -43,7 +37,5 @@ export const extractCustomerId = (user: User | null): number | null => {
  * Currently just uses the synchronous extraction
  */
 export const extractCustomerIdAsync = async (user: User | null): Promise<number | null> => {
-	// Use the synchronous extraction
 	return extractCustomerId(user)
 }
-

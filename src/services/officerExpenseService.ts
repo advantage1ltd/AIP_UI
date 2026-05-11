@@ -1,3 +1,7 @@
+/**
+ * Officer expense claims API (`/OfficerExpense`): list, submit, review, stats.
+ * Flow: week claim payload → save/submit → manager review endpoints for approvals tab.
+ */
 import { api } from '@/config/api'
 import type {
   OfficerExpenseClaim,
@@ -46,17 +50,11 @@ export const officerExpenseService = {
     return response.data
   },
 
-  /** Get expense claim by week start date */
-  getClaimByWeek: async (weekStartDate: string): Promise<OfficerExpenseClaim | null> => {
-    try {
-      const response = await api.get<OfficerExpenseClaim>(`${BASE_URL}/week/${weekStartDate}`)
-      return response.data
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        return null
-      }
-      throw error
-    }
+  /** Get expense claim by week start date (optional officerId for administrators/managers). Returns null when none exists. */
+  getClaimByWeek: async (weekStartDate: string, officerId?: string): Promise<OfficerExpenseClaim | null> => {
+    const qs = officerId ? `?officerId=${encodeURIComponent(officerId)}` : ''
+    const response = await api.get<OfficerExpenseClaim | null>(`${BASE_URL}/week/${weekStartDate}${qs}`)
+    return response.data ?? null
   },
 
   /** Create a new expense claim */

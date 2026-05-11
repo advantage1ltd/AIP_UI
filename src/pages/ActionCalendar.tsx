@@ -1,3 +1,7 @@
+/**
+ * Action calendar route: task list, progress, and scheduling for staff.
+ * Flow: task list queries → add/edit sheets → progress updates per assignee.
+ */
 import React, { useEffect, useState } from "react";
 import {
   Card,
@@ -14,11 +18,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
 import { AddTaskForm } from "@/components/action-calendar/AddTaskForm";
+import { MonthCalendarGrid } from "@/components/action-calendar/MonthCalendarGrid";
 import { TaskList } from "@/components/action-calendar/TaskList";
 import { TaskProgressSheet } from "@/components/action-calendar/TaskProgressSheet";
 import { usePageAccess } from "@/contexts/PageAccessContext";
@@ -53,6 +56,8 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { actionCalendarService, ActionCalendarStatusUpdate } from "@/services/actionCalendarService";
 import useAuth from "@/hooks/useAuth";
+import { getUser } from "@/services/auth";
+import { harmonizeRole, normalizeRoleId } from "@/utils/roles";
 
 export type Task = {
   id: string;
@@ -153,9 +158,16 @@ const ActionCalendar: React.FC = () => {
   });
   const [activeTab, setActiveTab] = useState<string>("day");
   const { toast } = useToast();
-  const { currentRole } = usePageAccess();
+  const { currentRole, isTestMode, testRole } = usePageAccess();
   const { user } = useAuth();
-  const isAdmin = currentRole === "administrator";
+  const viewer = getUser();
+  const effectiveNavigationRole = isTestMode && testRole ? testRole : currentRole;
+  const harmonizedRole =
+    normalizeRoleId(effectiveNavigationRole ?? "") ??
+    normalizeRoleId(viewer?.pageAccessRole ?? viewer?.role ?? "") ??
+    harmonizeRole(viewer?.pageAccessRole ?? viewer?.role ?? "");
+  const canManageTasks =
+    harmonizedRole === "administrator" || harmonizedRole === "manager";
   const currentUserId = user?.id;
 
   const [statusUpdates, setStatusUpdates] = useState<Record<string, TaskStatusUpdate[]>>({});
@@ -163,12 +175,17 @@ const ActionCalendar: React.FC = () => {
   const [statusUpdatesError, setStatusUpdatesError] = useState<Record<string, string | null>>({});
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [isProgressSheetOpen, setIsProgressSheetOpen] = useState(false);
+  const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
+  const [createTaskFormKey, setCreateTaskFormKey] = useState(0);
 
-  const canManageTasks = isAdmin;
+  const openCreateTaskDialog = () => {
+    setCreateTaskFormKey((k) => k + 1);
+    setCreateTaskDialogOpen(true);
+  };
+
   const canUpdateTaskStatus = (task: Task) => {
-    if (isAdmin) return true;
+    if (canManageTasks) return true;
     if (task.assignee && currentUserId && task.assignee === currentUserId) return true;
-    if (task.createdById && currentUserId && task.createdById === currentUserId) return true;
     return false;
   };
 
@@ -176,12 +193,14 @@ const ActionCalendar: React.FC = () => {
     try {
       setLoading(true);
       const response = await actionCalendarService.getTasks(
-        !isAdmin && currentUserId ? { assignee: currentUserId } : undefined
+        !canManageTasks && currentUserId
+          ? { assignee: currentUserId, page: 1, pageSize: 200 }
+          : { page: 1, pageSize: 200 }
       );
       if (response.success) {
         const convertedTasks = response.data.map((task: any) => actionCalendarService.convertToFrontendFormat(task));
         setTasks(convertedTasks);
-        if (!isAdmin) {
+        if (!canManageTasks) {
           setStatistics(buildTaskStatistics(convertedTasks));
         }
       } else {
@@ -197,7 +216,7 @@ const ActionCalendar: React.FC = () => {
 
   const loadStatistics = async () => {
     try {
-      if (!isAdmin) return;
+      if (!canManageTasks) return;
       const stats = await actionCalendarService.getStatistics();
       setStatistics(stats);
     } catch (error) {
@@ -233,6 +252,17 @@ const ActionCalendar: React.FC = () => {
   };
 
   const handleSubmitProgressUpdate = async (taskId: string, payload: { status: Task["status"]; comment?: string }) => {
+    const taskForPermission =
+      activeTask?.id === taskId ? activeTask : tasks.find((t) => t.id === taskId);
+    if (!taskForPermission || !canUpdateTaskStatus(taskForPermission)) {
+      toast({
+        title: "Access denied",
+        description: "You can only report progress on tasks assigned to you.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setStatusUpdatesError((p) => ({ ...p, [taskId]: null }));
       const response = await actionCalendarService.createStatusUpdate(parseInt(taskId), payload);
@@ -240,7 +270,7 @@ const ActionCalendar: React.FC = () => {
         const mappedUpdate = mapStatusUpdate(response.data);
         setStatusUpdates((p) => ({ ...p, [taskId]: [mappedUpdate, ...(p[taskId] || [])] }));
         await loadTasks();
-        if (isAdmin) await loadStatistics();
+        if (canManageTasks) await loadStatistics();
         setIsProgressSheetOpen(false);
         setActiveTask(null);
         toast({ title: "Progress Updated", description: "Task progress has been shared with the task creator and assignee." });
@@ -256,7 +286,7 @@ const ActionCalendar: React.FC = () => {
           setStatusUpdates((p) => ({ ...p, [taskId]: mappedUpdates }));
           if (hasRecentMatchingUpdate(mappedUpdates, payload)) {
             await loadTasks();
-            if (isAdmin) await loadStatistics();
+            if (canManageTasks) await loadStatistics();
             setIsProgressSheetOpen(false);
             setActiveTask(null);
             toast({ title: "Progress Updated", description: "Task progress was saved. The latest status has been refreshed." });
@@ -282,8 +312,12 @@ const ActionCalendar: React.FC = () => {
   };
 
   const handleAddTask = async (newTask: Omit<Task, "id" | "status">) => {
-    if (!isAdmin) {
-      toast({ title: "Access Denied", description: "Only administrators can create and assign tasks.", variant: "destructive" });
+    if (!canManageTasks) {
+      toast({
+        title: "Access denied",
+        description: "Only administrators and managers can create and assign tasks.",
+        variant: "destructive",
+      });
       return;
     }
     try {
@@ -292,8 +326,9 @@ const ActionCalendar: React.FC = () => {
       if (response.success) {
         const convertedTask = actionCalendarService.convertToFrontendFormat(response.data);
         setTasks((t) => [...t, convertedTask]);
-        if (isAdmin) await loadStatistics();
+        if (canManageTasks) await loadStatistics();
         toast({ title: "Task Added", description: "Your task has been successfully created." });
+        setCreateTaskDialogOpen(false);
       } else {
         toast({ title: "Error", description: response.message || "Failed to create task", variant: "destructive" });
       }
@@ -304,8 +339,12 @@ const ActionCalendar: React.FC = () => {
   };
 
   const handleUpdateTask = async (taskId: string, updatedTask: Partial<Task>) => {
-    if (!isAdmin) {
-      toast({ title: "Access Denied", description: "Only administrators can update tasks.", variant: "destructive" });
+    if (!canManageTasks) {
+      toast({
+        title: "Access denied",
+        description: "Only administrators and managers can edit tasks.",
+        variant: "destructive",
+      });
       return;
     }
     try {
@@ -316,7 +355,7 @@ const ActionCalendar: React.FC = () => {
       if (response.success) {
         const updated = actionCalendarService.convertToFrontendFormat(response.data);
         setTasks((t) => t.map((x) => (x.id === taskId ? updated : x)));
-        if (isAdmin) await loadStatistics();
+        if (canManageTasks) await loadStatistics();
         toast({ title: "Task Updated", description: "Task has been successfully updated." });
       } else {
         toast({ title: "Error", description: response.message || "Failed to update task", variant: "destructive" });
@@ -328,15 +367,19 @@ const ActionCalendar: React.FC = () => {
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    if (!isAdmin) {
-      toast({ title: "Access Denied", description: "Only administrators can delete tasks.", variant: "destructive" });
+    if (!canManageTasks) {
+      toast({
+        title: "Access denied",
+        description: "Only administrators and managers can delete tasks.",
+        variant: "destructive",
+      });
       return;
     }
     try {
       const response = await actionCalendarService.deleteTask(parseInt(taskId));
       if (response.success) {
         setTasks((t) => t.filter((task) => task.id !== taskId));
-        if (isAdmin) await loadStatistics();
+        if (canManageTasks) await loadStatistics();
         toast({ title: "Task Deleted", description: "Task has been successfully deleted." });
       } else {
         toast({ title: "Error", description: response.message || "Failed to delete task", variant: "destructive" });
@@ -349,16 +392,16 @@ const ActionCalendar: React.FC = () => {
 
   useEffect(() => {
     loadTasks();
-    if (isAdmin) loadStatistics();
+    if (canManageTasks) loadStatistics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, currentUserId]);
+  }, [canManageTasks, currentUserId]);
 
   const completionRate = statistics.total > 0 ? Math.round((statistics.completed / statistics.total) * 100) : 0;
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#EFF4FF]">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="w-full px-4 py-8">
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
             <div className="relative">
               <div className="h-20 w-20 rounded-full border-4 border-blue-100 animate-pulse" />
@@ -373,7 +416,7 @@ const ActionCalendar: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#EFF4FF]">
-      <div className="container mx-auto px-4 py-6 max-w-7xl space-y-6">
+      <div className="w-full px-4 py-6 space-y-6">
         
         {/* Modern Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -385,7 +428,7 @@ const ActionCalendar: React.FC = () => {
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Action Calendar</h1>
                 <p className="text-gray-500 text-sm">
-                  {isAdmin ? "Plan, organize, and assign tasks efficiently" : "View and manage your assigned tasks"}
+                  {canManageTasks ? "Plan, organize, and assign tasks efficiently" : "View your assigned tasks and report progress"}
                 </p>
               </div>
             </div>
@@ -397,22 +440,16 @@ const ActionCalendar: React.FC = () => {
               <span className="hidden sm:inline">Filter</span>
             </Button>
 
-            {isAdmin ? (
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md">
-                    <Plus className="h-4 w-4" />
-                    <span>Create Task</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[550px]">
-                  <DialogHeader>
-                    <DialogTitle>Create New Task</DialogTitle>
-                    <DialogDescription>Fill in the details below to create a new task.</DialogDescription>
-                  </DialogHeader>
-                  <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
-                </DialogContent>
-              </Dialog>
+            {canManageTasks ? (
+              <Button
+                type="button"
+                size="sm"
+                className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md"
+                onClick={openCreateTaskDialog}
+              >
+                <Plus className="h-4 w-4" />
+                <span>Create Task</span>
+              </Button>
             ) : (
               <Button size="sm" variant="outline" className="gap-2 border-gray-200 text-gray-400 cursor-not-allowed" disabled>
                 <Lock className="h-4 w-4" />
@@ -570,13 +607,11 @@ const ActionCalendar: React.FC = () => {
                   </button>
                 </div>
 
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(d) => d && setDate(d)}
+                <MonthCalendarGrid
+                  selectedDate={date}
+                  onSelectDay={setDate}
+                  tasks={tasks}
                   className="w-full"
-                  showOutsideDays
-                  hideNavigation
                 />
 
                 <Separator className="my-4" />
@@ -684,7 +719,7 @@ const ActionCalendar: React.FC = () => {
                           canUpdateStatus={canUpdateTaskStatus}
                         />
                       ) : (
-                        <EmptyTaskState isAdmin={isAdmin} handleAddTask={handleAddTask} date={date} />
+                        <EmptyTaskState canManageTasks={canManageTasks} onOpenCreateDialog={openCreateTaskDialog} />
                       )}
                     </div>
                   </TabsContent>
@@ -710,7 +745,7 @@ const ActionCalendar: React.FC = () => {
                           canUpdateStatus={canUpdateTaskStatus}
                         />
                       ) : (
-                        <EmptyTaskState isAdmin={isAdmin} handleAddTask={handleAddTask} date={date} />
+                        <EmptyTaskState canManageTasks={canManageTasks} onOpenCreateDialog={openCreateTaskDialog} />
                       )}
                     </div>
                   </TabsContent>
@@ -734,7 +769,7 @@ const ActionCalendar: React.FC = () => {
                           canUpdateStatus={canUpdateTaskStatus}
                         />
                       ) : (
-                        <EmptyTaskState isAdmin={isAdmin} handleAddTask={handleAddTask} date={date} />
+                        <EmptyTaskState canManageTasks={canManageTasks} onOpenCreateDialog={openCreateTaskDialog} />
                       )}
                     </div>
                   </TabsContent>
@@ -744,6 +779,18 @@ const ActionCalendar: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {canManageTasks && (
+        <Dialog open={createTaskDialogOpen} onOpenChange={setCreateTaskDialogOpen}>
+          <DialogContent className="sm:max-w-[550px]">
+            <DialogHeader>
+              <DialogTitle>Create New Task</DialogTitle>
+              <DialogDescription>Fill in the details below to create a new task.</DialogDescription>
+            </DialogHeader>
+            <AddTaskForm key={createTaskFormKey} onSubmit={handleAddTask} selectedDate={date} />
+          </DialogContent>
+        </Dialog>
+      )}
 
       <TaskProgressSheet
         open={isProgressSheetOpen}
@@ -755,21 +802,19 @@ const ActionCalendar: React.FC = () => {
         onRefresh={handleRefreshActiveTaskUpdates}
         onSubmitProgress={handleSubmitProgressUpdate}
         canUpdate={activeTask ? canUpdateTaskStatus(activeTask) : false}
-        isAdmin={isAdmin}
+        canManageTasks={canManageTasks}
       />
     </div>
   );
 };
 
 // Empty Task State Component
-const EmptyTaskState = ({ 
-  isAdmin, 
-  handleAddTask, 
-  date 
-}: { 
-  isAdmin: boolean; 
-  handleAddTask: (task: Omit<Task, "id" | "status">) => void;
-  date: Date;
+const EmptyTaskState = ({
+  canManageTasks,
+  onOpenCreateDialog,
+}: {
+  canManageTasks: boolean;
+  onOpenCreateDialog: () => void;
 }) => (
   <div className="flex flex-col items-center justify-center py-16 text-center">
     <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mb-5">
@@ -777,28 +822,20 @@ const EmptyTaskState = ({
     </div>
     <h3 className="text-lg font-semibold text-gray-900 mb-2">No Tasks Scheduled</h3>
     <p className="text-sm text-gray-500 max-w-sm mb-6">
-      {isAdmin 
-        ? "No tasks are scheduled for this period. Create a new task to get started." 
-        : "No tasks have been assigned to you for this period."
-      }
+      {canManageTasks
+        ? "No tasks are scheduled for this period. Create a new task to get started."
+        : "No tasks have been assigned to you for this period."}
     </p>
 
-    {isAdmin && (
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md">
-            <Plus className="h-4 w-4" />
-            Create Task
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Create New Task</DialogTitle>
-            <DialogDescription>Fill in the details below to create a new task.</DialogDescription>
-          </DialogHeader>
-          <AddTaskForm onSubmit={handleAddTask} selectedDate={date} />
-        </DialogContent>
-      </Dialog>
+    {canManageTasks && (
+      <Button
+        type="button"
+        className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md"
+        onClick={onOpenCreateDialog}
+      >
+        <Plus className="h-4 w-4" />
+        Create Task
+      </Button>
     )}
   </div>
 );

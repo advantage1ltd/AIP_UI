@@ -1,3 +1,4 @@
+/** Bank holiday authorization records for operations screens. */
 export type BankHolidayStatus = 'authorized' | 'declined' | 'pending';
 
 export interface BankHoliday {
@@ -39,6 +40,8 @@ export interface BankHolidayFilters {
 	limit?: number;
 	archived?: boolean;
 	status?: BankHolidayStatus;
+	/** When set, API should return only this officer's bank holidays (employee id). */
+	employeeId?: number;
 }
 
 export interface BankHolidayResponse {

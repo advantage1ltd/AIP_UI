@@ -1,9 +1,14 @@
+/**
+ * Operations incident report: filtered list, financial stats, and create/edit/view flows.
+ * Flow: shared filters → React Query list/stats → IncidentForm and read-only dialogs; mutations invalidate incident keys.
+ */
 import { useState, useCallback, useEffect, useMemo } from "react"
 import { Incident, IncidentType, StolenItem } from "@/types/incidents"
 import { IncidentForm } from "@/components/operations/IncidentForm"
 import { IncidentsTable } from "@/components/operations/IncidentsTable"
 import { Button } from "@/components/ui/button"
 import { useToast } from '@/components/ui/use-toast'
+import { logger } from '@/utils/logger'
 import {
   Dialog,
   DialogContent,
@@ -21,7 +26,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-// Removed mockIncidents import - now using API service
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   PlusCircle, 
@@ -63,7 +67,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 import BarcodeScanner from '@/components/BarcodeScanner'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { incidentsApi } from "@/services/api/incidents"
 import { productService } from "@/services/productService"
 import { regionService } from "@/services/regionService"
@@ -71,6 +75,54 @@ import { customerService } from "@/services/customerService"
 import type { Region } from "@/types/customer"
 import { Toaster } from '@/components/ui/toaster'
 import { useSearchParams } from 'react-router-dom'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { usePaginatedQuery } from '@/hooks/usePaginatedQuery'
+import { useIncidentStatsQuery } from '@/hooks/useIncidentStatsQuery'
+import { incidentQueryKeys, invalidateIncidentData } from '@/hooks/incidentQueryKeys'
+import { formatDateSafe } from '@/components/operations/incident-form/incidentFormConstants'
+
+const debugLogsEnabled = import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true'
+
+const INCIDENT_TABLE_DATE_FORMAT = 'dd/MM/yyyy'
+const INCIDENT_TABLE_TIME_FORMAT = 'HH:mm'
+
+const IncidentDateTimeDisplay = ({ incident }: { incident: Incident }) => {
+	const dateSource = incident.dateOfIncident ?? incident.date
+	if (!dateSource) {
+		return <>N/A</>
+	}
+
+	const dateLabel = formatDateSafe(dateSource, INCIDENT_TABLE_DATE_FORMAT)
+	const timeSource = incident.timeOfIncident?.trim()
+
+	if (timeSource) {
+		const normalizedTime = timeSource.length === 5 ? `${timeSource}:00` : timeSource
+		const combined = new Date(`${dateSource}T${normalizedTime}`)
+		const timeLabel = !Number.isNaN(combined.getTime())
+			? formatDateSafe(combined, INCIDENT_TABLE_TIME_FORMAT)
+			: timeSource
+
+		return (
+			<span>
+				{dateLabel}{' '}
+				<span className="font-semibold text-blue-600 dark:text-blue-400">{timeLabel}</span>
+			</span>
+		)
+	}
+
+	if (/T\d{2}:\d{2}/.test(dateSource)) {
+		return (
+			<span>
+				{dateLabel}{' '}
+				<span className="font-semibold text-blue-600 dark:text-blue-400">
+					{formatDateSafe(dateSource, INCIDENT_TABLE_TIME_FORMAT)}
+				</span>
+			</span>
+		)
+	}
+
+	return <>{dateLabel}</>
+}
 
 interface IncidentReportPageProps {
   isCustomerView?: boolean;
@@ -78,7 +130,9 @@ interface IncidentReportPageProps {
   siteId?: string | null;
 }
 
+// === Component ===
 export default function IncidentReportPage({ isCustomerView = false, customerId, siteId }: IncidentReportPageProps) {
+  // View overlays (dialogs, barcode scan) are separate from server-backed list and stats queries.
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
@@ -89,6 +143,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
   const [currentPage, setCurrentPage] = useState(1)
   const [scanningBarcode, setScanningBarcode] = useState(false)
   const [isLoadingProduct, setIsLoadingProduct] = useState(false)
+  const [isLoadingIncidentDetails, setIsLoadingIncidentDetails] = useState(false)
   const [datePreset, setDatePreset] = useState<'today' | 'week' | 'month' | 'custom' | null>(null)
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
@@ -103,7 +158,34 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false)
   const [searchParams] = useSearchParams()
   const itemsPerPage = 10
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 350)
 
+  const openEvidenceImage = useCallback((imageUrl: string) => {
+    if (!imageUrl) return
+    try {
+      const parsedUrl = new URL(imageUrl, window.location.origin)
+      const isAllowedProtocol = ['http:', 'https:', 'data:', 'blob:'].includes(parsedUrl.protocol)
+      if (!isAllowedProtocol) {
+        throw new Error('Unsupported image protocol')
+      }
+
+      const imageWindow = window.open(parsedUrl.toString(), '_blank', 'noopener,noreferrer')
+      if (!imageWindow) {
+        throw new Error('Unable to open image preview')
+      }
+    } catch (previewError) {
+      if (debugLogsEnabled) {
+        logger.debug('Unable to open verification evidence preview', previewError)
+      }
+      toast({
+        title: 'Preview unavailable',
+        description: 'Unable to open verification evidence preview.',
+        variant: 'destructive',
+      })
+    }
+  }, [toast])
+
+  // Financial helpers prefer stolen-item lines, then incident-level totals when lines are absent.
   const toSafeNumber = (value: unknown): number => {
     if (typeof value === 'number' && Number.isFinite(value)) return value
     if (typeof value === 'string') {
@@ -113,7 +195,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     return 0
   }
 
-  const getStolenItemsTotals = (incident: Incident) => {
+  const getStolenItemsTotals = useCallback((incident: Incident) => {
     if (!Array.isArray(incident.stolenItems) || incident.stolenItems.length === 0) {
       return { totalAmount: 0, totalRecovered: 0, totalLost: 0 }
     }
@@ -124,17 +206,20 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
         const itemRecovered = toSafeNumber(item.valueSaved)
         const itemLost = toSafeNumber(item.valueLost)
         const derivedItemLost = Math.max(0, itemTotalAmount - itemRecovered)
+        const hasConsistentStoredLoss =
+          itemLost > 0 && Math.abs((itemRecovered + itemLost) - itemTotalAmount) <= 0.01
+        const normalizedItemLost = hasConsistentStoredLoss ? itemLost : derivedItemLost
 
         acc.totalAmount += Math.max(0, itemTotalAmount)
         acc.totalRecovered += Math.max(0, itemRecovered)
-        acc.totalLost += Math.max(0, itemLost || derivedItemLost)
+        acc.totalLost += Math.max(0, normalizedItemLost)
         return acc
       },
       { totalAmount: 0, totalRecovered: 0, totalLost: 0 }
     )
-  }
+  }, [])
 
-  const getIncidentRecoveredValue = (incident: Incident) => {
+  const getIncidentRecoveredValue = useCallback((incident: Incident) => {
     const explicitRecovered = toSafeNumber(
       incident.totalValueRecovered ?? incident.valueRecovered ?? incident.amount ?? incident.value
     )
@@ -143,35 +228,40 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     }
 
     return getStolenItemsTotals(incident).totalRecovered
-  }
+  }, [getStolenItemsTotals])
 
-  const getIncidentLossValue = (incident: Incident) => {
+  const getIncidentLossValue = useCallback((incident: Incident) => {
+    const stolenTotals = getStolenItemsTotals(incident)
+    if (stolenTotals.totalAmount > 0 || stolenTotals.totalRecovered > 0 || stolenTotals.totalLost > 0) {
+      return Math.max(0, stolenTotals.totalAmount - stolenTotals.totalRecovered)
+    }
+
     const explicitLoss = toSafeNumber((incident as Incident & { totalValueLost?: number }).totalValueLost)
     if (explicitLoss > 0) {
       return explicitLoss
     }
 
-    const stolenTotals = getStolenItemsTotals(incident)
-    if (stolenTotals.totalLost > 0) {
-      return stolenTotals.totalLost
-    }
-
-    if (stolenTotals.totalAmount > 0) {
-      return Math.max(0, stolenTotals.totalAmount - getIncidentRecoveredValue(incident))
-    }
-
     return 0
-  }
+  }, [getStolenItemsTotals])
 
-  const getIncidentFinancialMetrics = (incident: Incident) => {
+  const getIncidentStolenValue = useCallback((incident: Incident) => {
+    const stolenTotals = getStolenItemsTotals(incident)
+    if (stolenTotals.totalAmount > 0) {
+      return stolenTotals.totalAmount
+    }
+
+    return Math.max(0, getIncidentRecoveredValue(incident) + getIncidentLossValue(incident))
+  }, [getIncidentLossValue, getIncidentRecoveredValue, getStolenItemsTotals])
+
+  const getIncidentFinancialMetrics = useCallback((incident: Incident) => {
     const recovered = getIncidentRecoveredValue(incident)
     const loss = getIncidentLossValue(incident)
     return {
       recovered,
       loss,
-      netSaved: recovered - loss
+      stolen: getIncidentStolenValue(incident)
     }
-  }
+  }, [getIncidentLossValue, getIncidentRecoveredValue, getIncidentStolenValue])
 
   const formatDateInput = (date: Date) => {
     const year = date.getFullYear()
@@ -180,7 +270,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     return `${year}-${month}-${day}`
   }
 
-  const getPresetRange = (preset: 'today' | 'week' | 'month') => {
+  const getPresetRange = useCallback((preset: 'today' | 'week' | 'month') => {
     const today = new Date()
     const end = formatDateInput(today)
     const startDate = new Date(today)
@@ -197,8 +287,9 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
       from: formatDateInput(startDate),
       to: end
     }
-  }
+  }, [])
 
+  // Filter presets and URL search params feed the same query filter object.
   const handlePresetFilter = (preset: 'today' | 'week' | 'month') => {
     const range = getPresetRange(preset)
     setDatePreset(preset)
@@ -286,7 +377,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     } else {
       setIncidentTypeFilter(null)
     }
-  }, [searchParams])
+  }, [searchParams, getPresetRange])
 
   useEffect(() => {
     let isMounted = true
@@ -330,7 +421,9 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
         const normalized = customers.map(customer => ({ id: customer.id, name: customer.name }))
         setCustomerOptions([{ id: 'all', name: 'All customers' }, ...normalized])
       } catch (customerError) {
-        console.error('Failed to load customers for incident filtering', customerError)
+        if (debugLogsEnabled) {
+          logger.error('Failed to load customers for incident filtering', customerError)
+        }
         if (isMounted) {
           setCustomerOptions([{ id: 'all', name: 'All customers' }])
         }
@@ -347,21 +440,56 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     }
   }, [isCustomerView])
 
-  // Fetch incidents using the API service
-  const { data: incidentsResponse = { data: [], pagination: { currentPage: 1, totalPages: 1, pageSize: 10, totalCount: 0, hasPrevious: false, hasNext: false } }, isLoading, error } = useQuery({
-    queryKey: ['incidents', currentPage, searchTerm, customerId, customerFilter, siteId, fromDate, toDate, incidentTypeFilter, regionFilter],
+  // List and stats queries share normalized filters so header totals match visible rows.
+  const incidentQueryFilters = useMemo(() => ({
+    ...(fromDate && { fromDate }),
+    ...(toDate && { toDate }),
+    ...(incidentTypeFilter && { incidentType: incidentTypeFilter }),
+    ...(regionFilter !== 'all' && { regionId: regionFilter }),
+    ...(isCustomerView && customerId && { customerId }),
+    ...(!isCustomerView && customerFilter !== 'all' && { customerId: customerFilter }),
+    ...(siteId && { siteId }),
+    ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+  }), [
+    customerFilter,
+    customerId,
+    debouncedSearchTerm,
+    fromDate,
+    incidentTypeFilter,
+    isCustomerView,
+    regionFilter,
+    siteId,
+    toDate,
+  ])
+
+  const {
+    data: incidentsResponse = {
+      data: [],
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        pageSize: 10,
+        totalCount: 0,
+        hasPrevious: false,
+        hasNext: false,
+      },
+    },
+    isLoading,
+    error,
+  } = usePaginatedQuery({
+    queryKey: incidentQueryKeys.list({
+      page: currentPage,
+      pageSize: itemsPerPage,
+      ...incidentQueryFilters,
+    }),
     queryFn: () => incidentsApi.getIncidents({
       page: currentPage,
       pageSize: itemsPerPage,
-      search: searchTerm,
-      ...(fromDate && { fromDate }),
-      ...(toDate && { toDate }),
-      ...(incidentTypeFilter && { incidentType: incidentTypeFilter }),
-      ...(regionFilter !== 'all' && { regionId: regionFilter }),
-      ...(isCustomerView && customerId && { customerId }),
-      ...(!isCustomerView && customerFilter !== 'all' && { customerId: customerFilter }),
-      ...(siteId && { siteId })
-    })
+      ...incidentQueryFilters,
+    }),
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
+    keepPreviousPage: false,
   })
 
   // Create/Update incident mutation using the API service
@@ -373,8 +501,8 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
         return await incidentsApi.createIncident(incident)
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['incidents'] })
+    onSuccess: async () => {
+      await invalidateIncidentData(queryClient)
       toast({
         title: 'Success',
         description: editingIncident ? 'Incident updated successfully' : 'Incident created successfully',
@@ -383,7 +511,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
       setEditingIncident(null)
     },
     onError: (error) => {
-      console.error('Error saving incident:', error)
+      logger.error('Error saving incident:', error)
       toast({
         title: 'Error',
         description: `Failed to save incident: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -397,8 +525,8 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     mutationFn: async (incidentId: string) => {
       await incidentsApi.deleteIncident(incidentId)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['incidents'] })
+    onSuccess: async () => {
+      await invalidateIncidentData(queryClient)
       toast({
         title: 'Success',
         description: 'Incident deleted successfully',
@@ -406,7 +534,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
       setDeletingIncident(null)
     },
     onError: (error) => {
-      console.error('Error deleting incident:', error)
+      logger.error('Error deleting incident:', error)
       toast({
         title: 'Error',
         description: `Failed to delete incident: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -415,24 +543,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
     }
   })
 
-  // Fetch all incidents for stats calculation (separate query to get complete data)
-  const { data: allIncidentsResponse } = useQuery({
-    queryKey: ['incidents-stats', searchTerm, customerId, customerFilter, siteId, fromDate, toDate, incidentTypeFilter, regionFilter],
-    queryFn: () => incidentsApi.getIncidents({
-      page: 1,
-      pageSize: 10000,
-      search: searchTerm,
-      ...(fromDate && { fromDate }),
-      ...(toDate && { toDate }),
-      ...(incidentTypeFilter && { incidentType: incidentTypeFilter }),
-      ...(regionFilter !== 'all' && { regionId: regionFilter }),
-      ...(isCustomerView && customerId && { customerId }),
-      ...(!isCustomerView && customerFilter !== 'all' && { customerId: customerFilter }),
-      ...(siteId && { siteId })
-    })
-  })
-
-  const statsData = allIncidentsResponse?.data?.length ? allIncidentsResponse.data : incidentsResponse.data
+  const { data: incidentStatsResponse } = useIncidentStatsQuery(incidentQueryFilters, true)
 
   // Blend data flow: stats and table use the same financial metrics.
   const incidentRows = useMemo(
@@ -440,41 +551,97 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
       incident,
       metrics: getIncidentFinancialMetrics(incident)
     })),
-    [incidentsResponse.data]
+    [getIncidentFinancialMetrics, incidentsResponse.data]
   )
 
-  // Calculate statistics using shared metrics
-  const stats = useMemo(() => {
-    const totals = statsData.reduce(
-      (acc, incident) => {
-        const metrics = getIncidentFinancialMetrics(incident)
-        acc.totalAmountRecovered += metrics.recovered
-        acc.totalAmountLost += metrics.loss
-        acc.totalNetSaved += metrics.netSaved
-        return acc
-      },
-      { totalAmountRecovered: 0, totalAmountLost: 0, totalNetSaved: 0 }
-    )
+  // Calculate fallback statistics from the current page when the stats endpoint is unavailable.
+  const localStats = useMemo(() => {
+    let totalAmountRecovered = 0
+    let totalAmountLost = 0
+    let totalStolenValue = 0
+
+    for (const incident of incidentsResponse.data) {
+      const metrics = getIncidentFinancialMetrics(incident)
+      totalAmountRecovered += metrics.recovered
+      totalAmountLost += metrics.loss
+      totalStolenValue += metrics.stolen
+    }
 
     return {
-      ...totals,
-      totalIncidents: allIncidentsResponse?.pagination?.totalCount || incidentsResponse.pagination?.totalCount || statsData.length
+      totalAmountRecovered,
+      totalAmountLost,
+      totalStolenValue,
     }
-  }, [allIncidentsResponse?.pagination?.totalCount, incidentsResponse.pagination?.totalCount, statsData])
+  }, [getIncidentFinancialMetrics, incidentsResponse.data])
+
+  const stats = useMemo(() => {
+    const remote = incidentStatsResponse?.data
+    const totalAmountRecovered = toSafeNumber(remote?.totalAmountRecovered) || localStats.totalAmountRecovered
+    const totalStolenValue = toSafeNumber(remote?.totalStolenValue) || localStats.totalStolenValue
+    const totalAmountLost =
+      toSafeNumber(remote?.totalAmountLost) ||
+      Math.max(0, totalStolenValue - totalAmountRecovered) ||
+      localStats.totalAmountLost
+    const totalIncidents =
+      toSafeNumber(remote?.totalIncidents) ||
+      toSafeNumber(incidentsResponse.pagination?.totalCount) ||
+      incidentsResponse.data.length
+
+    return {
+      totalAmountRecovered,
+      totalAmountLost,
+      totalStolenValue,
+      totalIncidents,
+    }
+  }, [incidentStatsResponse?.data, incidentsResponse.data.length, incidentsResponse.pagination?.totalCount, localStats])
 
   const handleSubmit = useCallback((incident: Incident) => {
     mutation.mutate(incident)
   }, [mutation])
 
-  const handleEdit = useCallback((incident: Incident) => {
-    setEditingIncident(incident)
-    setOpen(true)
-  }, [])
+  // Edit/view flows hydrate full incident detail before opening form or read-only dialog.
+  const fetchIncidentDetails = useCallback(async (incident: Incident): Promise<Incident> => {
+    if (!incident?.id) {
+      return incident
+    }
 
-  const handleView = useCallback((incident: Incident) => {
-    console.log('Viewing Incident:', incident)
-    setViewingIncident(incident)
-  }, [])
+    try {
+      const response = await incidentsApi.getIncident(incident.id)
+      if (response.success && response.data) {
+        return response.data
+      }
+      return incident
+    } catch (error) {
+      logger.error('Failed to load full incident details:', error)
+      toast({
+        title: 'Unable to load full incident details',
+        description: 'Showing available incident data. Please try again if some fields are missing.',
+        variant: 'destructive',
+      })
+      return incident
+    }
+  }, [toast])
+
+  const handleEdit = useCallback(async (incident: Incident) => {
+    setIsLoadingIncidentDetails(true)
+    try {
+      const fullIncident = await fetchIncidentDetails(incident)
+      setEditingIncident(fullIncident)
+      setOpen(true)
+    } finally {
+      setIsLoadingIncidentDetails(false)
+    }
+  }, [fetchIncidentDetails])
+
+  const handleView = useCallback(async (incident: Incident) => {
+    setIsLoadingIncidentDetails(true)
+    try {
+      const fullIncident = await fetchIncidentDetails(incident)
+      setViewingIncident(fullIncident)
+    } finally {
+      setIsLoadingIncidentDetails(false)
+    }
+  }, [fetchIncidentDetails])
 
   const handleDelete = useCallback((incident: Incident) => {
     setDeletingIncident(incident)
@@ -489,7 +656,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
   const totalPages = Math.max(1, incidentsResponse.pagination?.totalPages || 1)
 
   const hasIncidents = incidentRows.length > 0
-  const isSearchActive = Boolean(searchTerm)
+  const isSearchActive = Boolean(debouncedSearchTerm)
 
   const handlePageChange = useCallback((page: number) => {
     if (page < 1 || page > totalPages) return
@@ -544,7 +711,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
       
       // Debug log to help troubleshoot
       if (import.meta.env.DEV) {
-        console.log('🏷️ [Barcode] Category mapping started:', {
+        logger.debug('🏷️ [Barcode] Category mapping started:', {
           original: originalCategory,
           normalized: mappedCategory,
           productName: productData.productName
@@ -586,7 +753,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
       
       // Final debug log
       if (import.meta.env.DEV) {
-        console.log('✅ [Barcode] Final mapped category:', mappedCategory, 'from original:', originalCategory)
+        logger.debug('✅ [Barcode] Final mapped category:', mappedCategory, 'from original:', originalCategory)
       }
 
       const newItem: StolenItem = {
@@ -638,7 +805,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
       })
       
     } catch (error) {
-      console.error('Error with barcode:', error)
+      logger.error('Error with barcode:', error)
       toast({
         title: 'Error',
         description: 'Error processing barcode. Please try again.',
@@ -684,8 +851,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
             <Button
               variant="outline"
               onClick={() => {
-                // Force refetch the data
-                queryClient.invalidateQueries({ queryKey: ['incidents'] })
+                void invalidateIncidentData(queryClient)
               }}
               className="w-full"
             >
@@ -737,24 +903,22 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                 <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white">£{stats.totalAmountRecovered.toFixed(2)}</div>
               </CardContent>
             </Card>
+            <Card className="bg-gradient-to-br from-amber-800 to-amber-900 border-amber-700 shadow-md col-span-1">
+              <CardHeader className="flex flex-row items-center justify-between p-2 md:p-4 xl:p-6 pb-1 md:pb-2 xl:pb-3">
+                <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Total Stolen Value</CardTitle>
+                <PoundSterling className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 text-amber-300" />
+              </CardHeader>
+              <CardContent className="p-2 md:p-4 xl:p-6 pt-0 md:pt-1 xl:pt-2">
+                <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white">£{stats.totalStolenValue.toFixed(2)}</div>
+              </CardContent>
+            </Card>
             <Card className="bg-gradient-to-br from-rose-800 to-rose-900 border-rose-700 shadow-md col-span-1">
               <CardHeader className="flex flex-row items-center justify-between p-2 md:p-4 xl:p-6 pb-1 md:pb-2 xl:pb-3">
-                <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Loss Value</CardTitle>
+                <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Total Value Lost</CardTitle>
                 <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 text-rose-300" />
               </CardHeader>
               <CardContent className="p-2 md:p-4 xl:p-6 pt-0 md:pt-1 xl:pt-2">
                 <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white">£{stats.totalAmountLost.toFixed(2)}</div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-blue-800 to-blue-900 border-blue-700 shadow-md col-span-1">
-              <CardHeader className="flex flex-row items-center justify-between p-2 md:p-4 xl:p-6 pb-1 md:pb-2 xl:pb-3">
-                <CardTitle className="text-xs sm:text-sm lg:text-base xl:text-lg font-medium text-white">Net Saved</CardTitle>
-                <PoundSterling className="h-3 w-3 sm:h-4 sm:w-4 xl:h-5 xl:w-5 text-blue-300" />
-              </CardHeader>
-              <CardContent className="p-2 md:p-4 xl:p-6 pt-0 md:pt-1 xl:pt-2">
-                <div className={`text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold ${stats.totalNetSaved < 0 ? 'text-rose-200' : 'text-white'}`}>
-                  £{stats.totalNetSaved.toFixed(2)}
-                </div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-br from-purple-800 to-purple-900 border-purple-700 shadow-md col-span-1">
@@ -965,9 +1129,9 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                       <div className="font-semibold text-sm text-rose-600">
                         £{metrics.loss.toFixed(2)}
                       </div>
-                      <div className="text-[10px] uppercase tracking-wide text-gray-500 mt-1">Net</div>
-                      <div className={`font-semibold text-sm ${metrics.netSaved < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                        £{metrics.netSaved.toFixed(2)}
+                      <div className="text-[10px] uppercase tracking-wide text-gray-500 mt-1">Stolen</div>
+                      <div className="font-semibold text-sm text-amber-700">
+                        £{metrics.stolen.toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -980,7 +1144,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                     </div>
                     <div>
                       <span className="text-gray-500 block mb-0.5">Date</span>
-                      <div className="font-medium">{incident.date ? new Date(incident.date).toLocaleDateString() : 'N/A'}</div>
+                      <div className="font-medium"><IncidentDateTimeDisplay incident={incident} /></div>
                     </div>
                     <div className="col-span-2">
                       <span className="text-gray-500 block mb-0.5">Incident Type</span>
@@ -993,8 +1157,9 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleView(incident)}
+                      onClick={() => void handleView(incident)}
                       className="flex-1 h-9 text-xs"
+                      disabled={isLoadingIncidentDetails}
                     >
                       <Eye className="w-3.5 h-3.5 mr-1.5" />
                       View
@@ -1002,8 +1167,9 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleEdit(incident)}
+                      onClick={() => void handleEdit(incident)}
                       className="flex-1 h-9 text-xs"
+                      disabled={isLoadingIncidentDetails}
                     >
                       <Edit2 className="w-3.5 h-3.5 mr-1.5" />
                       Edit
@@ -1057,7 +1223,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                         </TableCell>
                         <TableCell className="py-3 xl:py-4">{incident.officerName || 'N/A'}</TableCell>
                         <TableCell className="py-3 xl:py-4 hidden lg:table-cell whitespace-nowrap">
-                          {incident.date ? new Date(incident.date).toLocaleDateString() : 'N/A'}
+                          <IncidentDateTimeDisplay incident={incident} />
                         </TableCell>
                         <TableCell className="py-3 xl:py-4 whitespace-nowrap text-emerald-600 font-medium">£{metrics.recovered.toFixed(2)}</TableCell>
                         <TableCell className="py-3 xl:py-4 whitespace-nowrap text-rose-600 font-medium">£{metrics.loss.toFixed(2)}</TableCell>
@@ -1067,8 +1233,9 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleView(incident)}
+                              onClick={() => void handleView(incident)}
                               className="h-8 w-8 xl:h-10 xl:w-10 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                              disabled={isLoadingIncidentDetails}
                             >
                               <Eye className="w-4 h-4 xl:w-5 xl:h-5" />
                               <span className="sr-only">View</span>
@@ -1076,8 +1243,9 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleEdit(incident)}
+                              onClick={() => void handleEdit(incident)}
                               className="h-8 w-8 xl:h-10 xl:w-10 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                              disabled={isLoadingIncidentDetails}
                             >
                               <Edit2 className="w-4 h-4 xl:w-5 xl:h-5" />
                               <span className="sr-only">Edit</span>
@@ -1218,6 +1386,15 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
             <div className="flex-1 overflow-y-auto">
               <div className="bg-[#F8F3F1]">
                 <div className="w-full max-w-[98%] mx-auto px-4 py-4">
+                  {/*
+                    Keep a defensive fallback for backend PascalCase payloads to ensure
+                    Officer Role is always visible in the view dialog.
+                  */}
+                  {(() => {
+                    const viewingIncidentWithFallback = viewingIncident as Incident & { OfficerRole?: string }
+                    const officerRoleValue = viewingIncident.officerRole || viewingIncidentWithFallback.OfficerRole || 'N/A'
+                    return (
+                      <>
                   {/* Basic Information */}
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
                     <div className="flex items-center gap-2 mb-4">
@@ -1236,6 +1413,10 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                       <div>
                         <label className="text-sm font-medium text-gray-500">Officer Name</label>
                         <p className="mt-1 text-sm text-gray-900">{viewingIncident.officerName || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Officer Role</label>
+                        <p className="mt-1 text-sm text-gray-900">{officerRoleValue}</p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-500">Assigned To</label>
@@ -1283,12 +1464,15 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-500">Total Value Lost</label>
-                        <p className="mt-1 text-sm text-gray-900">
+                        <p className="mt-1 text-sm font-medium text-red-600">
                           £{getIncidentLossValue(viewingIncident).toFixed(2)}
                         </p>
                       </div>
                     </div>
                   </div>
+                      </>
+                    )
+                  })()}
 
                   {/* Description */}
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
@@ -1469,18 +1653,7 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                                     alt="Verification Evidence"
                                     className="max-w-full h-auto max-h-64 rounded-lg border border-gray-200 shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
                                     onClick={() => {
-                                      // Open image in new window for full view
-                                      const newWindow = window.open('', '_blank')
-                                      if (newWindow) {
-                                        newWindow.document.write(`
-                                          <html>
-                                            <head><title>Verification Evidence</title></head>
-                                            <body style="margin:0;padding:20px;text-align:center;background:#f5f5f5;">
-                                              <img src="${viewingIncident.verificationEvidenceImage}" style="max-width:100%;height:auto;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);" />
-                                            </body>
-                                          </html>
-                                        `)
-                                      }
+                                      openEvidenceImage(viewingIncident.verificationEvidenceImage)
                                     }}
                                   />
                                   <p className="text-xs text-gray-500 mt-1">Click to view full size</p>
@@ -1521,23 +1694,32 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                       <div className="overflow-x-auto">
                         <table className="w-full">
                           <thead>
-                            <tr className="border-b">
+                            <tr className="border-b bg-gray-50">
                               <th className="text-left py-2 text-sm font-medium text-gray-500">Category</th>
                               <th className="text-left py-2 text-sm font-medium text-gray-500">Product Name</th>
                               <th className="text-left py-2 text-sm font-medium text-gray-500">Description</th>
                               <th className="text-right py-2 text-sm font-medium text-gray-500">Cost</th>
                               <th className="text-right py-2 text-sm font-medium text-gray-500">Qty</th>
                               <th className="text-right py-2 text-sm font-medium text-gray-500">Total</th>
+                              <th className="text-right py-2 text-sm font-medium text-gray-500">Recovered</th>
+                              <th className="text-right py-2 text-sm font-medium text-gray-500">Lost</th>
                             </tr>
                           </thead>
                           <tbody>
                             {viewingIncident.stolenItems.map((item, index) => {
                               const cost = typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0
                               const quantity = typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
+                              const itemWithFallback = item as StolenItem & { ValueSaved?: number; ValueLost?: number }
+                              const recoveredValue = toSafeNumber(item.valueSaved ?? itemWithFallback.ValueSaved)
                               // Fallback: calculate totalAmount if not present
                               const totalAmount = typeof item.totalAmount === 'number' && !isNaN(item.totalAmount)
                                 ? item.totalAmount
                                 : cost * quantity
+                              const storedLostValue = toSafeNumber(item.valueLost ?? itemWithFallback.ValueLost)
+                              const derivedLostValue = Math.max(0, totalAmount - recoveredValue)
+                              const hasConsistentStoredLoss =
+                                storedLostValue > 0 && Math.abs((recoveredValue + storedLostValue) - totalAmount) <= 0.01
+                              const lostValue = hasConsistentStoredLoss ? storedLostValue : derivedLostValue
                               return (
                                 <tr key={index} className="border-b">
                                   <td className="py-2 text-sm text-gray-900">{item.category || 'N/A'}</td>
@@ -1546,11 +1728,13 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                                   <td className="py-2 text-sm text-gray-900 text-right">£{cost.toFixed(2)}</td>
                                   <td className="py-2 text-sm text-gray-900 text-right">{quantity}</td>
                                   <td className="py-2 text-sm text-gray-900 text-right">£{totalAmount.toFixed(2)}</td>
+                                  <td className="py-2 text-sm text-emerald-700 text-right">£{recoveredValue.toFixed(2)}</td>
+                                  <td className="py-2 text-sm text-red-600 text-right">£{lostValue.toFixed(2)}</td>
                                 </tr>
                               )
                             })}
                             <tr className="bg-gray-50">
-                              <td colSpan={5} className="py-2 text-sm font-medium text-gray-900">Total Value</td>
+                              <td colSpan={7} className="py-2 text-sm font-medium text-gray-900">Total Value</td>
                               <td className="py-2 text-sm font-medium text-gray-900 text-right">
                                 £{Array.isArray(viewingIncident?.stolenItems)
                                     ? (() => {
@@ -1570,6 +1754,18 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
                                     : '0.00'}
                               </td>
                             </tr>
+                            <tr className="bg-gray-50">
+                              <td colSpan={7} className="py-2 text-sm font-medium text-gray-900">Total Recovered</td>
+                              <td className="py-2 text-sm font-medium text-emerald-700 text-right">
+                                £{getIncidentRecoveredValue(viewingIncident).toFixed(2)}
+                              </td>
+                            </tr>
+                            <tr className="bg-gray-50">
+                              <td colSpan={7} className="py-2 text-sm font-medium text-gray-900">Total Lost</td>
+                              <td className="py-2 text-sm font-medium text-red-600 text-right">
+                                £{getIncidentLossValue(viewingIncident).toFixed(2)}
+                              </td>
+                            </tr>
                           </tbody>
                         </table>
                       </div>
@@ -1582,10 +1778,11 @@ export default function IncidentReportPage({ isCustomerView = false, customerId,
               <div className="sticky bottom-0 bg-white border-t px-4 py-3 flex justify-end gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => handleEdit(viewingIncident)}
+                  onClick={() => void handleEdit(viewingIncident)}
                   className="h-9 px-4 text-sm"
+                  disabled={isLoadingIncidentDetails}
                 >
-                  Edit
+                  {isLoadingIncidentDetails ? 'Loading...' : 'Edit'}
                 </Button>
                 <Button
                   variant="outline"

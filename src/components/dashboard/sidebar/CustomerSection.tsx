@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { SidebarMenuButton } from "@/components/ui/sidebar"
 
+// === Component ===
 export function CustomerSection() {
   return (
     <div className="pl-4 space-y-2">

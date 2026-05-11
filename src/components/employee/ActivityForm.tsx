@@ -1,7 +1,10 @@
+/**
+ * Employee diary activity capture form.
+ * Flow: parent-owned react-hook-form state → category/source fields → onSubmit to diary page.
+ */
 import React from 'react';
 import { UseFormReturn } from 'react-hook-form';
-import { format } from 'date-fns';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { startOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -21,13 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { NativeDateInput } from '@/components/ui/native-date-input';
 import { ACTIVITY_CATEGORIES, ACTIVITY_SOURCES } from '@/config/activityConfig';
 import type { Employee } from '@/types/employee';
 
@@ -67,8 +64,8 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
                   </FormControl>
                   <SelectContent>
                     {employees.map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id}>
-                        {employee.name}
+                      <SelectItem key={employee.id} value={String(employee.id)}>
+                        {employee.fullName || `${employee.firstName} ${employee.surname}`.trim()}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -84,37 +81,19 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Date</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? (
-                          format(field.value, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) =>
-                        date > new Date() || date < new Date("1900-01-01")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <FormControl>
+                  <NativeDateInput
+                    ref={field.ref}
+                    name={field.name}
+                    value={field.value}
+                    onDateChange={field.onChange}
+                    onBlur={field.onBlur}
+                    disabled={field.disabled}
+                    minDate={new Date(1900, 0, 1)}
+                    maxDate={new Date()}
+                    aria-label="Activity date"
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -299,37 +278,18 @@ export const ActivityForm: React.FC<ActivityFormProps> = ({
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Action Deadline</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? (
-                          format(field.value, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) =>
-                        date < new Date()
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <FormControl>
+                  <NativeDateInput
+                    ref={field.ref}
+                    name={field.name}
+                    value={field.value}
+                    onDateChange={field.onChange}
+                    onBlur={field.onBlur}
+                    disabled={field.disabled}
+                    minDate={startOfDay(new Date())}
+                    aria-label="Action deadline"
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

@@ -1,44 +1,61 @@
-import * as React from "react"
-import { format } from "date-fns"
-import { Calendar as CalendarIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+import * as React from 'react'
 
-interface DatePickerProps {
-  date?: Date
-  setDate: (date?: Date) => void
-  placeholder?: string
+import { NativeDateInput } from '@/components/ui/native-date-input'
+
+export interface DatePickerProps {
+	date?: Date
+	setDate: (date?: Date) => void
+	placeholder?: string
+	allowYearSelect?: boolean
+	fromYear?: number
+	toYear?: number
+	className?: string
+	disabled?: boolean
+	/** Earliest selectable day (merged with year window when allowYearSelect is true) */
+	minDate?: Date
+	/** Latest selectable day (merged with year window when allowYearSelect is true) */
+	maxDate?: Date
 }
 
-export function DatePicker({ date, setDate, placeholder = "Pick a date" }: DatePickerProps) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant={"outline"}
-          className={cn(
-            "w-full justify-start text-left font-normal",
-            !date && "text-muted-foreground"
-          )}
-        >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? format(date, "PPP") : <span>{placeholder}</span>}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={date}
-          onSelect={setDate}
-          initialFocus
-        />
-      </PopoverContent>
-    </Popover>
-  )
-} 
+const mergeMin = (a: Date | undefined, b: Date | undefined): Date | undefined => {
+	if (!a) return b
+	if (!b) return a
+	return new Date(Math.max(a.getTime(), b.getTime()))
+}
+
+const mergeMax = (a: Date | undefined, b: Date | undefined): Date | undefined => {
+	if (!a) return b
+	if (!b) return a
+	return new Date(Math.min(a.getTime(), b.getTime()))
+}
+
+export function DatePicker({
+	date,
+	setDate,
+	placeholder = 'Pick a date',
+	allowYearSelect = false,
+	fromYear = 1990,
+	toYear = new Date().getFullYear() + 15,
+	className,
+	disabled,
+	minDate: minDateProp,
+	maxDate: maxDateProp,
+}: DatePickerProps) {
+	const yearMin = allowYearSelect ? new Date(fromYear, 0, 1) : undefined
+	const yearMax = allowYearSelect ? new Date(toYear, 11, 31) : undefined
+	const mergedMin = mergeMin(yearMin, minDateProp)
+	const mergedMax = mergeMax(yearMax, maxDateProp)
+
+	return (
+		<NativeDateInput
+			value={date}
+			onDateChange={setDate}
+			minDate={mergedMin}
+			maxDate={mergedMax}
+			disabled={disabled}
+			className={className}
+			aria-label={placeholder}
+			title={placeholder}
+		/>
+	)
+}

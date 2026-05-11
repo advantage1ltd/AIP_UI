@@ -1,3 +1,7 @@
+/**
+ * Employee roster table with actions.
+ * Flow: client search/pagination → row actions delegate create/edit/delete to parent page.
+ */
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Pencil, Trash2 } from "lucide-react"
@@ -13,6 +17,7 @@ interface EmployeesTableProps {
   onDeleteEmployee: (employee: Employee) => void
 }
 
+// === Component ===
 export function EmployeesTable({ employees, onNewEmployee, onEditEmployee, onDeleteEmployee }: EmployeesTableProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")

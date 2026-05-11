@@ -1,3 +1,7 @@
+/**
+ * Compliance asset register list and AssetForm.
+ * Flow: asset query list → AssetForm create/edit → compliance assignment tracking.
+ */
 import React, { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
@@ -149,33 +153,29 @@ const AssetRegisterPage = () => {
 			title: 'Total Assets',
 			value: stats.totalAssets,
 			icon: Package,
-			gradient: 'from-violet-600 to-indigo-600',
-			iconBg: 'bg-white/20',
-			ring: 'ring-violet-500/20'
+			iconBg: 'bg-violet-100',
+			iconColor: 'text-violet-600'
 		},
 		{
 			title: 'In Use',
 			value: stats.inUse,
 			icon: CheckCircle2,
-			gradient: 'from-emerald-500 to-teal-600',
-			iconBg: 'bg-white/20',
-			ring: 'ring-emerald-500/20'
+			iconBg: 'bg-emerald-100',
+			iconColor: 'text-emerald-600'
 		},
 		{
 			title: 'In Stock',
 			value: stats.inStock,
 			icon: Box,
-			gradient: 'from-sky-500 to-blue-600',
-			iconBg: 'bg-white/20',
-			ring: 'ring-sky-500/20'
+			iconBg: 'bg-sky-100',
+			iconColor: 'text-sky-600'
 		},
 		{
 			title: 'In Repair',
 			value: stats.inRepair,
 			icon: Wrench,
-			gradient: 'from-amber-500 to-orange-600',
-			iconBg: 'bg-white/20',
-			ring: 'ring-amber-500/20'
+			iconBg: 'bg-amber-100',
+			iconColor: 'text-amber-600'
 		}
 	]
 
@@ -352,28 +352,35 @@ const AssetRegisterPage = () => {
 
 	return (
 		<div className="min-h-screen bg-[#EFF4FF]">
-			<div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6 max-w-7xl">
+			<div className="container mx-auto max-w-screen-2xl px-4 py-4 lg:px-8 lg:py-8 space-y-6">
 
 				{/* Header Section */}
-				<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-					<div className="space-y-1">
-						<h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-slate-900 via-slate-700 to-slate-800 bg-clip-text text-transparent">
-							Asset Register
-						</h1>
-						<p className="text-slate-500 text-sm sm:text-base">
-							Track and manage your company's assets inventory
-						</p>
+				<div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+					<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+						<div className="space-y-1">
+							<h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+								Asset Register
+							</h1>
+							<p className="text-slate-500 text-sm sm:text-base">
+								Track and manage your company assets inventory.
+							</p>
+						</div>
+						<div className="flex items-center gap-2">
+							<Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-600">
+								{pagination.totalCount} records
+							</Badge>
+							<Button
+								onClick={() => {
+									setSelectedAsset(null)
+									setIsFormOpen(true)
+								}}
+								className="w-full lg:w-auto bg-violet-600 hover:bg-violet-700 text-white"
+							>
+								<Plus className="h-5 w-5 mr-2" />
+								Add New Asset
+							</Button>
+						</div>
 					</div>
-					<Button
-						onClick={() => {
-							setSelectedAsset(null)
-							setIsFormOpen(true)
-						}}
-						className="w-full lg:w-auto bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/30 hover:-translate-y-0.5"
-					>
-						<Plus className="h-5 w-5 mr-2" />
-						Add New Asset
-					</Button>
 				</div>
 
 				{/* Statistics Cards */}
@@ -381,21 +388,17 @@ const AssetRegisterPage = () => {
 					{statCards.map((stat, index) => (
 						<Card
 							key={stat.title}
-							className={cn(
-								'relative overflow-hidden border-0 shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1',
-								`ring-1 ${stat.ring}`
-							)}
+							className="border-slate-200 bg-white shadow-sm transition-shadow duration-200 hover:shadow-md"
 							style={{ animationDelay: `${index * 100}ms` }}
 						>
-							<div className={cn('absolute inset-0 bg-gradient-to-br opacity-95', stat.gradient)} />
-							<CardContent className="relative pt-5 pb-4 px-5">
+							<CardContent className="pt-5 pb-4 px-5">
 								<div className="flex items-center justify-between">
 									<div className="space-y-1">
-										<p className="text-xs sm:text-sm font-medium text-white/80">{stat.title}</p>
-										<p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{stat.value}</p>
+										<p className="text-xs sm:text-sm font-medium text-slate-500">{stat.title}</p>
+										<p className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">{stat.value}</p>
 									</div>
 									<div className={cn('p-3 rounded-xl', stat.iconBg)}>
-										<stat.icon className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+										<stat.icon className={cn('h-6 w-6 sm:h-7 sm:w-7', stat.iconColor)} />
 									</div>
 								</div>
 							</CardContent>
@@ -404,7 +407,7 @@ const AssetRegisterPage = () => {
 				</div>
 
 				{/* Filters Section */}
-				<Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+				<Card className="border-slate-200 bg-white shadow-sm">
 					<CardContent className="p-4">
 						<div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-4">
 							{/* Search */}
@@ -413,7 +416,7 @@ const AssetRegisterPage = () => {
 								<Input
 									type="text"
 									placeholder="Search by tag, make, model, or assignee..."
-									className="pl-10 h-11 bg-slate-50/50 border-slate-200 focus:bg-white transition-colors"
+									className="pl-10 h-11 bg-white border-slate-300 focus-visible:ring-2 focus-visible:ring-violet-200"
 									value={searchTerm}
 									onChange={(e) => {
 										setSearchTerm(e.target.value)
@@ -428,7 +431,7 @@ const AssetRegisterPage = () => {
 									setSelectedType(value)
 									setCurrentPage(1)
 								}}>
-									<SelectTrigger className="w-full sm:w-[160px] h-11 bg-slate-50/50 border-slate-200">
+									<SelectTrigger className="w-full sm:w-[160px] h-11 bg-white border-slate-300">
 										<SelectValue placeholder="Asset type" />
 									</SelectTrigger>
 									<SelectContent>
@@ -446,7 +449,7 @@ const AssetRegisterPage = () => {
 									setSelectedStatus(value)
 									setCurrentPage(1)
 								}}>
-									<SelectTrigger className="w-full sm:w-[140px] h-11 bg-slate-50/50 border-slate-200">
+									<SelectTrigger className="w-full sm:w-[140px] h-11 bg-white border-slate-300">
 										<SelectValue placeholder="Status" />
 									</SelectTrigger>
 									<SelectContent>
@@ -459,7 +462,7 @@ const AssetRegisterPage = () => {
 								</Select>
 
 								{/* View Toggle - Desktop only */}
-								<div className="hidden lg:flex border rounded-lg p-1 bg-slate-100/50">
+								<div className="hidden lg:flex border border-slate-200 rounded-lg p-1 bg-slate-50">
 									<Button
 										variant="ghost"
 										size="sm"
@@ -490,7 +493,7 @@ const AssetRegisterPage = () => {
 
 				{/* Loading State */}
 				{isLoading && (
-					<Card className="border-0 shadow-md">
+					<Card className="border-slate-200 bg-white shadow-sm">
 						<CardContent className="py-16">
 							<div className="flex flex-col items-center justify-center gap-4">
 								<div className="relative">
@@ -505,10 +508,10 @@ const AssetRegisterPage = () => {
 
 				{/* Empty State */}
 				{!isLoading && assets.length === 0 && (
-					<Card className="border-0 shadow-md bg-gradient-to-br from-slate-50 to-white">
+					<Card className="border-slate-200 bg-white shadow-sm">
 						<CardContent className="py-16">
 							<div className="flex flex-col items-center text-center gap-4 max-w-sm mx-auto">
-								<div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center">
+								<div className="h-20 w-20 rounded-2xl bg-violet-100 flex items-center justify-center">
 									<Package className="h-10 w-10 text-violet-500" />
 								</div>
 								<div className="space-y-2">
@@ -525,7 +528,7 @@ const AssetRegisterPage = () => {
 											setSelectedAsset(null)
 											setIsFormOpen(true)
 										}}
-										className="mt-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+										className="mt-2 bg-violet-600 hover:bg-violet-700"
 									>
 										<Plus className="h-5 w-5 mr-2" />
 										Add Your First Asset
@@ -544,11 +547,11 @@ const AssetRegisterPage = () => {
 							return (
 								<Card
 									key={asset.id}
-									className="group border-0 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden"
+									className="group border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
 								>
 									<CardContent className="p-0">
 										{/* Header */}
-										<div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-100">
+										<div className="p-4 bg-slate-50/70 border-b border-slate-200">
 											<div className="flex items-start justify-between gap-3">
 												<div className="flex items-center gap-3">
 													<div className={cn('p-2.5 rounded-xl', getAssetTypeColor(asset.assetType))}>
@@ -621,11 +624,11 @@ const AssetRegisterPage = () => {
 
 				{/* Table View - Large Screens */}
 				{!isLoading && assets.length > 0 && viewMode === 'table' && (
-					<Card className="hidden sm:block border-0 shadow-md overflow-hidden">
+					<Card className="hidden sm:block border-slate-200 bg-white shadow-sm overflow-hidden">
 						<div className="overflow-x-auto">
 							<table className="w-full">
 								<thead>
-									<tr className="bg-gradient-to-r from-slate-50 to-slate-100/50 border-b border-slate-200">
+									<tr className="bg-slate-50 border-b border-slate-200">
 										<th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Asset</th>
 										<th className="px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Make/Model</th>
 										<th className="hidden md:table-cell px-4 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Serial</th>
@@ -641,7 +644,7 @@ const AssetRegisterPage = () => {
 										return (
 											<tr
 												key={asset.id}
-												className="group hover:bg-slate-50/50 transition-colors"
+												className="group odd:bg-white even:bg-slate-50/20 hover:bg-violet-50/30 transition-colors"
 												style={{ animationDelay: `${index * 50}ms` }}
 											>
 												<td className="px-4 py-4">
@@ -710,7 +713,7 @@ const AssetRegisterPage = () => {
 
 						{/* Pagination */}
 						{pagination.totalPages > 1 && (
-							<div className="px-4 py-4 border-t border-slate-100 bg-slate-50/50">
+							<div className="px-4 py-4 border-t border-slate-200 bg-slate-50/60">
 								<div className="flex flex-col sm:flex-row items-center justify-between gap-3">
 									<p className="text-sm text-slate-500">
 										Showing <span className="font-medium text-slate-700">{((pagination.currentPage - 1) * pagination.pageSize) + 1}</span> to{' '}

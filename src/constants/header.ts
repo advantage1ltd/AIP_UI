@@ -1,10 +1,10 @@
 // User data
 export const USER_DATA = {
-  name: "David Ibanga",
-  email: "david.ibanga@example.com",
-  role: "Administrator",
-  avatar: "/AdvantageOne.svg",
-  initials: "DI"
+	name: 'User',
+	email: '',
+	role: '',
+	avatar: '/AdvantageOne.svg',
+	initials: '?'
 } as const;
 
 // Common button styles

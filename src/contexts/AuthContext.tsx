@@ -1,3 +1,7 @@
+/**
+ * Authentication provider: login, 2FA, logout, and session user hydration via `/Auth/me`.
+ * Persists tokens and user through sessionStore; axios interceptors in config/api.ts attach the bearer token.
+ */
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { isAxiosError } from 'axios';
 import { User } from '@/types/user';
@@ -6,22 +10,46 @@ import { sessionStore } from '@/state/sessionStore';
 import { ApiResponse } from '@/types/api';
 import type { BackendApiResponse } from '@/types/backend-api';
 import { getApiData, getApiErrors, getApiMessage, getApiSuccess } from '@/types/backend-api';
+import { mapRawApiUserToUser } from '@/services/userService';
+import { logger } from '@/utils/logger';
 
 type LoginResponsePayload = {
 	AccessToken: string;
 	RefreshToken?: string;
 	ExpiresAt?: string;
 	User: User;
+	RequiresTwoFactor?: boolean;
+	TwoFactorToken?: string;
+	TwoFactorExpiresAt?: string;
+	TwoFactorDestination?: string;
 	Success?: boolean;
 	Message?: string;
 }
+
+export type TwoFactorChallenge = {
+	requiresTwoFactor: true;
+	twoFactorToken: string;
+	twoFactorExpiresAt?: string;
+	twoFactorDestination?: string;
+};
+
+export type LoginSuccess = {
+	requiresTwoFactor: false;
+	user: User;
+};
+
+export type LoginResult = LoginSuccess | TwoFactorChallenge;
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   error: string | null;
-  login: (username: string, password: string) => Promise<User>;
+  login: (username: string, password: string) => Promise<LoginResult>;
+  verifyTwoFactor: (twoFactorToken: string, code: string) => Promise<User>;
+  resendTwoFactorCode: (twoFactorToken: string) => Promise<void>;
   logout: () => void;
+  /** Re-fetch `/Auth/me` and update session user (does not clear the session on failure). */
+  refreshUser: () => Promise<User | null>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Restore user from localStorage first for immediate UI rendering
+    // Restore user from session storage first for immediate UI rendering
     const cachedUser = sessionStore.getUser();
     if (cachedUser) {
       setUser(cachedUser);
@@ -54,37 +82,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const apiResponse = response.data;
       const currentUser = getApiData(apiResponse);
       if (getApiSuccess(apiResponse) && currentUser) {
-        setUser(currentUser);
-        sessionStore.setUser(currentUser);
+        const normalizedUser = mapRawApiUserToUser(currentUser);
+        setUser(normalizedUser);
+        sessionStore.setUser(normalizedUser);
         setError(null);
       } else {
         throw new Error(getApiMessage(apiResponse) || 'Failed to fetch user data');
       }
     } catch (err: unknown) {
-      // Only clear token if it's a 401 (unauthorized) - token is invalid
-      // For other errors (network, 500, etc.), keep the cached user
-      const isUnauthorized = isAxiosError(err) && err.response?.status === 401;
-      
-      if (isUnauthorized) {
-        console.error('Failed to fetch current user - unauthorized:', err);
-        sessionStore.clearToken();
-        setUser(null);
-        sessionStore.setUser(null);
-      } else {
-        // For other errors, keep the cached user and just log the error
-        console.warn('Failed to fetch current user (keeping cached user):', err);
-        // Keep the cached user, don't clear it
+      if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true') {
+        const isUnauthorized = isAxiosError(err) && err.response?.status === 401;
+        logger.debug(
+          isUnauthorized
+            ? 'Failed to fetch current user - unauthorized'
+            : 'Failed to fetch current user - clearing stale session',
+          err
+        );
       }
+      sessionStore.clearAll();
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  const refreshUser = useCallback(async (): Promise<User | null> => {
+    const token = sessionStore.getToken();
+    if (!token) return null;
+    try {
+      const response = await api.get<BackendApiResponse<User>>('/Auth/me');
+      const apiResponse = response.data;
+      const currentUser = getApiData(apiResponse);
+      if (getApiSuccess(apiResponse) && currentUser) {
+        const normalizedUser = mapRawApiUserToUser(currentUser);
+        setUser(normalizedUser);
+        sessionStore.setUser(normalizedUser);
+        setError(null);
+        return normalizedUser;
+      }
+    } catch (err: unknown) {
+      if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true') {
+        logger.debug('[AuthContext] refreshUser: /Auth/me failed', err);
+      }
+    }
+    return null;
   }, []);
 
   useEffect(() => {
     const handleUserAssignmentsUpdate = (event: CustomEvent<User>) => {
       const updatedUser = event.detail;
       if (updatedUser && updatedUser.id === user?.id) {
-        console.log('🔄 [AuthContext] Updating user assignments from event');
+        if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true') {
+          logger.debug('[AuthContext] Updating user assignments from event');
+        }
         setUser(updatedUser);
         sessionStore.setUser(updatedUser);
       }
@@ -101,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetchCurrentUser();
   }, [fetchCurrentUser]);
 
-  const login = async (username: string, password: string): Promise<User> => {
+  const login = async (username: string, password: string): Promise<LoginResult> => {
     try {
       setIsLoading(true);
       setError(null);
@@ -114,6 +164,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       } catch (axiosError: unknown) {
         if (isAxiosError(axiosError)) {
+          if (!axiosError.response || axiosError.code === 'ERR_NETWORK') {
+            const networkMessage = 'Unable to reach the server. Please ensure the backend is running and try again.';
+            setError(networkMessage);
+            throw new Error(networkMessage);
+          }
           const errorData = axiosError.response?.data as BackendApiResponse<unknown> | undefined;
           const errorMessage = getApiMessage(errorData) || 'Invalid email or password';
           setError(errorMessage);
@@ -122,14 +177,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw axiosError;
       }
 
-      // Log the raw response for debugging
-      if (import.meta.env.DEV) {
-        console.log('🔍 [AuthContext] Login response:', {
+      if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true') {
+        logger.debug('[AuthContext] Login response meta', {
           status: response.status,
-          data: response.data,
-          dataKeys: response.data ? Object.keys(response.data) : [],
-          hasSuccess: 'Success' in (response.data || {}),
-          hasData: 'Data' in (response.data || {})
+          keys: response.data ? Object.keys(response.data) : [],
+          hasSuccess: response.data ? 'Success' in response.data || 'success' in response.data : false,
+          hasData: response.data ? 'Data' in response.data || 'data' in response.data : false
         });
       }
 
@@ -141,12 +194,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const message = apiResponse?.Message ?? apiResponse?.message ?? 'Invalid response from server';
 
       if (!isSuccess || !responseData) {
-        console.error('❌ [AuthContext] Login failed:', {
-          isSuccess,
-          hasResponseData: !!responseData,
-          message,
-          fullResponse: apiResponse
-        });
+        if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true') {
+          logger.debug('[AuthContext] Login failed shape', {
+            isSuccess,
+            hasResponseData: !!responseData,
+            message,
+          });
+        }
         throw new Error(message);
       }
 
@@ -154,38 +208,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Handle both capital and lowercase for compatibility
       const loginData = responseData;
       const accessToken = loginData?.AccessToken ?? loginData?.accessToken;
-      const user = loginData?.User ?? loginData?.user;
+      const refreshToken = loginData?.RefreshToken ?? loginData?.refreshToken;
+      const expiresAt = loginData?.ExpiresAt ?? loginData?.expiresAt;
+      const rawUser = loginData?.User ?? loginData?.user;
+      const requiresTwoFactor = Boolean(loginData?.RequiresTwoFactor ?? loginData?.requiresTwoFactor);
+      const twoFactorToken = loginData?.TwoFactorToken ?? loginData?.twoFactorToken;
+      const twoFactorExpiresAt = loginData?.TwoFactorExpiresAt ?? loginData?.twoFactorExpiresAt;
+      const twoFactorDestination = loginData?.TwoFactorDestination ?? loginData?.twoFactorDestination;
 
-      if (!accessToken || !user) {
-        console.error('❌ [AuthContext] Missing token or user in response:', {
-          hasAccessToken: !!accessToken,
-          hasUser: !!user,
-          loginDataKeys: loginData ? Object.keys(loginData) : [],
-          loginData
-        });
+      if (requiresTwoFactor) {
+        if (!twoFactorToken) {
+          throw new Error('Two-factor sign-in session is invalid. Please try again.');
+        }
+        return {
+          requiresTwoFactor: true,
+          twoFactorToken,
+          twoFactorExpiresAt,
+          twoFactorDestination
+        };
+      }
+
+      if (!accessToken || !rawUser) {
+        if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true') {
+          logger.debug('[AuthContext] Missing token or user in login payload', {
+            hasAccessToken: !!accessToken,
+            hasUser: !!rawUser,
+          });
+        }
         throw new Error('Invalid response from server: missing token or user data');
       }
 
+      const user = mapRawApiUserToUser(rawUser);
+
       sessionStore.setToken(accessToken);
+      if (refreshToken) {
+        sessionStore.setRefreshToken(refreshToken);
+      }
+      if (expiresAt) {
+        sessionStore.setTokenExpiresAt(expiresAt);
+      }
       setUser(user);
       sessionStore.setUser(user);
       setError(null);
       
-      if (import.meta.env.DEV) {
-        console.log('✅ [AuthContext] Login successful:', {
-          username: user.username,
+      if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true') {
+        logger.debug('[AuthContext] Login successful', {
           userId: user.id,
           role: user.role
         });
       }
       
-      return user;
+      return {
+        requiresTwoFactor: false,
+        user
+      };
     } catch (err: unknown) {
       // If error is already an Error with a message, use it
       if (err instanceof Error && err.message && !err.message.includes('Invalid response from server')) {
         const errorMessage = err.message;
         setError(errorMessage);
-        console.error('❌ [AuthContext] Login error:', err);
+        if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true') {
+          logger.debug('[AuthContext] Login error', err);
+        }
         throw err;
       }
       
@@ -199,18 +283,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setError(errorMessage);
       
-      // Log detailed error information
-      console.error('❌ [AuthContext] Login error:', {
-        message: errorMessage,
-        error: err,
-        response: err?.response?.data,
-        status: err?.response?.status,
-        statusText: err?.response?.statusText
-      });
+      if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true') {
+        logger.debug('[AuthContext] Login error detail', {
+          message: errorMessage,
+          status: isAxiosError(err) ? err.response?.status : undefined,
+        });
+      }
       
       throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const verifyTwoFactor = async (twoFactorToken: string, code: string): Promise<User> => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await api.post<BackendApiResponse<LoginResponsePayload>>('/Auth/verify-two-factor', {
+        twoFactorToken,
+        code
+      });
+
+      const apiResponse = response.data;
+      const loginData = apiResponse?.Data ?? apiResponse?.data;
+      const accessToken = loginData?.AccessToken ?? loginData?.accessToken;
+      const refreshToken = loginData?.RefreshToken ?? loginData?.refreshToken;
+      const expiresAt = loginData?.ExpiresAt ?? loginData?.expiresAt;
+      const rawUser = loginData?.User ?? loginData?.user;
+
+      if (!accessToken || !rawUser) {
+        throw new Error('Invalid two-factor verification response');
+      }
+
+      const user = mapRawApiUserToUser(rawUser);
+
+      sessionStore.setToken(accessToken);
+      if (refreshToken) {
+        sessionStore.setRefreshToken(refreshToken);
+      }
+      if (expiresAt) {
+        sessionStore.setTokenExpiresAt(expiresAt);
+      }
+      setUser(user);
+      sessionStore.setUser(user);
+      return user;
+    } catch (err: unknown) {
+      const axiosError = isAxiosError(err) ? err : null;
+      const errorData = axiosError?.response?.data as BackendApiResponse<unknown> | undefined;
+      const errorMessage = getApiMessage(errorData)
+        ?? (err instanceof Error ? err.message : undefined)
+        ?? 'Unable to verify two-factor code';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendTwoFactorCode = async (twoFactorToken: string): Promise<void> => {
+    try {
+      await api.post('/Auth/resend-two-factor', { twoFactorToken });
+    } catch (err: unknown) {
+      const axiosError = isAxiosError(err) ? err : null;
+      const errorData = axiosError?.response?.data as BackendApiResponse<unknown> | undefined;
+      const errorMessage = getApiMessage(errorData)
+        ?? (err instanceof Error ? err.message : undefined)
+        ?? 'Unable to resend verification code';
+      throw new Error(errorMessage);
     }
   };
 
@@ -220,7 +360,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, error, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, error, login, verifyTwoFactor, resendTwoFactorCode, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

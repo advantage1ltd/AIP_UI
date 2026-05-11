@@ -7,6 +7,7 @@ interface PersonalInfoStepProps {
   onNext: () => void
 }
 
+// === Component ===
 export function PersonalInfoStep({ onNext }: PersonalInfoStepProps) {
   return (
     <div className="space-y-6">

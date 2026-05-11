@@ -1,3 +1,7 @@
+/**
+ * Application shell: sidebar, header, routed outlet, and footer.
+ * Flow: responsive sidebar state → Outlet for page routes → closes mobile nav on navigation.
+ */
 import React, { useState, useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Footer } from '../Footer'
@@ -12,10 +16,6 @@ interface LayoutProps {
   children?: React.ReactNode
 }
 
-/**
- * Main layout component that provides the application structure
- * Includes sidebar navigation, header, main content area, and footer
- */
 export const Layout = ({ children }: LayoutProps) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const location = useLocation()

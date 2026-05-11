@@ -1,3 +1,7 @@
+/**
+ * Customer satisfaction survey capture.
+ * Flow: filtered survey list → SurveyForm create/edit → SurveyDetails read-only view → CSV export.
+ */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SurveyTable } from '@/pages/operations/components/SurveyTable';
 import { SurveyForm } from '@/pages/operations/components/SurveyForm';
@@ -6,20 +10,20 @@ import { CustomerSurvey, CustomerSurveyFilters } from '@/types/customerSatisfact
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ClipboardList, FileSpreadsheet, BarChart3, Users, Building, MapPin, 
-  Eye, Pencil, Trash2, ChevronLeft, ChevronRight, Search, Download, Calendar as CalendarIcon 
+  Eye, Pencil, Trash2, ChevronLeft, ChevronRight, Search, Download 
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+import { NativeDateInput } from "@/components/ui/native-date-input";
 import { format } from 'date-fns';
-import { cn } from "@/lib/utils";
 import { customerSatisfactionService } from '@/services/customerSatisfactionService';
 import { toast } from 'react-toastify';
 import type { Region, Site } from '@/types/dashboard';
 import { customerDashboardService } from '@/services/dashboardService';
 import { customerService } from '@/services/customerService';
+import { regionService } from '@/services/regionService';
+import { siteService } from '@/services/siteService';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardMetrics } from '@/pages/operations/components/DashboardMetrics';
 import { MobileSurveyCard } from '@/pages/operations/components/MobileSurveyCard';
@@ -98,7 +102,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
 }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'administrator';
-  // State management
+  // UI toggles between table, entry form, and read-only detail panel.
   const [showForm, setShowForm] = useState(false);
   const [editingSurvey, setEditingSurvey] = useState<CustomerSurvey | null>(null);
   const [viewingSurvey, setViewingSurvey] = useState<CustomerSurvey | null>(null);
@@ -150,14 +154,32 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [customersData, regionsData, sitesData] = await Promise.all([
-          customerService.getAllCustomers(),
-          customerDashboardService.getRegions(),
-          customerDashboardService.getSites()
+        const scopedCustomerId = customerId || user?.customerId?.toString() || ''
+        const isScopedCustomer = isCustomerView && scopedCustomerId
+
+        const customersData = isScopedCustomer
+          ? (() => {
+            const customerPromise = customerService.getCustomer(scopedCustomerId)
+            return customerPromise.then(customer => (customer ? [customer] : []))
+          })()
+          : customerService.getAllCustomers()
+
+        const regionsData = isScopedCustomer
+          ? regionService.getRegionsByCustomer(Number(scopedCustomerId)).then(result => result.data)
+          : customerDashboardService.getRegions()
+
+        const sitesData = isScopedCustomer
+          ? siteService.getSitesByCustomer(Number(scopedCustomerId)).then(result => result.data)
+          : customerDashboardService.getSites()
+
+        const [resolvedCustomers, resolvedRegions, resolvedSites] = await Promise.all([
+          customersData,
+          regionsData,
+          sitesData
         ]);
         
         // Map customers to form format
-        const mappedCustomers = customersData.map(c => ({
+        const mappedCustomers = resolvedCustomers.map(c => ({
           id: c.id.toString(),
           name: c.companyName
         }));
@@ -165,7 +187,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
         
         // Map regions to form format
         // Backend uses camelCase JSON serialization, so properties are: regionID, regionName, fkCustomerID
-        const mappedRegions = regionsData.map((r: any) => ({
+        const mappedRegions = resolvedRegions.map((r: any) => ({
           id: (r.regionID ?? r.regionId ?? r.id)?.toString() || '',
           name: (r.regionName ?? r.name) || '',
           customerId: (r.fkCustomerID ?? r.fkCustomerId ?? r.customerId)?.toString() || ''
@@ -174,7 +196,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
         
         // Map sites to form format
         // Backend uses camelCase JSON serialization, so properties are: siteID, locationName, fkCustomerID, fkRegionID
-        const mappedSites = sitesData.map((s: any) => ({
+        const mappedSites = resolvedSites.map((s: any) => ({
           id: (s.siteID ?? s.siteId ?? s.id)?.toString() || '',
           name: (s.locationName ?? s.name) || '',
           customerId: (s.fkCustomerID ?? s.fkCustomerId ?? s.customerId)?.toString() || '',
@@ -188,7 +210,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
     };
 
     fetchData();
-  }, []);
+  }, [customerId, isCustomerView, user?.customerId]);
 
   // Update filters when customerId or siteId props change
   useEffect(() => {
@@ -358,7 +380,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
 
   return (
     <div className="min-h-screen bg-[#EFF4FF]">
-      <div className="container mx-auto max-w-[1280px] py-4 md:py-6 lg:py-8 px-2 md:px-4 lg:px-6">
+      <div className="container mx-auto max-w-screen-2xl px-2 md:px-4 lg:px-8 xl:px-10 py-4 md:py-6 lg:py-8">
         <PageHeader 
           pageId="customer-satisfaction"
           title="Customer Satisfaction Survey"
@@ -410,57 +432,21 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
                       <div className="mt-4 p-3 border rounded-md bg-gray-50">
                         <p className="text-xs font-medium text-gray-600 mb-2">Download Report (CSV)</p>
                         <div className="grid grid-cols-2 gap-2 mb-2">
-                           <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant={"outline"}
-                                  size="sm"
-                                  className={cn(
-                                    "w-full justify-start text-left font-normal h-8 text-xs",
-                                    !downloadStartDate && "text-muted-foreground"
-                                  )}
-                                  disabled={isLoading}
-                                >
-                                  <CalendarIcon className="mr-1 h-3.5 w-3.5" />
-                                  {downloadStartDate ? format(downloadStartDate, "PPP") : <span>Start date</span>}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                  mode="single"
-                                  selected={downloadStartDate}
-                                  onSelect={setDownloadStartDate}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant={"outline"}
-                                  size="sm"
-                                  className={cn(
-                                    "w-full justify-start text-left font-normal h-8 text-xs",
-                                    !downloadEndDate && "text-muted-foreground"
-                                  )}
-                                  disabled={isLoading}
-                                >
-                                  <CalendarIcon className="mr-1 h-3.5 w-3.5" />
-                                  {downloadEndDate ? format(downloadEndDate, "PPP") : <span>End date</span>}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                  mode="single"
-                                  selected={downloadEndDate}
-                                  onSelect={setDownloadEndDate}
-                                   disabled={(date) =>
-                                      downloadStartDate ? date < downloadStartDate : false
-                                    }
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
+                          <NativeDateInput
+                            value={downloadStartDate}
+                            onDateChange={setDownloadStartDate}
+                            disabled={isLoading}
+                            className="h-8 text-xs bg-white"
+                            aria-label="Download report start date"
+                          />
+                          <NativeDateInput
+                            value={downloadEndDate}
+                            onDateChange={setDownloadEndDate}
+                            minDate={downloadStartDate}
+                            disabled={isLoading}
+                            className="h-8 text-xs bg-white"
+                            aria-label="Download report end date"
+                          />
                         </div>
                         <Button 
                           size="sm" 
@@ -526,59 +512,23 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
                     {/* Desktop view - table layout (hidden on mobile) */}
                     <div className="hidden sm:block min-w-[320px] overflow-auto">
                       {/* Download Controls for Desktop */}
-                       <div className="flex items-center gap-2 p-4 border-b">
+                       <div className="flex items-center gap-2 p-4 border-b flex-wrap">
                          <span className="text-sm font-medium text-gray-700 mr-2">Download Report:</span>
-                         <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                size="sm"
-                                className={cn(
-                                  "w-[180px] justify-start text-left font-normal h-9",
-                                  !downloadStartDate && "text-muted-foreground"
-                                )}
-                                disabled={isLoading}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {downloadStartDate ? format(downloadStartDate, "PPP") : <span>Start date</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={downloadStartDate}
-                                onSelect={setDownloadStartDate}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                           <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant={"outline"}
-                                  size="sm"
-                                  className={cn(
-                                    "w-[180px] justify-start text-left font-normal h-9",
-                                    !downloadEndDate && "text-muted-foreground"
-                                  )}
-                                  disabled={isLoading}
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {downloadEndDate ? format(downloadEndDate, "PPP") : <span>End date</span>}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                  mode="single"
-                                  selected={downloadEndDate}
-                                  onSelect={setDownloadEndDate}
-                                  disabled={(date) =>
-                                      downloadStartDate ? date < downloadStartDate : false
-                                    }
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
+                         <NativeDateInput
+                            value={downloadStartDate}
+                            onDateChange={setDownloadStartDate}
+                            disabled={isLoading}
+                            className="h-9 w-[160px] sm:w-[180px] bg-white"
+                            aria-label="Download report start date"
+                          />
+                         <NativeDateInput
+                            value={downloadEndDate}
+                            onDateChange={setDownloadEndDate}
+                            minDate={downloadStartDate}
+                            disabled={isLoading}
+                            className="h-9 w-[160px] sm:w-[180px] bg-white"
+                            aria-label="Download report end date"
+                          />
                           <Button 
                             size="sm" 
                             className="h-9" 
@@ -609,7 +559,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="w-full max-w-5xl mx-auto">
+              <div className="w-full max-w-screen-xl mx-auto">
                 <div className="bg-white rounded-lg md:rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                   <div className="p-3 sm:p-4 md:p-6 lg:p-8">
                     <SurveyForm 

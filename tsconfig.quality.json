@@ -1,0 +1,8 @@
+{
+	"extends": "./tsconfig.app.json",
+	"include": [
+		"src/state/sessionStore.ts",
+		"src/utils/page-access-guards.ts"
+	]
+}
+

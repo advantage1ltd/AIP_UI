@@ -1,3 +1,7 @@
+/**
+ * Sidebar navigation tree from navigation config.
+ * Flow: PageAccessContext filters sections → customer selector when applicable → route navigation.
+ */
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Settings as SettingsIcon, LayoutGrid } from 'lucide-react'
@@ -8,6 +12,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { Button } from '../ui/button'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { usePageAccess } from '@/contexts/PageAccessContext'
 import { PageAccessContext } from '@/contexts/PageAccessContext'
@@ -21,6 +26,8 @@ import {
 	type SidebarNavLink,
 	type SidebarSection,
 } from '@/config/navigation/sidebar'
+import { harmonizeRole } from '@/utils/roles'
+import { logger } from '@/utils/logger'
 
 interface SidebarNavigationProps {
 	onNavigate?: () => void
@@ -35,9 +42,10 @@ interface NavItemProps {
   onClick?: () => void
   className?: string
 	bypassAccessCheck?: boolean
+	disabled?: boolean
 }
 
-const NavItem = ({ to, icon, label, onClick, className, bypassAccessCheck }: NavItemProps) => {
+const NavItem = ({ to, icon, label, onClick, className, bypassAccessCheck, disabled = false }: NavItemProps) => {
 	const { hasAccess } = usePageAccess()
 	const { selectedCustomerId, isAdmin } = useCustomerSelection()
 	const navigate = useNavigate()
@@ -69,11 +77,12 @@ const NavItem = ({ to, icon, label, onClick, className, bypassAccessCheck }: Nav
 	// bypassAccessCheck is only used for special cases where NavItem might be used outside the normal flow
   
   const handleClick = (e: React.MouseEvent) => {
-		e.preventDefault()
 		e.stopPropagation()
+		if (disabled) {
+			return
+		}
     
-    console.group('🖱️ [SidebarNavigation] Link Click');
-    console.log('📍 Click Details:', {
+    logger.debug('[SidebarNavigation] Link Click', {
       label,
       originalTo: to,
       normalizedTo,
@@ -84,24 +93,22 @@ const NavItem = ({ to, icon, label, onClick, className, bypassAccessCheck }: Nav
     });
     
     if (isCustomerPage && isAdmin && !selectedCustomerId) {
-      console.warn('⚠️ [SidebarNavigation] Navigation blocked: Customer page requires customer selection');
-      console.log('📋 Block Details:', {
+      logger.debug('[SidebarNavigation] Navigation blocked: customer page requires customer selection');
+      logger.debug('[SidebarNavigation] Block details', {
         reason: 'Customer page accessed by admin without selectedCustomerId',
         action: 'No navigation performed'
       });
-      console.groupEnd();
 			return
     }
     
 		// Ensure path is normalized before navigation
 		const normalizedFinalTo = normalizePath(finalTo)
     
-    console.log('🚀 [SidebarNavigation] Executing navigation:', {
+    logger.debug('[SidebarNavigation] Executing navigation:', {
       from: location.pathname + location.search,
       to: normalizedFinalTo,
       timestamp: new Date().toISOString()
     });
-    console.groupEnd();
     
 		navigate(normalizedFinalTo)
 		onClick?.()
@@ -111,6 +118,9 @@ const NavItem = ({ to, icon, label, onClick, className, bypassAccessCheck }: Nav
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault()
 			e.stopPropagation()
+			if (disabled) {
+				return
+			}
       
       if (isCustomerPage && isAdmin && !selectedCustomerId) {
 				return
@@ -124,23 +134,25 @@ const NavItem = ({ to, icon, label, onClick, className, bypassAccessCheck }: Nav
   }
 
   return (
-    <a
-      href="#"
+    <button
+      type="button"
       className={cn(
 				'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
 				'hover:bg-accent hover:text-accent-foreground',
 				'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
 				isActive && 'bg-accent text-accent-foreground',
+				disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-inherit',
 				className,
       )}
       onClick={handleClick}
       tabIndex={0}
       onKeyDown={handleKeyDown}
       aria-label={`Navigate to ${label}`}
+			aria-disabled={disabled}
     >
       {icon}
       <span>{label}</span>
-    </a>
+    </button>
   )
 }
 
@@ -173,34 +185,24 @@ const canDisplayLink = (link: SidebarNavLink, context: SidebarGuardContext, avai
 }
 
 export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate, onMobileClose }) => {
-	// Try to get context, but handle gracefully if not available
-	let pageAccessContext;
-	try {
-		pageAccessContext = React.useContext(PageAccessContext);
-	} catch (error) {
-		// Context not available
-		pageAccessContext = undefined;
-	}
-	
-	// Safety check - if context is not available, return loading state
-	if (!pageAccessContext) {
-		return (
-			<div className="px-3 py-2">
-				<div className="text-sm text-gray-500 dark:text-gray-400">Loading navigation...</div>
-			</div>
-		);
-	}
-	
-	const { hasAccess, currentRole, isLoading, availablePages, pageAccessByRole } = pageAccessContext;
+	const pageAccessContext = React.useContext(PageAccessContext)
+	const hasAccess = React.useCallback((path: string) => {
+		return pageAccessContext ? pageAccessContext.hasAccess(path) : false
+	}, [pageAccessContext])
+	const currentRole = pageAccessContext?.currentRole ?? null
+	const isLoading = pageAccessContext?.isLoading ?? true
+	const availablePages = React.useMemo(() => pageAccessContext?.availablePages ?? [], [pageAccessContext?.availablePages])
+	const pageAccessByRole = React.useMemo(() => pageAccessContext?.pageAccessByRole ?? {}, [pageAccessContext?.pageAccessByRole])
 	const { user } = useAuth(); // Check user from AuthContext
 	const { selectedCustomerId, isAdmin } = useCustomerSelection()
 	const navigate = useNavigate()
 	const location = useLocation()
 	
 	// Compute guard context and sections (must be before early returns)
-	const isCustomerRole = currentRole === 'customersitemanager' || currentRole === 'customerhomanager'
-	const isAdministrator = currentRole === 'administrator'
-	const isOfficerRole = currentRole === 'advantageoneofficer' || currentRole === 'advantageonehoofficer'
+	const harmonizedRole = harmonizeRole(currentRole)
+	const isCustomerRole = harmonizedRole === 'customer'
+	const isAdministrator = harmonizedRole === 'administrator'
+	const isOfficerRole = harmonizedRole === 'securityofficer' || harmonizedRole === 'manager'
 
 	const guardContext: SidebarGuardContext = React.useMemo(() => ({
 		hasAccess,
@@ -211,8 +213,8 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
 
 	// Debug: Log current page access for officer role
 	React.useEffect(() => {
-		if (currentRole === 'advantageoneofficer' && import.meta.env.DEV) {
-			const officerPages = pageAccessByRole[currentRole] || [];
+		if (harmonizedRole === 'securityofficer') {
+			const officerPages = pageAccessByRole[currentRole || ''] || pageAccessByRole['securityofficer'] || [];
 			const customerReportingPages = officerPages.filter(id => 
 				id === 'management-customer-reporting' || id.includes('customer-reporting')
 			);
@@ -221,7 +223,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
 				p.id === 'management-customer-reporting'
 			);
 			
-			console.log(`🔍 [Sidebar] Officer role page access:`, {
+			logger.debug(`🔍 [Sidebar] Officer role page access:`, {
 				totalPages: officerPages.length,
 				customerReporting: {
 					enabled: customerReportingPages.length > 0,
@@ -237,25 +239,26 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
 	// Create a key based on pageAccessByRole to force re-render when settings change
 	const settingsKey = React.useMemo(() => {
 		if (currentRole && pageAccessByRole[currentRole]) {
-			return JSON.stringify(pageAccessByRole[currentRole].sort());
+			return JSON.stringify([...pageAccessByRole[currentRole]].sort())
 		}
-		return '';
-	}, [currentRole, pageAccessByRole]);
+		return ''
+	}, [currentRole, pageAccessByRole])
 
-	const pages = availablePages || []
+	const pages = React.useMemo(() => availablePages, [availablePages])
+	const [customerPageSearch, setCustomerPageSearch] = React.useState('')
 	
 	// Debug: Log available pages and page access for Customer Reporting
 	React.useEffect(() => {
-		if (currentRole === 'advantageoneofficer' && import.meta.env.DEV) {
+		if (harmonizedRole === 'securityofficer') {
 			const customerReportingPage = pages.find(p => 
 				p.path === '/management/customer-reporting' || 
 				p.id === 'management-customer-reporting'
 			);
 			const officerPages = pageAccessByRole[currentRole] || [];
 			const hasCustomerReporting = officerPages.includes('management-customer-reporting') || 
-			                               officerPages.some(id => id.includes('customer-reporting'));
+				officerPages.some(id => id.includes('customer-reporting'));
 			
-			console.log(`🔍 [Sidebar] Available pages and access check:`, {
+			logger.debug(`🔍 [Sidebar] Available pages and access check:`, {
 				totalAvailablePages: pages.length,
 				customerReportingPage: customerReportingPage ? {
 					id: customerReportingPage.id,
@@ -273,11 +276,11 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
 		const filtered = SIDEBAR_TOP_LINKS.filter((link) => canDisplayLink(link, guardContext, pages, currentRole));
 		
 		// Debug Customer Reporting specifically
-		if (import.meta.env.DEV && currentRole === 'advantageoneofficer') {
+		if (harmonizedRole === 'securityofficer') {
 			const customerReportingLink = SIDEBAR_TOP_LINKS.find(l => l.path === '/management/customer-reporting');
 			if (customerReportingLink) {
 				const willShow = canDisplayLink(customerReportingLink, guardContext, pages, currentRole);
-				console.log(`🔍 [Sidebar] Top-level Customer Reporting link:`, {
+				logger.debug(`🔍 [Sidebar] Top-level Customer Reporting link:`, {
 					willShow,
 					hasAccess: guardContext.hasAccess('/management/customer-reporting'),
 					pageInAvailablePages: !!pages.find(p => p.path === '/management/customer-reporting')
@@ -286,7 +289,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
 		}
 		
 		return filtered;
-	}, [guardContext, pages, currentRole, settingsKey]);
+	}, [guardContext, pages, currentRole]);
 
 	const visibleSections = React.useMemo(() => {
 		return SIDEBAR_SECTIONS.reduce<SidebarSection[]>((acc, section) => {
@@ -299,12 +302,12 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
 				const canDisplay = canDisplayLink(link, guardContext, pages, currentRole)
 				
 				// Enhanced debug logging for Customer Reporting specifically
-				if (link.path === '/management/customer-reporting' && import.meta.env.DEV) {
+				if (link.path === '/management/customer-reporting') {
 					const page = pages.find(p => p.path === link.path);
-					const officerPages = pageAccessByRole['advantageoneofficer'] || [];
+					const officerPages = pageAccessByRole['securityofficer'] || [];
 					const hasCustomerReporting = officerPages.includes('management-customer-reporting') || 
-					                               officerPages.some(id => id.includes('customer-reporting'));
-					console.log(`🔍 [Sidebar] Customer Reporting link check:`, {
+						officerPages.some(id => id.includes('customer-reporting'));
+					logger.debug(`🔍 [Sidebar] Customer Reporting link check:`, {
 						label: link.label,
 						path: link.path,
 						canDisplay,
@@ -319,8 +322,8 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
 				}
 				
 				// Debug logging for CRM section
-				if (section.id === 'crm' && import.meta.env.DEV) {
-					console.log(`🔍 [Sidebar] CRM link "${link.label}" (${link.path}):`, {
+				if (section.id === 'crm') {
+					logger.debug(`🔍 [Sidebar] CRM link "${link.label}" (${link.path}):`, {
 						canDisplay,
 						currentRole,
 						hasAccess: guardContext.hasAccess(link.path),
@@ -331,8 +334,8 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
 			})
 			
 			// Debug logging for CRM section
-			if (section.id === 'crm' && import.meta.env.DEV) {
-				console.log(`🔍 [Sidebar] CRM section filtered:`, {
+			if (section.id === 'crm') {
+				logger.debug(`🔍 [Sidebar] CRM section filtered:`, {
 					sectionId: section.id,
 					totalLinks: section.links.length,
 					filteredLinks: links.length,
@@ -348,7 +351,30 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
 			acc.push({ ...section, links })
 			return acc
 		}, [])
-	}, [guardContext, pages, currentRole, settingsKey])
+	}, [guardContext, pages, currentRole, settingsKey, pageAccessByRole])
+
+	const customerSection = React.useMemo(
+		() => visibleSections.find(section => section.id === 'customer') ?? null,
+		[visibleSections]
+	)
+
+	const filteredCustomerLinkPaths = React.useMemo(() => {
+		const section = customerSection
+		if (!section) return new Set<string>()
+		const term = customerPageSearch.trim().toLowerCase()
+		const links = term
+			? section.links.filter(link => link.label.toLowerCase().includes(term))
+			: section.links
+		return new Set(links.map(link => link.path))
+	}, [customerPageSearch, customerSection])
+
+	if (!pageAccessContext) {
+		return (
+			<div className="px-3 py-2">
+				<div className="text-sm text-gray-500 dark:text-gray-400">Loading navigation...</div>
+			</div>
+		)
+	}
   
   if (isLoading) {
     return (
@@ -425,8 +451,8 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
             <Button
               asChild
               className={cn(
-								'w-[180px] rounded-[20px] bg-white px-3 text-black hover:bg-white/90 flex h-9 items-center justify-start gap-2',
-								location.pathname === '/' && 'bg-white/90',
+								'flex h-9 w-[180px] items-center justify-start gap-2 rounded-[20px] border border-slate-200/80 bg-gradient-to-r from-white to-slate-100 px-3 text-slate-900 shadow-[0_8px_20px_-14px_rgba(148,163,184,0.8)] hover:from-white hover:to-slate-200',
+								location.pathname === '/' && 'from-white to-slate-200',
               )}
             >
               <a 
@@ -481,8 +507,35 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
                   </div>
                 )}
                 
-									{section.links.map((link) => {
+									{section.id === 'customer' && (
+										<div className="space-y-2 px-3 pb-2">
+											<div className="rounded-md border border-slate-200/70 bg-slate-50/80 p-2">
+												<p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+													Customer context
+												</p>
+												<p className="mt-1 text-xs text-slate-600">
+													{isAdmin
+														? selectedCustomerId
+															? `Selected customer ID: ${selectedCustomerId}`
+															: 'Select a customer below to open customer pages'
+														: 'Customer pages reflect your assigned customer context'}
+												</p>
+											</div>
+											<Input
+												value={customerPageSearch}
+												onChange={(event) => setCustomerPageSearch(event.target.value)}
+												placeholder="Search customer pages..."
+												className="h-8 border-slate-300 bg-white text-xs text-slate-900 placeholder:text-slate-500"
+												aria-label="Search customer pages"
+											/>
+										</div>
+									)}
+
+									{section.links
+										.filter(link => section.id !== 'customer' || filteredCustomerLinkPaths.has(link.path))
+										.map((link) => {
 										const Icon = link.icon
+										const customerSelectionRequired = section.id === 'customer' && isAdmin && !selectedCustomerId
 										return (
                   <NavItem
 												key={link.path}
@@ -491,9 +544,13 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate
 												label={link.label}
                     onClick={onNavigate}
 												bypassAccessCheck={link.bypassAccessCheck}
+												disabled={customerSelectionRequired}
                   />
 										)
 									})}
+									{section.id === 'customer' && filteredCustomerLinkPaths.size === 0 && (
+										<p className="px-3 py-2 text-xs text-slate-500">No customer pages match your search.</p>
+									)}
               </AccordionContent>
             </AccordionItem>
 						)

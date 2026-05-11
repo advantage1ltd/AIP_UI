@@ -1,3 +1,7 @@
+/**
+ * Guard certification tracking for compliance.
+ * Flow: certification filters → officer certification table → expiry and renewal tracking.
+ */
 import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -12,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Search, AlertCircle, Shield, Clock, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
-import { addMonths, differenceInMonths, format } from 'date-fns'
+import { differenceInMonths, format } from 'date-fns'
 import { LicenseForm } from '@/components/compliance/LicenseForm'
 import {
   AlertDialog,
@@ -35,41 +39,11 @@ interface GuardLicense {
   status: 'Active' | 'Expiring Soon' | 'Critical'
 }
 
-const sampleData: GuardLicense[] = [
-  {
-    id: '1',
-    officerName: 'John Smith',
-    licenseNumber: 'DS/123456789',
-    issueDate: new Date('2023-01-15'),
-    expiryDate: addMonths(new Date(), 1), // 1 month to expiry
-    licenseType: 'Door Supervision',
-    status: 'Critical'
-  },
-  {
-    id: '2',
-    officerName: 'Sarah Wilson',
-    licenseNumber: 'SG/987654321',
-    issueDate: new Date('2023-03-20'),
-    expiryDate: addMonths(new Date(), 2), // 2 months to expiry
-    licenseType: 'Security Guarding',
-    status: 'Expiring Soon'
-  },
-  {
-    id: '3',
-    officerName: 'Mike Johnson',
-    licenseNumber: 'CCTV/456789123',
-    issueDate: new Date('2023-06-10'),
-    expiryDate: addMonths(new Date(), 4), // 4 months to expiry
-    licenseType: 'CCTV',
-    status: 'Active'
-  }
-]
-
 const GuardCertificationPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStatus, setSelectedStatus] = useState<string>('')
   const [selectedType, setSelectedType] = useState<string>('')
-  const [licenses, setLicenses] = useState<GuardLicense[]>(sampleData)
+  const [licenses, setLicenses] = useState<GuardLicense[]>([])
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedLicense, setSelectedLicense] = useState<GuardLicense | null>(null)
@@ -107,12 +81,12 @@ const GuardCertificationPage = () => {
     return 'bg-green-500'
   }
 
-  // Calculate statistics
+  // Calculate statistics from loaded licenses
   const stats = {
-    totalOfficers: sampleData.length,
-    expiringCritical: sampleData.filter(g => getExpiryStatus(g.expiryDate) === 'Critical').length,
-    expiringSoon: sampleData.filter(g => getExpiryStatus(g.expiryDate) === 'Expiring Soon').length,
-    active: sampleData.filter(g => getExpiryStatus(g.expiryDate) === 'Active').length
+    totalOfficers: licenses.length,
+    expiringCritical: licenses.filter((g) => getExpiryStatus(g.expiryDate) === 'Critical').length,
+    expiringSoon: licenses.filter((g) => getExpiryStatus(g.expiryDate) === 'Expiring Soon').length,
+    active: licenses.filter((g) => getExpiryStatus(g.expiryDate) === 'Active').length,
   }
 
   const handleAddLicense = (data: any) => {

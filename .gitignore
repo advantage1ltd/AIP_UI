@@ -40,3 +40,7 @@ yarn-error.log*
 
 # Optional eslint cache
 .eslintcache
+
+#appsettings
+.appsettings.json
+.appsettings.Development.json

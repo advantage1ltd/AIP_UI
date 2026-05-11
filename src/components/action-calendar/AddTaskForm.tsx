@@ -1,3 +1,7 @@
+/**
+ * Create-task form for the action calendar.
+ * Flow: active employee list → validated task fields → parent onSubmit with selected due date.
+ */
 import { useState, useEffect, useMemo } from 'react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
@@ -6,11 +10,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Task } from '@/pages/ActionCalendar'
 import { Label } from '@/components/ui/label'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { DatePicker } from '@/components/ui/date-picker'
 import { cn } from '@/lib/utils'
-import { format } from 'date-fns'
-import { Calendar as CalendarIcon, ArrowUpCircle, MinusCircle, ArrowDownCircle, Loader2 } from 'lucide-react'
+import { ArrowUpCircle, MinusCircle, ArrowDownCircle, Loader2 } from 'lucide-react'
 import { employeeService } from '@/services/employeeService'
 import { Employee } from '@/types/employee'
 import { useToast } from '@/hooks/use-toast'
@@ -31,16 +33,22 @@ const formSchema = z.object({
   })
 })
 
+// === Component ===
 export function AddTaskForm({ onSubmit, selectedDate }: AddTaskFormProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<Task['priority']>('medium')
+  /** Empty string = none chosen — Radix Select must stay controlled (never undefined → defined). */
   const [assignee, setAssignee] = useState('')
   const [assigneeEmail, setAssigneeEmail] = useState<string | undefined>()
   const [date, setDate] = useState<Date>(selectedDate)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loadingEmployees, setLoadingEmployees] = useState(true)
   const { toast } = useToast()
+
+  useEffect(() => {
+    setDate(selectedDate)
+  }, [selectedDate])
 
   // Fetch employees on component mount
   useEffect(() => {
@@ -84,13 +92,15 @@ export function AddTaskForm({ onSubmit, selectedDate }: AddTaskFormProps) {
       return
     }
 
+    const payload = validation.data
+
     onSubmit({
-      title,
-      description,
-      date,
-      priority,
-      assignee,
-      email: assigneeEmail
+      title: payload.title,
+      description: payload.description,
+      date: payload.date,
+      priority: payload.priority,
+      assignee: payload.assignee,
+      email: payload.assigneeEmail
     })
   }
 
@@ -107,19 +117,6 @@ export function AddTaskForm({ onSubmit, selectedDate }: AddTaskFormProps) {
     setAssignee(value)
     const matchedEmployee = employees.find(employee => employee.userId === value)
     setAssigneeEmail(matchedEmployee?.email)
-  }
-
-  const getPriorityIcon = (priority: Task['priority']) => {
-    switch (priority) {
-      case 'high':
-        return <ArrowUpCircle className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
-      case 'medium':
-        return <MinusCircle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500" />
-      case 'low':
-        return <ArrowDownCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-      default:
-        return null
-    }
   }
 
   const getEmployeeDisplayName = (employee: Employee) => {
@@ -193,7 +190,7 @@ export function AddTaskForm({ onSubmit, selectedDate }: AddTaskFormProps) {
             </p>
           )}
           <Select 
-            value={assignee || undefined} 
+            value={assignee} 
             onValueChange={handleAssigneeSelect}
             disabled={loadingEmployees || employees.length === 0}
           >
@@ -241,36 +238,25 @@ export function AddTaskForm({ onSubmit, selectedDate }: AddTaskFormProps) {
       </div>
 
       <div className="space-y-1 sm:space-y-2">
-        <Label className="text-sm sm:text-base">Due Date</Label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant={"outline"}
-              className={cn(
-                "w-full justify-start text-left font-normal border-purple-100 focus:ring-purple-500 text-sm sm:text-base",
-                !date && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-              {date ? format(date, "PPP") : <span>Pick a date</span>}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={(date) => date && setDate(date)}
-              initialFocus
-              className="rounded-md border shadow-sm"
-            />
-          </PopoverContent>
-        </Popover>
+        <Label id="due-date-label" className="text-sm sm:text-base">
+          Due date
+        </Label>
+        <DatePicker
+          date={date}
+          setDate={(next) => {
+            if (next) setDate(next)
+          }}
+          placeholder="Pick due date"
+          allowYearSelect
+          fromYear={new Date().getFullYear() - 10}
+          toYear={new Date().getFullYear() + 15}
+        />
       </div>
 
       <Button 
         type="submit" 
         className="w-full bg-purple-600 hover:bg-purple-700 mt-2 sm:mt-4 text-sm sm:text-base py-2 sm:py-2.5"
-        disabled={loadingEmployees || !assignee}
+        disabled={loadingEmployees || assignee === undefined || assignee === ''}
       >
         Create Task
       </Button>

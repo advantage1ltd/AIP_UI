@@ -1,3 +1,4 @@
+/** Redux store: users, CRM contacts, and recruitment quiz slices (legacy; most screens use React Query). */
 import { configureStore } from '@reduxjs/toolkit'
 import usersReducer from './features/users/usersSlice'
 import contactsReducer from './features/contactsSlice'

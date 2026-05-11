@@ -1,11 +1,15 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+/**
+ * Management customer reporting aggregates.
+ * Flow: customer and site pickers → enabled customer pages → deep links into customer modules.
+ */
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { CustomerWithRelations, CustomerPage } from '@/types/customer';
+import type { Customer, CustomerPage, Site } from '@/types/customer';
 import { CUSTOMER_PAGES } from '@/config/customerPages';
 import { BASE_API_URL, api } from '@/config/api';
 import { BackendApiResponse, getApiData } from '@/types/backend-api';
-import { User } from '@/types/user';
+import type { StaffUser, User } from '@/types/user';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,8 +52,9 @@ import {
 import { customerService } from '@/services/customerService';
 import { customerPageAccessCache } from '@/services/customerPageAccessCache';
 import { siteService } from '@/services/siteService';
-import type { Site } from '@/types/customer';
 import type { CustomerPageAccessPage } from '@/api/customerPageAccess';
+import { filterAssignedCustomerPages } from '@/utils/customer-page-access-display';
+import { harmonizeRole } from '@/utils/roles';
 import { cn } from '@/lib/utils';
 
 const iconMap = {
@@ -65,13 +70,6 @@ const iconMap = {
   Users,
   FileText
 };
-
-interface Site {
-  id: string;
-  locationName: string;
-  customerId: number;
-  regionId?: string;
-}
 
 type ReportingStep = 'customer' | 'page' | 'site';
 
@@ -93,7 +91,7 @@ const mapAccessPageToCustomerPage = (page: CustomerPageAccessPage): CustomerPage
   };
 };
 
-const resolveNumericCustomerId = (customer: CustomerWithRelations): number | null => {
+const resolveNumericCustomerId = (customer: Customer): number | null => {
   const candidates = [
     (customer as any)?.id,
     (customer as any)?.customerId,
@@ -119,7 +117,7 @@ const resolveNumericCustomerId = (customer: CustomerWithRelations): number | nul
   return null;
 };
 
-const buildCustomerKey = (customer: CustomerWithRelations, index: number): string => {
+const buildCustomerKey = (customer: Customer, index: number): string => {
   const numericId = resolveNumericCustomerId(customer);
   if (numericId !== null) {
     return `customer-${numericId}`;
@@ -150,6 +148,9 @@ const areCustomerIdsEqual = (left: number[], right: number[]): boolean => {
 	return leftSorted.every((value, index) => value === rightSorted[index])
 }
 
+const reportingWizardStorageKey = (userId: string | number | undefined): string | null =>
+	userId != null && userId !== '' ? `aip-customer-reporting-wizard:${userId}` : null
+
 // Step indicator component
 const StepIndicator = ({ 
   step, 
@@ -171,7 +172,7 @@ const StepIndicator = ({
   return (
     <div className="flex items-center gap-3">
       <div className={cn(
-        "h-10 w-10 rounded-full flex items-center justify-center transition-all duration-300",
+        "h-10 w-10 rounded-full flex items-center justify-center",
         isCurrent && "bg-blue-600 text-white shadow-lg shadow-blue-500/30",
         isPast || isCompleted ? "bg-emerald-500 text-white" : "",
         !isCurrent && !isPast && !isCompleted && "bg-gray-100 text-gray-400 border-2 border-gray-200"
@@ -196,8 +197,9 @@ const StepIndicator = ({
   );
 };
 
+// === Component ===
 export default function CustomerReportingPage(): React.JSX.Element {
-  const [customers, setCustomers] = useState<CustomerWithRelations[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingSites, setIsLoadingSites] = useState(false);
@@ -206,7 +208,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
   
   // Wizard state
   const [currentStep, setCurrentStep] = useState<ReportingStep>('customer');
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithRelations | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedPage, setSelectedPage] = useState<CustomerPage | null>(null);
   const [selectedSite, setSelectedSite] = useState<Site | null>(null);
   const [assignedPageCounts, setAssignedPageCounts] = useState<Record<string, number>>({});
@@ -223,9 +225,17 @@ export default function CustomerReportingPage(): React.JSX.Element {
   const { user } = useAuth();
   const navigate = useNavigate();
   const assignedCustomerIdsKey = useMemo(() => {
-    if (!user?.assignedCustomerIds || user.assignedCustomerIds.length === 0) return '';
-    return [...user.assignedCustomerIds].sort((a, b) => a - b).join('|');
-  }, [user?.assignedCustomerIds]);
+    const ids = user && 'assignedCustomerIds' in user ? user.assignedCustomerIds : undefined
+    if (!ids?.length) return '';
+    return [...ids].sort((a, b) => a - b).join('|');
+  }, [user]);
+
+  const isOfficerViewer = useMemo(
+    () => harmonizeRole(user?.pageAccessRole ?? user?.role) === 'securityofficer',
+    [user?.pageAccessRole, user?.role]
+  );
+
+  const restoreAttemptedRef = useRef(false);
 
   const fetchCustomerReportingData = async () => {
     try {
@@ -241,8 +251,10 @@ export default function CustomerReportingPage(): React.JSX.Element {
 
       let customerData = await customerService.getAllCustomers();
 
-      if (user.role === 'advantageoneofficer') {
-        let assignedCustomerIds = normalizeAssignedCustomerIds(user.assignedCustomerIds) ?? [];
+      if (harmonizeRole(user.pageAccessRole ?? user.role) === 'securityofficer') {
+        let assignedCustomerIds = normalizeAssignedCustomerIds(
+          'assignedCustomerIds' in user ? user.assignedCustomerIds : undefined
+        ) ?? [];
 
         try {
           const response = await api.get<BackendApiResponse<AuthUserPayload>>('/Auth/me');
@@ -252,11 +264,13 @@ export default function CustomerReportingPage(): React.JSX.Element {
           );
 
           if (latestAssignedIds && !areCustomerIdsEqual(latestAssignedIds, assignedCustomerIds)) {
-            const updatedUser: User = {
-              ...user,
-              assignedCustomerIds: latestAssignedIds
-            };
-            window.dispatchEvent(new CustomEvent<User>('user-assignments-updated', { detail: updatedUser }));
+            if (user.role !== 'customer') {
+              const updatedUser: StaffUser = {
+                ...user,
+                assignedCustomerIds: latestAssignedIds,
+              };
+              window.dispatchEvent(new CustomEvent<User>('user-assignments-updated', { detail: updatedUser }));
+            }
             assignedCustomerIds = latestAssignedIds;
           }
         } catch (error) {
@@ -284,7 +298,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
       }
 
       setCustomers(customerData);
-      await preloadAssignedCounts(customerData);
+      void preloadAssignedCounts(customerData);
       
     } catch (error) {
       console.error('Error fetching customer data:', error);
@@ -294,16 +308,25 @@ export default function CustomerReportingPage(): React.JSX.Element {
     }
   };
 
-  const preloadAssignedCounts = async (customerList: CustomerWithRelations[]) => {
+  const preloadAssignedCounts = async (customerList: Customer[]) => {
     try {
+      const forcePageAccessRefresh =
+        !!user &&
+        harmonizeRole(user.pageAccessRole ?? user.role) === 'securityofficer';
+
       const entries = await Promise.all(
         customerList.map(async (customer) => {
           const numericId = resolveNumericCustomerId(customer);
           if (numericId === null) return null;
 
           try {
-            const access = await customerPageAccessCache.get(numericId);
-            return [String(numericId), access.assignedPageIds.length] as const;
+            const access = await customerPageAccessCache.get(numericId, {
+              force: forcePageAccessRefresh,
+            });
+            return [
+              String(numericId),
+              filterAssignedCustomerPages(access.availablePages, access.assignedPageIds).length,
+            ] as const;
           } catch (error) {
             return [String(numericId), 0] as const;
           }
@@ -322,30 +345,32 @@ export default function CustomerReportingPage(): React.JSX.Element {
     }
   };
 
-  const fetchSitesForCustomer = async (customerId: number) => {
+  const fetchSitesForCustomer = useCallback(async (customerId: number): Promise<Site[]> => {
     try {
       setIsLoadingSites(true);
       const response = await siteService.getSitesByCustomer(customerId);
-      
-      if (response.success) {
-        const sortedSites = response.data.sort((a, b) =>
+
+      if (response.success && response.data?.length) {
+        const sortedSites = [...response.data].sort((a, b) =>
           (a.locationName || '').localeCompare(b.locationName || '')
         );
         setSites(sortedSites);
-      } else {
-        setSites([]);
+        return sortedSites;
       }
+      setSites([]);
+      return [];
     } catch (error) {
       console.error('Error fetching sites:', error);
       setSites([]);
+      return [];
     } finally {
       setIsLoadingSites(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchCustomerReportingData();
-  }, [user?.id, user?.role, assignedCustomerIdsKey]);
+  }, [user?.id, user?.role, user?.pageAccessRole, assignedCustomerIdsKey]);
 
   useEffect(() => {
     const handleUserAssignmentUpdate = () => {
@@ -357,22 +382,22 @@ export default function CustomerReportingPage(): React.JSX.Element {
     return () => {
       window.removeEventListener('user-assignments-updated', handleUserAssignmentUpdate as EventListener);
     };
-  }, [user?.id, user?.role]);
+  }, [user?.id, user?.role, user?.pageAccessRole]);
 
   const getIcon = (iconName: string | undefined) => {
     if (!iconName) return FileText;
     return iconMap[iconName as keyof typeof iconMap] || FileText;
   };
 
-  const loadPagesForCustomer = useCallback(async (customerId: number) => {
+  const loadPagesForCustomer = useCallback(async (customerId: number): Promise<CustomerPage[]> => {
     try {
       setPageAccessState({ isLoading: true, error: null, pages: [] });
-      
-      const access = await customerPageAccessCache.get(customerId, { force: false });
-      
-      const assignedPages = access.availablePages
-        .filter(page => access.assignedPageIds.includes(page.pageId))
-        .map(mapAccessPageToCustomerPage);
+
+      const access = await customerPageAccessCache.get(customerId);
+
+      const assignedPages = filterAssignedCustomerPages(access.availablePages, access.assignedPageIds).map(
+        mapAccessPageToCustomerPage
+      );
 
       setPageAccessState({
         isLoading: false,
@@ -384,6 +409,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
         ...prev,
         [String(customerId)]: assignedPages.length
       }));
+      return assignedPages;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load customer pages';
       setPageAccessState({
@@ -391,27 +417,105 @@ export default function CustomerReportingPage(): React.JSX.Element {
         error: message,
         pages: []
       });
+      return [];
     }
   }, []);
 
-  const handleCustomerSelect = (customer: CustomerWithRelations) => {
-    setSelectedCustomer(customer);
-    setSelectedPage(null);
-    setSelectedSite(null);
-    setCurrentStep('page');
+  const selectReportingCustomer = useCallback(
+    async (
+      customer: Customer,
+      preserveSelection?: { pagePath?: string; siteId?: number | string }
+    ) => {
+      setSelectedCustomer(customer);
+      const numericId = resolveNumericCustomerId(customer);
 
-    const numericId = resolveNumericCustomerId(customer);
-    if (numericId !== null) {
-      loadPagesForCustomer(numericId);
-      fetchSitesForCustomer(numericId);
-    } else {
-      setPageAccessState({
-        isLoading: false,
-        error: 'Invalid customer identifier',
-        pages: []
-      });
-    }
+      if (numericId === null) {
+        setSelectedPage(null);
+        setSelectedSite(null);
+        setCurrentStep('page');
+        setPageAccessState({
+          isLoading: false,
+          error: 'Invalid customer identifier',
+          pages: []
+        });
+        setSites([]);
+        return;
+      }
+
+      const pagePath = preserveSelection?.pagePath;
+      const shouldPreserve = Boolean(pagePath);
+
+      if (!shouldPreserve) {
+        setSelectedPage(null);
+        setSelectedSite(null);
+        setCurrentStep('page');
+      }
+
+      const [pages, loadedSites] = await Promise.all([
+        loadPagesForCustomer(numericId),
+        fetchSitesForCustomer(numericId),
+      ]);
+
+      if (shouldPreserve && pagePath) {
+        const matchPage = pages.find(
+          (p) => p.path === pagePath || String(p.id) === String(pagePath)
+        );
+        if (matchPage) {
+          setSelectedPage(matchPage);
+          setCurrentStep('site');
+          const rawSiteId = preserveSelection?.siteId;
+          if (rawSiteId != null && rawSiteId !== '') {
+            const sid = Number(rawSiteId);
+            const matchSite = loadedSites.find((s) => Number(s.siteID) === sid);
+            setSelectedSite(matchSite ?? null);
+          } else {
+            setSelectedSite(null);
+          }
+          return;
+        }
+      }
+
+      if (shouldPreserve) {
+        setSelectedPage(null);
+        setSelectedSite(null);
+        setCurrentStep('page');
+      }
+    },
+    [loadPagesForCustomer, fetchSitesForCustomer]
+  );
+
+  const handleCustomerSelect = (customer: Customer) => {
+    void selectReportingCustomer(customer);
   };
+
+  useEffect(() => {
+    if (!isOfficerViewer || !user?.id || customers.length === 0 || restoreAttemptedRef.current) {
+      return;
+    }
+    const key = reportingWizardStorageKey(user.id);
+    if (!key) return;
+
+    let parsed: { customerId?: number; pagePath?: string; siteId?: number | string };
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return;
+      parsed = JSON.parse(raw) as typeof parsed;
+    } catch {
+      return;
+    }
+
+    const cid = parsed.customerId != null ? Number(parsed.customerId) : NaN;
+    if (!Number.isFinite(cid)) return;
+
+    const customerMatch = customers.find((c) => resolveNumericCustomerId(c) === cid);
+    if (!customerMatch) return;
+
+    restoreAttemptedRef.current = true;
+    void selectReportingCustomer(customerMatch, {
+      pagePath: parsed.pagePath,
+      siteId: parsed.siteId,
+    });
+  }, [isOfficerViewer, user?.id, customers, selectReportingCustomer]);
 
   useEffect(() => {
     const handlePageAccessUpdate = (event: CustomEvent) => {
@@ -420,7 +524,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
       
       if (numericId !== null && numericId === customerId) {
         customerPageAccessCache.clear(customerId);
-        loadPagesForCustomer(numericId);
+        void loadPagesForCustomer(numericId);
       }
     };
 
@@ -443,12 +547,30 @@ export default function CustomerReportingPage(): React.JSX.Element {
 
   const handleNavigateToReport = () => {
     if (!selectedCustomer || !selectedPage || !selectedSite) return;
-    
+
     const numericCustomerId = resolveNumericCustomerId(selectedCustomer);
     const customerIdForUrl = numericCustomerId ?? selectedCustomer.id;
-    
+
     if (!customerIdForUrl) return;
-    
+
+    if (isOfficerViewer && user?.id != null) {
+      const key = reportingWizardStorageKey(user.id);
+      if (key) {
+        try {
+          sessionStorage.setItem(
+            key,
+            JSON.stringify({
+              customerId: Number(customerIdForUrl),
+              pagePath: selectedPage.path,
+              siteId: selectedSite.siteID,
+            })
+          );
+        } catch {
+          /* ignore quota / private mode */
+        }
+      }
+    }
+
     const url = `${selectedPage.path}?customerId=${customerIdForUrl}&siteId=${selectedSite.siteID}`;
     navigate(url);
   };
@@ -458,6 +580,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
     setSelectedCustomer(null);
     setSelectedPage(null);
     setSelectedSite(null);
+    restoreAttemptedRef.current = false;
   };
 
   const handleBackToPages = () => {
@@ -471,15 +594,15 @@ export default function CustomerReportingPage(): React.JSX.Element {
   );
 
   const availablePages = pageAccessState.pages;
+  const totalAssignedReports = Object.values(assignedPageCounts).reduce((sum, value) => sum + value, 0);
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#EFF4FF]">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="container mx-auto max-w-screen-2xl px-4 py-8 lg:px-8">
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <div className="relative">
-              <div className="h-20 w-20 rounded-full border-4 border-blue-100 animate-pulse" />
-              <Loader2 className="h-10 w-10 text-blue-600 animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+            <div className="h-20 w-20 rounded-2xl bg-blue-100 flex items-center justify-center">
+              <FileBarChart className="h-10 w-10 text-blue-600" />
             </div>
             <p className="mt-6 text-gray-600 font-medium">Loading customer data...</p>
           </div>
@@ -491,7 +614,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
   if (error) {
     return (
       <div className="min-h-screen bg-[#EFF4FF]">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="container mx-auto max-w-screen-2xl px-4 py-8 lg:px-8">
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
             <div className="h-20 w-20 rounded-2xl bg-red-100 flex items-center justify-center mb-5">
               <AlertCircle className="h-10 w-10 text-red-600" />
@@ -510,27 +633,41 @@ export default function CustomerReportingPage(): React.JSX.Element {
 
   return (
     <div className="min-h-screen bg-[#EFF4FF]">
-      <div className="container mx-auto px-4 py-6 max-w-7xl space-y-6">
+      <div className="container mx-auto max-w-screen-2xl px-4 py-6 lg:px-8 lg:py-8 space-y-6">
         
-        {/* Modern Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                <FileBarChart className="h-6 w-6 text-white" />
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                  <FileBarChart className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Customer Reporting</h1>
+                  <p className="text-gray-500 text-sm">
+                    Select a customer, choose a report type, and pick a site
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Customer Reporting</h1>
-                <p className="text-gray-500 text-sm">
-                  Select a customer, choose a report type, and pick a site
-                </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-auto">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Customers</p>
+                <p className="text-base font-semibold text-slate-900">{customers.length}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Assigned reports</p>
+                <p className="text-base font-semibold text-slate-900">{totalAssignedReports}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Sites loaded</p>
+                <p className="text-base font-semibold text-slate-900">{sites.length}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Progress Steps - Modern Design */}
-        <Card className="border-0 shadow-md bg-white overflow-hidden">
+        <Card className="overflow-hidden border-slate-200 shadow-sm bg-white">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <StepIndicator 
@@ -543,7 +680,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
               
               <div className="flex-1 mx-4 h-1 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
                 <div className={cn(
-                  "h-full bg-gradient-to-r from-emerald-500 to-blue-500 transition-all duration-500",
+                  "h-full bg-gradient-to-r from-emerald-500 to-blue-500",
                   currentStep === 'customer' && "w-0",
                   currentStep === 'page' && "w-1/2",
                   currentStep === 'site' && "w-full"
@@ -560,7 +697,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
               
               <div className="flex-1 mx-4 h-1 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
                 <div className={cn(
-                  "h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500",
+                  "h-full bg-gradient-to-r from-blue-500 to-purple-500",
                   (currentStep === 'customer' || currentStep === 'page') && "w-0",
                   currentStep === 'site' && selectedSite && "w-full",
                   currentStep === 'site' && !selectedSite && "w-1/2"
@@ -578,16 +715,55 @@ export default function CustomerReportingPage(): React.JSX.Element {
           </CardContent>
         </Card>
 
+        {isOfficerViewer && selectedCustomer && currentStep !== 'customer' && (
+          <Card className="border-blue-100 bg-blue-50/40 shadow-sm overflow-hidden">
+            <CardContent className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-slate-900">Switch assigned customer</p>
+                <p className="text-xs text-slate-600">
+                  Keep the same report and site when they exist for the next customer
+                </p>
+              </div>
+              <Select
+                value={String(resolveNumericCustomerId(selectedCustomer) ?? '')}
+                onValueChange={(value) => {
+                  const next = customers.find((c) => String(resolveNumericCustomerId(c)) === value);
+                  if (!next) return;
+                  void selectReportingCustomer(next, {
+                    pagePath: selectedPage?.path,
+                    siteId: selectedSite?.siteID,
+                  });
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-80 bg-white" aria-label="Switch customer">
+                  <SelectValue placeholder="Customer" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {customers.map((c) => {
+                    const id = resolveNumericCustomerId(c);
+                    if (id === null) return null;
+                    return (
+                      <SelectItem key={String(id)} value={String(id)}>
+                        {c.companyName}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Step 1: Customer Selection */}
         {currentStep === 'customer' && (
           <div className="space-y-6">
-            <Card className="border-0 shadow-md bg-white">
-              <CardHeader className="border-b bg-gradient-to-r from-gray-50 to-white">
+            <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+              <CardHeader className="border-b border-slate-200 bg-slate-50/60">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <Building2 className="h-5 w-5 text-indigo-600" />
                     <CardTitle className="text-lg">Select a Customer</CardTitle>
-                    <Badge className="bg-indigo-100 text-indigo-700 border-0">
+                    <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-200">
                       {filteredCustomers.length} available
                     </Badge>
                   </div>
@@ -613,19 +789,19 @@ export default function CustomerReportingPage(): React.JSX.Element {
                     return (
                       <Card 
                         key={buildCustomerKey(customer, index)} 
-                        className="cursor-pointer border border-gray-200 hover:border-indigo-300 hover:shadow-lg transition-all duration-200 group"
+                        className="cursor-pointer border border-gray-200 hover:border-indigo-300 hover:shadow-lg group"
                         onClick={() => handleCustomerSelect(customer)}
                       >
                         <CardContent className="p-5">
                           <div className="flex items-start justify-between mb-3">
-                            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center group-hover:from-indigo-200 group-hover:to-purple-200 transition-colors">
+                            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center group-hover:from-indigo-200 group-hover:to-purple-200">
                               <Building2 className="h-5 w-5 text-indigo-600" />
                             </div>
                             <Badge variant="outline" className="text-xs bg-gray-50">
                               ID: {customer.id}
                             </Badge>
                           </div>
-                          <h3 className="font-semibold text-gray-900 mb-2 group-hover:text-indigo-600 transition-colors">
+                          <h3 className="font-semibold text-gray-900 mb-2 group-hover:text-indigo-600">
                             {customer.companyName}
                           </h3>
                           <p className="text-sm text-gray-500 mb-4 line-clamp-1">
@@ -638,7 +814,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
                             <Badge className="bg-emerald-100 text-emerald-700 border-0">
                               {assignedCount} Reports
                             </Badge>
-                            <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+                            <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500" />
                           </div>
                         </CardContent>
                       </Card>
@@ -655,7 +831,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
                     <p className="text-gray-500 mb-6 max-w-sm mx-auto">
                       {searchTerm ? 'Try adjusting your search criteria.' : 'No customers are available for reporting.'}
                     </p>
-                    {user?.role === 'advantageoneofficer' && (
+                    {harmonizeRole(user?.pageAccessRole ?? user?.role) === 'securityofficer' && (
                       <Button
                         onClick={async () => {
                           try {
@@ -664,12 +840,12 @@ export default function CustomerReportingPage(): React.JSX.Element {
                             const latestAssignedIds = normalizeAssignedCustomerIds(
                               userData?.assignedCustomerIds ?? userData?.AssignedCustomerIds
                             )
-                            if (latestAssignedIds) {
-                              const updatedUser: User = {
+                            if (latestAssignedIds && user && user.role !== 'customer') {
+                              const updatedUser: StaffUser = {
                                 ...user,
-                                assignedCustomerIds: latestAssignedIds
-                              }
-                              window.dispatchEvent(new CustomEvent<User>('user-assignments-updated', { detail: updatedUser }))
+                                assignedCustomerIds: latestAssignedIds,
+                              };
+                              window.dispatchEvent(new CustomEvent<User>('user-assignments-updated', { detail: updatedUser }));
                             }
                             fetchCustomerReportingData()
                           } catch (error) {
@@ -693,8 +869,8 @@ export default function CustomerReportingPage(): React.JSX.Element {
         {/* Step 2: Page Selection */}
         {currentStep === 'page' && selectedCustomer && (
           <div className="space-y-6">
-            <Card className="border-0 shadow-md bg-white">
-              <CardHeader className="border-b bg-gradient-to-r from-gray-50 to-white">
+            <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+              <CardHeader className="border-b border-slate-200 bg-slate-50/60">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-3 mb-1">
@@ -712,7 +888,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
               <CardContent className="p-6">
                 {pageAccessState.isLoading && (
                   <div className="text-center py-16">
-                    <Loader2 className="h-10 w-10 text-blue-600 animate-spin mx-auto mb-4" />
+                    <FileText className="h-10 w-10 text-blue-600 mx-auto mb-4" />
                     <p className="text-gray-600">Loading available reports...</p>
                   </div>
                 )}
@@ -733,21 +909,21 @@ export default function CustomerReportingPage(): React.JSX.Element {
                       return (
                         <Card 
                           key={page.id} 
-                          className="cursor-pointer border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 group"
+                          className="cursor-pointer border border-gray-200 hover:border-blue-300 hover:shadow-lg group"
                           onClick={() => handlePageSelect(page)}
                         >
                           <CardContent className="p-5">
                             <div className="flex items-start gap-4">
-                              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center group-hover:from-blue-200 group-hover:to-indigo-200 transition-colors flex-shrink-0">
+                              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center group-hover:from-blue-200 group-hover:to-indigo-200 flex-shrink-0">
                                 <IconComponent className="h-6 w-6 text-blue-600" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">
+                                <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600">
                                   {page.title}
                                 </h3>
                                 <p className="text-sm text-gray-500 line-clamp-2">{page.description}</p>
                               </div>
-                              <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                              <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-blue-500 flex-shrink-0" />
                             </div>
                           </CardContent>
                         </Card>
@@ -775,8 +951,8 @@ export default function CustomerReportingPage(): React.JSX.Element {
         {/* Step 3: Site Selection */}
         {currentStep === 'site' && selectedCustomer && selectedPage && (
           <div className="space-y-6">
-            <Card className="border-0 shadow-md bg-white">
-              <CardHeader className="border-b bg-gradient-to-r from-gray-50 to-white">
+            <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+              <CardHeader className="border-b border-slate-200 bg-slate-50/60">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-3 mb-1">
@@ -796,13 +972,13 @@ export default function CustomerReportingPage(): React.JSX.Element {
               <CardContent className="p-6">
                 {isLoadingSites ? (
                   <div className="text-center py-16">
-                    <Loader2 className="h-10 w-10 text-purple-600 animate-spin mx-auto mb-4" />
+                    <MapPin className="h-10 w-10 text-purple-600 mx-auto mb-4" />
                     <p className="text-gray-600">Loading sites...</p>
                   </div>
                 ) : sites.length > 0 ? (
                   <div className="max-w-xl mx-auto space-y-6">
                     {/* Info Card */}
-                    <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50">
+                    <Card className="border-amber-200 bg-amber-50/70">
                       <CardContent className="p-4">
                         <div className="flex gap-3">
                           <Info className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -832,7 +1008,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
                           }
                         }}
                       >
-                        <SelectTrigger className="w-full h-12 bg-gray-50 border-gray-200">
+                        <SelectTrigger className="w-full h-12 bg-white border-slate-300">
                           <SelectValue placeholder="Select a site..." />
                         </SelectTrigger>
                         <SelectContent className="max-h-60">
@@ -854,7 +1030,7 @@ export default function CustomerReportingPage(): React.JSX.Element {
                       {selectedSite && (
                         <Button 
                           onClick={handleNavigateToReport} 
-                          className="w-full h-12 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg"
+                          className="w-full h-12 bg-blue-600 hover:bg-blue-700 shadow-sm"
                         >
                           <span>Continue to Report</span>
                           <ChevronRight className="h-5 w-5 ml-2" />

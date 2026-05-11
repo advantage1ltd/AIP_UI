@@ -1,3 +1,7 @@
+/**
+ * Signed-in user profile view and edits.
+ * Flow: load current user → validated profile form → userService update and optional photo upload.
+ */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
@@ -6,13 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Alert } from '@/components/ui/alert'
 import { toast } from '@/components/ui/use-toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Camera, Loader2, Save, User as UserIcon, KeyRound } from 'lucide-react'
+import { Camera, Loader2, Save, User as UserIcon, KeyRound, Mail } from 'lucide-react'
 import { api } from '@/config/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { sessionStore } from '@/state/sessionStore'
@@ -61,6 +66,10 @@ const Profile = () => {
 
 	const [isSavingProfile, setIsSavingProfile] = useState(false)
 	const [isChangingPassword, setIsChangingPassword] = useState(false)
+	const [isUpdatingTwoFactor, setIsUpdatingTwoFactor] = useState(false)
+	const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(Boolean(user?.twoFactorEnabled))
+	const [isUpdatingSignInNotification, setIsUpdatingSignInNotification] = useState(false)
+	const [notifySignInEmail, setNotifySignInEmail] = useState<boolean>(Boolean(user?.notifySignInEmail))
 
 	const [employeeLoading, setEmployeeLoading] = useState(false)
 	const [employeeError, setEmployeeError] = useState<string | null>(null)
@@ -87,6 +96,11 @@ const Profile = () => {
 	}, [user])
 
 	const displayPhotoFile = employeePhotoFile || localProfilePhotoFile || ''
+
+	useEffect(() => {
+		setTwoFactorEnabled(Boolean(user?.twoFactorEnabled))
+		setNotifySignInEmail(Boolean(user?.notifySignInEmail))
+	}, [user?.twoFactorEnabled, user?.notifySignInEmail])
 
 	useEffect(() => {
 		if (!user?.id) {
@@ -446,13 +460,81 @@ const Profile = () => {
 		}
 	}
 
+	const handleToggleTwoFactor = async (enabled: boolean) => {
+		if (!user) return
+		setIsUpdatingTwoFactor(true)
+		try {
+			const response = await api.post<BackendApiResponse<object>>('/Auth/two-factor', { enabled })
+			const apiResponse = response.data
+			if (!getApiSuccess(apiResponse)) {
+				const errors = getApiErrors(apiResponse)
+				throw new Error(errors[0] || getApiMessage(apiResponse) || 'Failed to update two-factor authentication')
+			}
+
+			const updatedUser = { ...user, twoFactorEnabled: enabled }
+			setTwoFactorEnabled(enabled)
+			sessionStore.setUser(updatedUser)
+			window.dispatchEvent(new CustomEvent<User>('user-assignments-updated', { detail: updatedUser }))
+			toast({
+				title: enabled ? 'Two-factor enabled' : 'Two-factor disabled',
+				description: enabled
+					? 'You will now receive a verification code via email when signing in.'
+					: 'Two-factor sign-in verification has been turned off.',
+			})
+		} catch (err) {
+			console.error('❌ [Profile] Failed to update 2FA:', err)
+			setTwoFactorEnabled(Boolean(user.twoFactorEnabled))
+			toast({
+				title: '2FA update failed',
+				description: err instanceof Error ? err.message : 'Unable to update two-factor setting',
+				variant: 'destructive',
+			})
+		} finally {
+			setIsUpdatingTwoFactor(false)
+		}
+	}
+
+	const handleToggleSignInNotification = async (enabled: boolean) => {
+		if (!user) return
+		setIsUpdatingSignInNotification(true)
+		try {
+			const response = await api.post<BackendApiResponse<object>>('/Auth/sign-in-notification', { enabled })
+			const apiResponse = response.data
+			if (!getApiSuccess(apiResponse)) {
+				const errors = getApiErrors(apiResponse)
+				throw new Error(errors[0] || getApiMessage(apiResponse) || 'Failed to update sign-in alerts')
+			}
+
+			const updatedUser = { ...user, notifySignInEmail: enabled }
+			setNotifySignInEmail(enabled)
+			sessionStore.setUser(updatedUser)
+			window.dispatchEvent(new CustomEvent<User>('user-assignments-updated', { detail: updatedUser }))
+			toast({
+				title: enabled ? 'Sign-in alerts on' : 'Sign-in alerts off',
+				description: enabled
+					? 'You will get an email when your account completes a sign-in.'
+					: 'You will no longer receive sign-in emails.',
+			})
+		} catch (err) {
+			console.error('❌ [Profile] Failed to update sign-in alerts:', err)
+			setNotifySignInEmail(Boolean(user.notifySignInEmail))
+			toast({
+				title: 'Sign-in alerts update failed',
+				description: err instanceof Error ? err.message : 'Unable to update sign-in alert setting',
+				variant: 'destructive',
+			})
+		} finally {
+			setIsUpdatingSignInNotification(false)
+		}
+	}
+
 	if (isLoading) {
 		return (
 			<div className="h-full">
 				<div className="flex items-center justify-between border-b px-6 py-4">
 					<div>
 						<h1 className="text-2xl font-semibold">Profile</h1>
-						<p className="text-sm text-muted-foreground">Loading your profile…</p>
+						<p className="text-sm text-muted-foreground">Loading your profile...</p>
 					</div>
 				</div>
 				<div className="p-4 md:p-6">
@@ -460,7 +542,7 @@ const Profile = () => {
 						<CardContent className="p-6">
 							<div className="flex items-center gap-3">
 								<Loader2 className="h-5 w-5 animate-spin" />
-								<span className="text-sm text-muted-foreground">Loading…</span>
+									<span className="text-sm text-muted-foreground">Loading...</span>
 							</div>
 						</CardContent>
 					</Card>
@@ -487,7 +569,7 @@ const Profile = () => {
 			<div className="flex items-center justify-between border-b px-6 py-4">
 				<div>
 					<h1 className="text-2xl font-semibold">Profile</h1>
-					<p className="text-sm text-muted-foreground">Update your personal information and profile photo</p>
+					<p className="text-sm text-muted-foreground">Update your personal information and profile photo.</p>
 				</div>
 			</div>
 
@@ -560,7 +642,7 @@ const Profile = () => {
 											{isUploadingPhoto ? (
 												<>
 													<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-													Uploading…
+													Uploading...
 												</>
 											) : (
 												'Choose file'
@@ -603,7 +685,7 @@ const Profile = () => {
 												<div className="absolute inset-0 grid place-items-center bg-background/60 backdrop-blur">
 													<div className="flex items-center gap-2 text-sm text-muted-foreground">
 														<Loader2 className="h-4 w-4 animate-spin" />
-														Starting camera…
+														Starting camera...
 													</div>
 												</div>
 											)}
@@ -634,7 +716,7 @@ const Profile = () => {
 										{isUploadingPhoto ? (
 											<>
 												<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-												Saving…
+												Saving...
 											</>
 										) : (
 											'Capture photo'
@@ -715,6 +797,60 @@ const Profile = () => {
 					<TabsContent value="security" className="space-y-6">
 						<Card>
 							<CardHeader>
+								<CardTitle>Email Two-Factor Authentication</CardTitle>
+								<CardDescription>
+									Add an extra verification step at sign-in. A one-time code will be sent to your email.
+								</CardDescription>
+							</CardHeader>
+							<CardContent>
+								<div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+									<div className="space-y-1">
+										<p className="text-sm font-medium">Require verification code at login</p>
+										<p className="text-xs text-muted-foreground">
+											Current status: {twoFactorEnabled ? 'Enabled' : 'Disabled'}
+										</p>
+									</div>
+									<Switch
+										checked={twoFactorEnabled}
+										onCheckedChange={handleToggleTwoFactor}
+										disabled={isUpdatingTwoFactor}
+										aria-label='Toggle two-factor authentication'
+									/>
+								</div>
+							</CardContent>
+						</Card>
+
+						<Card>
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2">
+									<Mail className="h-5 w-5 text-muted-foreground" aria-hidden />
+									Sign-in email alerts
+								</CardTitle>
+								<CardDescription>
+									Get an email when your account successfully signs in, including time (UTC), IP address, and device
+									hint.
+								</CardDescription>
+							</CardHeader>
+							<CardContent>
+								<div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+									<div className="space-y-1">
+										<p className="text-sm font-medium">Notify me by email on sign-in</p>
+										<p className="text-xs text-muted-foreground">
+											Current status: {notifySignInEmail ? 'Enabled' : 'Disabled'}
+										</p>
+									</div>
+									<Switch
+										checked={notifySignInEmail}
+										onCheckedChange={handleToggleSignInNotification}
+										disabled={isUpdatingSignInNotification}
+										aria-label="Toggle sign-in email notifications"
+									/>
+								</div>
+							</CardContent>
+						</Card>
+
+						<Card>
+							<CardHeader>
 								<CardTitle>Change Password</CardTitle>
 								<CardDescription>Use a strong password you don’t reuse elsewhere.</CardDescription>
 							</CardHeader>
@@ -749,7 +885,7 @@ const Profile = () => {
 										{isChangingPassword ? (
 											<>
 												<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-												Updating…
+												Updating...
 											</>
 										) : (
 											<>

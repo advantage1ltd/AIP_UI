@@ -1,3 +1,7 @@
+/**
+ * Page-access provider: loads role-based page lists from the API and answers hasAccess(path).
+ * Wraps the route tree in routes.tsx; ProtectedRoute consults this context when enforcePageAccess is set.
+ */
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { PageAccess, PageAccessSettings, pageAccessApi } from '@/api/pageAccess';
 import { isBackendUnavailableError } from '@/config/api';
@@ -5,7 +9,21 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { customerPageAccessCache } from '@/services/customerPageAccessCache';
 import { PAGE_DEFINITIONS } from '@/config/navigation/pageDefinitions';
 import { sessionStore } from '@/state/sessionStore';
-import { isCustomerRole, normalizeRoleId } from '@/utils/roles';
+import { harmonizeRole, isCustomerRole, normalizeRoleId } from '@/utils/roles';
+import { isAlwaysAllowedPath, isPageAccessBootstrapPending, isPageAccessReadyButEmpty } from '@/utils/page-access-guards';
+import { logger } from '@/utils/logger';
+
+/** Map routes → canonical pageIds (PAGE_DEFINITIONS). Fixes access when DB PageId differs from Settings ids (e.g. officer toggle uses `management-customer-reporting`). */
+const canonicalPageIdByNormalizedPath: Readonly<Record<string, string>> = Object.freeze(
+	Object.fromEntries(
+		PAGE_DEFINITIONS.map((def) => {
+			let path = def.path.trim()
+			if (!path.startsWith('/')) path = `/${path}`
+			const normalized = path.endsWith('/') && path !== '/' ? path.slice(0, -1) : path
+			return [normalized.toLowerCase(), def.pageId] as const
+		}),
+	),
+)
 
 interface PageAccessContextType {
 	hasAccess: (path: string) => boolean;
@@ -48,21 +66,14 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 	const user = authContext?.user || sessionStore.getUser();
 	
 	const [currentRole, setCurrentRoleState] = useState<string | null>(() => {
-		// Initialize from sessionStore if available
 		const initialUser = sessionStore.getUser();
-		if (initialUser?.pageAccessRole) return initialUser.pageAccessRole.trim().toLowerCase();
-		if (initialUser?.role) return initialUser.role.trim().toLowerCase();
-		return null;
+		const raw = initialUser?.pageAccessRole ?? initialUser?.role;
+		return raw ? harmonizeRole(raw) : null;
 	});
 	
 	useEffect(() => {
-		if (user?.pageAccessRole) {
-			setCurrentRoleState(user.pageAccessRole.trim().toLowerCase());
-		} else if (user?.role) {
-			setCurrentRoleState(user.role.trim().toLowerCase());
-		} else {
-			setCurrentRoleState(null);
-		}
+		const raw = user?.pageAccessRole ?? user?.role;
+		setCurrentRoleState(raw ? harmonizeRole(raw) : null);
 	}, [user]);
 
 	const [pageAccessByRole, setPageAccessByRole] = useState<Record<string, string[]>>({});
@@ -87,11 +98,10 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 		}
 	}, []);
 
-	// Normalize role name to lowercase (backend stores roles in lowercase)
+	// Canonical role for lookups (legacy JWT/DB values map to administrator | manager | securityofficer | customer)
 	const normalizeRoleName = useCallback((role: string | null): string | null => {
 		if (!role) return null;
-		// Backend returns roles in lowercase, just ensure it's lowercase
-		return role.trim().toLowerCase();
+		return harmonizeRole(role);
 	}, []);
 
 	// Resolve role key from available roles (case-insensitive)
@@ -125,15 +135,15 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			
 			// Log loaded settings for debugging
 			if (debugLogsEnabled) {
-				console.group('📥 [PageAccess] Settings Loaded from API');
-				console.log('📊 Settings Summary:', {
+				logger.debug('[PageAccess] Settings loaded from API');
+				logger.debug('📊 Settings Summary:', {
 					availablePagesCount: data.availablePages.length,
 					rolesCount: Object.keys(data.pageAccessByRole).length,
 					roleKeys: Object.keys(data.pageAccessByRole)
 				});
 				
-				// Log AdvantageOneOfficer specifically
-				const officerPages = data.pageAccessByRole['advantageoneofficer'] || [];
+				// Log security officer pages specifically
+				const officerPages = data.pageAccessByRole['securityofficer'] || [];
 				const customerPagesInList = officerPages.filter(p => String(p).toLowerCase().includes('customer')).map(p => String(p));
 				
 				// Check if this looks like default settings (has all default customer pages)
@@ -154,12 +164,12 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 				);
 				
 				if (hasAllDefaultCustomerPages && customerPagesInList.length > 0) {
-					console.warn('⚠️ [PageAccess] WARNING: Settings appear to be DEFAULTS, not from database!');
-					console.warn('⚠️ [PageAccess] Officer has all default customer pages. This suggests defaults are being used instead of database settings.');
-					console.warn('⚠️ [PageAccess] If you disabled customer pages in settings, they should NOT appear here.');
+					logger.debug('⚠️ [PageAccess] WARNING: Settings appear to be DEFAULTS, not from database!');
+					logger.debug('⚠️ [PageAccess] Officer has all default customer pages. This suggests defaults are being used instead of database settings.');
+					logger.debug('⚠️ [PageAccess] If you disabled customer pages in settings, they should NOT appear here.');
 				}
 				
-				console.log('👤 AdvantageOneOfficer Pages:', {
+				logger.debug('👤 Security officer pages:', {
 					count: officerPages.length,
 					hasCustomerIncidentReport: officerPages.includes('customer-incident-report'),
 					customerPagesCount: customerPagesInList.length,
@@ -167,15 +177,15 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					allPages: officerPages,
 					pageTypes: officerPages.map(p => typeof p)
 				});
-				console.log('👤 AdvantageOneOfficer Pages (as strings):', officerPages.map(p => String(p)).join(', '));
-				console.log('👤 Has customer-incident-report?', officerPages.map(p => String(p).toLowerCase().trim()).includes('customer-incident-report'));
-				console.log('👤 Customer pages in list:', customerPagesInList);
+				logger.debug('👤 Security officer pages (as strings):', officerPages.map(p => String(p)).join(', '));
+				logger.debug('👤 Has customer-incident-report?', officerPages.map(p => String(p).toLowerCase().trim()).includes('customer-incident-report'));
+				logger.debug('👤 Customer pages in list:', customerPagesInList);
 				
 				// Check available pages for customer-incident-report
 				const incidentReportPage = data.availablePages.find(p => 
 					p.path === '/customer/incident-report' || p.id === 'customer-incident-report'
 				);
-				console.log('📄 customer-incident-report Page in Available Pages:', {
+				logger.debug('📄 customer-incident-report Page in Available Pages:', {
 					found: !!incidentReportPage,
 					page: incidentReportPage ? {
 						id: incidentReportPage.id,
@@ -183,8 +193,6 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 						path: incidentReportPage.path
 					} : null
 				});
-				
-				console.groupEnd();
 			}
 			
 			setPageAccessByRole(data.pageAccessByRole);
@@ -194,9 +202,9 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			return data;
 		} catch (error) {
 			if (!isBackendUnavailableError(error)) {
-				console.error('❌ [PageAccess] Error loading settings:', error);
+				logger.error('❌ [PageAccess] Error loading settings:', error);
 			} else if (debugLogsEnabled) {
-				console.warn('⚠️ [PageAccess] Backend unavailable while loading settings; switched to offline mode');
+				logger.debug('⚠️ [PageAccess] Backend unavailable while loading settings; switched to offline mode');
 			}
 			setError(error instanceof Error ? error.message : 'Failed to load page access settings');
 			setStatus('offline');
@@ -231,7 +239,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			const isExpectedError = status === 403 || status === 404;
 			
 			if (!isExpectedError && debugLogsEnabled) {
-				console.warn('⚠️ [PageAccess] Error loading customer page assignments:', error);
+				logger.debug('⚠️ [PageAccess] Error loading customer page assignments:', error);
 			}
 			
 			setCustomerAssignedPageIds(new Set());
@@ -243,25 +251,50 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 	const hasAccess = useCallback((path: string): boolean => {
 		const startTime = performance.now();
 		try {
-			// Allow access during loading or if no data loaded yet (prevents redirect loops)
-			// This check must come before the currentRole check to prevent redirect loops
-			if (status === 'loading' || Object.keys(pageAccessByRole).length === 0 || availablePages.length === 0) {
-				if (debugLogsEnabled && path !== '/dashboard' && path !== '/') {
-					console.log('✅ [PageAccess] Allowing access during initialization:', {
+			// Normalize path - strip query parameters and hash
+			let normalizedPath = path.split('?')[0].split('#')[0];
+			normalizedPath = normalizedPath.endsWith('/') && normalizedPath !== '/' ? normalizedPath.slice(0, -1) : normalizedPath;
+
+			// Dashboard and root are always accessible
+			if (isAlwaysAllowedPath(normalizedPath)) {
+				return true;
+			}
+
+			const settingsState = {
+				status,
+				pageAccessRoleCount: Object.keys(pageAccessByRole).length,
+				availablePageCount: availablePages.length
+			};
+
+			// Fail closed while settings are initializing for non-dashboard routes.
+			if (isPageAccessBootstrapPending(settingsState)) {
+				if (debugLogsEnabled) {
+					logger.debug('⏳ [PageAccess] Access pending until settings load:', {
 						path,
-						status,
-						pageAccessByRoleCount: Object.keys(pageAccessByRole).length,
-						availablePagesCount: availablePages.length,
-						reason: 'System still loading'
+						normalizedPath,
+						status
 					});
 				}
-				return true;
+				return false;
+			}
+
+			// If settings are marked ready but still empty, deny access.
+			if (isPageAccessReadyButEmpty(settingsState)) {
+				if (debugLogsEnabled) {
+					logger.debug('🔒 [PageAccess] Access denied: settings are ready but empty', {
+						path,
+						normalizedPath,
+						pageAccessByRoleCount: settingsState.pageAccessRoleCount,
+						availablePagesCount: settingsState.availablePageCount
+					});
+				}
+				return false;
 			}
 
 			// No role = no access (except during initialization which is handled above)
 			if (!currentRole) {
 				if (debugLogsEnabled && path !== '/dashboard' && path !== '/') {
-					console.log('❌ [PageAccess] Access denied: No currentRole', {
+					logger.debug('❌ [PageAccess] Access denied: No currentRole', {
 						path,
 						status,
 						reason: 'No role assigned'
@@ -270,13 +303,21 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 				return false;
 			}
 
-			// Normalize path - strip query parameters and hash
-			let normalizedPath = path.split('?')[0].split('#')[0];
-			normalizedPath = normalizedPath.endsWith('/') && normalizedPath !== '/' ? normalizedPath.slice(0, -1) : normalizedPath;
-
-			// Dashboard and root are always accessible
-			if (normalizedPath === '/dashboard' || normalizedPath === '/') {
-				return true;
+			// Security officers: hub is granted when Settings lists the canonical page id,
+			// even if /management/customer-reporting is missing from availablePages (inactive DB row / catalog drift).
+			const customerReportingHubPath = '/management/customer-reporting';
+			if (
+				normalizedPath === customerReportingHubPath &&
+				normalizeRoleId(currentRole) === 'securityofficer'
+			) {
+				const rk = resolveRoleKey(currentRole);
+				const ids = rk ? pageAccessByRole[rk] ?? [] : [];
+				const hubGranted =
+					ids.some((id) => String(id).toLowerCase().trim() === 'management-customer-reporting') ||
+					ids.some((id) => String(id).toLowerCase().includes('customer-reporting'));
+				if (hubGranted) {
+					return true;
+				}
 			}
 
 			// Find page by path (exact match first, then try without leading slash)
@@ -290,7 +331,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			if (!page) {
 				// Page not in available pages - deny access
 				if (debugLogsEnabled) {
-					console.warn('🔒 [PageAccess] Page not found in availablePages:', {
+					logger.debug('🔒 [PageAccess] Page not found in availablePages:', {
 						originalPath: path,
 						normalizedPath,
 						availablePaths: availablePages.slice(0, 20).map(p => ({ path: p.path, id: p.id })),
@@ -300,9 +341,13 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 				}
 				return false;
 			}
+
+			const isCustomerPage = Boolean(
+				page.path?.startsWith('/customer') || page.category === 'Customer'
+			);
 			
 			if (debugLogsEnabled) {
-				console.log('🔍 [PageAccess] Found page:', {
+				logger.debug('🔍 [PageAccess] Found page:', {
 					path: normalizedPath,
 					pageId: page.id,
 					pageIdType: typeof page.id,
@@ -320,7 +365,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					(ap.dbId && page.dbId && ap.dbId === page.dbId)
 				);
 				if (similarPages.length > 1) {
-					console.log('⚠️ [PageAccess] Found multiple pages with same path/ID:', similarPages.map(p => ({
+					logger.debug('⚠️ [PageAccess] Found multiple pages with same path/ID:', similarPages.map(p => ({
 						id: p.id,
 						dbId: p.dbId,
 						path: p.path
@@ -337,15 +382,29 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			const roleKey = resolveRoleKey(currentRole);
 			if (!roleKey) {
 				if (debugLogsEnabled) {
-					console.warn('🔒 [PageAccess] No role key resolved for role:', currentRole, 'Available keys:', Object.keys(pageAccessByRole));
+					logger.debug('🔒 [PageAccess] No role key resolved for role:', currentRole, 'Available keys:', Object.keys(pageAccessByRole));
 				}
 				return false;
 			}
 
+			const normalizedStaffRole = normalizeRoleId(currentRole);
+			const staffCustomerRouteBypass =
+				isCustomerPage &&
+				(normalizedStaffRole === 'securityofficer' || normalizedStaffRole === 'manager');
+
 			const allowedPageIds = pageAccessByRole[roleKey];
 			if (!allowedPageIds || allowedPageIds.length === 0) {
+				if (staffCustomerRouteBypass) {
+					if (debugLogsEnabled) {
+						logger.debug('✅ [PageAccess] Staff customer route: role has no page list entry; allow catalog customer page', {
+							path: normalizedPath,
+							roleKey,
+						});
+					}
+					return true;
+				}
 				if (debugLogsEnabled) {
-					console.warn('🔒 [PageAccess] No page IDs found for role:', roleKey, 'Resolved from:', currentRole);
+					logger.debug('🔒 [PageAccess] No page IDs found for role:', roleKey, 'Resolved from:', currentRole);
 				}
 				return false;
 			}
@@ -401,7 +460,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 				});
 				
 				if (debugLogsEnabled && hasRoleAccess) {
-					console.log('✅ [PageAccess] Access granted via PATH-based matching:', {
+					logger.debug('✅ [PageAccess] Access granted via PATH-based matching:', {
 						path: pagePathLower,
 						matchingPages: pagesWithSamePath.map(p => ({ id: p.id, dbId: p.dbId }))
 					});
@@ -431,43 +490,27 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 				}
 				
 				if (debugLogsEnabled && hasRoleAccess) {
-					console.log('✅ [PageAccess] Access granted via ID-based matching:', {
+					logger.debug('✅ [PageAccess] Access granted via ID-based matching:', {
 						pageId: page.id,
 						pageDbId: page.dbId
 					});
 				}
 			}
-			
-			// TERTIARY: For officers, allow access to specific pages they should always have
-			// (This happens BEFORE the debug logging so we can see if it worked)
-			const normalizedCurrentRole = normalizeRoleId(currentRole);
-			const isOfficer = normalizedCurrentRole === 'securityofficer' || normalizedCurrentRole === 'manager';
-			const isCustomerPage = page.path?.startsWith('/customer') || page.category === 'Customer';
-			const isManagementCustomerReporting = page.path === '/management/customer-reporting' || page.id === 'management-customer-reporting';
-			
-			if (!hasRoleAccess && isOfficer) {
-				// Officers can access customer pages (customer assignment checked at API level)
-				if (isCustomerPage) {
-					if (debugLogsEnabled) {
-						console.log('✅ [PageAccess] Allowing customer page access for officer (customer assignment checked at API level):', {
-							path,
-							pageId: page.id,
-							pagePath: page.path,
-							reason: 'Officers can access customer pages - customer assignment verified at data access level'
-						});
+
+			// TERTIARY: canonical pageId for route from PAGE_DEFINITIONS (Settings may use canonical id while DB row PageId differs)
+			if (!hasRoleAccess) {
+				const canonicalPageId = canonicalPageIdByNormalizedPath[normalizedPath.toLowerCase()]
+				if (canonicalPageId) {
+					const canonLower = canonicalPageId.toLowerCase().trim()
+					hasRoleAccess = allowedPageIds.some(
+						(id) => String(id).toLowerCase().trim() === canonLower,
+					)
+					if (debugLogsEnabled && hasRoleAccess) {
+						logger.debug('✅ [PageAccess] Access granted via canonical path → pageId:', {
+							path: normalizedPath,
+							canonicalPageId,
+						})
 					}
-					hasRoleAccess = true;
-				}
-				// Officers should always have access to management customer reporting
-				else if (isManagementCustomerReporting) {
-					if (debugLogsEnabled) {
-						console.log('✅ [PageAccess] Allowing management customer reporting for officer:', {
-							path,
-							pageId: page.id,
-							reason: 'Officers should always have access to customer reporting management page'
-						});
-					}
-					hasRoleAccess = true;
 				}
 			}
 			
@@ -488,18 +531,17 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					pageCategory: page.category
 				};
 				
-				// Log as separate lines for better readability
-				console.group('🔒 [PageAccess] Access denied for:', normalizedPath);
+				logger.debug('[PageAccess] Access denied for:', normalizedPath);
 				
 				// Explicit string logging for debugging
-				console.log('🔍 ACTUAL VALUES:');
-				console.log('  Page ID:', page.id, '(type:', typeof page.id + ')');
-				console.log('  Page DB ID:', page.dbId, '(type:', typeof page.dbId + ')');
-				console.log('  Page Path:', page.path);
-				console.log('  Page ID (normalized):', page.id?.toLowerCase().trim());
-				console.log('  Allowed IDs count:', allowedPageIds.length);
-				console.log('  Allowed IDs (as strings):', allowedPageIds.map(id => String(id)).join(', '));
-				console.log('  Looking for "customer-incident-report":', allowedPageIds.map(id => String(id).toLowerCase().trim()).includes('customer-incident-report'));
+				logger.debug('🔍 ACTUAL VALUES:');
+				logger.debug('  Page ID:', page.id, '(type:', typeof page.id + ')');
+				logger.debug('  Page DB ID:', page.dbId, '(type:', typeof page.dbId + ')');
+				logger.debug('  Page Path:', page.path);
+				logger.debug('  Page ID (normalized):', page.id?.toLowerCase().trim());
+				logger.debug('  Allowed IDs count:', allowedPageIds.length);
+				logger.debug('  Allowed IDs (as strings):', allowedPageIds.map(id => String(id)).join(', '));
+				logger.debug('  Looking for "customer-incident-report":', allowedPageIds.map(id => String(id).toLowerCase().trim()).includes('customer-incident-report'));
 				
 				// Check path-based matching
 				const pagesWithSamePath = availablePages.filter(ap => {
@@ -515,7 +557,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					});
 				});
 				
-				console.log('📄 Page Info:', {
+				logger.debug('📄 Page Info:', {
 					id: page.id,
 					dbId: page.dbId,
 					path: page.path,
@@ -523,20 +565,20 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					pagesWithSamePath: pagesWithSamePath.length,
 					pathBasedMatchAvailable: pathBasedMatch
 				});
-				console.log('👤 User Role:', {
+				logger.debug('👤 User Role:', {
 					currentRole,
 					roleKey,
 					resolved: roleKey ? '✅' : '❌'
 				});
-				console.log('📋 Allowed Page IDs (Full List):', allowedPageIds);
-				console.log('📋 Allowed Page IDs (Full List - Strings):', allowedPageIds.map(id => String(id)));
-				console.log('📋 Allowed Page IDs (First 30):', allowedPageIds.slice(0, 30));
-				console.log('📋 Allowed Page IDs (Types):', allowedPageIds.map(id => ({ id, type: typeof id, stringValue: String(id) })));
+				logger.debug('📋 Allowed Page IDs (Full List):', allowedPageIds);
+				logger.debug('📋 Allowed Page IDs (Full List - Strings):', allowedPageIds.map(id => String(id)));
+				logger.debug('📋 Allowed Page IDs (First 30):', allowedPageIds.slice(0, 30));
+				logger.debug('📋 Allowed Page IDs (Types):', allowedPageIds.map(id => ({ id, type: typeof id, stringValue: String(id) })));
 				// Enhanced search with case-insensitive comparison
 				const exactMatch = allowedPageIds.find(id => String(id).toLowerCase().trim() === pageIdLower);
 				const dbIdMatch = page.dbId ? allowedPageIds.find(id => String(id).toLowerCase().trim() === String(page.dbId).toLowerCase().trim()) : null;
 				
-				console.log('🔍 Search Results:', {
+				logger.debug('🔍 Search Results:', {
 					'path-based match': pathBasedMatch,
 					'page.id in allowed? (exact)': allowedPageIds.includes(page.id),
 					'page.id in allowed? (case-insensitive)': !!exactMatch,
@@ -549,7 +591,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					'pageId normalized': pageIdLower,
 					'allowedIds sample (normalized)': allowedPageIds.slice(0, 5).map(id => String(id).toLowerCase().trim())
 				});
-				console.log('🔎 Looking for:', {
+				logger.debug('🔎 Looking for:', {
 					pageId: page.id,
 					pageIdNormalized: pageIdLower,
 					pageDbId: page.dbId?.toString(),
@@ -581,7 +623,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					});
 				});
 				
-				console.log('🔍 Direct Comparison:', {
+				logger.debug('🔍 Direct Comparison:', {
 					'customer-incident-report in array (exact)': allowedPageIds.includes('customer-incident-report'),
 					'customer-incident-report in array (case-insensitive)': allowedPageIds.some(id => String(id).toLowerCase().trim() === 'customer-incident-report'),
 					'dbId in array': page.dbId ? allowedPageIds.includes(String(page.dbId)) : false,
@@ -597,14 +639,21 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					const idStr = String(id).toLowerCase();
 					return idStr.includes('incident') || idStr.includes('customer');
 				});
-				console.log('🔍 Relevant Allowed IDs (containing "incident" or "customer"):', relevantIds);
-				console.log('🔍 All Allowed IDs:', allowedPageIds.map(id => String(id)).join(', '));
-				console.groupEnd();
+				logger.debug('🔍 Relevant Allowed IDs (containing "incident" or "customer"):', relevantIds);
+				logger.debug('🔍 All Allowed IDs:', allowedPageIds.map(id => String(id)).join(', '));
 			}
 
 
-			if (!hasRoleAccess) {
+			if (!hasRoleAccess && !staffCustomerRouteBypass) {
 				return false;
+			}
+
+			if (staffCustomerRouteBypass && debugLogsEnabled && !hasRoleAccess) {
+				logger.debug('✅ [PageAccess] Staff customer route bypass (assignment enforced by APIs):', {
+					path: normalizedPath,
+					pageId: page.id,
+					roleKey,
+				});
 			}
 
 			// For customer roles accessing customer pages, check customer assignments
@@ -613,7 +662,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			if (customerRoleDetected && isCustomerPage && customerAssignedPageIds.size > 0) {
 				const hasCustomerAssignment = customerAssignedPageIds.has(page.id);
 				if (debugLogsEnabled) {
-					console.log('🔍 [PageAccess] Customer assignment check:', {
+					logger.debug('🔍 [PageAccess] Customer assignment check:', {
 						path,
 						pageId: page.id,
 						isCustomerRole,
@@ -630,7 +679,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			if (debugLogsEnabled) {
 				const endTime = performance.now();
 				const duration = endTime - startTime;
-				console.log('✅ [PageAccess] Access GRANTED:', {
+				logger.debug('✅ [PageAccess] Access GRANTED:', {
 					path,
 					pageId: page.id,
 					pagePath: page.path,
@@ -644,8 +693,8 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			}
 			return true;
 		} catch (error) {
-			console.error('🔒 [PageAccess] Error checking access:', error);
-			console.error('📋 Error Context:', {
+			logger.error('🔒 [PageAccess] Error checking access:', error);
+			logger.error('📋 Error Context:', {
 				path,
 				currentRole,
 				errorMessage: error instanceof Error ? error.message : String(error),
@@ -668,7 +717,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			setIsLoading(true);
 			await loadPageAccessSettings();
 		} catch (error) {
-			console.error('❌ [PageAccess] Error refreshing settings:', error);
+			logger.error('❌ [PageAccess] Error refreshing settings:', error);
 		} finally {
 			setIsLoading(false);
 		}
@@ -690,7 +739,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 			await pageAccessApi.syncPages(PAGE_DEFINITIONS);
 			await refreshSettings();
 		} catch (error) {
-			console.error('❌ [PageAccess] Error syncing pages:', error);
+			logger.error('❌ [PageAccess] Error syncing pages:', error);
 		}
 	}, [hasAuthToken, currentRole, refreshSettings]);
 
@@ -716,22 +765,6 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 		}
 	}, [normalizeRoleName, hasAuthToken, user, loadCustomerPageAssignments]);
 
-	// Set role immediately when user exists (before loading settings)
-	// This runs synchronously on mount and whenever user changes
-	useEffect(() => {
-		if (user) {
-			const userRole = user.pageAccessRole || user.role || null;
-			const normalizedRole = normalizeRoleName(userRole);
-			if (normalizedRole && normalizedRole !== currentRole) {
-				setCurrentRoleState(normalizedRole);
-			}
-		} else if (!user && currentRole) {
-			// Clear role when user logs out
-			setCurrentRoleState(null);
-		}
-	}, [user, currentRole, normalizeRoleName]);
-
-	// Initialize on mount and when user/auth token changes
 	useEffect(() => {
 		// Prevent multiple initializations
 		if (initializationRef.current) {
@@ -777,7 +810,7 @@ export const PageAccessProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 					}
 				}
 			} catch (error) {
-				console.error('❌ [PageAccess] Initialization error:', error);
+				logger.error('❌ [PageAccess] Initialization error:', error);
 				setStatus('offline');
 				
 				// Set role from user even on error

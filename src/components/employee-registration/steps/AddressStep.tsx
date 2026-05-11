@@ -7,6 +7,7 @@ interface AddressStepProps {
   onBack: () => void
 }
 
+// === Component ===
 export function AddressStep({ onNext, onBack }: AddressStepProps) {
   return (
     <div className="space-y-6">

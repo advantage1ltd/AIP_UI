@@ -1,6 +1,11 @@
+/**
+ * Customer daily activity report entry and table.
+ * Flow: scoped customer/site filters → daily activity list → DailyActivityForm create/edit.
+ */
 import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { ArrowLeft } from "lucide-react"
 import { DailyActivityTable } from "@/components/customer/DailyActivityTable"
 import { DailyActivityDialog } from "@/components/customer/DailyActivityDialog"
@@ -132,84 +137,106 @@ export default function CustomerDailyActivityReport() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+      <div className="min-h-screen bg-[#EFF4FF]">
+        <div className="container mx-auto max-w-screen-2xl px-4 py-8 lg:px-8">
+          <div className="flex min-h-[50vh] items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+          </div>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="container mx-auto p-4">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        <div className={`p-4 rounded-lg border ${
+      <div className="min-h-screen bg-[#EFF4FF]">
+        <div className="container mx-auto max-w-screen-2xl p-4 lg:px-8 lg:py-8">
+          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div className={`rounded-xl border p-4 shadow-sm ${
           isAdmin 
             ? 'bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800' 
             : 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
         }`}>
-          <p className={isAdmin ? 'text-amber-800 dark:text-amber-200' : 'text-red-600 dark:text-red-400'}>
-            {error}
-          </p>
-          {isAdmin && (
-            <p className="text-sm text-amber-700 dark:text-amber-300 mt-2">
-              As an administrator, you need to select a customer first before accessing customer-specific pages.
+            <p className={isAdmin ? 'text-amber-800 dark:text-amber-200' : 'text-red-600 dark:text-red-400'}>
+              {error}
             </p>
-          )}
+            {isAdmin && (
+              <p className="text-sm text-amber-700 dark:text-amber-300 mt-2">
+                As an administrator, you need to select a customer first before accessing customer-specific pages.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          onClick={() => navigate(-1)}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        {customer && (
-          <div>
-            <h2 className="text-xl font-semibold">
-              {customer.name} - Daily Activity Reports
-            </h2>
+    <div className="min-h-screen bg-[#EFF4FF]">
+      <div className="container mx-auto max-w-screen-2xl p-4 lg:px-8 lg:py-8 space-y-6">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate(-1)}
+                  className="h-9 px-3"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+                <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">
+                  Customer Page
+                </Badge>
+              </div>
+              {customer && (
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    {customer.name} - Daily Activity Reports
+                  </h2>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Manage and review daily activity submissions and compliance records.
+                  </p>
+                </div>
+              )}
+            </div>
             {selectedSiteName && (
-              <p className="text-sm text-gray-600 mt-1">
-                Filtered by site: <span className="font-medium">{selectedSiteName}</span>
-              </p>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Site Filter</p>
+                <p className="text-sm font-medium text-slate-700">{selectedSiteName}</p>
+              </div>
             )}
           </div>
-        )}
+        </div>
+
+        <DailyActivityTable
+          onView={handleViewReport}
+          onEdit={handleEditReport}
+          onNew={handleNewReport}
+          refreshTrigger={refreshTrigger}
+          customerId={customer?.id.toString()}
+          siteId={selectedSiteId}
+        />
+
+        <DailyActivityDialog
+          open={showDialog}
+          onOpenChange={handleDialogClose}
+          report={selectedReport}
+        />
+
+        <DailyActivityForm
+          open={showForm}
+          onOpenChange={handleFormClose}
+          report={editingReport}
+          onSuccess={handleFormSuccess}
+          customerId={customer?.id.toString()}
+          siteId={selectedSiteId}
+        />
       </div>
-
-      <DailyActivityTable
-        onView={handleViewReport}
-        onEdit={handleEditReport}
-        onNew={handleNewReport}
-        refreshTrigger={refreshTrigger}
-        customerId={customer?.id.toString()}
-        siteId={selectedSiteId}
-      />
-
-      <DailyActivityDialog
-        open={showDialog}
-        onOpenChange={handleDialogClose}
-        report={selectedReport}
-      />
-
-      <DailyActivityForm
-        open={showForm}
-        onOpenChange={handleFormClose}
-        report={editingReport}
-        onSuccess={handleFormSuccess}
-        customerId={customer?.id.toString()}
-        siteId={selectedSiteId}
-      />
     </div>
   )
 }

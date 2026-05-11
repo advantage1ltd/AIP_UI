@@ -1,11 +1,19 @@
-import { useEffect, useState } from "react"
+/**
+ * Customer reporting hub navigation.
+ * Flow: customer page assignments → quick links into scoped customer report routes.
+ */
+import { useEffect, useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Customer } from "@/types/customer"
+import type { User } from "@/types/user"
 import useAuth from "@/hooks/useAuth"
+import { api } from "@/config/api"
+import { BackendApiResponse, getApiData } from "@/types/backend-api"
+import { harmonizeRole } from "@/utils/roles"
 import { 
   RefreshCw, 
   FileBarChart, 
@@ -20,11 +28,35 @@ import {
 import { customerService } from "@/services/customerService"
 import { customerPageAccessCache } from "@/services/customerPageAccessCache"
 import type { CustomerPageAccessPage } from "@/api/customerPageAccess"
+import { filterAssignedCustomerPages } from "@/utils/customer-page-access-display"
 import { cn } from "@/lib/utils"
+
+type AuthUserPayload = User & {
+	AssignedCustomerIds?: Array<number | string>
+	assignedCustomerIds?: Array<number | string>
+}
+
+const normalizeAssignedCustomerIds = (value?: Array<number | string> | null): number[] | null => {
+	if (!value) return null
+	const normalized = value.map(id => Number(id)).filter(id => Number.isFinite(id))
+	return normalized
+}
+
+const areCustomerIdsEqual = (left: number[], right: number[]): boolean => {
+	if (left.length !== right.length) return false
+	const leftSorted = [...left].sort((a, b) => a - b)
+	const rightSorted = [...right].sort((a, b) => a - b)
+	return leftSorted.every((value, index) => value === rightSorted[index])
+}
 
 export default function CustomerReporting() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const assignedCustomerIdsKey = useMemo(() => {
+    const ids = user && 'assignedCustomerIds' in user ? user.assignedCustomerIds : undefined
+    if (!ids?.length) return ''
+    return [...ids].sort((a, b) => a - b).join('|')
+  }, [user])
   const [selectedCustomer, setSelectedCustomer] = useState<string>("")
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,23 +78,41 @@ export default function CustomerReporting() {
     const loadCustomers = async () => {
       try {
         setLoading(true)
-        
-        // Load customer data from customer store (which uses cached data)
+
+        if (!user) {
+          setCustomers([])
+          return
+        }
+
         let customerData = await customerService.getAllCustomers()
-        
-        // For officers, filter to only assigned customers
-        if (user?.role === 'advantageoneofficer') {
-          const assignedCustomerIds = user.assignedCustomerIds || []
-          // Normalize IDs to numbers for comparison (customer.id might be string or number)
-          const assignedIdsAsNumbers = assignedCustomerIds.map(id => Number(id)).filter(id => !isNaN(id))
-          
-          customerData = customerData.filter((customer: any) => {
+
+        const officerEffectiveRole = harmonizeRole(user.pageAccessRole ?? user.role)
+        if (officerEffectiveRole === 'securityofficer') {
+          let assignedCustomerIds =
+            normalizeAssignedCustomerIds('assignedCustomerIds' in user ? user.assignedCustomerIds : undefined) ?? []
+
+          try {
+            const response = await api.get<BackendApiResponse<AuthUserPayload>>('/Auth/me')
+            const userData = getApiData(response.data)
+            const latestAssignedIds = normalizeAssignedCustomerIds(
+              userData?.assignedCustomerIds ?? userData?.AssignedCustomerIds
+            )
+            if (latestAssignedIds && !areCustomerIdsEqual(latestAssignedIds, assignedCustomerIds)) {
+              const updatedUser: User = { ...user, assignedCustomerIds: latestAssignedIds }
+              window.dispatchEvent(new CustomEvent<User>('user-assignments-updated', { detail: updatedUser }))
+              assignedCustomerIds = latestAssignedIds
+            }
+          } catch (error) {
+            console.warn('[CustomerReporting] Failed to refresh assignments from /Auth/me:', error)
+          }
+
+          const assignedIdsAsNumbers = assignedCustomerIds.filter(id => Number.isFinite(id))
+          customerData = customerData.filter((customer) => {
             const customerId = Number(customer.id)
-            const isAssigned = !isNaN(customerId) && assignedIdsAsNumbers.includes(customerId)
-            return isAssigned
+            return Number.isFinite(customerId) && assignedIdsAsNumbers.includes(customerId)
           })
         }
-        
+
         setCustomers(customerData)
       } catch (error) {
         console.error('Error loading customers:', error)
@@ -73,7 +123,7 @@ export default function CustomerReporting() {
     }
 
     loadCustomers()
-  }, [user, refreshTrigger])
+  }, [user?.id, user?.role, user?.pageAccessRole, assignedCustomerIdsKey, refreshTrigger])
 
   // Listen for customer data updates to refresh data automatically
   useEffect(() => {
@@ -85,6 +135,16 @@ export default function CustomerReporting() {
     
     return () => {
       window.removeEventListener('customer-data-updated', handleCustomerDataUpdate as EventListener)
+    }
+  }, [refreshData])
+
+  useEffect(() => {
+    const handleAssignmentsUpdated = () => {
+      refreshData()
+    }
+    window.addEventListener('user-assignments-updated', handleAssignmentsUpdated as EventListener)
+    return () => {
+      window.removeEventListener('user-assignments-updated', handleAssignmentsUpdated as EventListener)
     }
   }, [refreshData])
 
@@ -109,9 +169,9 @@ export default function CustomerReporting() {
         }
 
         const access = await customerPageAccessCache.get(customerId)
-        const assignedPages = access.availablePages
-          .filter(page => access.assignedPageIds.includes(page.pageId))
-          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        const assignedPages = filterAssignedCustomerPages(access.availablePages, access.assignedPageIds).sort(
+          (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+        )
 
         if (!isActive) return
 

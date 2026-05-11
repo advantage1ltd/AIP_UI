@@ -1,3 +1,7 @@
+/**
+ * Customer daily occurrence book entries.
+ * Flow: date and site filters → occurrence entries list → create/edit occurrence records.
+ */
 import { useState, useEffect, useMemo } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
@@ -24,8 +28,9 @@ import { useAuth } from "@/contexts/AuthContext"
 import { findCustomerById } from "@/hooks/useAvailableCustomers"
 import { useToast } from "@/hooks/use-toast"
 import { siteService } from "@/services/siteService"
-import { getAuthHeaders } from "@/services/auth"
-import { BASE_API_URL } from "@/config/api"
+import { api } from "@/config/api"
+import type { StaffUser } from '@/types/user'
+import { harmonizeRole } from '@/utils/roles'
 import type { 
   DailyOccurrenceEntry,
   DailyOccurrenceBookFilters,
@@ -215,10 +220,13 @@ export default function CustomerDailyOccurrenceBook() {
         console.log('CustomerDailyOccurrenceBook: Found customer:', customerData)
 
         // Verify access
-        if (user && user.role === 'advantageoneofficer' && 'assignedCustomerIds' in user && (user as any).assignedCustomerIds && !(user as any).assignedCustomerIds.includes(targetCustomerId)) {
-          setError('Access denied: You are not assigned to this customer')
-          setLoading(false)
-          return
+        if (harmonizeRole(user.pageAccessRole ?? user.role) === 'securityofficer' && 'assignedCustomerIds' in user) {
+          const staffUser = user as StaffUser
+          if (staffUser.assignedCustomerIds?.length && !staffUser.assignedCustomerIds.includes(targetCustomerId)) {
+            setError('Access denied: You are not assigned to this customer')
+            setLoading(false)
+            return
+          }
         }
 
         console.log('CustomerDailyOccurrenceBook: Access granted - setting customer')
@@ -280,39 +288,12 @@ export default function CustomerDailyOccurrenceBook() {
         ...(searchTerm && { search: searchTerm })
       })
 
-      const url = `${BASE_API_URL}/customers/${customer.id}/daily-occurrence-book?${queryParams}`
-      const headers = getAuthHeaders()
-      const authHeaders = headers as Record<string, string>
-      
-      console.log('Fetching occurrences:', { url, hasAuth: !!authHeaders.Authorization })
-      
-      const response = await fetch(url, {
-        headers: headers
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('API Error Response:', {
-          status: response.status,
-          statusText: response.statusText,
-          url: url,
-          body: errorText.substring(0, 500)
-        })
-        throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`)
-      }
-      
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text()
-        console.error('Expected JSON but got:', {
-          contentType: contentType,
-          url: url,
-          preview: text.substring(0, 500)
-        })
-        throw new Error('Server returned non-JSON response. Check if the API endpoint exists.')
-      }
-      
-      const result = await response.json()
+      const { data: result } = await api.get<{
+        success: boolean
+        data: DailyOccurrenceEntry[]
+        stats: DailyOccurrenceBookStats
+        message?: string
+      }>(`/customers/${customer.id}/daily-occurrence-book?${queryParams}`)
 
       if (result.success) {
         setOccurrences(result.data)
@@ -373,22 +354,13 @@ export default function CustomerDailyOccurrenceBook() {
         ...(isEdit && selectedOccurrence && { id: selectedOccurrence.id })
       }
 
-      const url = isEdit 
-        ? `${BASE_API_URL}/customers/${customer.id}/daily-occurrence-book/${selectedOccurrence?.id}`
-        : `${BASE_API_URL}/customers/${customer.id}/daily-occurrence-book`
-      
-      const method = isEdit ? 'PUT' : 'POST'
+      const path = isEdit
+        ? `/customers/${customer.id}/daily-occurrence-book/${selectedOccurrence?.id}`
+        : `/customers/${customer.id}/daily-occurrence-book`
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          ...getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-      })
-
-      const result = await response.json()
+      const result = isEdit
+        ? (await api.put<{ success: boolean; message?: string }>(path, requestData)).data
+        : (await api.post<{ success: boolean; message?: string }>(path, requestData)).data
 
       if (result.success) {
         toast({
@@ -421,12 +393,9 @@ export default function CustomerDailyOccurrenceBook() {
     if (!customer) return
 
     try {
-      const response = await fetch(`${BASE_API_URL}/customers/${customer.id}/daily-occurrence-book/${occurrence.id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      })
-
-      const result = await response.json()
+      const { data: result } = await api.delete<{ success: boolean; message?: string }>(
+        `/customers/${customer.id}/daily-occurrence-book/${occurrence.id}`
+      )
 
       if (result.success) {
         toast({
@@ -691,9 +660,8 @@ export default function CustomerDailyOccurrenceBook() {
 
   return (
     <div className="min-h-screen bg-[#EFF4FF]">
-      <div className="container mx-auto p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6 max-w-7xl">
-        {/* Sticky Header */}
-        <div className="sticky top-0 z-30 -mx-3 sm:-mx-4 md:-mx-6 px-3 sm:px-4 md:px-6 py-3 bg-[#EFF4FF]/80 backdrop-blur supports-[backdrop-filter]:bg-[#EFF4FF]/60 border-b border-border/40">
+      <div className="container mx-auto max-w-screen-2xl px-3 sm:px-4 md:px-6 lg:px-8 py-4 md:py-6 space-y-4 md:space-y-6">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <Button
@@ -849,57 +817,57 @@ export default function CustomerDailyOccurrenceBook() {
           {/* Stats Cards */}
           {stats && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              <Card className="border-0 shadow-md bg-gradient-to-br from-blue-600 to-blue-700">
+              <Card className="border border-blue-200 bg-blue-50 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-blue-100">Total entries</p>
-                      <p className="text-2xl font-bold text-white">{stats.totalEntries}</p>
+                      <p className="text-xs text-blue-700">Total entries</p>
+                      <p className="text-2xl font-bold text-blue-900">{stats.totalEntries}</p>
                     </div>
-                    <div className="rounded-full bg-white/20 p-2">
-                      <BookOpen className="h-5 w-5 text-white" />
+                    <div className="rounded-full bg-white p-2 border border-blue-100">
+                      <BookOpen className="h-5 w-5 text-blue-700" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-600 to-emerald-700">
+              <Card className="border border-slate-200 bg-white shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-emerald-100">This week</p>
-                      <p className="text-2xl font-bold text-white">{stats.entriesThisWeek}</p>
+                      <p className="text-xs text-slate-500">This week</p>
+                      <p className="text-2xl font-bold text-slate-900">{stats.entriesThisWeek}</p>
                     </div>
-                    <div className="rounded-full bg-white/20 p-2">
-                      <Calendar className="h-5 w-5 text-white" />
+                    <div className="rounded-full bg-slate-50 p-2 border border-slate-200">
+                      <Calendar className="h-5 w-5 text-slate-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-md bg-gradient-to-br from-amber-600 to-amber-700">
+              <Card className="border border-slate-200 bg-white shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-amber-100">This month</p>
-                      <p className="text-2xl font-bold text-white">{stats.entriesThisMonth}</p>
+                      <p className="text-xs text-slate-500">This month</p>
+                      <p className="text-2xl font-bold text-slate-900">{stats.entriesThisMonth}</p>
                     </div>
-                    <div className="rounded-full bg-white/20 p-2">
-                      <Clock className="h-5 w-5 text-white" />
+                    <div className="rounded-full bg-slate-50 p-2 border border-slate-200">
+                      <Clock className="h-5 w-5 text-slate-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-md bg-gradient-to-br from-slate-700 to-slate-800">
+              <Card className="border border-slate-200 bg-white shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-slate-200">Active stores</p>
-                      <p className="text-2xl font-bold text-white">{Object.keys(stats.byStore ?? {}).length}</p>
+                      <p className="text-xs text-slate-500">Active stores</p>
+                      <p className="text-2xl font-bold text-slate-900">{Object.keys(stats.byStore ?? {}).length}</p>
                     </div>
-                    <div className="rounded-full bg-white/20 p-2">
-                      <MapPin className="h-5 w-5 text-white" />
+                    <div className="rounded-full bg-slate-50 p-2 border border-slate-200">
+                      <MapPin className="h-5 w-5 text-slate-600" />
                     </div>
                   </div>
                 </CardContent>

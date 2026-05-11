@@ -1,5 +1,13 @@
+/**
+ * User administration API and mapRawApiUserToUser normalizer for AuthContext.
+ * Flow: raw API user payload → role/customer normalization → Redux and form consumers.
+ */
+import axios from 'axios'
 import { api } from '@/config/api'
-import { User, CreateUserInput, UpdateUserInput, UsersResponse, CustomerUser, AdvantageOneUser, UserRole } from '@/types/user'
+import { User, CreateUserInput, UpdateUserInput, UsersResponse } from '@/types/user'
+import type { UserRole } from '@/utils/roles'
+import { harmonizeRole } from '@/utils/roles'
+import { logger } from '@/utils/logger'
 
 export interface CreateUserRequest {
   username: string
@@ -42,6 +50,8 @@ export interface BackendUserResponse {
   lastLoginAt?: string
   phoneNumber?: string
   emailConfirmed: boolean
+  twoFactorEnabled?: boolean
+  notifySignInEmail?: boolean
   employeeId?: number
   employeeName?: string
   assignedCustomerIds?: number[] | string // Can be array or JSON string
@@ -53,6 +63,116 @@ export interface BackendUserListResponse {
   totalCount?: number
   page?: number
   pageSize?: number
+}
+
+function parseEmployeeId(raw: unknown): number | undefined {
+	if (raw === null || raw === undefined) return undefined
+	if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return Math.trunc(raw)
+	if (typeof raw === 'string') {
+		const t = raw.trim()
+		if (!t) return undefined
+		const n = Number(t)
+		if (Number.isFinite(n) && n > 0) return Math.trunc(n)
+	}
+	return undefined
+}
+
+export function mapBackendUserToUser(backendUser: BackendUserResponse): User {
+  const role = harmonizeRole(backendUser.role)
+  const pageAccessTrimmed = backendUser.pageAccessRole?.trim()
+  const pageAccessRole = harmonizeRole(pageAccessTrimmed ? pageAccessTrimmed : backendUser.role)
+  const cidRaw = backendUser.customerId
+  const cid = cidRaw != null ? Number(cidRaw) : NaN
+  const hasTenant = Number.isFinite(cid) && cid > 0
+
+  const base = {
+    id: backendUser.id,
+    username: backendUser.username,
+    firstName: backendUser.firstName,
+    lastName: backendUser.lastName,
+    email: backendUser.email,
+    role,
+    pageAccessRole,
+    signature: backendUser.signature,
+    signatureCode: backendUser.signatureCode,
+    jobTitle: backendUser.jobTitle,
+    recordIsDeleted: backendUser.recordIsDeleted,
+    createdAt: backendUser.createdAt,
+    updatedAt: backendUser.updatedAt || backendUser.createdAt,
+		employeeId: parseEmployeeId(backendUser.employeeId),
+    employeeName: backendUser.employeeName,
+    phoneNumber: backendUser.phoneNumber,
+    emailConfirmed: backendUser.emailConfirmed,
+    twoFactorEnabled: Boolean(backendUser.twoFactorEnabled),
+    notifySignInEmail: Boolean(backendUser.notifySignInEmail),
+    lastLoginAt: backendUser.lastLoginAt,
+  }
+
+  if (role === 'customer' && hasTenant) {
+    return {
+      ...base,
+      role: 'customer',
+      customerId: cid,
+      customerName: backendUser.customerName,
+    } as User
+  }
+
+  const staffRole: Exclude<UserRole, 'customer'> =
+    role === 'customer' ? 'securityofficer' : role
+
+  return {
+    ...base,
+    role: staffRole,
+    assignedCustomerIds: parseAssignedCustomerIdsStatic(backendUser.assignedCustomerIds),
+    assignedCustomerNames: backendUser.assignedCustomerNames || [],
+  } as User
+}
+
+function parseAssignedCustomerIdsStatic(customerIds: unknown): number[] {
+  if (!customerIds) return []
+  if (Array.isArray(customerIds)) return customerIds.map((id) => Number(id)).filter((n) => Number.isFinite(n))
+  if (typeof customerIds === 'string') {
+    try {
+      const parsed = JSON.parse(customerIds)
+      return Array.isArray(parsed) ? parsed.map((id: unknown) => Number(id)).filter((n: number) => Number.isFinite(n)) : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+/** Normalize loose login / Auth.me payloads into `User`. */
+export function mapRawApiUserToUser(raw: unknown): User {
+  const r = raw as Record<string, unknown>
+  const backendUser: BackendUserResponse = {
+    id: String(r.id ?? r.Id ?? ''),
+    username: String(r.username ?? r.Username ?? ''),
+    firstName: String(r.firstName ?? r.FirstName ?? ''),
+    lastName: String(r.lastName ?? r.LastName ?? ''),
+    email: String(r.email ?? r.Email ?? ''),
+    role: String(r.role ?? r.Role ?? ''),
+    pageAccessRole: String(r.pageAccessRole ?? r.PageAccessRole ?? r.role ?? r.Role ?? ''),
+    signature: (r.signature ?? r.Signature) as string | undefined,
+    signatureCode: (r.signatureCode ?? r.SignatureCode) as string | undefined,
+    jobTitle: (r.jobTitle ?? r.JobTitle) as string | undefined,
+    customerId: (r.customerId ?? r.CustomerId) as number | undefined,
+    customerName: (r.customerName ?? r.CustomerName) as string | undefined,
+    recordIsDeleted: Boolean(r.recordIsDeleted ?? r.RecordIsDeleted ?? false),
+    isActive: Boolean(r.isActive ?? r.IsActive ?? true),
+    createdAt: String(r.createdAt ?? r.CreatedAt ?? new Date().toISOString()),
+    updatedAt: (r.updatedAt ?? r.UpdatedAt) as string | undefined,
+    employeeId: parseEmployeeId(r.employeeId ?? r.EmployeeId),
+    employeeName: (r.employeeName ?? r.EmployeeName) as string | undefined,
+    assignedCustomerIds: (r.assignedCustomerIds ?? r.AssignedCustomerIds) as BackendUserResponse['assignedCustomerIds'],
+    assignedCustomerNames: (r.assignedCustomerNames ?? r.AssignedCustomerNames) as string[] | undefined,
+    phoneNumber: (r.phoneNumber ?? r.PhoneNumber) as string | undefined,
+    emailConfirmed: Boolean(r.emailConfirmed ?? r.EmailConfirmed ?? false),
+    twoFactorEnabled: Boolean(r.twoFactorEnabled ?? r.TwoFactorEnabled ?? false),
+    notifySignInEmail: Boolean(r.notifySignInEmail ?? r.NotifySignInEmail ?? false),
+    lastLoginAt: (r.lastLoginAt ?? r.LastLoginAt) as string | undefined,
+  }
+  return mapBackendUserToUser(backendUser)
 }
 
 export interface UsersQueryParams {
@@ -69,60 +189,20 @@ export interface UsersQueryParams {
 class UserService {
   private baseUrl = '/User'
 
-  // Helper function to parse assignedCustomerIds
-  private parseAssignedCustomerIds(customerIds: any): number[] {
-    if (!customerIds) return [];
-    if (Array.isArray(customerIds)) return customerIds;
-    if (typeof customerIds === 'string') {
-      try {
-        const parsed = JSON.parse(customerIds);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (error) {
-        console.error('Error parsing assignedCustomerIds:', error);
-        return [];
-      }
-    }
-    return [];
-  }
-
   /**
    * Creates a new user account with optional employee linking
    */
   async createUser(userData: CreateUserRequest): Promise<User> {
     try {
-      console.log('🔄 [UserService] Creating user:', userData)
-      console.log('🔄 [UserService] CustomerId in request:', userData.customerId)
+      logger.debug('🔄 [UserService] Creating user:', userData)
+      logger.debug('🔄 [UserService] CustomerId in request:', userData.customerId)
       const response = await api.post(`${this.baseUrl}/create`, userData)
-      console.log('✅ [UserService] User created successfully:', response.data)
+      logger.debug('✅ [UserService] User created successfully:', response.data)
       
-      // Transform backend response to frontend format
       const backendUser = response.data as BackendUserResponse
-      return {
-        id: backendUser.id,
-        username: backendUser.username,
-        firstName: backendUser.firstName,
-        lastName: backendUser.lastName,
-        email: backendUser.email,
-        role: backendUser.role as UserRole,
-        pageAccessRole: backendUser.pageAccessRole as UserRole,
-        signature: backendUser.signature,
-        signatureCode: backendUser.signatureCode,
-        jobTitle: backendUser.jobTitle,
-        customerId: backendUser.customerId,
-        customerName: backendUser.customerName,
-        recordIsDeleted: backendUser.recordIsDeleted,
-        createdAt: backendUser.createdAt,
-        updatedAt: backendUser.updatedAt || backendUser.createdAt,
-        employeeId: backendUser.employeeId,
-        employeeName: backendUser.employeeName,
-        assignedCustomerIds: this.parseAssignedCustomerIds(backendUser.assignedCustomerIds),
-        assignedCustomerNames: backendUser.assignedCustomerNames || [],
-        phoneNumber: backendUser.phoneNumber,
-        emailConfirmed: backendUser.emailConfirmed,
-        lastLoginAt: backendUser.lastLoginAt
-      } as User
+      return mapBackendUserToUser(backendUser)
     } catch (error) {
-      console.error('❌ [UserService] Error creating user:', error)
+      logger.error('❌ [UserService] Error creating user:', error)
       throw new Error('Failed to create user account')
     }
   }
@@ -132,7 +212,7 @@ class UserService {
    */
   async getUsers(params: UsersQueryParams = {}): Promise<UsersResponse> {
     try {
-      console.log('🔄 [UserService] Fetching users with params:', params)
+      logger.debug('🔄 [UserService] Fetching users with params:', params)
       const queryParams = {
         page: params.page ?? 1,
         pageSize: params.pageSize ?? 10,
@@ -145,75 +225,16 @@ class UserService {
       }
 
       const response = await api.get(`${this.baseUrl}/list`, { params: queryParams })
-      console.log('✅ [UserService] Raw backend response:', response.data)
+      logger.debug('✅ [UserService] Raw backend response:', response.data)
       
       // Transform backend response to frontend format
       const backendResponse = response.data as BackendUserListResponse
       const backendUsers = Array.isArray(backendResponse.users) ? backendResponse.users : []
-      console.log('✅ [UserService] Backend response users:', backendUsers)
+      logger.debug('✅ [UserService] Backend response users:', backendUsers)
       
-      const transformedUsers = backendUsers.map(user => {
-        // Backend returns roles in lowercase, use directly
-        const normalizedRole = (user.role?.toLowerCase() || '') as UserRole;
-        const isCustomerRole = normalizedRole === 'customersitemanager' || normalizedRole === 'customerhomanager';
-        const normalizedPageAccessRole = (user.pageAccessRole?.toLowerCase() || normalizedRole) as UserRole;
-        
-        console.log('🔄 [UserService] getUsers - Transforming user:', {
-          username: user.username,
-          backendRole: user.role,
-          normalizedRole,
-          isCustomerRole,
-          customerId: user.customerId,
-          customerName: user.customerName
-        });
-        
-        const baseUser = {
-          id: user.id,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          role: normalizedRole,
-          pageAccessRole: normalizedPageAccessRole,
-          signature: user.signature,
-          signatureCode: user.signatureCode,
-          jobTitle: user.jobTitle,
-          customerId: user.customerId,
-          recordIsDeleted: user.recordIsDeleted,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt || user.createdAt,
-          employeeId: user.employeeId,
-          employeeName: user.employeeName,
-          phoneNumber: user.phoneNumber,
-          emailConfirmed: user.emailConfirmed,
-          lastLoginAt: user.lastLoginAt
-        };
-
-        // Handle union type based on role
-        if (isCustomerRole) {
-          const customerUser = {
-            ...baseUser,
-            role: normalizedRole as 'customersitemanager' | 'customerhomanager',
-            customerId: user.customerId ?? undefined, // Use actual customerId from backend
-            customerName: user.customerName
-          } as CustomerUser;
-          console.log('✅ [UserService] Created CustomerUser:', {
-            id: customerUser.id,
-            customerId: customerUser.customerId,
-            customerName: customerUser.customerName
-          });
-          return customerUser;
-        } else {
-          return {
-            ...baseUser,
-            role: normalizedRole as 'advantageoneofficer' | 'advantageonehoofficer' | 'administrator',
-            assignedCustomerIds: this.parseAssignedCustomerIds(user.assignedCustomerIds),
-            assignedCustomerNames: user.assignedCustomerNames || []
-          } as AdvantageOneUser;
-        }
-      })
+      const transformedUsers = backendUsers.map((user) => mapBackendUserToUser(user as BackendUserResponse))
       
-      console.log('✅ [UserService] Transformed users:', transformedUsers)
+      logger.debug('✅ [UserService] Transformed users:', transformedUsers)
       const resolvedPageSize = backendResponse.pageSize ?? queryParams.pageSize ?? 10
       const resolvedTotalCount = backendResponse.totalCount ?? transformedUsers.length
 
@@ -228,7 +249,7 @@ class UserService {
         }
       }
     } catch (error) {
-      console.error('❌ [UserService] Error getting users:', error)
+      logger.error('❌ [UserService] Error getting users:', error)
       throw new Error('Failed to get users')
     }
   }
@@ -238,50 +259,23 @@ class UserService {
    */
   async getUserById(userId: string): Promise<User> {
     try {
-      console.log('🔄 [UserService] Fetching user by ID:', userId)
+      logger.debug('🔄 [UserService] Fetching user by ID:', userId)
       const response = await api.get(`${this.baseUrl}/${userId}`)
-      console.log('✅ [UserService] User fetched successfully:', response.data)
+      logger.debug('✅ [UserService] User fetched successfully:', response.data)
       
       // Transform backend response to frontend format
       const backendUser = response.data as BackendUserResponse
-      
-      // Backend returns roles in lowercase, use directly
-      const normalizedRole = (backendUser.role?.toLowerCase() || '') as UserRole;
-      const normalizedPageAccessRole = (backendUser.pageAccessRole?.toLowerCase() || normalizedRole) as UserRole;
-      
-      console.log('🔄 [UserService] getUserById - Role normalization:', {
+
+      logger.debug('🔄 [UserService] getUserById - Role normalization:', {
         backendRole: backendUser.role,
-        normalizedRole,
-        customerId: backendUser.customerId,
-        customerName: backendUser.customerName
-      });
-      
-      return {
-        id: backendUser.id,
-        username: backendUser.username,
-        firstName: backendUser.firstName,
-        lastName: backendUser.lastName,
-        email: backendUser.email,
-        role: normalizedRole,
-        pageAccessRole: normalizedPageAccessRole,
-        signature: backendUser.signature,
-        signatureCode: backendUser.signatureCode,
-        jobTitle: backendUser.jobTitle,
+        harmonized: harmonizeRole(backendUser.role),
         customerId: backendUser.customerId,
         customerName: backendUser.customerName,
-        recordIsDeleted: backendUser.recordIsDeleted,
-        createdAt: backendUser.createdAt,
-        updatedAt: backendUser.updatedAt || backendUser.createdAt,
-        employeeId: backendUser.employeeId,
-        employeeName: backendUser.employeeName,
-        assignedCustomerIds: this.parseAssignedCustomerIds(backendUser.assignedCustomerIds),
-        assignedCustomerNames: backendUser.assignedCustomerNames || [],
-        phoneNumber: backendUser.phoneNumber,
-        emailConfirmed: backendUser.emailConfirmed,
-        lastLoginAt: backendUser.lastLoginAt
-      } as User
+      })
+
+      return mapBackendUserToUser(backendUser)
     } catch (error) {
-      console.error('❌ [UserService] Error getting user:', error)
+      logger.error('❌ [UserService] Error getting user:', error)
       throw new Error('Failed to get user')
     }
   }
@@ -291,7 +285,7 @@ class UserService {
    */
   async updateUser(userData: { id: string } & Partial<CreateUserRequest>): Promise<User> {
     try {
-      console.log('🔄 [UserService] updateUser called with:', {
+      logger.debug('🔄 [UserService] updateUser called with:', {
         id: userData.id,
         hasCustomerId: 'customerId' in userData,
         customerId: userData.customerId,
@@ -305,7 +299,7 @@ class UserService {
       // Ensure assignedCustomerIds is included in the update data
       if ('assignedCustomerIds' in userData) {
         (updateData as any).assignedCustomerIds = userData.assignedCustomerIds
-        console.log('🔄 [UserService] Added assignedCustomerIds:', (updateData as any).assignedCustomerIds)
+        logger.debug('🔄 [UserService] Added assignedCustomerIds:', (updateData as any).assignedCustomerIds)
       }
       
       // Always include customerId in update data (even if null/undefined)
@@ -313,7 +307,7 @@ class UserService {
       if ('customerId' in userData) {
         // Send null explicitly if customerId is undefined, to allow backend to process it
         (updateData as any).customerId = userData.customerId ?? null
-        console.log('🔄 [UserService] Processed customerId:', {
+        logger.debug('🔄 [UserService] Processed customerId:', {
           original: userData.customerId,
           processed: (updateData as any).customerId,
           type: typeof (updateData as any).customerId,
@@ -321,15 +315,15 @@ class UserService {
           isUndefined: (updateData as any).customerId === undefined
         })
       } else {
-        console.log('⚠️ [UserService] customerId not in userData, not including in update')
+        logger.debug('⚠️ [UserService] customerId not in userData, not including in update')
       }
       
-      console.log('🔄 [UserService] Final updateData being sent:', JSON.stringify(updateData, null, 2))
-      console.log('🔄 [UserService] Making PUT request to:', `${this.baseUrl}/${id}`)
+      logger.debug('🔄 [UserService] Final updateData being sent:', JSON.stringify(updateData, null, 2))
+      logger.debug('🔄 [UserService] Making PUT request to:', `${this.baseUrl}/${id}`)
       
       const response = await api.put(`${this.baseUrl}/${id}`, updateData)
       
-      console.log('✅ [UserService] API response received:', {
+      logger.debug('✅ [UserService] API response received:', {
         status: response.status,
         hasData: !!response.data,
         customerId: response.data?.customerId,
@@ -340,44 +334,17 @@ class UserService {
       
       // Transform backend response to frontend format
       const backendUser = response.data as BackendUserResponse
-      
-      // Backend returns roles in lowercase, use directly
-      const normalizedRole = (backendUser.role?.toLowerCase() || '') as UserRole;
-      const normalizedPageAccessRole = (backendUser.pageAccessRole?.toLowerCase() || normalizedRole) as UserRole;
-      
-      console.log('🔄 [UserService] updateUser - Role normalization:', {
+
+      logger.debug('🔄 [UserService] updateUser - Role normalization:', {
         backendRole: backendUser.role,
-        normalizedRole,
-        customerId: backendUser.customerId,
-        customerName: backendUser.customerName
-      });
-      
-      return {
-        id: backendUser.id,
-        username: backendUser.username,
-        firstName: backendUser.firstName,
-        lastName: backendUser.lastName,
-        email: backendUser.email,
-        role: normalizedRole,
-        pageAccessRole: normalizedPageAccessRole,
-        signature: backendUser.signature,
-        signatureCode: backendUser.signatureCode,
-        jobTitle: backendUser.jobTitle,
+        harmonized: harmonizeRole(backendUser.role),
         customerId: backendUser.customerId,
         customerName: backendUser.customerName,
-        recordIsDeleted: backendUser.recordIsDeleted,
-        createdAt: backendUser.createdAt,
-        updatedAt: backendUser.updatedAt || backendUser.createdAt,
-        employeeId: backendUser.employeeId,
-        employeeName: backendUser.employeeName,
-        assignedCustomerIds: this.parseAssignedCustomerIds(backendUser.assignedCustomerIds),
-        assignedCustomerNames: backendUser.assignedCustomerNames || [],
-        phoneNumber: backendUser.phoneNumber,
-        emailConfirmed: backendUser.emailConfirmed,
-        lastLoginAt: backendUser.lastLoginAt
-      } as User
+      })
+
+      return mapBackendUserToUser(backendUser)
     } catch (error) {
-      console.error('❌ [UserService] Error updating user:', error)
+      logger.error('❌ [UserService] Error updating user:', error)
       throw new Error('Failed to update user')
     }
   }
@@ -387,12 +354,29 @@ class UserService {
    */
   async deleteUser(userId: string): Promise<void> {
     try {
-      console.log('🔄 [UserService] Deleting user:', userId)
+      logger.debug('🔄 [UserService] Deleting user:', userId)
       await api.delete(`${this.baseUrl}/${userId}`)
-      console.log('✅ [UserService] User deleted successfully')
+      logger.debug('✅ [UserService] User deleted successfully')
     } catch (error) {
-      console.error('❌ [UserService] Error deleting user:', error)
-      throw new Error('Failed to delete user')
+      logger.error('❌ [UserService] Error deleting user:', error)
+      const message = ((): string => {
+        if (axios.isAxiosError(error)) {
+          const d = error.response?.data as { error?: string; details?: unknown; message?: string } | undefined
+          const parts: string[] = []
+          if (typeof d?.error === 'string' && d.error.trim()) parts.push(d.error.trim())
+          if (typeof d?.message === 'string' && d.message.trim()) parts.push(d.message.trim())
+          if (Array.isArray(d?.details)) {
+            for (const item of d.details) {
+              if (typeof item === 'string' && item.trim()) parts.push(item.trim())
+            }
+          }
+          if (parts.length) return parts.join(' ')
+          return error.message || 'Failed to delete user'
+        }
+        if (error instanceof Error) return error.message
+        return 'Failed to delete user'
+      })()
+      throw new Error(message)
     }
   }
 
@@ -405,7 +389,7 @@ class UserService {
         newPassword
       })
     } catch (error) {
-      console.error('Error resetting password:', error)
+      logger.error('Error resetting password:', error)
       throw new Error('Failed to reset password')
     }
   }
@@ -420,7 +404,7 @@ class UserService {
       })
       return response.data
     } catch (error) {
-      console.error('Error linking user to employee:', error)
+      logger.error('Error linking user to employee:', error)
       throw new Error('Failed to link user to employee')
     }
   }
@@ -433,7 +417,7 @@ class UserService {
       const response = await api.post(`${this.baseUrl}/${userId}/unlink-employee`)
       return response.data
     } catch (error) {
-      console.error('Error unlinking user from employee:', error)
+      logger.error('Error unlinking user from employee:', error)
       throw new Error('Failed to unlink user from employee')
     }
   }
@@ -446,7 +430,7 @@ class UserService {
       const response = await api.get(`${this.baseUrl}/by-role/${role}`)
       return response.data
     } catch (error) {
-      console.error('Error getting users by role:', error)
+      logger.error('Error getting users by role:', error)
       throw new Error('Failed to get users by role')
     }
   }
@@ -469,7 +453,7 @@ class UserService {
         userId: employee.userId
       }))
     } catch (error) {
-      console.error('Error getting unlinked employees:', error)
+      logger.error('Error getting unlinked employees:', error)
       throw new Error('Failed to get unlinked employees')
     }
   }
@@ -482,7 +466,7 @@ class UserService {
       const response = await api.get(`${this.baseUrl}/linked-employees`)
       return response.data
     } catch (error) {
-      console.error('Error getting linked employees:', error)
+      logger.error('Error getting linked employees:', error)
       throw new Error('Failed to get linked employees')
     }
   }
@@ -497,7 +481,7 @@ class UserService {
       })
       return response.data
     } catch (error) {
-      console.error('Error validating username:', error)
+      logger.error('Error validating username:', error)
       throw new Error('Failed to validate username')
     }
   }
@@ -512,7 +496,7 @@ class UserService {
       })
       return response.data
     } catch (error) {
-      console.error('Error validating email:', error)
+      logger.error('Error validating email:', error)
       throw new Error('Failed to validate email')
     }
   }

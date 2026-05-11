@@ -1,3 +1,7 @@
+/**
+ * Safe duress words reference for officers.
+ * Flow: load current safe/duress codes → optional admin rotation with history pagination.
+ */
 import React, { useState, useEffect } from 'react';
 import {
   Card,
@@ -46,53 +50,66 @@ import { cn } from "@/lib/utils";
 import { toast } from 'react-toastify';
 import { safeDuressWordsService } from '@/services/safeDuressWordsService';
 import { CodeWord, WordHistory, WordHistoryFilters } from '@/types/safeDuressWords';
-import { useAuth } from '@/contexts/AuthContext';
+import { usePageAccess } from '@/contexts/PageAccessContext';
+import { getUser } from '@/services/auth';
+import { harmonizeRole, normalizeRoleId } from '@/utils/roles';
 
 // Reusable components
-const PageHeader = ({ onShowHistory, onShowUpdateDialog, isAdmin }) => (
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
-    <div className="flex items-center gap-2 sm:gap-3">
-      <div className="bg-blue-100 p-1.5 sm:p-2 rounded-lg">
-        <Shield className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-blue-600" />
+const PageHeader = ({
+	onShowHistory,
+	onShowUpdateDialog,
+	canUpdateWords,
+}: {
+	onShowHistory: () => void;
+	onShowUpdateDialog: () => void;
+	canUpdateWords: boolean;
+}) => (
+  <div className="mb-4 md:mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className="bg-blue-100 p-1.5 sm:p-2 rounded-lg">
+          <Shield className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-blue-600" />
+        </div>
+        <div>
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900">Safe and Duress Words</h1>
+          <p className="text-xs sm:text-sm text-slate-500">Secure communication protocols for security personnel</p>
+        </div>
       </div>
-      <div>
-        <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Safe and Duress Words</h1>
-        <p className="text-xs sm:text-sm text-gray-500">Secure communication protocols for security personnel</p>
+      <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+        <Button
+          variant="outline"
+          className="text-xs sm:text-sm h-8 sm:h-9 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center border-slate-300"
+          onClick={onShowHistory}
+        >
+          <History className="w-3.5 h-3.5" />
+          <span>View History</span>
+        </Button>
+        {canUpdateWords ? (
+          <Button
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm h-8 sm:h-9 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center"
+            onClick={onShowUpdateDialog}
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span>Update Words</span>
+          </Button>
+        ) : (
+          <Button
+            variant="secondary"
+            className="text-xs sm:text-sm h-8 sm:h-9 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center cursor-not-allowed opacity-70"
+            disabled
+            aria-label="Updating words requires manager or administrator access"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span>Managers only</span>
+          </Button>
+        )}
       </div>
-    </div>
-    <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-      <Button
-        variant="outline"
-        className="text-xs sm:text-sm h-8 sm:h-9 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center"
-        onClick={onShowHistory}
-      >
-        <History className="w-3.5 h-3.5" />
-        <span>View History</span>
-      </Button>
-      {isAdmin ? (
-        <Button
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm h-8 sm:h-9 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center"
-          onClick={onShowUpdateDialog}
-        >
-          <KeyRound className="w-3.5 h-3.5" />
-          <span>Update Words</span>
-        </Button>
-      ) : (
-        <Button
-          variant="secondary"
-          className="text-xs sm:text-sm h-8 sm:h-9 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center cursor-not-allowed opacity-70"
-          disabled
-        >
-          <KeyRound className="w-3.5 h-3.5" />
-          <span>Admin Only</span>
-        </Button>
-      )}
     </div>
   </div>
 );
 
 const ImportantNotice = () => (
-  <Alert className="mb-4 md:mb-6 border-red-200 bg-red-50">
+  <Alert className="mb-4 md:mb-6 border-red-200 bg-red-50/80">
     <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
     <AlertTitle className="text-sm sm:text-base text-red-600 font-semibold">Confidential Information</AlertTitle>
     <AlertDescription className="text-xs sm:text-sm text-red-700">
@@ -111,8 +128,8 @@ const CodeWordCard = ({ type, word, updatedAt, updatedBy }) => {
   const descColor = isafe ? 'text-green-700' : 'text-red-700';
   
   return (
-    <Card className={`bg-gradient-to-br ${bgColor}`}>
-      <CardHeader className="p-3 sm:p-4">
+    <Card className={cn(`border shadow-sm ${bgColor}`)}>
+      <CardHeader className="p-3 sm:p-4 border-b border-slate-200/70">
         <CardTitle className={`flex items-center gap-2 ${textColor} text-sm sm:text-base`}>
           {isafe ? (
             <CheckCircle className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />
@@ -126,7 +143,7 @@ const CodeWordCard = ({ type, word, updatedAt, updatedBy }) => {
         </CardDescription>
       </CardHeader>
       <CardContent className="p-3 sm:p-4">
-        <div className={`bg-white rounded-lg p-3 sm:p-4 border ${borderColor}`}>
+        <div className={`bg-white rounded-lg p-3 sm:p-4 border ${borderColor} shadow-sm`}>
           <span className={`text-xl sm:text-2xl font-bold ${descColor}`}>{word}</span>
         </div>
       </CardContent>
@@ -425,9 +442,16 @@ const UsageExampleTable = () => (
 );
 
 const SafeDuressWordsPage: React.FC = () => {
-  const { user } = useAuth();
-  const role = user?.role?.toLowerCase() ?? '';
-  const isAdmin = role === 'administrator';
+  const { currentRole, isTestMode, testRole } = usePageAccess();
+  const viewer = getUser();
+  const effectiveNavigationRole = isTestMode && testRole ? testRole : currentRole;
+  const harmonizedRole =
+    normalizeRoleId(effectiveNavigationRole ?? '') ??
+    normalizeRoleId(viewer?.pageAccessRole ?? viewer?.role ?? '') ??
+    harmonizeRole(viewer?.pageAccessRole ?? viewer?.role ?? '');
+  const canUpdateWords =
+    harmonizedRole === 'administrator' || harmonizedRole === 'manager';
+
   // State management
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -491,12 +515,12 @@ const SafeDuressWordsPage: React.FC = () => {
   const [historyFilters, setHistoryFilters] = useState<WordHistoryFilters>({});
 
   useEffect(() => {
-    if (!isAdmin && showUpdateDialog) {
+    if (!canUpdateWords && showUpdateDialog) {
       setShowUpdateDialog(false);
     }
-  }, [isAdmin, showUpdateDialog]);
+  }, [canUpdateWords, showUpdateDialog]);
 
-  // Fetch current words
+  // Current words and history use safeDuressWordsService with local fallback when unavailable.
   const fetchCurrentWords = async () => {
     try {
       setIsLoading(true);
@@ -553,8 +577,8 @@ const SafeDuressWordsPage: React.FC = () => {
   }, [showHistory, historyPagination.page, historyPagination.pageSize, historyFilters]);
 
   const handleUpdateWord = async () => {
-    if (!isAdmin) {
-      toast.error('Only administrators can update code words.');
+    if (!canUpdateWords) {
+      toast.error('Only administrators and managers can update code words.');
       return;
     }
 
@@ -617,18 +641,18 @@ const SafeDuressWordsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#EFF4FF]">
-      <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6 max-w-[1280px]">
+      <div className="container mx-auto max-w-screen-2xl px-4 py-4 lg:px-8 lg:py-8">
         {/* Header Section */}
         <PageHeader 
           onShowHistory={() => setShowHistory(true)} 
           onShowUpdateDialog={() => {
-            if (!isAdmin) {
-              toast.error('Only administrators can update code words.');
+            if (!canUpdateWords) {
+              toast.error('Only administrators and managers can update code words.');
               return;
             }
             setShowUpdateDialog(true);
           }} 
-          isAdmin={isAdmin}
+          canUpdateWords={canUpdateWords}
         />
 
         {/* Important Notice */}
@@ -651,8 +675,8 @@ const SafeDuressWordsPage: React.FC = () => {
         </div>
 
         {/* Guidelines Section */}
-        <Card className="mb-4 md:mb-6">
-          <CardHeader className="p-3 sm:p-4">
+        <Card className="mb-4 md:mb-6 border-slate-200 bg-white shadow-sm">
+          <CardHeader className="p-3 sm:p-4 border-b border-slate-200 bg-slate-50/60">
             <CardTitle className="flex items-center gap-1.5 text-sm sm:text-base">
               <Info className="h-4 w-4 text-blue-600" />
               Usage Guidelines
@@ -675,8 +699,8 @@ const SafeDuressWordsPage: React.FC = () => {
         </Card>
 
         {/* Usage Examples */}
-        <Card>
-          <CardHeader className="p-3 sm:p-4">
+        <Card className="border-slate-200 bg-white shadow-sm overflow-hidden">
+          <CardHeader className="p-3 sm:p-4 border-b border-slate-200 bg-slate-50/60">
             <CardTitle className="flex items-center gap-1.5 text-sm sm:text-base">
               <Lock className="h-4 w-4 text-blue-600" />
               Secure Communication Examples
@@ -691,7 +715,7 @@ const SafeDuressWordsPage: React.FC = () => {
         </Card>
 
         {/* Update Dialog */}
-        {isAdmin && (
+        {canUpdateWords && (
           <UpdateDialog 
             isOpen={showUpdateDialog}
             onClose={() => setShowUpdateDialog(false)}

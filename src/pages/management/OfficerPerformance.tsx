@@ -1,3 +1,7 @@
+/**
+ * Officer performance metrics for managers.
+ * Flow: date and officer filters → dashboardService aggregates → paginated performance table.
+ */
 import React, { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Users, AlertCircle, PoundSterling } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
@@ -357,7 +361,7 @@ const OfficerPerformance = () => {
                   <label className="block text-[9px] xs:text-xs sm:text-sm lg:text-base font-medium text-gray-600 mb-0.5 xs:mb-1 lg:mb-2">
                     End Date
                   </label>
-                  <DatePicker date={endDate} setDate={setEndDate} placeholder="End Date" />
+                  <DatePicker date={endDate} setDate={setEndDate} placeholder="End Date" minDate={startDate} />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[9px] xs:text-xs sm:text-sm lg:text-base font-medium text-gray-600 mb-0.5 xs:mb-1 lg:mb-2">
