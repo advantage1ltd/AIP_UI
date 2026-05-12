@@ -29,7 +29,18 @@ import {
   ChevronRight
 } from "lucide-react";
 import { CustomerSurvey, CustomerSurveyFilters } from '@/types/customerSatisfaction';
-import type { Region, Site } from '@/types/dashboard';
+type SurveyRegionOption = {
+  id: string;
+  name: string;
+  customerId: string;
+};
+
+type SurveySiteOption = {
+  id: string;
+  name: string;
+  customerId: string;
+  regionId: string;
+};
 
 // Customer data for admin filtering
 const CUSTOMERS = [
@@ -47,8 +58,8 @@ interface SurveyTableProps {
     total: number;
   };
   filters: CustomerSurveyFilters;
-  regions: Region[];
-  sites: Site[];
+  regions: SurveyRegionOption[];
+  sites: SurveySiteOption[];
   onNewSurvey?: () => void;
   onEditSurvey?: (survey: CustomerSurvey) => void;
   onViewSurvey: (survey: CustomerSurvey) => void;
@@ -130,7 +141,7 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
             <SelectContent>
               <SelectItem value="all">All Regions</SelectItem>
               {regions
-                .filter(region => !isAdmin || !filters.customerId || region.customerId === parseInt(filters.customerId, 10))
+                .filter(region => !isAdmin || !filters.customerId || region.customerId === filters.customerId)
                 .map(region => (
                   <SelectItem key={region.id} value={region.id}>{region.name}</SelectItem>
                 ))}
@@ -149,13 +160,13 @@ export const SurveyTable: React.FC<SurveyTableProps> = ({
               {sites
                 .filter(site => {
                   // Filter by customer if admin and customer is selected
-                  const customerMatch = !isAdmin || !filters.customerId || site.customerId === parseInt(filters.customerId, 10);
+                  const customerMatch = !isAdmin || !filters.customerId || site.customerId === filters.customerId;
                   // Filter by region if region is selected
                   const regionMatch = !filters.regionId || site.regionId === filters.regionId;
                   return customerMatch && regionMatch;
                 })
                 .map(site => (
-                  <SelectItem key={site.id} value={site.id}>{site.locationName}</SelectItem>
+                  <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>
                 ))}
             </SelectContent>
           </Select>

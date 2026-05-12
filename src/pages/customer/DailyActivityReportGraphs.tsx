@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { dailyActivityAnalyticsService, type AnalyticsResponse } from '@/services/dailyActivityAnalyticsService';
 import { customerDashboardService } from '@/services/dashboardService';
+import { logger } from '@/utils/logger';
 import { getCustomerMappings, getCustomerNameById } from '@/services/customerMappingService';
 import type { Site } from '@/types/dashboard';
 import { 
@@ -176,8 +177,8 @@ const DailyActivityReportGraphs: React.FC = () => {
         } : {})
       };
 
-      console.log('[Analytics] Loading data with filters:', filters);
-      console.log('[Analytics] User context:', { 
+      logger.debug('[Analytics] Loading data with filters:', filters);
+      logger.debug('[Analytics] User context:', { 
         role: user?.role, 
         customerId: user?.customerId, 
         urlCustomerId, 
@@ -185,8 +186,8 @@ const DailyActivityReportGraphs: React.FC = () => {
       });
       const data = await dailyActivityAnalyticsService.getAnalytics(filters);
       setAnalyticsData(data);
-      console.log('[Analytics] Data loaded successfully:', data);
-      console.log('[Analytics] Site breakdown received:', data.siteBreakdown);
+      logger.debug('[Analytics] Data loaded successfully:', data);
+      logger.debug('[Analytics] Site breakdown received:', data.siteBreakdown);
     } catch (error) {
       console.error('[Analytics] Failed to load data:', error);
       setError('Failed to load analytics data. Please try again.');
@@ -236,12 +237,12 @@ const DailyActivityReportGraphs: React.FC = () => {
     }
 
     setDisplayData(data);
-    console.log('[Analytics] Processed display data for', selectedFilter, ':', data);
+    logger.debug('[Analytics] Processed display data for', selectedFilter, ':', data);
   }, [analyticsData, selectedFilter]);
 
   // Initial load
   React.useEffect(() => {
-    console.log('[Analytics] Component mounted');
+    logger.debug('[Analytics] Component mounted');
     loadSites();
     loadAnalyticsData();
   }, [loadSites, loadAnalyticsData]);
@@ -252,7 +253,7 @@ const DailyActivityReportGraphs: React.FC = () => {
   }, [processDisplayData]);
 
   const handleSearch = () => {
-    console.log('[Analytics] Manual refresh triggered');
+    logger.debug('[Analytics] Manual refresh triggered');
     loadAnalyticsData();
   };
 
@@ -433,18 +434,18 @@ const DailyActivityReportGraphs: React.FC = () => {
 
   const handleSiteChange = (value: string) => {
     setSelectedSite(value);
-    console.log('[Analytics] Site filter changed:', value);
+    logger.debug('[Analytics] Site filter changed:', value);
   };
 
   const handleCustomerChange = (value: string) => {
     setSelectedCustomer(value);
     setSelectedSite('all'); // Reset site filter when customer changes
-    console.log('[Analytics] Customer filter changed:', value);
+    logger.debug('[Analytics] Customer filter changed:', value);
   };
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    console.log('[Analytics] Tab changed:', value);
+    logger.debug('[Analytics] Tab changed:', value);
   };
 
   // Filter sites based on selected customer

@@ -48,10 +48,11 @@ export function DropdownMenuTrigger({
   };
 
   if (asChild && React.isValidElement(children)) {
-    return React.cloneElement(children as React.ReactElement<any, string>, {
+    const child = children as React.ReactElement<{ className?: string }>
+    return React.cloneElement(child, {
       onClick: handleClick,
-      className: cn(children.props.className, className),
-    });
+      className: cn(child.props.className, className),
+    } as React.HTMLAttributes<HTMLElement>);
   }
 
   return (
@@ -109,8 +110,9 @@ export function DropdownMenuItem({
   children: React.ReactNode;
 }) {
   if (asChild && React.isValidElement(children)) {
-    return React.cloneElement(children as React.ReactElement<any, string>, {
-      className: cn("block w-full", children.props.className, className),
+    const child = children as React.ReactElement<{ className?: string }>
+    return React.cloneElement(child, {
+      className: cn("block w-full", child.props.className, className),
       ...props
     });
   }
@@ -171,10 +173,11 @@ export function DropdownMenuRadioGroup({
     <div className={cn("", className)} {...props}>
       {React.Children.map(children, (child) => {
         if (!React.isValidElement(child)) return child;
-        return React.cloneElement(child as React.ReactElement<any, string>, {
-          checked: child.props.value === value,
-          onClick: () => onValueChange?.(child.props.value),
-        });
+        const radioChild = child as React.ReactElement<{ value?: string }>
+        return React.cloneElement(radioChild, {
+          checked: radioChild.props.value === value,
+          onClick: () => onValueChange?.(radioChild.props.value),
+        } as Record<string, unknown>);
       })}
     </div>
   );
@@ -205,4 +208,32 @@ export function DropdownMenuRadioItem({
       {children}
     </div>
   );
+}
+
+export function DropdownMenuSub({ children }: { children: React.ReactNode }) {
+  return <div className="relative">{children}</div>
+}
+
+export function DropdownMenuSubTrigger({
+  children,
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) {
+  return (
+    <div className={cn('flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm', className)} {...props}>
+      {children}
+    </div>
+  )
+}
+
+export function DropdownMenuSubContent({
+  children,
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) {
+  return (
+    <div className={cn('min-w-[8rem] rounded-md border bg-white p-1 shadow-md', className)} {...props}>
+      {children}
+    </div>
+  )
 }

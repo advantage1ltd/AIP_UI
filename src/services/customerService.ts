@@ -1,5 +1,8 @@
 import type { Customer } from "@/types/customer"
 import { api, CUSTOMER_ENDPOINTS, ApiResponse } from "@/config/api"
+import { logger } from "@/utils/logger"
+
+let inFlightCustomersRequest: Promise<Customer[]> | null = null
 
 // Helper function to map backend customer data to frontend Customer type
 const mapBackendCustomerToFrontend = (backendCustomer: any): Customer => {
@@ -74,22 +77,32 @@ const mapFrontendCustomerToBackend = (frontendCustomer: Customer): any => {
 export const customerService = {
   // Get all customers from backend
   getAllCustomers: async (): Promise<Customer[]> => {
-    try {
-      console.log('🔄 [CustomerService] Fetching customers from backend')
+    if (inFlightCustomersRequest) {
+      return inFlightCustomersRequest
+    }
+
+    const request = (async () => {
+      logger.debug('[CustomerService] Fetching customers from backend')
       const response = await api.get<ApiResponse<{ customers: any[] }>>(CUSTOMER_ENDPOINTS.LIST)
-      
+
       if (response.data.success && response.data.data?.customers) {
         const customers = response.data.data.customers.map(mapBackendCustomerToFrontend)
-        console.log('✅ [CustomerService] Successfully fetched customers:', customers.length)
+        logger.debug('[CustomerService] Successfully fetched customers:', customers.length)
         return customers
-      } else {
-        console.error('❌ [CustomerService] Failed to fetch customers:', response.data.message)
-        return []
       }
-    } catch (error) {
-      console.error('❌ [CustomerService] Error fetching customers:', error)
+
+      logger.error('[CustomerService] Failed to fetch customers:', response.data.message)
       return []
-    }
+    })().catch((error) => {
+      logger.error('[CustomerService] Error fetching customers:', error)
+      return []
+    })
+
+    inFlightCustomersRequest = request.finally(() => {
+      inFlightCustomersRequest = null
+    })
+
+    return inFlightCustomersRequest
   },
 
   // Get a customer by ID from backend.
@@ -99,18 +112,18 @@ export const customerService = {
       const customers = await customerService.getAllCustomers()
       const found = customers.find(c => String(c.id) === String(id))
       if (found) {
-        console.log('✅ [CustomerService] Found customer via list fallback:', found.companyName)
+        logger.debug('[CustomerService] Found customer via list fallback:', found.companyName)
         return found
       }
       return undefined
     }
 
     try {
-      console.log('🔄 [CustomerService] Fetching customer by ID:', id)
+logger.debug('🔄 [CustomerService] Fetching customer by ID:', id)
       const response = await api.get<ApiResponse<any>>(CUSTOMER_ENDPOINTS.DETAIL(id))
       if (response.data?.success && response.data?.data) {
         const customer = mapBackendCustomerToFrontend(response.data.data)
-        console.log('✅ [CustomerService] Successfully fetched customer:', customer.companyName)
+  logger.debug('✅ [CustomerService] Successfully fetched customer:', customer.companyName)
         return customer
       }
       return undefined
@@ -120,10 +133,10 @@ export const customerService = {
         try {
           return await fallbackFromList()
         } catch (fallbackError) {
-          console.error('❌ [CustomerService] Fallback fetch failed:', fallbackError)
+    logger.error('❌ [CustomerService] Fallback fetch failed:', fallbackError)
         }
       }
-      console.error('❌ [CustomerService] Error fetching customer:', error)
+logger.error('❌ [CustomerService] Error fetching customer:', error)
       return undefined
     }
   },
@@ -131,7 +144,7 @@ export const customerService = {
   // Create a new customer via backend
   createCustomer: async (customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'viewConfig' | 'pageAssignments'>): Promise<{ success: boolean; customer?: Customer; error?: string }> => {
     try {
-      console.log('🔄 [CustomerService] Creating new customer:', customerData.companyName)
+logger.debug('🔄 [CustomerService] Creating new customer:', customerData.companyName)
       
       const backendData = mapFrontendCustomerToBackend({
         ...customerData,
@@ -146,14 +159,14 @@ export const customerService = {
       
       if (response.data.success && response.data.data) {
         const customer = mapBackendCustomerToFrontend(response.data.data)
-        console.log('✅ [CustomerService] Successfully created customer:', customer.companyName)
+  logger.debug('✅ [CustomerService] Successfully created customer:', customer.companyName)
         return { success: true, customer }
       } else {
-        console.error('❌ [CustomerService] Failed to create customer:', response.data.message)
+  logger.error('❌ [CustomerService] Failed to create customer:', response.data.message)
         return { success: false, error: response.data.message || 'Failed to create customer' }
       }
     } catch (error) {
-      console.error('❌ [CustomerService] Error creating customer:', error)
+logger.error('❌ [CustomerService] Error creating customer:', error)
       return { success: false, error: 'Failed to create customer' }
     }
   },
@@ -161,7 +174,7 @@ export const customerService = {
   // Update a customer via backend
   updateCustomer: async (customerData: Customer): Promise<{ success: boolean; customer?: Customer; error?: string }> => {
     try {
-      console.log('🔄 [CustomerService] Updating customer:', customerData.companyName)
+logger.debug('🔄 [CustomerService] Updating customer:', customerData.companyName)
       
       const backendData = mapFrontendCustomerToBackend(customerData)
       
@@ -169,14 +182,14 @@ export const customerService = {
       
       if (response.data.success && response.data.data) {
         const customer = mapBackendCustomerToFrontend(response.data.data)
-        console.log('✅ [CustomerService] Successfully updated customer:', customer.companyName)
+  logger.debug('✅ [CustomerService] Successfully updated customer:', customer.companyName)
         return { success: true, customer }
       } else {
-        console.error('❌ [CustomerService] Failed to update customer:', response.data.message)
+  logger.error('❌ [CustomerService] Failed to update customer:', response.data.message)
         return { success: false, error: response.data.message || 'Failed to update customer' }
       }
     } catch (error) {
-      console.error('❌ [CustomerService] Error updating customer:', error)
+logger.error('❌ [CustomerService] Error updating customer:', error)
       return { success: false, error: 'Failed to update customer' }
     }
   },
@@ -184,19 +197,19 @@ export const customerService = {
   // Delete a customer via backend
   deleteCustomer: async (customerId: string): Promise<{ success: boolean; customerName?: string; error?: string }> => {
     try {
-      console.log('🔄 [CustomerService] Deleting customer:', customerId)
+logger.debug('🔄 [CustomerService] Deleting customer:', customerId)
       
       const response = await api.delete<ApiResponse<any>>(`${CUSTOMER_ENDPOINTS.LIST}/${customerId}`)
       
       if (response.data.success) {
-        console.log('✅ [CustomerService] Successfully deleted customer')
+  logger.debug('✅ [CustomerService] Successfully deleted customer')
         return { success: true }
       } else {
-        console.error('❌ [CustomerService] Failed to delete customer:', response.data.message)
+  logger.error('❌ [CustomerService] Failed to delete customer:', response.data.message)
         return { success: false, error: response.data.message || 'Failed to delete customer' }
       }
     } catch (error) {
-      console.error('❌ [CustomerService] Error deleting customer:', error)
+logger.error('❌ [CustomerService] Error deleting customer:', error)
       return { success: false, error: 'Failed to delete customer' }
     }
   },
@@ -204,7 +217,7 @@ export const customerService = {
   // Update customer page assignments via backend
   updateCustomerPageAssignments: async (customerId: string, pageAssignments: Record<string, any>): Promise<Customer | null> => {
     try {
-      console.log('🔄 [CustomerService] Updating page assignments for customer:', customerId)
+logger.debug('🔄 [CustomerService] Updating page assignments for customer:', customerId)
       
       const response = await api.put<ApiResponse<any>>(`${CUSTOMER_ENDPOINTS.LIST}/${customerId}/page-assignments`, {
         pageAssignments: JSON.stringify(pageAssignments)
@@ -212,14 +225,14 @@ export const customerService = {
       
       if (response.data.success && response.data.data) {
         const customer = mapBackendCustomerToFrontend(response.data.data)
-        console.log('✅ [CustomerService] Successfully updated page assignments')
+  logger.debug('✅ [CustomerService] Successfully updated page assignments')
         return customer
       } else {
-        console.error('❌ [CustomerService] Failed to update page assignments:', response.data.message)
+  logger.error('❌ [CustomerService] Failed to update page assignments:', response.data.message)
         return null
       }
     } catch (error) {
-      console.error('❌ [CustomerService] Error updating page assignments:', error)
+logger.error('❌ [CustomerService] Error updating page assignments:', error)
       return null
     }
   },
@@ -233,7 +246,7 @@ export const customerService = {
         name: customer.companyName
       }))
     } catch (error) {
-      console.error('❌ [CustomerService] Error getting available customers:', error)
+logger.error('❌ [CustomerService] Error getting available customers:', error)
       return []
     }
   },
@@ -246,7 +259,7 @@ export const customerService = {
   // Create a new customer with auto-generated ID and proper page assignments
   createNewCustomer: async (customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'viewConfig' | 'pageAssignments'>): Promise<{ success: boolean; customer?: Customer; error?: string }> => {
     try {
-      console.log('🔄 [CustomerService] Creating new customer with page assignments')
+logger.debug('🔄 [CustomerService] Creating new customer with page assignments')
       
       // Get pages for customer type
       const { getPagesByCustomerType } = require('@/config/customerPages')
@@ -277,7 +290,7 @@ export const customerService = {
       
       return await customerService.createCustomer(customerWithAssignments)
     } catch (error) {
-      console.error('❌ [CustomerService] Error creating new customer:', error)
+logger.error('❌ [CustomerService] Error creating new customer:', error)
       return { success: false, error: 'Failed to create new customer' }
     }
   }

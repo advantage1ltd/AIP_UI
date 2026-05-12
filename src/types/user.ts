@@ -75,6 +75,16 @@ export interface BaseUser {
 	updatedAt: string;
 	employeeId?: number;
 	employeeName?: string;
+	/** Present for customer logins; may appear on normalized API payloads for other roles. */
+	customerId?: number;
+	/** Staff multi-tenant assignments; optional on customer accounts in legacy UI. */
+	assignedCustomerIds?: number[];
+	lastLogin?: string;
+	phoneNumber?: string;
+	/** Legacy API casing retained for dashboard and auth normalization. */
+	CustomerId?: number;
+	Role?: UserRole | string;
+	companyId?: number;
 }
 
 /** Tenant-scoped customer login (maps legacy site/HO customer managers). */

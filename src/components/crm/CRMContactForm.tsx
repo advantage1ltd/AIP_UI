@@ -872,8 +872,8 @@ export function CRMContactForm({ onSubmit, initialData, isSaving = false }: CRMC
 								{renderSelectField('region', 'Region *', UK_COUNTIES, true, 2, 'Select region')}
 								{renderSelectField('industrySector', 'Industry Sector *', INDUSTRIES, true, 2, 'Select industry')}
 								{renderField('website', 'Website', false, 'text', 'https://example.com', 2)}
-								{renderField('sizeOfBusinessEmployees', 'Size of Business (Employees)', false, 'number', undefined, 2, undefined, undefined, '0')}
-								{renderField('sizeOfBusinessTurnover', 'Size of Business (Turnover)', false, 'number', undefined, 2, undefined, '0.01', '0')}
+								{renderField('sizeOfBusinessEmployees', 'Size of Business (Employees)', false, 'number', undefined, 2)}
+								{renderField('sizeOfBusinessTurnover', 'Size of Business (Turnover)', false, 'number', undefined, 2)}
 							</div>
 						</CardContent>
 					</Card>
@@ -971,7 +971,7 @@ export function CRMContactForm({ onSubmit, initialData, isSaving = false }: CRMC
 								</div>
 
 								{renderField('incumbentSupplier', 'Incumbent Supplier', false, 'text', undefined, 1)}
-								{renderField('lengthOfContract', 'Length of Contract (years)', false, 'number', undefined, 1, undefined, undefined, '0')}
+								{renderField('lengthOfContract', 'Length of Contract (years)', false, 'number', undefined, 1)}
 								{renderField('dateOfNextReview', 'Date of Next Review', false, 'date', undefined, 1)}
 								{renderField('lastActivityDate', 'Last Activity Date', false, 'date', undefined, 1)}
 								{renderField('nextAppointmentDate', 'Next Appointment Date', false, 'date', undefined, 1)}

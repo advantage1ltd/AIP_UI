@@ -17,6 +17,7 @@ import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, format, 
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { findCustomerById } from '@/hooks/useAvailableCustomers'
+import { logger } from '@/utils/logger'
 import { 
 	incidentGraphService, 
 	IncidentGraphData, 
@@ -205,11 +206,10 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 					setFilteredTotal(graphResponse.data.totals.totalValue)
 				}
 			} else {
-				console.error('🔍 [IncidentGraph] Graph response not successful:', graphResponse)
-				// Set error message for failed responses
+				setGraphData([])
+				setFilteredTotal(0)
 				if (!graphResponse.data?.incidents || graphResponse.data.incidents.length === 0) {
-					const errorMsg = 'Unable to load incident data. Please ensure the backend server is running on http://localhost:5128'
-					setError(errorMsg)
+					setError(graphResponse.message || 'Unable to load incident analytics for the selected filters.')
 				}
 			}
 
@@ -221,7 +221,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 			}
 
 		} catch (err: any) {
-			console.error('🔍 [IncidentGraph] Error fetching incident data:', err)
+			logger.error('[IncidentGraph] Error fetching incident data:', err)
 			
 			// Provide user-friendly error message for network errors
 			if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
@@ -244,7 +244,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 				setAvailableRegions(response.data)
 			}
 		} catch (err) {
-			console.error('Error fetching regions:', err)
+			logger.error('Error fetching regions:', err)
 		}
 	}, [currentCustomerId])
 
@@ -258,7 +258,7 @@ const IncidentGraph: React.FC<IncidentGraphProps> = ({ customerId }) => {
 				setCustomerName(customer.name)
 			}
 		} catch (err) {
-			console.error('Error fetching customer name:', err)
+			logger.error('Error fetching customer name:', err)
 		}
 	}, [currentCustomerId])
 

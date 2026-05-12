@@ -29,10 +29,23 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
+type VettingCandidate = FormValues & {
+  region?: string
+  roleOffered?: string
+  interviewDate?: string
+  driver?: string
+  vettingStartDate?: string
+  interviewNotes?: string
+  estimatedStartDate?: string
+  interviewingManager?: string
+  redFlags?: string
+  recruitmentOutcome?: string
+}
+
 interface VettingDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  candidate?: FormValues | null
+  candidate?: VettingCandidate | null
   onSubmit?: (data: FormValues) => void
 }
 

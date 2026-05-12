@@ -1,4 +1,5 @@
 import { customerPageAccessApi, type CustomerPageAccessResponse } from '@/api/customerPageAccess'
+import { logger } from '@/utils/logger'
 
 const CACHE_TTL_MS = 5 * 60 * 1000
 
@@ -8,6 +9,7 @@ interface CacheEntry {
 }
 
 const cache = new Map<number, CacheEntry>()
+const inFlightRequests = new Map<number, Promise<CustomerPageAccessResponse>>()
 
 const isFresh = (entry?: CacheEntry) => {
 	if (!entry) return false
@@ -19,15 +21,29 @@ export const customerPageAccessCache = {
 		if (!options?.force) {
 			const cached = cache.get(customerId)
 			if (isFresh(cached)) {
-				console.log('💾 [CustomerPageAccessCache] Cache hit for customer', customerId)
+				logger.debug('[CustomerPageAccessCache] Cache hit for customer', customerId)
 				return cached!.data
+			}
+
+			const pending = inFlightRequests.get(customerId)
+			if (pending) {
+				return pending
 			}
 		}
 
-		console.log('🔄 [CustomerPageAccessCache] Fetching page access for customer', customerId)
-		const data = await customerPageAccessApi.getCustomerPageAccess(customerId)
-		cache.set(customerId, { data, timestamp: Date.now() })
-		return data
+		logger.debug('[CustomerPageAccessCache] Fetching page access for customer', customerId)
+		const request = customerPageAccessApi
+			.getCustomerPageAccess(customerId)
+			.then((data) => {
+				cache.set(customerId, { data, timestamp: Date.now() })
+				return data
+			})
+			.finally(() => {
+				inFlightRequests.delete(customerId)
+			})
+
+		inFlightRequests.set(customerId, request)
+		return request
 	},
 	set(customerId: number, data: CustomerPageAccessResponse) {
 		cache.set(customerId, { data, timestamp: Date.now() })
@@ -35,9 +51,10 @@ export const customerPageAccessCache = {
 	clear(customerId?: number) {
 		if (typeof customerId === 'number') {
 			cache.delete(customerId)
+			inFlightRequests.delete(customerId)
 			return
 		}
 		cache.clear()
+		inFlightRequests.clear()
 	}
 }
-

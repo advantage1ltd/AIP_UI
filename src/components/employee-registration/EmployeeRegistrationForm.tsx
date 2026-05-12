@@ -6,7 +6,7 @@ import { LicensingStep } from "./steps/LicensingStep"
 import { OnboardingStep } from "./steps/OnboardingStep"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import type { Employee } from "./EmployeesTable"
+import type { Employee } from '@/types/employee'
 
 interface EmployeeRegistrationFormProps {
   mode: 'new' | 'edit'

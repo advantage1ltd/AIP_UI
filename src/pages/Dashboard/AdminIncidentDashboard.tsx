@@ -405,12 +405,7 @@ export const AdminIncidentDashboard = () => {
 					'/incidents',
 					Object.keys(headers).length > 0 ? { params, headers } : { params }
 				)
-				const responseData = extractApiResponseData(response.data)
-				const incidents = Array.isArray(responseData?.data)
-					? responseData.data
-					: Array.isArray(responseData)
-						? responseData
-						: []
+				const incidents = extractApiResponseData(response.data)
 				setRawIncidents(incidents)
 				setLastUpdated(new Date())
 			} catch (loadError) {

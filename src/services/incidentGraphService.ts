@@ -22,6 +22,7 @@ export interface IncidentGraphData {
 	location: string
 	value: number
 	quantity: number
+	quantityRecovered?: number
 	totalValueRecovered: number
 	totalValueLost?: number
 	count?: number
@@ -122,7 +123,7 @@ export const incidentGraphService = {
 				})
 				return data
 			} catch (error) {
-				logger.error('[IncidentGraphService] graph-data endpoint failed', error)
+				logger.warn('[IncidentGraphService] graph-data unavailable:', handleApiError(error))
 				return {
 					success: false,
 					message: handleApiError(error),
@@ -169,7 +170,7 @@ export const incidentGraphService = {
 				})
 				return data
 			} catch (error) {
-				logger.error('[IncidentGraphService] types-summary endpoint failed', error)
+				logger.warn('[IncidentGraphService] types-summary unavailable:', handleApiError(error))
 				return {
 					success: false,
 					message: handleApiError(error),
@@ -198,10 +199,10 @@ export const incidentGraphService = {
 			return {
 				success: true,
 				data: response.data
-					.filter(region => (region.regionID ?? region.RegionID ?? (region as { id?: number }).id) !== undefined)
+					.filter(region => (region.regionID ?? (region as { id?: number }).id) !== undefined)
 					.map(region => ({
-						id: (region.regionID ?? region.RegionID ?? (region as { id?: number }).id)?.toString() || '',
-						name: region.regionName || region.RegionName || 'Unnamed Region',
+						id: (region.regionID ?? (region as { id?: number }).id)?.toString() || '',
+						name: region.regionName || 'Unnamed Region',
 					}))
 					.filter(region => region.id.length > 0),
 			}

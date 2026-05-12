@@ -1,5 +1,6 @@
 import { api, SITE_ENDPOINTS, handleApiError } from '@/config/api'
 import type { Site } from '@/types/customer'
+import { logger } from '@/utils/logger'
 
 export interface CreateSiteData {
   fkCustomerID: number
@@ -58,7 +59,7 @@ export const siteService = {
   // Get all sites
   async getSites(customerId?: number, regionId?: number): Promise<{ success: boolean; data: Site[] }> {
     try {
-      console.log('🔄 [SiteService] Fetching sites from backend')
+      logger.debug('🔄 [SiteService] Fetching sites from backend')
       
       const params = new URLSearchParams()
       if (customerId) {
@@ -71,20 +72,20 @@ export const siteService = {
       const response = await api.get<ApiResponse<Site[]>>(`${SITE_ENDPOINTS.LIST}?${params}`)
       
       if (response.data.success) {
-        console.log('✅ [SiteService] Successfully fetched sites:', response.data.data.length)
+        logger.debug('✅ [SiteService] Successfully fetched sites:', response.data.data.length)
         return {
           success: true,
           data: response.data.data
         }
       } else {
-        console.error('❌ [SiteService] Failed to fetch sites:', response.data.message)
+        logger.error('❌ [SiteService] Failed to fetch sites:', response.data.message)
         return {
           success: false,
           data: []
         }
       }
     } catch (error) {
-      console.error('❌ [SiteService] Error fetching sites:', error)
+      logger.error('❌ [SiteService] Error fetching sites:', error)
       return {
         success: false,
         data: []
@@ -95,7 +96,7 @@ export const siteService = {
   // Get sites by customer
   async getSitesByCustomer(customerId: number): Promise<{ success: boolean; data: Site[] }> {
     try {
-      console.log('🔄 [SiteService] Fetching sites for customer:', customerId)
+      logger.debug('🔄 [SiteService] Fetching sites for customer:', customerId)
       
       const response = await api.get<ApiResponse<any[]>>(SITE_ENDPOINTS.BY_CUSTOMER(customerId.toString()))
       
@@ -130,20 +131,20 @@ export const siteService = {
           modifiedBy: site.ModifiedBy || site.modifiedBy
         }))
         
-        console.log('✅ [SiteService] Successfully fetched sites for customer:', mappedSites.length)
+        logger.debug('✅ [SiteService] Successfully fetched sites for customer:', mappedSites.length)
         return {
           success: true,
           data: mappedSites
         }
       } else {
-        console.error('❌ [SiteService] Failed to fetch sites for customer:', response.data.message)
+        logger.error('❌ [SiteService] Failed to fetch sites for customer:', response.data.message)
         return {
           success: false,
           data: []
         }
       }
     } catch (error) {
-      console.error('❌ [SiteService] Error fetching sites for customer:', error)
+      logger.error('❌ [SiteService] Error fetching sites for customer:', error)
       return {
         success: false,
         data: []
@@ -154,25 +155,25 @@ export const siteService = {
   // Get sites by region
   async getSitesByRegion(regionId: number): Promise<{ success: boolean; data: Site[] }> {
     try {
-      console.log('🔄 [SiteService] Fetching sites for region:', regionId)
+      logger.debug('🔄 [SiteService] Fetching sites for region:', regionId)
       
       const response = await api.get<ApiResponse<Site[]>>(SITE_ENDPOINTS.BY_REGION(regionId.toString()))
       
       if (response.data.success) {
-        console.log('✅ [SiteService] Successfully fetched sites for region:', response.data.data.length)
+        logger.debug('✅ [SiteService] Successfully fetched sites for region:', response.data.data.length)
         return {
           success: true,
           data: response.data.data
         }
       } else {
-        console.error('❌ [SiteService] Failed to fetch sites for region:', response.data.message)
+        logger.error('❌ [SiteService] Failed to fetch sites for region:', response.data.message)
         return {
           success: false,
           data: []
         }
       }
     } catch (error) {
-      console.error('❌ [SiteService] Error fetching sites for region:', error)
+      logger.error('❌ [SiteService] Error fetching sites for region:', error)
       return {
         success: false,
         data: []
@@ -183,24 +184,24 @@ export const siteService = {
   // Get site by ID
   async getSiteById(id: number): Promise<{ success: boolean; data?: Site }> {
     try {
-      console.log('🔄 [SiteService] Fetching site by ID:', id)
+      logger.debug('🔄 [SiteService] Fetching site by ID:', id)
       
       const response = await api.get<ApiResponse<Site>>(SITE_ENDPOINTS.DETAIL(id.toString()))
       
       if (response.data.success) {
-        console.log('✅ [SiteService] Successfully fetched site:', response.data.data)
+        logger.debug('✅ [SiteService] Successfully fetched site:', response.data.data)
         return {
           success: true,
           data: response.data.data
         }
       } else {
-        console.error('❌ [SiteService] Failed to fetch site:', response.data.message)
+        logger.error('❌ [SiteService] Failed to fetch site:', response.data.message)
         return {
           success: false
         }
       }
     } catch (error) {
-      console.error('❌ [SiteService] Error fetching site:', error)
+      logger.error('❌ [SiteService] Error fetching site:', error)
       return {
         success: false
       }
@@ -210,25 +211,25 @@ export const siteService = {
   // Create new site
   async createSite(data: CreateSiteData): Promise<{ success: boolean; data?: Site; message?: string }> {
     try {
-      console.log('🔄 [SiteService] Creating site:', data)
+      logger.debug('🔄 [SiteService] Creating site:', data)
       
       const response = await api.post<ApiResponse<Site>>(SITE_ENDPOINTS.CREATE, data)
       
       if (response.data.success) {
-        console.log('✅ [SiteService] Successfully created site:', response.data.data)
+        logger.debug('✅ [SiteService] Successfully created site:', response.data.data)
         return {
           success: true,
           data: response.data.data
         }
       } else {
-        console.error('❌ [SiteService] Failed to create site:', response.data.message)
+        logger.error('❌ [SiteService] Failed to create site:', response.data.message)
         return {
           success: false,
           message: response.data.message
         }
       }
     } catch (error) {
-      console.error('❌ [SiteService] Error creating site:', error)
+      logger.error('❌ [SiteService] Error creating site:', error)
       return {
         success: false,
         message: handleApiError(error)
@@ -239,25 +240,25 @@ export const siteService = {
   // Update site
   async updateSite(id: number, data: UpdateSiteData): Promise<{ success: boolean; data?: Site; message?: string }> {
     try {
-      console.log('🔄 [SiteService] Updating site:', id, data)
+      logger.debug('🔄 [SiteService] Updating site:', id, data)
       
       const response = await api.put<ApiResponse<Site>>(SITE_ENDPOINTS.UPDATE(id.toString()), data)
       
       if (response.data.success) {
-        console.log('✅ [SiteService] Successfully updated site:', response.data.data)
+        logger.debug('✅ [SiteService] Successfully updated site:', response.data.data)
         return {
           success: true,
           data: response.data.data
         }
       } else {
-        console.error('❌ [SiteService] Failed to update site:', response.data.message)
+        logger.error('❌ [SiteService] Failed to update site:', response.data.message)
         return {
           success: false,
           message: response.data.message
         }
       }
     } catch (error) {
-      console.error('❌ [SiteService] Error updating site:', error)
+      logger.error('❌ [SiteService] Error updating site:', error)
       return {
         success: false,
         message: handleApiError(error)
@@ -268,24 +269,24 @@ export const siteService = {
   // Delete site
   async deleteSite(id: number): Promise<{ success: boolean; message?: string }> {
     try {
-      console.log('🔄 [SiteService] Deleting site:', id)
+      logger.debug('🔄 [SiteService] Deleting site:', id)
       
       const response = await api.delete<ApiResponse<object>>(SITE_ENDPOINTS.DELETE(id.toString()))
       
       if (response.data.success) {
-        console.log('✅ [SiteService] Successfully deleted site')
+        logger.debug('✅ [SiteService] Successfully deleted site')
         return {
           success: true
         }
       } else {
-        console.error('❌ [SiteService] Failed to delete site:', response.data.message)
+        logger.error('❌ [SiteService] Failed to delete site:', response.data.message)
         return {
           success: false,
           message: response.data.message
         }
       }
     } catch (error) {
-      console.error('❌ [SiteService] Error deleting site:', error)
+      logger.error('❌ [SiteService] Error deleting site:', error)
       return {
         success: false,
         message: handleApiError(error)

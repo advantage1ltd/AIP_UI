@@ -14,10 +14,14 @@ import { mapRawApiUserToUser } from '@/services/userService';
 import { logger } from '@/utils/logger';
 
 type LoginResponsePayload = {
-	AccessToken: string;
+	AccessToken?: string;
 	RefreshToken?: string;
 	ExpiresAt?: string;
-	User: User;
+	User?: User;
+	accessToken?: string;
+	refreshToken?: string;
+	expiresAt?: string;
+	user?: User;
 	RequiresTwoFactor?: boolean;
 	TwoFactorToken?: string;
 	TwoFactorExpiresAt?: string;
@@ -42,6 +46,7 @@ export type LoginResult = LoginSuccess | TwoFactorChallenge;
 
 interface AuthContextType {
   user: User | null;
+  isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
   login: (username: string, password: string) => Promise<LoginResult>;
@@ -360,7 +365,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, error, login, verifyTwoFactor, resendTwoFactorCode, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: Boolean(user), isLoading, error, login, verifyTwoFactor, resendTwoFactorCode, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

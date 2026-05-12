@@ -324,7 +324,6 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
                   <TabsContent value="regions" className="mt-6">
                   <RegionsTable
                     customerId={customer?.id ? parseInt(customer.id) || 0 : null}
-                    regions={regions}
                     onEdit={handleEditRegion}
                     onDataChange={handleRegionSuccess}
                   />
@@ -345,7 +344,6 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
                   <TabsContent value="sites" className="mt-6">
                     <SitesTable
                       customerId={customer?.id ? parseInt(customer.id) || 0 : null}
-                      sites={sites}
                       onEdit={handleEditSite}
                       onDataChange={handleSiteSuccess}
                     />
@@ -383,7 +381,7 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
             open={regionDialogOpen}
             onOpenChange={setRegionDialogOpen}
             region={selectedRegion}
-            selectedCustomerId={customer?.id ? parseInt(customer.id) || 0 : null}
+            selectedCustomerId={customer?.id ?? null}
             onSuccess={handleRegionSuccess}
           />
         )}
@@ -394,7 +392,7 @@ export function CustomerDialog({ open, onOpenChange, customer, onSave }: Custome
             open={siteDialogOpen}
             onOpenChange={setSiteDialogOpen}
             site={selectedSite}
-            selectedCustomerId={customer?.id ? parseInt(customer.id) || 0 : null}
+            selectedCustomerId={customer?.id ? parseInt(customer.id, 10) || null : null}
             onSuccess={handleSiteSuccess}
           />
         )}

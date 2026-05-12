@@ -128,8 +128,8 @@ const getCustomerIdFromAuth = () => {
 };
 
 // Helper function to add customer ID to headers
-const getHeaders = () => ({
-  'X-Customer-Id': getCustomerIdFromAuth()
+const getHeaders = (): Record<string, string> => ({
+  'X-Customer-Id': String(getCustomerIdFromAuth()),
 });
 
 // Helper function to calculate incident chart data from incidents

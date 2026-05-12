@@ -73,7 +73,16 @@ export const Footer = () => {
                     0121 820 2973
                   </a>
                 </p>
-                <p className="text-gray-300 text-sm sm:text-base">For Support Call Scott or James at Head Office</p>
+                <p className="text-gray-300 text-sm sm:text-base">
+                  For support, email{' '}
+                  <a
+                    href="mailto:ops@advantage1.co.uk"
+                    className="hover:text-blue-400 transition-colors"
+                    aria-label="Email support at ops@advantage1.co.uk"
+                  >
+                    ops@advantage1.co.uk
+                  </a>
+                </p>
               </div>
             </div>
           </div>

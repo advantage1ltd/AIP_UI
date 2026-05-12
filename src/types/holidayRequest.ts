@@ -13,6 +13,7 @@ export interface HolidayRequest {
   comment: string;
   reason?: string;
   totalDays: number;
+  daysLeftYTD?: number;
   archived: boolean;
 }
 
@@ -29,6 +30,7 @@ export interface UpdateHolidayRequestDTO extends Partial<CreateHolidayRequestDTO
   status?: 'pending' | 'approved' | 'denied';
   dateAuthorised?: Date | null;
   reason?: string;
+  daysLeftYTD?: number;
 }
 
 export interface HolidayRequestsResponse {

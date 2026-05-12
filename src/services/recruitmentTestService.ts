@@ -20,7 +20,7 @@ import {
 	submitRecruitmentAttemptRequestSchema,
 } from '@/validation/recruitment-tests'
 
-const parseOrThrow = <T>(schema: { parse: (v: unknown) => T }, value: unknown): T => schema.parse(value)
+const parseOrThrow = <T>(schema: { parse: (v: unknown) => T }, value: unknown): T => schema.parse(value) as T
 
 /** Extract server error message from axios error or API response */
 function apiError(err: unknown, fallback: string): string {
@@ -42,7 +42,7 @@ export const recruitmentTestService = {
 		const res = await recruitmentApi.get<BackendApiResponse<RecruitmentTestSummary[]>>('/recruitment/tests/available')
 		if (!getApiSuccess(res.data)) throw new Error(apiError(null, getApiMessage(res.data) || 'Failed to load tests'))
 		const data = getApiData(res.data) ?? []
-		return parseOrThrow({ parse: (v) => recruitmentTestSummarySchema.array().parse(v) }, data)
+		return parseOrThrow({ parse: (v) => recruitmentTestSummarySchema.array().parse(v) }, data) as RecruitmentTestSummary[]
 	},
 
 	getTestForTaking: async (testId: string): Promise<RecruitmentTestTake> => {
@@ -50,7 +50,7 @@ export const recruitmentTestService = {
 		if (!getApiSuccess(res.data)) throw new Error(apiError(null, 'Failed to load test'))
 		const data = getApiData(res.data)
 		if (!data) throw new Error('No data returned')
-		return parseOrThrow(recruitmentTestTakeSchema, data)
+		return parseOrThrow(recruitmentTestTakeSchema, data) as RecruitmentTestTake
 	},
 
 	startAttempt: async (testId: string): Promise<RecruitmentAttemptStart> => {
@@ -58,7 +58,7 @@ export const recruitmentTestService = {
 		if (!getApiSuccess(res.data)) throw new Error(apiError(null, 'Failed to start attempt'))
 		const data = getApiData(res.data)
 		if (!data) throw new Error('No data returned')
-		return parseOrThrow(recruitmentAttemptStartSchema, data)
+		return parseOrThrow(recruitmentAttemptStartSchema, data) as RecruitmentAttemptStart
 	},
 
 	submitAttempt: async (attemptId: number, payload: SubmitRecruitmentAttemptRequest): Promise<RecruitmentAttemptDetail> => {
@@ -67,14 +67,14 @@ export const recruitmentTestService = {
 		if (!getApiSuccess(res.data)) throw new Error(apiError(null, 'Failed to submit attempt'))
 		const data = getApiData(res.data)
 		if (!data) throw new Error('No data returned')
-		return parseOrThrow(recruitmentAttemptDetailSchema, data)
+		return parseOrThrow(recruitmentAttemptDetailSchema, data) as RecruitmentAttemptDetail
 	},
 
 	getMyAttempts: async (): Promise<RecruitmentAttemptSummary[]> => {
 		const res = await recruitmentApi.get<BackendApiResponse<RecruitmentAttemptSummary[]>>('/recruitment/my/attempts')
 		if (!getApiSuccess(res.data)) throw new Error(apiError(null, 'Failed to load attempts'))
 		const data = getApiData(res.data) ?? []
-		return parseOrThrow({ parse: (v) => recruitmentAttemptSummarySchema.array().parse(v) }, data)
+		return parseOrThrow({ parse: (v) => recruitmentAttemptSummarySchema.array().parse(v) }, data) as RecruitmentAttemptSummary[]
 	},
 
 	getMyAttemptById: async (attemptId: number): Promise<RecruitmentAttemptDetail> => {
@@ -82,7 +82,7 @@ export const recruitmentTestService = {
 		if (!getApiSuccess(res.data)) throw new Error(apiError(null, 'Failed to load attempt'))
 		const data = getApiData(res.data)
 		if (!data) throw new Error('No data returned')
-		return parseOrThrow(recruitmentAttemptDetailSchema, data)
+		return parseOrThrow(recruitmentAttemptDetailSchema, data) as RecruitmentAttemptDetail
 	},
 
 	// —— Admin CRUD: API only, no local fallback. Errors surface so you can fix API/DB. ——
@@ -106,7 +106,7 @@ export const recruitmentTestService = {
 			if (!getApiSuccess(res.data)) throw new Error(getApiErrors(res.data)[0] || getApiMessage(res.data) || 'Test not found')
 			const data = getApiData(res.data)
 			if (!data) throw new Error('No data returned')
-			return parseOrThrow(recruitmentAdminTestSchema, data)
+			return parseOrThrow(recruitmentAdminTestSchema, data) as RecruitmentAdminTest
 		} catch (err) {
 			throw new Error(apiError(err, 'Failed to load test'))
 		}
@@ -141,7 +141,7 @@ export const recruitmentTestService = {
 			if (!getApiSuccess(res.data)) throw new Error(getApiErrors(res.data)[0] || getApiMessage(res.data) || 'Failed to create test')
 			const data = getApiData(res.data)
 			if (!data) throw new Error('No data returned')
-			return parseOrThrow(recruitmentAdminTestSchema, data)
+			return parseOrThrow(recruitmentAdminTestSchema, data) as RecruitmentAdminTest
 		} catch (err) {
 			throw new Error(apiError(err, 'Failed to create test'))
 		}
@@ -155,7 +155,7 @@ export const recruitmentTestService = {
 			if (!getApiSuccess(res.data)) throw new Error(getApiErrors(res.data)[0] || getApiMessage(res.data) || 'Failed to update test')
 			const data = getApiData(res.data)
 			if (!data) throw new Error('No data returned')
-			return parseOrThrow(recruitmentAdminTestSchema, data)
+			return parseOrThrow(recruitmentAdminTestSchema, data) as RecruitmentAdminTest
 		} catch (err) {
 			throw new Error(apiError(err, 'Failed to update test'))
 		}
@@ -176,7 +176,7 @@ export const recruitmentTestService = {
 		const res = await recruitmentApi.get<BackendApiResponse<RecruitmentAttemptSummary[]>>('/recruitment/admin/attempts', { params: testId ? { testId } : undefined })
 		if (!getApiSuccess(res.data)) throw new Error(apiError(null, 'Failed to load attempts'))
 		const data = getApiData(res.data) ?? []
-		return parseOrThrow({ parse: (v) => recruitmentAttemptSummarySchema.array().parse(v) }, data)
+		return parseOrThrow({ parse: (v) => recruitmentAttemptSummarySchema.array().parse(v) }, data) as RecruitmentAttemptSummary[]
 	},
 
 	getAdminAttemptById: async (attemptId: number): Promise<RecruitmentAttemptDetail> => {
@@ -184,6 +184,6 @@ export const recruitmentTestService = {
 		if (!getApiSuccess(res.data)) throw new Error(apiError(null, 'Failed to load attempt'))
 		const data = getApiData(res.data)
 		if (!data) throw new Error('No data returned')
-		return parseOrThrow(recruitmentAttemptDetailSchema, data)
+		return parseOrThrow(recruitmentAttemptDetailSchema, data) as RecruitmentAttemptDetail
 	},
 }

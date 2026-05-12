@@ -23,7 +23,7 @@ export interface CustomerUpdateRequest extends Partial<CustomerCreateRequest> {
   id: number
 }
 
-export interface CustomerDetailResponse extends Customer {
+export interface CustomerDetailResponse extends Omit<Customer, 'id'> {
   id: number
   createdAt: string
   updatedAt: string

@@ -29,6 +29,7 @@ import { findCustomerById } from "@/hooks/useAvailableCustomers"
 import { useToast } from "@/hooks/use-toast"
 import { siteService } from "@/services/siteService"
 import { api } from "@/config/api"
+import { logger } from '@/utils/logger'
 import type { StaffUser } from '@/types/user'
 import { harmonizeRole } from '@/utils/roles'
 import type { 
@@ -177,11 +178,10 @@ export default function CustomerDailyOccurrenceBook() {
         const site = response.data.find((s) => String(s.siteID) === siteId)
         if (site) {
           setSelectedSiteName(site.locationName)
-          console.log('CustomerDailyOccurrenceBook: Found site name:', site.locationName)
         }
       }
     } catch (error) {
-      console.error('Failed to fetch site name:', error)
+      logger.error('Failed to fetch site name:', error)
     }
   }
 
@@ -198,11 +198,6 @@ export default function CustomerDailyOccurrenceBook() {
         // Determine target customer ID
         const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : userCustomerId
 
-        console.log('CustomerDailyOccurrenceBook: URL customerId:', urlCustomerId)
-        console.log('CustomerDailyOccurrenceBook: URL siteId:', urlSiteId)
-        console.log('CustomerDailyOccurrenceBook: User customerId:', userCustomerId)
-        console.log('CustomerDailyOccurrenceBook: Target customerId:', targetCustomerId)
-
         if (!targetCustomerId) {
           setError('No customer ID provided')
           setLoading(false)
@@ -217,8 +212,6 @@ export default function CustomerDailyOccurrenceBook() {
           return
         }
 
-        console.log('CustomerDailyOccurrenceBook: Found customer:', customerData)
-
         // Verify access
         if (harmonizeRole(user.pageAccessRole ?? user.role) === 'securityofficer' && 'assignedCustomerIds' in user) {
           const staffUser = user as StaffUser
@@ -229,7 +222,6 @@ export default function CustomerDailyOccurrenceBook() {
           }
         }
 
-        console.log('CustomerDailyOccurrenceBook: Access granted - setting customer')
         setCustomer({ id: targetCustomerId, name: customerData.name })
         
         if (urlSiteId) {
@@ -240,7 +232,7 @@ export default function CustomerDailyOccurrenceBook() {
         }
 
       } catch (err) {
-        console.error('CustomerDailyOccurrenceBook: Error loading customer:', err)
+        logger.error('CustomerDailyOccurrenceBook: Error loading customer:', err)
         setError('Failed to load customer data')
       } finally {
         setLoading(false)

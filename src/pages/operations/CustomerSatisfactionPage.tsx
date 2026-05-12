@@ -7,6 +7,7 @@ import { SurveyTable } from '@/pages/operations/components/SurveyTable';
 import { SurveyForm } from '@/pages/operations/components/SurveyForm';
 import { SurveyDetails } from '@/pages/operations/components/SurveyDetails';
 import { CustomerSurvey, CustomerSurveyFilters } from '@/types/customerSatisfaction';
+import type { CustomerSurvey as SurveyFormModel } from '@/pages/operations/components/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ClipboardList, FileSpreadsheet, BarChart3, Users, Building, MapPin, 
@@ -19,7 +20,18 @@ import { NativeDateInput } from "@/components/ui/native-date-input";
 import { format } from 'date-fns';
 import { customerSatisfactionService } from '@/services/customerSatisfactionService';
 import { toast } from 'react-toastify';
-import type { Region, Site } from '@/types/dashboard';
+type SurveyRegionOption = {
+  id: string;
+  name: string;
+  customerId: string;
+};
+
+type SurveySiteOption = {
+  id: string;
+  name: string;
+  customerId: string;
+  regionId: string;
+};
 import { customerDashboardService } from '@/services/dashboardService';
 import { customerService } from '@/services/customerService';
 import { regionService } from '@/services/regionService';
@@ -44,6 +56,21 @@ interface CustomerSatisfactionPageProps {
   customerId?: string;
   siteId?: string | null;
 }
+
+const toSurveyFormModel = (survey: CustomerSurvey): SurveyFormModel => ({
+  id: survey.id,
+  officerName: survey.officerName,
+  date: survey.date,
+  customer: survey.customer,
+  region: survey.region,
+  location: survey.siteName,
+  siteName: survey.siteName,
+  ratings: survey.ratings,
+  storeManagerName: survey.storeManagerName,
+  areaManagerName: survey.areaManagerName,
+  followUpActions: survey.followUpActions,
+  datesToBeCompleted: survey.datesToBeCompleted,
+});
 
 // Helper function to generate CSV data
 const generateCsvData = (data: CustomerSurvey[]): string => {
@@ -107,8 +134,8 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
   const [editingSurvey, setEditingSurvey] = useState<CustomerSurvey | null>(null);
   const [viewingSurvey, setViewingSurvey] = useState<CustomerSurvey | null>(null);
   const [surveys, setSurveys] = useState<CustomerSurvey[]>([]);
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [sites, setSites] = useState<Site[]>([]);
+  const [regions, setRegions] = useState<SurveyRegionOption[]>([]);
+  const [sites, setSites] = useState<SurveySiteOption[]>([]);
   const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [pagination, setPagination] = useState({
@@ -563,9 +590,20 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
                 <div className="bg-white rounded-lg md:rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                   <div className="p-3 sm:p-4 md:p-6 lg:p-8">
                     <SurveyForm 
-                      onSubmit={handleSurveySubmit} 
+                      onSubmit={(data) => {
+                        void handleSurveySubmit({
+                          ...(editingSurvey ?? {
+                            id: '',
+                            customerId: Number(customerId) || 0,
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString(),
+                          }),
+                          ...data,
+                          siteName: data.siteName ?? data.location,
+                        } as CustomerSurvey)
+                      }} 
                       onCancel={handleCancelForm}
-                      initialData={editingSurvey}
+                      initialData={editingSurvey ? toSurveyFormModel(editingSurvey) : undefined}
                       customerId={customerId}
                       siteId={siteId}
                       customers={customers}
@@ -599,7 +637,7 @@ const CustomerSatisfactionPage: React.FC<CustomerSatisfactionPageProps> = ({
 
         {viewingSurvey && (
           <SurveyDetails
-            survey={viewingSurvey}
+            survey={toSurveyFormModel(viewingSurvey)}
             open={!!viewingSurvey}
             onClose={handleCloseDetails}
           />

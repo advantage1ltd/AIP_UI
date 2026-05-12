@@ -4,7 +4,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Users, AlertCircle, PoundSterling } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +24,7 @@ import type {
   OfficerPerformanceCategory,
   OfficerPerformanceRecordLimit,
   OfficerPerformanceItem,
+  OfficerPerformanceResponse,
 } from '@/types/officerPerformance'
 
 type StatCardProps = {
@@ -72,7 +73,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, icon, iconB
           <p className="text-[10px] xs:text-xs sm:text-sm text-white/70 mt-1 xs:mt-1.5 truncate">{subtitle}</p>
         </div>
         <div className={`${iconColor} p-2 xs:p-3 sm:p-4 rounded-full bg-white/10 flex-shrink-0`}>
-          {React.cloneElement(icon as React.ReactElement, { className: 'h-4 w-4 xs:h-6 xs:w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-white' })}
+          {React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: 'h-4 w-4 xs:h-6 xs:w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-white' })}
         </div>
       </div>
     </CardContent>
@@ -128,7 +129,7 @@ const OfficerPerformance = () => {
     isLoading: isPerformanceLoading,
     isFetching: isPerformanceFetching,
     error: performanceError,
-  } = useQuery({
+  } = useQuery<OfficerPerformanceResponse>({
     queryKey: [
       'officer-performance',
       appliedFilters.customerId,
@@ -150,7 +151,7 @@ const OfficerPerformance = () => {
         maxRecords: activeRecordLimit,
       }),
     enabled: canQuery,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   })
 
   const stats = performanceData?.stats ?? {

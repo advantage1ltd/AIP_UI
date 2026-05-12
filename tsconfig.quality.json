@@ -1,5 +1,8 @@
 {
 	"extends": "./tsconfig.app.json",
+	"compilerOptions": {
+		"types": ["vite/client"]
+	},
 	"include": [
 		"src/state/sessionStore.ts",
 		"src/utils/page-access-guards.ts"

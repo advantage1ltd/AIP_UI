@@ -133,7 +133,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
     if (!file) return
 
     const validation = validateImageFile(file)
-    if (!validation.ok) {
+    if (validation.ok === false) {
       alert(validation.message)
       event.target.value = "" // Clear the input
       return

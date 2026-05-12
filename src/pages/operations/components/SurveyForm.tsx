@@ -598,7 +598,7 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
                           location: '' // Reset location when region changes
                         }));
                       }}
-                      disabled={!formData.customer || !!(customerId && siteId && user?.role !== 'Administrator')}
+                      disabled={!formData.customer || !!(customerId && siteId && user?.role !== 'administrator')}
                     >
                       <FormControl>
                         <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm">
@@ -633,7 +633,7 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({
                       key={`site-select-${formData.region}-${filteredSites.length}`}
                       value={formData.location} 
                       onValueChange={(value) => setFormData(prev => ({ ...prev, location: value }))}
-                      disabled={!formData.customer || !!(customerId && siteId && user?.role !== 'Administrator')}
+                      disabled={!formData.customer || !!(customerId && siteId && user?.role !== 'administrator')}
                     >
                       <FormControl>
                         <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm">

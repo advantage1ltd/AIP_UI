@@ -163,7 +163,7 @@ const SummaryCard: React.FC<{
 					<p className={`${textColor} font-medium text-base`}>{title}</p>
 					<p className={`text-3xl font-bold ${textColor}`}>{value}</p>
 				</div>
-				{React.cloneElement(icon, { className: `h-6 w-6 ${iconColor}` })}
+				{React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: `h-6 w-6 ${iconColor}` })}
 			</div>
 		</CardContent>
 	</Card>

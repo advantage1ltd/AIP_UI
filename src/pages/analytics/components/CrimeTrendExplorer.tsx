@@ -139,12 +139,14 @@ export const CrimeTrendExplorer = ({ data, loading = false }: CrimeTrendExplorer
 						</CardTitle>
 						<CardDescription>
 							Analyze crime patterns by day, time, and incident type
-							{selectedDay && (
+						</CardDescription>
+						{selectedDay && (
+							<p className="text-sm text-muted-foreground">
 								<span className="ml-2">
 									• Filtered by: <Badge>{selectedDay}</Badge>
 								</span>
-							)}
-						</CardDescription>
+							</p>
+						)}
 					</div>
 					{(selectedDay || selectedStore) && (
 						<Button

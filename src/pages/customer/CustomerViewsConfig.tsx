@@ -111,7 +111,10 @@ export default function CustomerViewsConfig() {
             <CustomerViewConfig
               customerId={Number(selectedCustomer.id)}
               customerType={selectedCustomer.customerType}
-              initialConfig={selectedCustomer.viewConfig}
+              initialConfig={{
+                ...selectedCustomer.viewConfig,
+                customerId: Number(selectedCustomer.viewConfig.customerId),
+              }}
             />
           )}
         </CardContent>

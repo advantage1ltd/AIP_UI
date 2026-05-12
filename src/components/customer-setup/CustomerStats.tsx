@@ -9,6 +9,7 @@ import type { Customer, Region, Site } from "@/types/customer"
 import { customerService } from "@/services/customerService"
 import { regionService } from "@/services/regionService"
 import { siteService } from "@/services/siteService"
+import { logger } from "@/utils/logger"
 
 interface CustomerStatsProps {
   selectedCustomerId: string | null
@@ -26,15 +27,13 @@ export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerSta
     const fetchData = async () => {
       try {
         setIsLoading(true)
-        console.log('🔍 [CustomerStats] Fetching data...')
         
         // Fetch customers
         const customersResult = await customerService.getAllCustomers()
         if (customersResult && customersResult.length > 0) {
           setCustomers(customersResult)
-          console.log('✅ [CustomerStats] Successfully fetched customers:', customersResult.length)
         } else {
-          console.error('❌ [CustomerStats] Failed to fetch customers')
+          logger.error('[CustomerStats] Failed to fetch customers')
           setCustomers([])
         }
 
@@ -44,9 +43,8 @@ export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerSta
           const regionsResult = await regionService.getRegionsByCustomer(parseInt(selectedCustomerId))
           if (regionsResult.success) {
             setRegions(regionsResult.data || [])
-            console.log('✅ [CustomerStats] Successfully fetched regions for customer:', regionsResult.data?.length || 0)
           } else {
-            console.error('❌ [CustomerStats] Failed to fetch regions')
+            logger.error('[CustomerStats] Failed to fetch regions')
             setRegions([])
           }
         } else {
@@ -54,9 +52,8 @@ export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerSta
           const regionsResult = await regionService.getRegions()
           if (regionsResult.success) {
             setRegions(regionsResult.data || [])
-            console.log('✅ [CustomerStats] Successfully fetched all regions:', regionsResult.data?.length || 0)
           } else {
-            console.error('❌ [CustomerStats] Failed to fetch all regions')
+            logger.error('[CustomerStats] Failed to fetch all regions')
             setRegions([])
           }
         }
@@ -67,9 +64,8 @@ export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerSta
           const sitesResult = await siteService.getSitesByCustomer(parseInt(selectedCustomerId))
           if (sitesResult.success) {
             setSites(sitesResult.data || [])
-            console.log('✅ [CustomerStats] Successfully fetched sites for customer:', sitesResult.data?.length || 0)
           } else {
-            console.error('❌ [CustomerStats] Failed to fetch sites')
+            logger.error('[CustomerStats] Failed to fetch sites')
             setSites([])
           }
         } else {
@@ -77,15 +73,14 @@ export function CustomerStats({ selectedCustomerId, updateTrigger }: CustomerSta
           const sitesResult = await siteService.getSites()
           if (sitesResult.success) {
             setSites(sitesResult.data || [])
-            console.log('✅ [CustomerStats] Successfully fetched all sites:', sitesResult.data?.length || 0)
           } else {
-            console.error('❌ [CustomerStats] Failed to fetch all sites')
+            logger.error('[CustomerStats] Failed to fetch all sites')
             setSites([])
           }
         }
         
       } catch (error) {
-        console.error('❌ [CustomerStats] Error fetching data:', error)
+        logger.error('[CustomerStats] Error fetching data:', error)
         setCustomers([])
         setRegions([])
         setSites([])

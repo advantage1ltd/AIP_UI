@@ -103,7 +103,7 @@ export const useUserTaskCount = () => {
 				backendOfflineCooldownUntilRef.current = 0
 			} else {
 				setTaskCount(0)
-				setError(response.message || 'Failed to fetch tasks')
+				setError(responses.find((item) => !item.success)?.message || 'Failed to fetch tasks')
 			}
 		} catch (err) {
 			const authErrorDetected = isAuthError(err)

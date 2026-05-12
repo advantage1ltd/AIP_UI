@@ -194,7 +194,6 @@ const Profile = () => {
 		} finally {
 			mediaStreamRef.current = null
 			if (videoRef.current) {
-				// @ts-expect-error - srcObject exists on HTMLMediaElement in DOM
 				videoRef.current.srcObject = null
 			}
 		}
@@ -222,7 +221,6 @@ const Profile = () => {
 			})
 			mediaStreamRef.current = stream
 			if (videoRef.current) {
-				// @ts-expect-error - srcObject exists on HTMLMediaElement in DOM
 				videoRef.current.srcObject = stream
 				await videoRef.current.play()
 			}
@@ -294,7 +292,7 @@ const Profile = () => {
 		if (!user?.id) return
 
 		const validation = validateImageFile(file, { maxSizeBytes: 2 * 1024 * 1024, allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] })
-		if (!validation.ok) {
+		if (validation.ok === false) {
 			toast({
 				title: 'Invalid image',
 				description: validation.message,

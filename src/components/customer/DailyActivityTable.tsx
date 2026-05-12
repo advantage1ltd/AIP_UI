@@ -19,7 +19,7 @@ import { dailyActivityService } from '@/services/dailyActivityService';
 import { regionService } from '@/services/regionService';
 import { siteService } from '@/services/siteService';
 import type { DailyActivityReport, DailyActivityFilters } from '@/types/dailyActivity';
-import type { Region, Site } from '@/types/dashboard';
+import type { Region, Site } from '@/types/customer';
 
 interface DailyActivityTableProps {
   onEdit: (report: DailyActivityReport) => void;
@@ -331,7 +331,7 @@ export const DailyActivityTable = ({ onEdit, onView, onNew, refreshTrigger, cust
                   <SelectContent>
                     <SelectItem value="">All sites</SelectItem>
                     {filteredSites.map((site) => (
-                      <SelectItem key={site.id} value={site.id}>
+                      <SelectItem key={site.siteID} value={String(site.siteID)}>
                         {site.locationName}
                       </SelectItem>
                     ))}

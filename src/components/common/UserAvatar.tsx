@@ -36,7 +36,10 @@ export function UserAvatar({
   const borderClass = showBorder ? 'border border-blue-700' : '';
 
 	useEffect(() => {
-		return sessionStore.subscribe(setUser)
+		const unsubscribe = sessionStore.subscribe(setUser)
+		return () => {
+			unsubscribe()
+		}
 	}, [])
 
 	const userId = user?.id ? String(user.id) : null

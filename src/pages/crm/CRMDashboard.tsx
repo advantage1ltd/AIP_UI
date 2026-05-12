@@ -133,6 +133,19 @@ const convertToActivity = (activity: RecentActivity): Activity => {
 	}
 }
 
+const convertStatsToFrontend = (
+	stats: Awaited<ReturnType<typeof crmDashboardService.getDashboardStats>>,
+	activities: Activity[]
+): DashboardStats => ({
+	totalContacts: stats.totalContacts,
+	pipelineValue: stats.pipelineValue,
+	avgDealValue: stats.avgDealValue,
+	conversionRate: stats.conversionRate,
+	contactGrowth: stats.contactGrowth,
+	recentActivities: activities,
+	upcomingEvents: stats.upcomingEvents,
+})
+
 // Components
 const StatCard: React.FC<{
 	title: string
@@ -441,9 +454,17 @@ const EventForm: React.FC<{
 })
 
 // Initial state
-const initialEventFormState = {
+const initialEventFormState: {
+	title: string
+	type: ScheduledEvent['type']
+	time: string
+	duration: string
+	description: string
+	sendEmailNotification: boolean
+	recipientEmail: string
+} = {
 	title: '',
-	type: 'meeting' as const,
+	type: 'meeting',
 	time: '09:00',
 	duration: '30',
 	description: '',
@@ -570,6 +591,41 @@ export default function CRMDashboard() {
 			setIsLoadingEvents(false)
 		}
 	}, [])
+
+	const handleEditEvent = useCallback((event: ScheduledEvent) => {
+		setEditingEventId(event.id)
+		setSelectedDate(new Date(event.date))
+		setEventFormData({
+			title: event.title,
+			type: event.type,
+			time: event.time,
+			duration: event.duration,
+			description: event.description,
+			sendEmailNotification: event.sendEmailNotification ?? false,
+			recipientEmail: event.recipientEmail ?? '',
+		})
+		setIsScheduleDialogOpen(true)
+	}, [])
+
+	const handleDeleteEvent = useCallback(async (eventId: string) => {
+		try {
+			await crmDashboardService.deleteScheduledEvent(eventId)
+			setDeletingEventId(null)
+			await loadScheduledEvents()
+			await loadDashboardStats()
+			toast({
+				title: 'Event deleted',
+				description: 'The scheduled event has been removed.',
+			})
+		} catch (error) {
+			console.error('[CRM Dashboard] Error deleting event:', error)
+			toast({
+				title: 'Error',
+				description: 'Failed to delete event. Please try again.',
+				variant: 'destructive',
+			})
+		}
+	}, [loadDashboardStats, loadScheduledEvents])
 
 	// Load dashboard data on mount and when recent activities are loaded
 	useEffect(() => {

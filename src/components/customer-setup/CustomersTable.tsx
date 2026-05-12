@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast"
 import { CustomerDialog } from "./CustomerDialog"
 import { CustomerTableRow } from "./CustomerTableRow"
 import { customerService } from "@/services/customerService"
+import { logger } from "@/utils/logger"
 import type { Customer } from "@/types/customer"
 
 interface CustomersTableProps {
@@ -41,9 +42,7 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
   }, [])
 
   useEffect(() => {
-    console.log("CustomersTable mounted")
     return () => {
-      console.log("CustomersTable unmounting")
       cleanup()
     }
   }, [cleanup])
@@ -77,12 +76,6 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
   }
 
   const handleDelete = (customer: Customer) => {
-    console.log('🔧 [CustomersTable] handleDelete called for customer:', {
-      id: customer.id,
-      name: customer.companyName,
-      idType: typeof customer.id,
-      idString: String(customer.id)
-    })
     setCustomerToDelete(customer)
     setDeleteDialogOpen(true)
   }
@@ -90,17 +83,9 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
   const confirmDelete = async () => {
     if (customerToDelete) {
       try {
-        console.log('🔧 [CustomersTable] confirmDelete - attempting to delete customer:', {
-          id: customerToDelete.id,
-          name: customerToDelete.companyName,
-          idType: typeof customerToDelete.id
-        })
-        
         const result = await customerService.deleteCustomer(String(customerToDelete.id))
         
         if (result.success) {
-          console.log('🔧 [CustomersTable] confirmDelete - customer deleted successfully')
-          
           // If the deleted customer was selected, clear the selection
           if (selectedCustomerId === String(customerToDelete.id)) {
             onCustomerSelect(null)
@@ -118,7 +103,7 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
           throw new Error(result.error || 'Failed to delete customer')
         }
       } catch (error) {
-        console.error('❌ [CustomersTable] confirmDelete - error:', error)
+        logger.error('[CustomersTable] confirmDelete - error:', error)
         toast({
           title: "Delete Failed",
           description: error instanceof Error ? error.message : "Failed to delete customer. Please try again.",
@@ -133,39 +118,15 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
 
   const handleSave = async (updatedCustomer: Customer) => {
     try {
-      console.log('🔧 [CustomersTable] handleSave - received customer data:', {
-        id: updatedCustomer.id,
-        companyName: updatedCustomer.companyName,
-        pageAssignmentsCount: Object.keys(updatedCustomer.pageAssignments || {}).length,
-        enabledPagesCount: updatedCustomer.viewConfig?.enabledPages?.length || 0,
-        pageAssignments: updatedCustomer.pageAssignments,
-        enabledPages: updatedCustomer.viewConfig?.enabledPages
-      })
-      
-      // Determine if this is a new customer based on ID
-      // New customers have IDs starting with 'CUST' (temporary IDs)
-      // Existing customers have numeric IDs from the database
       const idString = String(updatedCustomer.id || '')
       const isNew = idString.startsWith('CUST')
       
-      console.log('🔧 [CustomersTable] handleSave - customer type:', { 
-        id: updatedCustomer.id, 
-        idString, 
-        isNew 
-      })
-      
       let result
       if (isNew) {
-        // Create new customer via customerService
-        console.log('🔧 [CustomersTable] handleSave - creating new customer')
         result = await customerService.createCustomer(updatedCustomer)
       } else {
-        // Update existing customer via customerService
-        console.log('🔧 [CustomersTable] handleSave - updating existing customer')
         result = await customerService.updateCustomer(updatedCustomer)
       }
-      
-      console.log('🔧 [CustomersTable] handleSave - service response:', result)
       
       if (result.success) {
         toast({
@@ -181,7 +142,7 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
         throw new Error(result.error || 'Failed to save customer')
       }
     } catch (error) {
-      console.error('❌ [CustomersTable] handleSave - error:', error)
+      logger.error('[CustomersTable] handleSave - error:', error)
       toast({
         title: "Save Failed",
         description: error instanceof Error ? error.message : "Failed to save customer. Please try again.",
@@ -203,14 +164,12 @@ export function CustomersTable({ onCustomerSelect, selectedCustomerId, onDataCha
     const fetchCustomers = async () => {
       try {
         setIsLoadingCustomers(true)
-        console.log('🔄 [CustomersTable] Fetching customers from backend...')
         
         const customers = await customerService.getAllCustomers()
-        console.log('✅ [CustomersTable] Successfully fetched customers:', customers.length)
         
         setAllCustomers(customers)
       } catch (error) {
-        console.error('❌ [CustomersTable] Error fetching customers:', error)
+        logger.error('[CustomersTable] Error fetching customers:', error)
         setAllCustomers([])
         toast({
           title: "Error",

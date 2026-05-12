@@ -61,6 +61,7 @@ interface SiteDialogProps {
 // === Component ===
 export function SiteDialog({ open, onOpenChange, site, selectedCustomerId, onSuccess }: SiteDialogProps) {
   const [availableRegions, setAvailableRegions] = useState<Region[]>([])
+  const [customersList, setCustomersList] = useState<Customer[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingRegions, setIsLoadingRegions] = useState(false)
   const { toast } = useToast()

@@ -164,7 +164,6 @@ const CustomerOfficerSupportPage = lazy(() => import('./pages/customer/CustomerO
 const CustomerCrimeIntelligencePage = lazy(() => import('./pages/customer/CustomerCrimeIntelligence'));
 
 const CustomerViewsConfig = lazy(() => import('./pages/customer/CustomerViewsConfig'));
-import BarcodeTestPage from './pages/test/BarcodeTestPage';
 
 const router = createBrowserRouter([
   {
@@ -186,10 +185,6 @@ const router = createBrowserRouter([
       {
         path: 'reset-password',
         element: <ResetPasswordPage />,
-      },
-      {
-        path: 'test/barcode',
-        element: <BarcodeTestPage />,
       },
       {
         path: '/',

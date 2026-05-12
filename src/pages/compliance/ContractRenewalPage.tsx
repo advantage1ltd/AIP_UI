@@ -576,7 +576,18 @@ const ContractRenewalPage = () => {
 					setIsFormOpen(false)
 					setSelectedContract(null)
 				}}
-				onSubmit={selectedContract ? handleEditContract : handleAddContract}
+				onSubmit={(data) => {
+					const submit = selectedContract ? handleEditContract : handleAddContract
+					submit({
+						contractName: data.contractName ?? '',
+						contractType: data.contractType ?? 'Other',
+						provider: data.provider ?? '',
+						startDate: data.startDate ?? new Date(),
+						expiryDate: data.expiryDate ?? new Date(),
+						cost: data.cost ?? '',
+						notes: data.notes,
+					})
+				}}
 				initialData={getFormInitialData()}
 				isLoading={createMutation.isPending || updateMutation.isPending}
 			/>

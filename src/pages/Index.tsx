@@ -13,16 +13,6 @@ const Index = () => {
 	const effectiveRole = isTestMode && testRole ? testRole : currentRole
 	const normalizedRole = normalizeRoleId(effectiveRole)
 
-	React.useEffect(() => {
-		console.log('🏠 [Index] Component state:', {
-			currentRole,
-			isTestMode,
-			testRole,
-			effectiveRole,
-			isLoading,
-		})
-	}, [currentRole, isTestMode, testRole, effectiveRole, isLoading])
-
 	if (isLoading) {
 		return (
 			<div className="flex min-h-screen items-center justify-center">

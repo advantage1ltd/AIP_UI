@@ -16,6 +16,7 @@ import { useCustomerSelection } from "@/contexts/CustomerSelectionContext"
 import { findCustomerById } from "@/hooks/useAvailableCustomers"
 import { siteService } from '@/services/siteService'
 import { extractCustomerId } from '@/utils/customerId'
+import { logger } from '@/utils/logger'
 
 export default function CustomerDailyActivityReport() {
   const navigate = useNavigate()
@@ -40,11 +41,10 @@ export default function CustomerDailyActivityReport() {
         const site = response.data.find((s) => String(s.siteID) === siteId);
         if (site) {
           setSelectedSiteName(site.locationName);
-          console.log('CustomerDailyActivityReport: Found site name:', site.locationName);
         }
       }
     } catch (error) {
-      console.error('Failed to fetch site name:', error);
+      logger.error('Failed to fetch site name:', error);
     }
   }
 
@@ -61,11 +61,6 @@ export default function CustomerDailyActivityReport() {
         const urlSiteId = searchParams.get('siteId')
         const userCustomerId = extractCustomerId(user)
         const targetCustomerId = urlCustomerId ? parseInt(urlCustomerId) : (userCustomerId || undefined)
-
-        console.log('CustomerDailyActivityReport: URL customerId:', urlCustomerId)
-        console.log('CustomerDailyActivityReport: URL siteId:', urlSiteId)
-        console.log('CustomerDailyActivityReport: User customerId:', userCustomerId)
-        console.log('CustomerDailyActivityReport: Target customerId:', targetCustomerId)
 
         // Set selected site if provided in URL
         if (urlSiteId && targetCustomerId) {
@@ -84,20 +79,17 @@ export default function CustomerDailyActivityReport() {
         }
 
         const customerData = await findCustomerById(targetCustomerId)
-        console.log('CustomerDailyActivityReport: Found customer:', customerData)
         
         if (!customerData) {
           setError("Customer not found")
           return
         }
         
-        console.log('CustomerDailyActivityReport: Access granted - setting customer')
         setCustomer(customerData)
       } catch (error) {
-        console.error('CustomerDailyActivityReport: Error loading customer:', error)
+        logger.error('CustomerDailyActivityReport: Error loading customer:', error)
         setError('Failed to load customer data')
       } finally {
-        console.log('CustomerDailyActivityReport: Setting loading to false')
         setLoading(false)
       }
     }

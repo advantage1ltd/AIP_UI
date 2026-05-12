@@ -276,7 +276,7 @@ export default function SiteVisitPage({ customerId, siteId }: SiteVisitPageProps
         // Pre-populate customer if resolvedCustomerId is available
         if (resolvedCustomerId) {
           const matchingCustomer = mappedCustomers.find(c => 
-            c.customerId === resolvedCustomerId
+            String(c.customerId) === String(resolvedCustomerId)
           );
           if (matchingCustomer && !form.getValues().customer) {
             form.setValue('customer', matchingCustomer.id);
