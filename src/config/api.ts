@@ -11,20 +11,15 @@ const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, '')
 
 /**
  * API root including `/api` (e.g. `https://api.example.com/api`).
- * - Deployed builds: set `VITE_API_BASE_URL`.
- * - Local dev: defaults to `/api` so Vite proxies to the .NET API (`vite.config` server.proxy).
+ * - Set `VITE_API_BASE_URL` when the API is on another host.
+ * - Otherwise defaults to `/api` (Vite dev proxy locally; same-origin in production).
  */
 export const BASE_API_URL = ((): string => {
 	const raw = import.meta.env.VITE_API_BASE_URL
 	if (typeof raw === 'string' && raw.trim().length > 0) {
 		return trimTrailingSlashes(raw.trim())
 	}
-	if (import.meta.env.DEV) {
-		return '/api'
-	}
-	throw new Error(
-		'VITE_API_BASE_URL must be set for production builds (include /api suffix, e.g. https://host.example/api). See .env.example.'
-	)
+	return '/api'
 })()
 
 const resolveTimeoutMs = (): number => {
