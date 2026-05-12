@@ -549,7 +549,7 @@ const IncidentForm: React.FC<IncidentFormProps> = memo(({ initialData, onSubmit,
         }
       }
 
-      let errors: { arrestSaveComment?: string } = {}
+      const errors: { arrestSaveComment?: string } = {}
       if (values.incidentType === 'Arrest - Saved?' && !values.arrestSaveComment.trim()) {
         errors.arrestSaveComment = 'This comment is required.'
       }

@@ -218,16 +218,40 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 	const location = useLocation();
 	const navigate = useNavigate()
-  
-  // Try to get context, but handle gracefully if not available
-  let pageAccessContext;
-  try {
-    pageAccessContext = React.useContext(PageAccessContext);
-  } catch (error) {
-    // Context not available
-    pageAccessContext = undefined;
-  }
-  
+	const pageAccessContext = React.useContext(PageAccessContext);
+	const authenticatedUser = getUser();
+	const isAuthenticated = !!authenticatedUser;
+	const effectiveRoleForUi =
+		authenticatedUser?.pageAccessRole ?? authenticatedUser?.role ?? null;
+	const profileRoleLabel =
+		isAuthenticated && effectiveRoleForUi
+			? roleDisplayName(effectiveRoleForUi)
+			: 'IT manager';
+	const canAccessSettings = harmonizeRole(effectiveRoleForUi) === 'administrator';
+	const currentRole = pageAccessContext?.currentRole ?? null;
+	const pageHasAccess = pageAccessContext?.hasAccess ?? (() => false);
+
+	const mobileNavItemVisible = useCallback(
+		(item: NavItem) => {
+			const raw =
+				isAuthenticated && authenticatedUser?.pageAccessRole
+					? authenticatedUser.pageAccessRole
+					: (authenticatedUser?.role ?? currentRole ?? null)
+			const canonicalRole = raw ? harmonizeRole(raw) : null
+			if (!canonicalRole) return false
+			if (canonicalRole === 'administrator') return true
+			const path = item.href.split('?')[0]
+			return pageHasAccess(path)
+		},
+		[
+			isAuthenticated,
+			authenticatedUser?.pageAccessRole,
+			authenticatedUser?.role,
+			currentRole,
+			pageHasAccess,
+		],
+	)
+
   // If context is not available, return minimal header
   if (!pageAccessContext) {
     return (
@@ -238,19 +262,6 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
       </header>
     );
   }
-  
-	const { currentRole, hasAccess: pageHasAccess } = pageAccessContext;
-  
-  // Get authenticated user info
-  const authenticatedUser = getUser();
-  const isAuthenticated = !!authenticatedUser;
-  const effectiveRoleForUi =
-    authenticatedUser?.pageAccessRole ?? authenticatedUser?.role ?? null;
-  const profileRoleLabel =
-    isAuthenticated && effectiveRoleForUi
-      ? roleDisplayName(effectiveRoleForUi)
-      : 'IT manager';
-  const canAccessSettings = harmonizeRole(effectiveRoleForUi) === 'administrator';
 
   // Define navigation sections to match SidebarNavigation
   const navigationItems = [
@@ -490,28 +501,6 @@ export function Header({ onMobileMenuClick }: HeaderProps) {
       ]
     }
   ];
-
-	const mobileNavItemVisible = useCallback(
-		(item: NavItem) => {
-			const raw =
-				isAuthenticated && authenticatedUser?.pageAccessRole
-					? authenticatedUser.pageAccessRole
-					: (authenticatedUser?.role ?? currentRole ?? null)
-			const canonicalRole = raw ? harmonizeRole(raw) : null
-			if (!canonicalRole) return false
-			// Match SidebarNavigation: admins see full catalog; others follow Settings / PageAccess.
-			if (canonicalRole === 'administrator') return true
-			const path = item.href.split('?')[0]
-			return pageHasAccess(path)
-		},
-		[
-			isAuthenticated,
-			authenticatedUser?.pageAccessRole,
-			authenticatedUser?.role,
-			currentRole,
-			pageHasAccess,
-		],
-	)
 
   // Handle navigation and close sheet
   const handleNavigate = () => {
