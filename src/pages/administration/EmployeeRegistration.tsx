@@ -92,11 +92,15 @@ export default function EmployeeRegistration() {
       } else {
         // Create
         const created = await employeeService.registerEmployeeFromFrontend(data)
+        const createdName =
+          created.fullName?.trim() ||
+          [created.firstName, created.surname].filter(Boolean).join(' ').trim() ||
+          created.employeeNumber
         // Refresh the list to get the new employee with full details
         await fetchEmployees()
         toast({
           title: "Success",
-          description: `${created.firstName} ${created.surname} has been created`,
+          description: `${createdName} has been created`,
         })
       }
       // Clear selected employee and close dialog

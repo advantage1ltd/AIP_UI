@@ -63,6 +63,7 @@ const CHART_COLORS = [
 export const CrimeTrendExplorer = ({ data, loading = false }: CrimeTrendExplorerProps) => {
 	const [selectedDay, setSelectedDay] = useState<string | null>(null)
 	const [selectedStore, setSelectedStore] = useState<string | null>(null)
+	const [selectedHour, setSelectedHour] = useState<number | null>(null)
 
 	const dayOfWeekData = useMemo(() => {
 		return data.dayOfWeek.map((item) => ({
@@ -116,6 +117,22 @@ export const CrimeTrendExplorer = ({ data, loading = false }: CrimeTrendExplorer
 		if (!selectedStore) return null
 		return data.storeDrilldown[selectedStore] || null
 	}, [selectedStore, data.storeDrilldown])
+
+	const storesWithSelectedPeakHour = useMemo(() => {
+		if (selectedHour === null) return []
+
+		return Object.values(data.storeDrilldown)
+			.filter((store) => store.peakHour === selectedHour)
+			.sort((a, b) => b.incidents - a.incidents)
+	}, [selectedHour, data.storeDrilldown])
+
+	const formatHourLabel = (hour: number) => {
+		const normalizedHour = ((hour % 24) + 24) % 24
+		if (normalizedHour === 0) return '12 AM'
+		if (normalizedHour === 12) return '12 PM'
+		if (normalizedHour < 12) return `${normalizedHour} AM`
+		return `${normalizedHour - 12} PM`
+	}
 
 	if (loading) {
 		return (
@@ -291,10 +308,67 @@ export const CrimeTrendExplorer = ({ data, loading = false }: CrimeTrendExplorer
 											fill={CHART_COLORS[1]}
 											name="Incidents"
 											radius={[8, 8, 0, 0]}
+											onClick={(chartData: any) => {
+												if (chartData && typeof chartData.hour === 'number') {
+													setSelectedHour((prev) =>
+														prev === chartData.hour ? null : chartData.hour
+													)
+												}
+											}}
+											style={{ cursor: 'pointer' }}
 										/>
 									</BarChart>
 								</ResponsiveContainer>
 							</div>
+							{selectedHour !== null && (
+								<div className="space-y-4">
+									<div className="flex items-center gap-2">
+										<MapPin className="h-4 w-4 text-gray-600" />
+										<h3 className="font-semibold">
+											Stores with peak activity at {formatHourLabel(selectedHour)}
+										</h3>
+									</div>
+									<div className="border rounded-lg">
+										<Table>
+											<TableHeader>
+												<TableRow>
+													<TableHead>Store</TableHead>
+													<TableHead>Incidents</TableHead>
+													<TableHead>Peak Day</TableHead>
+													<TableHead>Peak Hour</TableHead>
+													<TableHead className="text-right">Actions</TableHead>
+												</TableRow>
+											</TableHeader>
+											<TableBody>
+												{storesWithSelectedPeakHour.map((store) => (
+													<TableRow key={store.storeId}>
+														<TableCell className="font-medium">
+															{store.storeName}
+														</TableCell>
+														<TableCell>{store.incidents}</TableCell>
+														<TableCell>
+															<Badge variant="outline">{store.peakDay}</Badge>
+														</TableCell>
+														<TableCell>
+															<Badge variant="outline">{store.peakHour}:00</Badge>
+														</TableCell>
+														<TableCell className="text-right">
+															<Button
+																variant="ghost"
+																size="sm"
+																onClick={() => handleStoreClick(store.storeName)}
+															>
+																View Details
+																<ChevronRight className="h-4 w-4 ml-1" />
+															</Button>
+														</TableCell>
+													</TableRow>
+												))}
+											</TableBody>
+										</Table>
+									</div>
+								</div>
+							)}
 							<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 								{timeOfDayData
 									.sort((a, b) => b.incidents - a.incidents)

@@ -10,7 +10,7 @@ import { mapToBackendRequest, mapFromBackendResponse, mapFromBackendResponseArra
 
 export interface EmployeeRegistrationRequest {
   // Required fields
-  EmployeeNumber: string
+  EmployeeNumber?: string
   Title: string
   FirstName: string
   Surname: string
@@ -60,13 +60,14 @@ export interface EmployeeRegistrationRequest {
 }
 
 export interface EmployeeRegistrationResponse {
-  id: number
+  employeeId: number
   employeeNumber: string
-  firstName: string
-  surname: string
+  fullName: string
+  firstName?: string
+  surname?: string
   email?: string
   position: string
-  status: string
+  employeeStatus: string
   createdAt: string
 }
 
