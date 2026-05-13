@@ -29,7 +29,7 @@ import type { AxiosError } from "axios"
 import { Employee } from "@/types/employee"
 import { lookupTableService, LookupTableItem } from "@/services/lookupTableService"
 import { employeeService, EmployeeRegistrationRequest } from "@/services/employeeService"
-import { mapToBackendUpdateRequest, generateEmployeeNumber } from "@/utils/employeeMapper"
+import { mapToBackendUpdateRequest } from "@/utils/employeeMapper"
 import { compressImageFileToDataUrl, validateImageFile } from "@/utils/image"
 import { Upload, User, FileText, Shield, MapPin, Briefcase, CreditCard, Camera, Calendar, Mail } from "lucide-react"
 
@@ -123,9 +123,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
 
   const ensureAutoEmployeeNumber = () => {
     if (initialData?.id) return
-    const currentEmployeeNumber = form.getValues('employeeNumber')
-    if (currentEmployeeNumber && currentEmployeeNumber.trim().length > 0) return
-    form.setValue('employeeNumber', generateEmployeeNumber(), { shouldValidate: true, shouldDirty: false })
+    form.setValue('employeeNumber', '', { shouldValidate: false, shouldDirty: false })
   }
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -303,7 +301,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
   // Submission: optional parent callback or employeeService create/update via employeeMapper.
   const handleSubmit = async (data: FormData) => {
     // Validate required fields before submission
-    const requiredFields = ['employeeNumber', 'title', 'firstName', 'surname', 'startDate', 'position', 'employeeStatus', 'employmentType']
+    const requiredFields = ['title', 'firstName', 'surname', 'startDate', 'position', 'employeeStatus', 'employmentType']
     const missingFields = requiredFields.filter(field => !data[field as keyof FormData])
     
     if (missingFields.length > 0) {
@@ -469,7 +467,7 @@ export function EmployeeForm({ onSubmit, onCancel, initialData, isLoading }: Emp
                   <FormLabel>Employee Number</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Auto-generated"
+                      placeholder={initialData?.id ? "Employee number" : "Auto-generated on save"}
                       {...field}
                       disabled
                       readOnly

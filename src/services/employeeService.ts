@@ -176,7 +176,7 @@ class EmployeeService {
     logger.debug('📤 [EmployeeService] Frontend data:', employee)
     
     // Check for required fields before mapping
-    const requiredFields = ['employeeNumber', 'title', 'firstName', 'surname', 'startDate', 'position', 'employeeStatus', 'employmentType']
+    const requiredFields = ['title', 'firstName', 'surname', 'startDate', 'position', 'employeeStatus', 'employmentType']
     const missingFields = requiredFields.filter(field => !employee[field as keyof Employee])
     
     if (missingFields.length > 0) {

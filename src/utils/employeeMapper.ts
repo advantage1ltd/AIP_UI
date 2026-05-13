@@ -304,7 +304,6 @@ export const validateEmployeeRegistration = (employee: Partial<Employee>): strin
   const errors: string[] = []
   
   // Required fields validation
-  if (!employee.employeeNumber) errors.push('Employee number is required')
   if (!employee.title) errors.push('Title is required')
   if (!employee.firstName) errors.push('First name is required')
   if (!employee.surname) errors.push('Surname is required')
@@ -328,9 +327,11 @@ export const validateEmployeeRegistration = (employee: Partial<Employee>): strin
  * Generates a unique employee number if not provided
  */
 export const generateEmployeeNumber = (): string => {
-  const timestamp = Date.now().toString(36)
-  const random = Math.random().toString(36).substring(2, 8)
-  return `EMP${timestamp}${random}`.toUpperCase()
+  // Backend constraint: employee number must be 3-10 alphanumeric chars.
+  // Keep deterministic prefix while capping length to avoid 400 validation failures.
+  const timestampPart = Date.now().toString(36).slice(-4).toUpperCase()
+  const randomPart = Math.random().toString(36).slice(2, 5).toUpperCase()
+  return `EMP${timestampPart}${randomPart}`
 }
 
 /**

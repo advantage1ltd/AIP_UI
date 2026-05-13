@@ -3,7 +3,7 @@ import * as z from 'zod'
 
 export const employeeFormSchema = z.object({
   // Basic Information - Backend Required Fields
-  employeeNumber: z.string().min(1, "Employee number is required"),
+  employeeNumber: z.string().optional(),
   title: z.string().min(1, "Title is required"),
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   surname: z.string().min(2, "Last name must be at least 2 characters"),
