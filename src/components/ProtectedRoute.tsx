@@ -40,6 +40,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 	const offlineNoticePathRef = useRef<string | null>(null);
 
 	const pathToCheck = normalizePath(accessPath ?? location.pathname);
+	const showBackendConnectionNotices = import.meta.env.VITE_SHOW_BACKEND_CONNECTION_TOASTS === 'true';
 	
 	// Lightweight trace for access debugging (silent unless VITE_DEBUG_LOGS=true in dev)
 	useEffect(() => {
@@ -120,14 +121,22 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 				offlineNoticePathRef.current = pathToCheck;
 				logger.debug('[ProtectedRoute] backend offline fallback', pathToCheck);
 			}
-			return (
-				<div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
-					<div className="text-sm font-medium text-amber-900">Backend connection is temporarily unavailable.</div>
-					<div className="max-w-md text-xs text-amber-800">
-						Your session is still active. Please retry in a moment without logging out.
+			// Do not block authenticated users in offline mode unless notice mode is explicitly enabled.
+			// This keeps routes usable during brief backend/page-access outages while still honoring role checks above.
+			if (showBackendConnectionNotices) {
+				return (
+					<div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
+						<div className="text-sm font-medium text-amber-900">Backend connection is temporarily unavailable.</div>
+						<div className="max-w-md text-xs text-amber-800">
+							Your session is still active. Please retry in a moment without logging out.
+						</div>
 					</div>
-				</div>
-			);
+				);
+			}
+			logger.debug('[ProtectedRoute] offline mode: bypassing page-access block and continuing with role checks only', {
+				pathToCheck,
+			});
+			return <>{children}</>;
 		}
 
 		// Check access using page access settings

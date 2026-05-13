@@ -188,8 +188,16 @@ export const UserForm = ({ initialData, onSubmit, onCancel }: UserFormProps) => 
         } else {
           // When creating, get only unlinked employees
           const unlinked = await userService.getUnlinkedEmployees();
-          logger.debug('🔍 [UserForm] Loaded unlinked employees for creating:', unlinked);
-          setEmployees(unlinked);
+          if (unlinked.length > 0) {
+            logger.debug('🔍 [UserForm] Loaded unlinked employees for creating:', unlinked);
+            setEmployees(unlinked);
+          } else {
+            // Fallback: if unlinked endpoint returns empty unexpectedly, derive from active employee list.
+            const allEmployees = await employeeService.getActiveEmployees();
+            const derivedUnlinked = allEmployees.filter((employee) => !employee.userId);
+            logger.debug('🔍 [UserForm] Unlinked endpoint empty; derived unlinked employees:', derivedUnlinked);
+            setEmployees(derivedUnlinked);
+          }
         }
       } catch (err) {
         logger.error('Error loading employees for UserForm:', err);

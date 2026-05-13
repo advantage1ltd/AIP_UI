@@ -1,44 +1,32 @@
-import React, { useMemo, useState } from 'react';
-import { Check, ChevronDown, Loader2 } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import React, { useMemo } from 'react';
+import { Loader2 } from 'lucide-react';
 import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from '@/components/ui/command';
-import { Button } from '@/components/ui/button';
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/employee';
 
-const formatEmployeeLabel = (emp: Employee): string => {
-	const raw = emp.fullName?.trim();
-	if (raw) return raw;
-	const parts = [emp.firstName, emp.surname].filter(Boolean).join(' ').trim();
-	return parts || `Employee #${emp.id}`;
+const toEmployeeId = (rawId: unknown): number | null => {
+	const parsed = typeof rawId === 'number' ? rawId : Number(rawId);
+	return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : null;
 };
 
-const employeeSearchValue = (emp: Employee): string =>
-	[
-		emp.firstName,
-		emp.surname,
-		emp.fullName,
-		emp.employeeNumber,
-		emp.position,
-		String(emp.id),
-	]
-		.filter(Boolean)
-		.join(' ')
-		.toLowerCase();
+const formatEmployeeLabel = (employee: Employee): string => {
+	const fullName = employee.fullName?.trim();
+	if (fullName) return fullName;
+	const parts = [employee.firstName, employee.surname].filter(Boolean).join(' ').trim();
+	return parts || `Employee #${employee.id}`;
+};
 
 export interface EmployeeComboboxProps {
 	employees: Employee[];
 	loading: boolean;
 	value?: number;
 	onChange: (employeeId: number | undefined) => void;
-	/** Shown when `value` is set but the employee row is not in `employees` yet (e.g. during fetch). */
 	fallbackLabel?: string;
 	id?: string;
 	disabled?: boolean;
@@ -57,107 +45,58 @@ export const EmployeeCombobox = ({
 	triggerClassName,
 	invalid,
 }: EmployeeComboboxProps) => {
-	const [open, setOpen] = useState(false);
+	const normalizedEmployees = useMemo(() => {
+		return employees
+			.map((employee) => {
+				const normalizedId = toEmployeeId((employee as { id?: unknown }).id);
+				if (normalizedId == null) return null;
+				return { ...employee, id: normalizedId };
+			})
+			.filter(Boolean) as Array<Employee & { id: number }>;
+	}, [employees]);
 
-	const displayLabel = useMemo(() => {
-		if (value == null) return null;
-		const hit = employees.find((e) => e.id === value);
+	const selectedEmployeeId = toEmployeeId(value);
+	const selectedEmployeeLabel = useMemo(() => {
+		if (selectedEmployeeId == null) return undefined;
+		const hit = normalizedEmployees.find((employee) => employee.id === selectedEmployeeId);
 		if (hit) return formatEmployeeLabel(hit);
-		const trimmed = fallbackLabel?.trim();
-		if (trimmed) return trimmed;
-		return `Employee #${value}`;
-	}, [value, employees, fallbackLabel]);
-
-	const triggerDisabled =
-		disabled || (loading && employees.length === 0 && value == null);
-
-	const placeholder = loading ? 'Loading employees…' : 'Search or select an employee…';
+		return fallbackLabel?.trim() || undefined;
+	}, [selectedEmployeeId, normalizedEmployees, fallbackLabel]);
 
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
-				<Button
-					id={id}
-					type="button"
-					variant="outline"
-					role="combobox"
-					aria-expanded={open}
-					aria-haspopup="listbox"
-					aria-label={displayLabel ? `Selected employee: ${displayLabel}` : placeholder}
-					disabled={triggerDisabled}
-					className={cn(
-						'w-full justify-between font-normal h-10 px-3',
-						!displayLabel && 'text-muted-foreground',
-						invalid && 'border-red-500',
-						triggerClassName,
-					)}
-				>
-					<span className="truncate text-left">
-						{displayLabel ?? placeholder}
-					</span>
-					{loading ? (
-						<Loader2 className="ml-2 h-4 w-4 shrink-0 animate-spin opacity-70" aria-hidden />
-					) : (
-						<ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden />
-					)}
-				</Button>
-			</PopoverTrigger>
-			<PopoverContent className="w-[min(100vw-2rem,420px)] p-0" align="start">
-				<Command shouldFilter>
-					<CommandInput
-						placeholder="Search by name, number, or ID…"
-						disabled={loading && employees.length === 0}
-					/>
-					<CommandList>
-						{loading && employees.length === 0 ? (
-							<div className="flex items-center gap-2 py-6 justify-center text-sm text-muted-foreground">
-								<Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
-								Loading employees…
-							</div>
-						) : employees.length === 0 ? (
-							<CommandEmpty>No employees available.</CommandEmpty>
-						) : (
-							<>
-								<CommandEmpty>No employee matches your search.</CommandEmpty>
-								<CommandGroup heading="Employees">
-									{employees.map((emp) => {
-										const label = formatEmployeeLabel(emp);
-										const selected = value === emp.id;
-										return (
-											<CommandItem
-												key={emp.id}
-												value={employeeSearchValue(emp)}
-												keywords={[label, String(emp.id), emp.employeeNumber ?? ''].filter(Boolean)}
-												onSelect={() => {
-													onChange(emp.id);
-													setOpen(false);
-												}}
-												className="cursor-pointer"
-											>
-												<Check
-													className={cn(
-														'mr-2 h-4 w-4 shrink-0',
-														selected ? 'opacity-100' : 'opacity-0',
-													)}
-													aria-hidden
-												/>
-												<span className="truncate">
-													<span className="font-medium">{label}</span>
-													{emp.employeeNumber ? (
-														<span className="ml-2 text-xs text-muted-foreground tabular-nums">
-															#{emp.employeeNumber}
-														</span>
-													) : null}
-												</span>
-											</CommandItem>
-										);
-									})}
-								</CommandGroup>
-							</>
-						)}
-					</CommandList>
-				</Command>
-			</PopoverContent>
-		</Popover>
+		<Select
+			value={selectedEmployeeId != null ? String(selectedEmployeeId) : undefined}
+			onValueChange={(selectedValue) => {
+				const employeeId = toEmployeeId(selectedValue);
+				onChange(employeeId ?? undefined);
+			}}
+			disabled={disabled || loading || normalizedEmployees.length === 0}
+		>
+			<SelectTrigger
+				id={id}
+				className={cn(invalid && 'border-red-500', triggerClassName)}
+				aria-label={selectedEmployeeLabel ? `Selected employee: ${selectedEmployeeLabel}` : 'Select employee'}
+			>
+				<SelectValue placeholder={loading ? 'Loading employees...' : 'Select employee'} />
+				{loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin opacity-70" aria-hidden /> : null}
+			</SelectTrigger>
+
+			<SelectContent>
+				{normalizedEmployees.length === 0 ? (
+					<SelectItem value="__no_employees__" disabled>
+						No employees available
+					</SelectItem>
+				) : (
+					normalizedEmployees.map((employee) => (
+						<SelectItem key={employee.id} value={String(employee.id)}>
+							<span className="font-medium">{formatEmployeeLabel(employee)}</span>
+							{employee.employeeNumber ? (
+								<span className="ml-2 text-xs text-muted-foreground">#{employee.employeeNumber}</span>
+							) : null}
+						</SelectItem>
+					))
+				)}
+			</SelectContent>
+		</Select>
 	);
 };

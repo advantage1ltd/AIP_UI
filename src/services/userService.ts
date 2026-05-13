@@ -443,7 +443,7 @@ class UserService {
       const response = await api.get(`${this.baseUrl}/unlinked-employees`)
       // Transform backend response to frontend format
       return response.data.map((employee: any) => ({
-        id: employee.employeeId,
+        id: Number(employee.employeeId ?? employee.EmployeeId ?? employee.id),
         firstName: employee.firstName,
         surname: employee.surname,
         employeeNumber: employee.employeeNumber,

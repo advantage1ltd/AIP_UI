@@ -165,13 +165,14 @@ export const CrimeTrendExplorer = ({ data, loading = false }: CrimeTrendExplorer
 							</p>
 						)}
 					</div>
-					{(selectedDay || selectedStore) && (
+					{(selectedDay || selectedStore || selectedHour !== null) && (
 						<Button
 							variant="outline"
 							size="sm"
 							onClick={() => {
 								setSelectedDay(null)
 								setSelectedStore(null)
+								setSelectedHour(null)
 							}}
 						>
 							<ArrowLeft className="h-4 w-4 mr-2" />
