@@ -88,7 +88,13 @@ class ErrorBoundaryComponent extends React.Component<{ children: React.ReactNode
 }
 
 const App = () => {
+  const showBackendConnectionToasts = import.meta.env.VITE_SHOW_BACKEND_CONNECTION_TOASTS === 'true'
+
   React.useEffect(() => {
+    if (!showBackendConnectionToasts) {
+      return
+    }
+
     const handleConnectionStatus = (event: Event) => {
       const customEvent = event as CustomEvent<BackendConnectionDetail>
       const detail = customEvent.detail
@@ -107,7 +113,7 @@ const App = () => {
     return () => {
       window.removeEventListener('backend-connection-status', handleConnectionStatus)
     }
-  }, [])
+  }, [showBackendConnectionToasts])
 
   return (
     <ErrorBoundaryComponent>

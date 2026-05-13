@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { managerSupportService, type ManagerSupportUpdate, type ManagerSupportDeclaration } from '@/services/managerSupportService';
-import { BASE_API_URL } from '@/config/api';
+import { api } from '@/config/api';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -191,36 +191,55 @@ const ManagerSupportPage: React.FC = () => {
 	const [deleteTarget, setDeleteTarget] = useState<ManagerSupportUpdate | null>(null);
 	const [showSignDialog, setShowSignDialog] = useState(false);
 	const [signatureData, setSignatureData] = useState({ managerName: '', signature: '' });
+	const [previewFileUrl, setPreviewFileUrl] = useState('');
+	const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
 	const normalizedRole = (user?.role || (user as any)?.Role || '').toLowerCase();
 	const isAdmin = normalizedRole === 'administrator';
 
-	const fileHost = useMemo(() => {
-		const override = import.meta.env.VITE_FILE_BASE_URL as string | undefined;
-		const target = override || BASE_API_URL;
+	const resolveStoredFileApiPath = useCallback((fileUrl?: string): string | null => {
+		if (!fileUrl) return null;
+
+		let pathWithQuery = '';
 		try
 		{
-			const url = new URL(target);
-			const trimmedPath = url.pathname.replace(/\/api\/?$/, '');
-			const base = `${url.origin}${trimmedPath}`.replace(/\/$/, '');
-			return base || window.location.origin;
+			const parsed = new URL(fileUrl);
+			pathWithQuery = `${parsed.pathname}${parsed.search ?? ''}`;
 		}
 		catch
 		{
-			const fallback = target.replace(/\/api\/?$/, '');
-			return fallback || window.location.origin;
+			pathWithQuery = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
 		}
+
+		if (pathWithQuery.startsWith('/api/stored-files/download/'))
+			return pathWithQuery.replace(/^\/api/, '');
+		if (pathWithQuery.startsWith('/stored-files/download/'))
+			return pathWithQuery;
+
+		if (pathWithQuery.startsWith('/api/uploads/'))
+		{
+			const relative = pathWithQuery.replace(/^\/api\/uploads\//, '');
+			return `/stored-files/download/${relative}`;
+		}
+		if (pathWithQuery.startsWith('/uploads/'))
+		{
+			const relative = pathWithQuery.replace(/^\/uploads\//, '');
+			return `/stored-files/download/${relative}`;
+		}
+
+		if (pathWithQuery.startsWith('/api/'))
+			return pathWithQuery.replace(/^\/api/, '');
+
+		return pathWithQuery;
 	}, []);
 
-	const resolveFileUrl = useCallback((fileUrl: string) => {
-		if (!fileUrl) return '';
-		if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
-			return fileUrl;
-		}
+	const fetchStoredFileBlob = useCallback(async (fileUrl?: string): Promise<Blob | null> => {
+		const apiPath = resolveStoredFileApiPath(fileUrl);
+		if (!apiPath) return null;
 
-		const normalizedPath = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
-		return `${fileHost}${normalizedPath}`;
-	}, [fileHost]);
+		const response = await api.get(apiPath, { responseType: 'blob' });
+		return response.data as Blob;
+	}, [resolveStoredFileApiPath]);
 
 	const safeParseDate = (value?: string) => {
 		if (!value) return undefined;
@@ -303,6 +322,11 @@ const ManagerSupportPage: React.FC = () => {
 		}
 
 		if (type === 'view') {
+			if (previewFileUrl.startsWith('blob:')) {
+				URL.revokeObjectURL(previewFileUrl);
+			}
+			setPreviewFileUrl('');
+			setIsPreviewLoading(false);
 			setSelectedUpdate(null);
 			setDeclarations([]);
 			setShowSignDialog(false);
@@ -453,17 +477,32 @@ const ManagerSupportPage: React.FC = () => {
 		}
 	};
 
-	const handleDownload = (update: ManagerSupportUpdate) => {
-		const url = resolveFileUrl(update.fileUrl);
-		if (!url) {
+	const handleDownload = async (update: ManagerSupportUpdate) => {
+		try
+		{
+			const blob = await fetchStoredFileBlob(update.fileUrl);
+			if (!blob) {
+				throw new Error('Unable to locate the document for download.');
+			}
+
+			const objectUrl = URL.createObjectURL(blob);
+			const anchor = document.createElement('a');
+			anchor.href = objectUrl;
+			anchor.download = update.fileName || `${update.name || 'manager-support-update'}.pdf`;
+			document.body.appendChild(anchor);
+			anchor.click();
+			document.body.removeChild(anchor);
+			URL.revokeObjectURL(objectUrl);
+		}
+		catch (err)
+		{
+			const message = err instanceof Error ? err.message : 'Unable to locate the document for download.';
 			toast({
 				title: 'File unavailable',
-				description: 'Unable to locate the document for download.',
+				description: message,
 				variant: 'destructive'
 			});
-			return;
 		}
-		window.open(url, '_blank', 'noopener,noreferrer');
 	};
 
 	const handleSignDeclaration = async () => {
@@ -514,11 +553,6 @@ const ManagerSupportPage: React.FC = () => {
 		}
 	};
 
-	const selectedDocumentUrl = useMemo(
-		() => (selectedUpdate ? resolveFileUrl(selectedUpdate.fileUrl) : ''),
-		[selectedUpdate, resolveFileUrl]
-	);
-
 	const summaryStats = useMemo(() => {
 		const totalUpdates = updates.length;
 		const activeUpdates = updates.filter((update) => update.status === 'active').length;
@@ -542,6 +576,54 @@ const ManagerSupportPage: React.FC = () => {
 			setDeclarationsLoading(false);
 		}
 	}, [toast]);
+
+	useEffect(() => {
+		if (!dialogState.view || !selectedUpdate?.fileUrl) return;
+
+		let isActive = true;
+		let nextObjectUrl = '';
+
+		const loadPreview = async () => {
+			try
+			{
+				setIsPreviewLoading(true);
+				const blob = await fetchStoredFileBlob(selectedUpdate.fileUrl);
+				if (!blob || !isActive) return;
+
+				nextObjectUrl = URL.createObjectURL(blob);
+				setPreviewFileUrl((previousUrl) => {
+					if (previousUrl.startsWith('blob:')) {
+						URL.revokeObjectURL(previousUrl);
+					}
+					return nextObjectUrl;
+				});
+			}
+			catch (err)
+			{
+				if (!isActive) return;
+				setPreviewFileUrl('');
+				const message = err instanceof Error ? err.message : 'Unable to load file preview.';
+				toast({
+					title: 'Preview unavailable',
+					description: message,
+					variant: 'destructive'
+				});
+			}
+			finally
+			{
+				if (isActive) setIsPreviewLoading(false);
+			}
+		};
+
+		void loadPreview();
+
+		return () => {
+			isActive = false;
+			if (nextObjectUrl.startsWith('blob:')) {
+				URL.revokeObjectURL(nextObjectUrl);
+			}
+		};
+	}, [dialogState.view, selectedUpdate, fetchStoredFileBlob, toast]);
 
 	if (authLoading) {
 		return (
@@ -894,7 +976,7 @@ const ManagerSupportPage: React.FC = () => {
 									<Button
 										variant='outline'
 										size='sm'
-										onClick={() => selectedUpdate && handleDownload(selectedUpdate)}
+										onClick={() => selectedUpdate && void handleDownload(selectedUpdate)}
 										className='flex-1 sm:flex-none'
 									>
 										<Download className='mr-2 h-4 w-4' />
@@ -926,10 +1008,14 @@ const ManagerSupportPage: React.FC = () => {
 
 							<div className='flex-1 flex flex-col'>
 								<div className='flex-1 bg-slate-50'>
-									{selectedDocumentUrl ? (
+									{isPreviewLoading ? (
+										<div className='h-full flex items-center justify-center text-sm text-gray-500'>
+											Loading document preview...
+										</div>
+									) : previewFileUrl ? (
 										<iframe
-											key={selectedDocumentUrl}
-											src={selectedDocumentUrl}
+											key={previewFileUrl}
+											src={previewFileUrl}
 											title={`Manager support document ${selectedUpdate?.name ?? ''}`}
 											className='w-full h-full border-0'
 										/>
@@ -941,7 +1027,7 @@ const ManagerSupportPage: React.FC = () => {
 													We could not locate the attached file or it is not a supported preview type. Please download it instead.
 												</AlertDescription>
 											</Alert>
-											<Button onClick={() => selectedUpdate && handleDownload(selectedUpdate)}>Download file</Button>
+											<Button onClick={() => selectedUpdate && void handleDownload(selectedUpdate)}>Download file</Button>
 										</div>
 									)}
 								</div>

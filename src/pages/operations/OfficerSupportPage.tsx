@@ -7,6 +7,7 @@ import { officerSupportService, type OfficerSupportUpdate, type OfficerSupportDe
 import { useToast } from '@/hooks/use-toast';
 import { usePageAccess } from '@/contexts/PageAccessContext';
 import { getUser } from '@/services/auth';
+import { api } from '@/config/api';
 import { harmonizeRole, normalizeRoleId, roleDisplayName } from '@/utils/roles';
 import {
   Card,
@@ -198,6 +199,8 @@ const OfficerSupportPage: React.FC = () => {
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [previewFileUrl, setPreviewFileUrl] = useState<string>('');
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -212,6 +215,62 @@ const OfficerSupportPage: React.FC = () => {
     effectiveDate: '',
     file: null as File | null
   });
+
+  const resolveStoredFileApiPath = useCallback((fileUrl?: string): string | null => {
+    if (!fileUrl) {
+      return null;
+    }
+
+    try {
+      const url = new URL(fileUrl);
+      const relativePath = `${url.pathname}${url.search ?? ''}`;
+      if (relativePath.startsWith('/api/')) {
+        return relativePath.replace(/^\/api/, '');
+      }
+      return relativePath;
+    } catch {
+      const normalized = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
+      if (normalized.startsWith('/api/')) {
+        return normalized.replace(/^\/api/, '');
+      }
+      return normalized;
+    }
+  }, []);
+
+  const fetchStoredFileBlob = useCallback(async (fileUrl?: string): Promise<Blob | null> => {
+    const apiPath = resolveStoredFileApiPath(fileUrl);
+    if (!apiPath) {
+      return null;
+    }
+
+    const response = await api.get(apiPath, { responseType: 'blob' });
+    return response.data as Blob;
+  }, [resolveStoredFileApiPath]);
+
+  const handleDownloadFile = useCallback(async (update: OfficerSupportUpdate) => {
+    try {
+      const blob = await fetchStoredFileBlob(update.fileUrl);
+      if (!blob) {
+        throw new Error('No file URL found for this update.');
+      }
+
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = update.fileName || `${update.name || 'officer-support-update'}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to download this file.';
+      toast({
+        title: 'Download failed',
+        description: message,
+        variant: 'destructive'
+      });
+    }
+  }, [fetchStoredFileBlob, toast]);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -492,8 +551,61 @@ const OfficerSupportPage: React.FC = () => {
           URL.revokeObjectURL(update.fileUrl);
         }
       });
+      if (previewFileUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewFileUrl);
+      }
     };
-  }, [updates]);
+  }, [updates, previewFileUrl]);
+
+  useEffect(() => {
+    if (!showDocumentPreview || !selectedUpdate?.fileUrl) {
+      return;
+    }
+
+    let isActive = true;
+    let nextObjectUrl = '';
+
+    const loadPreview = async () => {
+      try {
+        setIsPreviewLoading(true);
+        const blob = await fetchStoredFileBlob(selectedUpdate.fileUrl);
+        if (!blob || !isActive) {
+          return;
+        }
+        nextObjectUrl = URL.createObjectURL(blob);
+        setPreviewFileUrl((previousUrl) => {
+          if (previousUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(previousUrl);
+          }
+          return nextObjectUrl;
+        });
+      } catch (err) {
+        if (!isActive) {
+          return;
+        }
+        const message = err instanceof Error ? err.message : 'Unable to load file preview.';
+        setPreviewFileUrl('');
+        toast({
+          title: 'Preview unavailable',
+          description: message,
+          variant: 'destructive'
+        });
+      } finally {
+        if (isActive) {
+          setIsPreviewLoading(false);
+        }
+      }
+    };
+
+    void loadPreview();
+
+    return () => {
+      isActive = false;
+      if (nextObjectUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(nextObjectUrl);
+      }
+    };
+  }, [showDocumentPreview, selectedUpdate, fetchStoredFileBlob, toast]);
 
   return (
     <div className="min-h-screen bg-[#EFF4FF] flex flex-col">
@@ -891,6 +1003,7 @@ const OfficerSupportPage: React.FC = () => {
                 <Button 
                   variant="outline" 
                   size="sm" 
+                  onClick={() => selectedUpdate && void handleDownloadFile(selectedUpdate)}
                   className="flex items-center gap-2 flex-1 sm:flex-none justify-center h-9"
                 >
                   <Download className="h-4 w-4" />
@@ -916,13 +1029,27 @@ const OfficerSupportPage: React.FC = () => {
               </div>
               <TabsContent value="document" className="flex-1 p-2 md:p-6">
                 <div className="h-full border rounded-md bg-white overflow-hidden">
-                  <iframe
-                    src={selectedUpdate?.fileUrl?.startsWith('http') 
-                      ? selectedUpdate.fileUrl 
-                      : `${import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5128'}${selectedUpdate?.fileUrl}`}
-                    className="w-full h-full"
-                    title={selectedUpdate?.name}
-                  />
+                  {isPreviewLoading ? (
+                    <div className="h-full flex items-center justify-center text-sm text-gray-500">
+                      Loading document preview...
+                    </div>
+                  ) : previewFileUrl ? (
+                    <iframe
+                      src={previewFileUrl}
+                      className="w-full h-full"
+                      title={selectedUpdate?.name}
+                    />
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center gap-3 p-6 text-center">
+                      <p className="text-sm text-gray-600">Unable to load an inline preview for this document.</p>
+                      {selectedUpdate ? (
+                        <Button variant="outline" onClick={() => void handleDownloadFile(selectedUpdate)}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download file
+                        </Button>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               </TabsContent>
               <TabsContent value="declarations" className="p-2 md:p-6 overflow-auto">

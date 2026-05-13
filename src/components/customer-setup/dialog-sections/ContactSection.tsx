@@ -18,7 +18,7 @@ export function ContactSection({ form }: ContactSectionProps) {
           name="contact.title"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Title</FormLabel>
+              <FormLabel>Title (Optional)</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -41,7 +41,7 @@ export function ContactSection({ form }: ContactSectionProps) {
           name="contact.forename"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Forename</FormLabel>
+              <FormLabel>Forename (Optional)</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>
@@ -53,7 +53,7 @@ export function ContactSection({ form }: ContactSectionProps) {
           name="contact.surname"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Surname</FormLabel>
+              <FormLabel>Surname (Optional)</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>
@@ -65,7 +65,7 @@ export function ContactSection({ form }: ContactSectionProps) {
           name="contact.position"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Position</FormLabel>
+              <FormLabel>Position (Optional)</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>
@@ -77,7 +77,7 @@ export function ContactSection({ form }: ContactSectionProps) {
           name="contact.email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>Email (Optional)</FormLabel>
               <FormControl>
                 <Input type="email" {...field} />
               </FormControl>
@@ -89,7 +89,7 @@ export function ContactSection({ form }: ContactSectionProps) {
           name="contact.phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Phone Number</FormLabel>
+              <FormLabel>Phone Number (Optional)</FormLabel>
               <FormControl>
                 <Input type="tel" {...field} />
               </FormControl>

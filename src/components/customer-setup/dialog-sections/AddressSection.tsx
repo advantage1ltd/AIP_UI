@@ -31,7 +31,7 @@ export function AddressSection({ form }: AddressSectionProps) {
           name="address.street"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Street</FormLabel>
+              <FormLabel>Street (Optional)</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>
@@ -55,7 +55,7 @@ export function AddressSection({ form }: AddressSectionProps) {
           name="address.town"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Town/City</FormLabel>
+              <FormLabel>Town/City (Optional)</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>

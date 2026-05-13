@@ -43,19 +43,31 @@ const customerSchema = z.object({
   customerType: z.enum(["retail", "static", "gatehouse", "mobile-patrol", "keyholding-alarm-response", "event"]),
   address: z.object({
     building: z.string().optional(),
-    street: z.string().min(1, "Street is required"),
+    street: z.string().optional(),
     village: z.string().optional(),
-    town: z.string().min(1, "Town/City is required"),
+    town: z.string().optional(),
     county: z.string().min(1, "County is required"),
     postcode: z.string().min(1, "Postcode is required").regex(/^[A-Z]{1,2}[0-9]{1,2}[A-Z]?\s?[0-9][A-Z]{2}$/i, "Invalid UK postcode format")
   }),
   contact: z.object({
-    title: z.string().min(1, "Title is required"),
-    forename: z.string().min(1, "Forename is required"),
-    surname: z.string().min(1, "Surname is required"),
-    position: z.string().min(1, "Position is required"),
-    email: z.string().min(1, "Email is required").email("Invalid email address"),
-    phone: z.string().min(1, "Phone number is required").min(10, "Phone number must be at least 10 digits")
+    title: z.string().optional(),
+    forename: z.string().optional(),
+    surname: z.string().optional(),
+    position: z.string().optional(),
+    email: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value.length === 0 || z.string().email().safeParse(value).success,
+        "Invalid email address"
+      ),
+    phone: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value.length === 0 || value.replace(/\D/g, "").length >= 10,
+        "Phone number must be at least 10 digits"
+      )
   })
 })
 

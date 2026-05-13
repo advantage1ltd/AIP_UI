@@ -36,7 +36,8 @@ import {
 	CheckCircle2,
 	Archive,
 	LayoutGrid,
-	List
+	List,
+	Download
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { AssetForm } from '@/components/compliance/AssetForm'
@@ -66,6 +67,7 @@ const AssetRegisterPage = () => {
 	const [selectedAsset, setSelectedAsset] = useState<AssetRegister | null>(null)
 	const [currentPage, setCurrentPage] = useState(1)
 	const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
+	const [isExportingCsv, setIsExportingCsv] = useState(false)
 	const pageSize = 10
 
 	// Fetch assets using the API service
@@ -304,6 +306,104 @@ const AssetRegisterPage = () => {
 		setIsDeleteDialogOpen(true)
 	}, [])
 
+	const escapeCsvValue = useCallback((value: unknown) => {
+		const text = value == null ? '' : String(value)
+		if (text.includes('"') || text.includes(',') || text.includes('\n')) {
+			return `"${text.replace(/"/g, '""')}"`
+		}
+		return text
+	}, [])
+
+	const formatDateValue = useCallback((value?: string) => {
+		if (!value) return ''
+		try {
+			return format(parseISO(value), 'dd MMM yyyy')
+		} catch {
+			return value
+		}
+	}, [])
+
+	const handleDownloadCsv = useCallback(async () => {
+		try {
+			setIsExportingCsv(true)
+			const firstPage = await assetRegisterService.getAssets({
+				page: 1,
+				pageSize: 5000,
+				searchTerm: searchTerm || undefined,
+				assetType: selectedType !== 'all' ? selectedType : undefined,
+				status: selectedStatus !== 'all' ? selectedStatus : undefined,
+			})
+
+			const records = firstPage.items
+			if (records.length === 0) {
+				toast({
+					title: 'No records to export',
+					description: 'No assets match the current filters.',
+				})
+				return
+			}
+
+			const headers = [
+				'Asset Tag',
+				'Asset Type',
+				'Make',
+				'Model',
+				'Serial Number',
+				'Purchase Date',
+				'Purchase Cost (GBP)',
+				'Assigned To',
+				'Location',
+				'Status',
+				'Warranty Expiry Date',
+				'Notes',
+			]
+
+			const rows = records.map((asset) => [
+				asset.assetTag,
+				asset.assetType,
+				asset.make,
+				asset.model,
+				asset.serialNumber,
+				formatDateValue(asset.purchaseDate),
+				typeof asset.purchaseCost === 'number' ? asset.purchaseCost.toFixed(2) : '',
+				asset.assignedTo || '',
+				asset.location,
+				asset.status,
+				formatDateValue(asset.warrantyExpiryDate),
+				asset.notes || '',
+			])
+
+			const csvContent = [
+				headers.map(escapeCsvValue).join(','),
+				...rows.map((row) => row.map(escapeCsvValue).join(',')),
+			].join('\n')
+
+			const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+			const url = URL.createObjectURL(blob)
+			const link = document.createElement('a')
+			const timestamp = format(new Date(), 'yyyy-MM-dd_HH-mm')
+			link.href = url
+			link.download = `asset-register-${timestamp}.csv`
+			document.body.appendChild(link)
+			link.click()
+			document.body.removeChild(link)
+			URL.revokeObjectURL(url)
+
+			toast({
+				title: 'CSV downloaded',
+				description: `${records.length} asset record${records.length === 1 ? '' : 's'} exported.`,
+			})
+		} catch (error) {
+			toast({
+				title: 'Export failed',
+				description: error instanceof Error ? error.message : 'Unable to export CSV right now.',
+				variant: 'destructive',
+			})
+		} finally {
+			setIsExportingCsv(false)
+		}
+	}, [escapeCsvValue, formatDateValue, searchTerm, selectedType, selectedStatus, toast])
+
 	// Transform selected asset for form
 	const getFormInitialData = useCallback(() => {
 		if (!selectedAsset) return undefined
@@ -369,6 +469,24 @@ const AssetRegisterPage = () => {
 							<Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-600">
 								{pagination.totalCount} records
 							</Badge>
+							<Button
+								variant="outline"
+								onClick={() => { void handleDownloadCsv() }}
+								disabled={isExportingCsv || isLoading}
+								className="w-full lg:w-auto border-slate-300 bg-white hover:bg-slate-50"
+							>
+								{isExportingCsv ? (
+									<>
+										<Loader2 className="h-5 w-5 mr-2 animate-spin" />
+										Exporting...
+									</>
+								) : (
+									<>
+										<Download className="h-5 w-5 mr-2" />
+										Download CSV
+									</>
+								)}
+							</Button>
 							<Button
 								onClick={() => {
 									setSelectedAsset(null)
@@ -685,7 +803,7 @@ const AssetRegisterPage = () => {
 													</Badge>
 												</td>
 												<td className="px-4 py-4">
-													<div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+													<div className="flex items-center justify-end gap-1">
 														<Button
 															variant="ghost"
 															size="sm"

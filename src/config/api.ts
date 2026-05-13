@@ -11,8 +11,7 @@ const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, '')
 
 /**
  * API root including `/api` (e.g. `https://api.example.com/api`).
- * - Set `VITE_API_BASE_URL` when the API is on another host.
- * - Otherwise defaults to `/api` (Vite dev proxy locally; same-origin in production).
+ * Local dev: defaults to `/api` (Vite proxy). Production: set `VITE_API_BASE_URL` when the API is on another host.
  */
 export const BASE_API_URL = ((): string => {
 	const raw = import.meta.env.VITE_API_BASE_URL

@@ -202,12 +202,21 @@ class EmployeeService {
     region?: string
   }): Promise<{ employees: EmployeeDetailResponse[]; total: number; page: number; pageSize: number }> {
     try {
+      const queryParams = {
+        page: params?.page ?? 1,
+        pageSize: params?.pageSize ?? 20,
+        ...(params?.search ? { search: params.search } : {}),
+        ...(params?.status ? { status: params.status } : {}),
+        ...(params?.position ? { position: params.position } : {}),
+        ...(params?.region ? { region: params.region } : {}),
+      }
+
       const response = await api.get<ApiResponse<{
         items: EmployeeDetailResponse[]
         totalCount: number
         pageNumber: number
         pageSize: number
-      }>>(EMPLOYEE_ENDPOINTS.LIST, { params })
+      }>>(EMPLOYEE_ENDPOINTS.LIST, { params: queryParams })
       
       // Transform backend PaginatedResponseDto to expected format
       return {
